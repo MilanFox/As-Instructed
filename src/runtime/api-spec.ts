@@ -1,0 +1,666 @@
+import type { ApiFunctionSpec, ApiTypeSpec, PlayerApiSpec } from './protocol.ts';
+
+/**
+ * The player-callable API surface, as data.
+ *
+ * Three consumers read this file: RUNTIME binds one real implementation per entry, UI renders the
+ * docs panel, and Monaco concatenates every `types[].declaration` into one ambient `.d.ts` before
+ * transpiling the player's source. Nothing here is executable — this module holds no logic beyond
+ * four lookup helpers.
+ *
+ * Bindings: the spec describes the SINGLE-BOT binding, where the acting bot id is already bound
+ * away by the runtime. Player code never passes a bot id. World 7 additionally exposes the same
+ * functions on per-bot handle objects; constructing those handles is RUNTIME's concern and does
+ * not change any signature described here.
+ *
+ * Specified, not yet implemented in `Sim`: `link`, `receive`, `transmit`, `decode`. World 5 and 6
+ * semantics are deliberately open in DESIGN.md, so these four are contracts for the RUNTIME and
+ * CONTENT agents to satisfy on top of `Sim.applyMachineChange`; each `doc` says so.
+ *
+ * Unlock ordering: `functions` is stored in unlock order, and level ids (`w<world>-<index>`, both
+ * single-digit world and zero-padded index) sort lexicographically in that same order, which is
+ * what `apiUnlockedBy` relies on.
+ */
+
+const TYPES: ApiTypeSpec[] = [
+  {
+    name: 'Vec',
+    declaration: `interface Vec {
+  x: number;
+  y: number;
+}`,
+    doc: 'A grid position. `x` grows East, `y` grows South, so North is `y - 1`.',
+  },
+  {
+    name: 'Dir',
+    declaration: `declare const Dir: {
+  readonly North: 0;
+  readonly East: 1;
+  readonly South: 2;
+  readonly West: 3;
+};
+type Dir = (typeof Dir)[keyof typeof Dir];`,
+    doc: 'The four cardinal directions. A plain frozen object, not a TypeScript enum, so `Dir.North` survives transpilation into your program.',
+  },
+  {
+    name: 'Terrain',
+    declaration: `declare const Terrain: {
+  readonly Void: 'void';
+  readonly Floor: 'floor';
+  readonly Wall: 'wall';
+  readonly Pad: 'pad';
+  readonly Regolith: 'regolith';
+  readonly Soil: 'soil';
+  readonly Rock: 'rock';
+  readonly Ore: 'ore';
+  readonly Rubble: 'rubble';
+  readonly Ice: 'ice';
+  readonly Pit: 'pit';
+  readonly Cable: 'cable';
+  readonly Depot: 'depot';
+  readonly Conveyor: 'conveyor';
+};
+type Terrain = (typeof Terrain)[keyof typeof Terrain];`,
+    doc: 'What a tile is made of. `void` is outside the playable area, `pit` is walkable but kills a bot that stops on it.',
+  },
+  {
+    name: 'ItemKind',
+    declaration: `declare const ItemKind: {
+  readonly Regolith: 'regolith';
+  readonly Stone: 'stone';
+  readonly Ore: 'ore';
+  readonly Ice: 'ice';
+  readonly Scrap: 'scrap';
+  readonly Seed: 'seed';
+  readonly Crop: 'crop';
+  readonly Crate: 'crate';
+  readonly Part: 'part';
+  readonly Cell: 'cell';
+  readonly Chip: 'chip';
+};
+type ItemKind = (typeof ItemKind)[keyof typeof ItemKind];`,
+    doc: 'Every kind of item a bot can hold, drop, plant or deliver. The values are plain strings, so `plant("seed")` and `plant(ItemKind.Seed)` are the same call.',
+  },
+  {
+    name: 'ItemStack',
+    declaration: `interface ItemStack {
+  kind: ItemKind;
+  count: number;
+}`,
+    doc: 'A quantity of one item kind. Tile and machine inventories are arrays of these.',
+  },
+  {
+    name: 'TileView',
+    declaration: `interface TileView {
+  at: Vec;
+  inBounds: boolean;
+  terrain: Terrain;
+  walkable: boolean;
+  growth: number;
+  maxGrowth: number;
+  crop: ItemKind | null;
+  items: ItemStack[];
+  botId: number | null;
+  machineId: string | null;
+  mark: string | null;
+}`,
+    doc: 'Everything a bot perceives about one tile. A crop is ready when `growth >= maxGrowth`. Tiles outside the world come back with `inBounds: false` and `terrain: "void"`.',
+  },
+  {
+    name: 'MachineView',
+    declaration: `interface MachineView {
+  id: string;
+  kind: string;
+  at: Vec;
+  state: string;
+  vars: Record<string, number>;
+  inventory: ItemStack[];
+}`,
+    doc: 'A read-only snapshot of one machine. `state` is free-form but stable per machine kind, typically one of `idle`, `on`, `off`, `open`, `closed` or `busy`.',
+  },
+  {
+    name: 'Message',
+    declaration: `interface Message {
+  from: number;
+  body: string | number;
+  t: number;
+}`,
+    doc: 'One message in a bot inbox. `from` is the sender id and `t` is the sender clock at the moment it was sent.',
+  },
+];
+
+const FUNCTIONS: ApiFunctionSpec[] = [
+  {
+    name: 'move',
+    params: [{ name: 'dir', type: 'Dir', doc: 'The cardinal direction to step in.' }],
+    returns: 'boolean',
+    doc: 'Steps one tile in `dir` and returns whether the step happened. A move fails when the target tile is out of bounds, not walkable, or held by another bot at an overlapping time; the failed move still costs a tick and the bot still ends up facing `dir`.',
+    example: `for (let i = 0; i < 4; i++) {
+  move(Dir.East);
+}`,
+    cost: 1,
+    unlockedBy: 'w1-01',
+    world: 1,
+    category: 'movement',
+    requiresTypes: ['Dir'],
+  },
+  {
+    name: 'pos',
+    params: [],
+    returns: 'Vec',
+    doc: "Returns the bot's current grid position as a fresh object. Free, and safe to call as often as you like.",
+    example: `const here = pos();
+if (here.x < 5) {
+  move(Dir.East);
+}`,
+    cost: 0,
+    unlockedBy: 'w1-01',
+    world: 1,
+    category: 'sensing',
+    requiresTypes: ['Vec'],
+  },
+  {
+    name: 'print',
+    params: [{ name: 'text', type: 'string', doc: 'The line to write.' }],
+    returns: 'void',
+    doc: 'Writes one line to the console panel. It is free, and it is recorded in the trace, so the line reappears at the exact tick it was printed when you scrub the replay.',
+    example: `const here = pos();
+print(\`starting at \${here.x},\${here.y}\`);`,
+    cost: 0,
+    unlockedBy: 'w1-02',
+    world: 1,
+    category: 'output',
+  },
+  {
+    name: 'canMove',
+    params: [{ name: 'dir', type: 'Dir', doc: 'The direction to test.' }],
+    returns: 'boolean',
+    doc: 'Reports whether a `move` in `dir` would succeed right now, without spending a tick or moving the bot. The answer reflects this instant only; another bot may take the tile before you get there.',
+    example: `if (!canMove(Dir.North)) {
+  move(Dir.East);
+}`,
+    cost: 0,
+    unlockedBy: 'w1-03',
+    world: 1,
+    category: 'sensing',
+    requiresTypes: ['Dir'],
+  },
+  {
+    name: 'wait',
+    params: [
+      {
+        name: 'n',
+        type: 'number',
+        optional: true,
+        defaultValue: '1',
+        doc: 'How many ticks to burn.',
+      },
+    ],
+    returns: 'void',
+    doc: "Burns `n` ticks doing nothing, advancing only this bot's clock. Use it to let a crop mature or to let another bot clear a tile you need.",
+    example: `if (!canMove(Dir.East)) {
+  wait(3);
+  move(Dir.East);
+}`,
+    cost: 'n',
+    unlockedBy: 'w1-04',
+    world: 1,
+    category: 'movement',
+  },
+  {
+    name: 'scan',
+    params: [
+      {
+        name: 'dir',
+        type: 'Dir',
+        optional: true,
+        doc: "Omit to scan the bot's own tile, otherwise the adjacent tile in this direction.",
+      },
+    ],
+    returns: 'TileView',
+    doc: 'Returns a view of the bot\'s own tile, or of the adjacent tile in `dir`. It never returns null: a tile outside the world comes back with `inBounds: false` and `terrain: "void"`.',
+    example: `const ahead = scan(Dir.South);
+if (ahead.walkable && ahead.botId === null) {
+  move(Dir.South);
+}`,
+    cost: 0,
+    unlockedBy: 'w2-01',
+    world: 2,
+    category: 'sensing',
+    requiresTypes: ['Dir', 'TileView'],
+  },
+  {
+    name: 'harvest',
+    params: [],
+    returns: 'ItemKind | null',
+    doc: 'Harvests the mature crop on the tile under the bot and adds it to the inventory, returning the item kind gathered. Returns null when there is no crop or it is not ripe yet, which still costs the full harvest price.',
+    example: `const picked = harvest();
+if (picked === null) {
+  wait(4);
+}`,
+    cost: 2,
+    unlockedBy: 'w2-02',
+    world: 2,
+    category: 'terraforming',
+    requiresTypes: ['ItemKind'],
+  },
+  {
+    name: 'plant',
+    params: [
+      {
+        name: 'kind',
+        type: 'ItemKind',
+        optional: true,
+        defaultValue: "'seed'",
+        doc: 'Which carried item to plant.',
+      },
+    ],
+    returns: 'boolean',
+    doc: 'Plants one item of `kind` from the inventory into plantable ground under the bot. Returns false when the ground is not soil or the bot carries none of that kind, and costs the full price either way.',
+    example: `if (scan().terrain === 'soil') {
+  plant();
+}`,
+    cost: 2,
+    unlockedBy: 'w2-03',
+    world: 2,
+    category: 'terraforming',
+    requiresTypes: ['ItemKind'],
+  },
+  {
+    name: 'inventory',
+    params: [
+      {
+        name: 'kind',
+        type: 'ItemKind',
+        optional: true,
+        doc: 'Count only this kind. Omit to count every item held.',
+      },
+    ],
+    returns: 'number',
+    doc: 'Counts what the bot is carrying: the total across all kinds, or just `kind` when you pass one.',
+    example: `harvest();
+print(\`crops held: \${inventory('crop')}\`);`,
+    cost: 0,
+    unlockedBy: 'w2-04',
+    world: 2,
+    category: 'inventory',
+    requiresTypes: ['ItemKind'],
+  },
+  {
+    name: 'pickup',
+    params: [
+      {
+        name: 'kind',
+        type: 'ItemKind',
+        optional: true,
+        doc: 'Take only this kind. Omit to take whatever is lying there.',
+      },
+      {
+        name: 'count',
+        type: 'number',
+        optional: true,
+        defaultValue: '1',
+        doc: 'How many to take.',
+      },
+    ],
+    returns: 'number',
+    doc: "Picks loose items up off the bot's own tile and returns how many were actually taken. The result is clamped by what is on the ground and by the remaining inventory capacity, so it can be smaller than `count`, or zero.",
+    example: `const taken = pickup('ore', 5);
+print(\`loaded \${taken} ore\`);`,
+    cost: 1,
+    unlockedBy: 'w3-01',
+    world: 3,
+    category: 'inventory',
+    requiresTypes: ['ItemKind'],
+  },
+  {
+    name: 'drop',
+    params: [
+      {
+        name: 'kind',
+        type: 'ItemKind',
+        optional: true,
+        doc: 'Drop only this kind. Omit to drop from the first stack held.',
+      },
+      {
+        name: 'count',
+        type: 'number',
+        optional: true,
+        defaultValue: '1',
+        doc: 'How many to drop.',
+      },
+    ],
+    returns: 'number',
+    doc: "Drops items from the inventory onto the bot's own tile and returns how many actually left the inventory. Dropping a kind the bot is not carrying returns 0 and still costs a tick.",
+    example: `while (inventory() > 0) {
+  drop();
+  move(Dir.East);
+}`,
+    cost: 1,
+    unlockedBy: 'w3-01',
+    world: 3,
+    category: 'inventory',
+    requiresTypes: ['ItemKind'],
+  },
+  {
+    name: 'carrying',
+    params: [],
+    returns: 'ItemKind[]',
+    doc: 'Lists the distinct item kinds the bot currently holds, in the order they were first picked up. Returns an empty array when the inventory is empty.',
+    example: `if (carrying().length === 0) {
+  pickup();
+}`,
+    cost: 0,
+    unlockedBy: 'w3-02',
+    world: 3,
+    category: 'inventory',
+    requiresTypes: ['ItemKind'],
+  },
+  {
+    name: 'use',
+    params: [
+      {
+        name: 'dir',
+        type: 'Dir',
+        optional: true,
+        doc: "Omit to use the machine on the bot's own tile, otherwise the adjacent one in this direction.",
+      },
+    ],
+    returns: 'boolean',
+    doc: "Operates a machine on the bot's tile, or the adjacent one in `dir`, advancing it one step through its state cycle. Returns false when there is no machine there, and costs the full price regardless.",
+    example: `if (!canMove(Dir.North)) {
+  use(Dir.North);
+  move(Dir.North);
+}`,
+    cost: 2,
+    unlockedBy: 'w3-03',
+    world: 3,
+    category: 'machines',
+    requiresTypes: ['Dir'],
+  },
+  {
+    name: 'look',
+    params: [
+      { name: 'dir', type: 'Dir', doc: 'The direction to cast along.' },
+      {
+        name: 'range',
+        type: 'number',
+        optional: true,
+        defaultValue: '8',
+        doc: 'How many tiles to look ahead at most.',
+      },
+    ],
+    returns: 'TileView[]',
+    doc: "Casts a ray from the bot along `dir` and returns up to `range` tile views, nearest first. The bot's own tile is excluded, and the cast stops after the first sight-blocking or out-of-bounds tile, which is still included in the result.",
+    example: `const corridor = look(Dir.East, 5);
+const blockedAt = corridor.findIndex((tile) => !tile.walkable);
+print(\`clear for \${blockedAt < 0 ? corridor.length : blockedAt} tiles\`);`,
+    cost: 0,
+    unlockedBy: 'w4-01',
+    world: 4,
+    category: 'sensing',
+    requiresTypes: ['Dir', 'TileView'],
+  },
+  {
+    name: 'mark',
+    params: [
+      {
+        name: 'text',
+        type: 'string | null',
+        doc: 'The breadcrumb to write, or null to erase the existing one.',
+      },
+    ],
+    returns: 'void',
+    doc: "Writes a breadcrumb onto the bot's own tile, replacing whatever was there. Ordinary JavaScript values — objects, arrays, `Map`, `Set`, closures — already persist for the entire run, so use them for anything your own program needs to remember; `mark` is only for state that must live in the world itself, where another bot or a later pass can read it back with `readMark`.",
+    example: `mark('visited');
+move(Dir.East);`,
+    cost: 1,
+    unlockedBy: 'w4-02',
+    world: 4,
+    category: 'navigation',
+  },
+  {
+    name: 'readMark',
+    params: [],
+    returns: 'string | null',
+    doc: "Returns the breadcrumb written on the bot's own tile, or null when the tile carries no mark. Reading a mark is for state stored in the world; a `Set` or `Map` held in your own program persists for the whole run and needs no marks at all.",
+    example: `if (readMark() === null) {
+  mark('seen');
+}`,
+    cost: 0,
+    unlockedBy: 'w4-02',
+    world: 4,
+    category: 'navigation',
+  },
+  {
+    name: 'fuel',
+    params: [],
+    returns: 'number',
+    doc: 'Returns the fuel the bot has left. Levels that do not use the fuel mechanic report `Infinity`, so a check like `fuel() < 4` is simply never true there.',
+    example: `if (fuel() < 6) {
+  refuel();
+}`,
+    cost: 0,
+    unlockedBy: 'w4-05',
+    world: 4,
+    category: 'sensing',
+  },
+  {
+    name: 'refuel',
+    params: [],
+    returns: 'boolean',
+    doc: "Refills the bot to its maximum fuel. Only succeeds while the bot is parked on a depot tile; anywhere else it returns false and still costs the full price. Refuelling itself burns no fuel, and acting consumes fuel equal to the action's tick cost while sensing and waiting are free.",
+    example: `while (scan().terrain !== Terrain.Depot) {
+  move(Dir.East);
+}
+refuel();`,
+    cost: 2,
+    unlockedBy: 'w4-05',
+    world: 4,
+    category: 'machines',
+    requiresTypes: ['Terrain', 'Dir'],
+  },
+  {
+    name: 'probe',
+    params: [
+      {
+        name: 'machineId',
+        type: 'string',
+        optional: true,
+        doc: "Omit to probe the machine on or next to the bot, otherwise any machine's id.",
+      },
+    ],
+    returns: 'MachineView | null',
+    doc: 'Returns a read-only snapshot of the machine on or beside the bot, or of `machineId` anywhere in the world. Returns null when there is no such machine.',
+    example: `const node = probe('node-1');
+if (node !== null && node.state === 'off') {
+  print(\`\${node.id} is cold\`);
+}`,
+    cost: 0,
+    unlockedBy: 'w5-01',
+    world: 5,
+    category: 'machines',
+    requiresTypes: ['MachineView'],
+  },
+  {
+    name: 'power',
+    params: [
+      { name: 'machineId', type: 'string', doc: 'The machine to set.' },
+      { name: 'state', type: 'string', doc: "The state to force, typically 'on' or 'off'." },
+    ],
+    returns: 'boolean',
+    doc: "Sets a machine's state directly instead of stepping through its cycle the way `use` does. Returns false for an unknown machine id, and costs the full price either way.",
+    example: `power('node-1', 'on');
+power('node-2', 'off');`,
+    cost: 2,
+    unlockedBy: 'w5-02',
+    world: 5,
+    category: 'machines',
+  },
+  {
+    name: 'link',
+    params: [
+      { name: 'fromId', type: 'string', doc: 'The machine the connection starts at.' },
+      { name: 'toId', type: 'string', doc: 'The machine the connection ends at.' },
+    ],
+    returns: 'boolean',
+    doc: 'Connects two machines so that `fromId` feeds `toId`, returning false when either id is unknown or the grid refuses the connection. What a connection carries, and which pairs are legal, is defined by the level and stated in its brief.',
+    example: `if (link('node-1', 'node-2')) {
+  power('node-1', 'on');
+}`,
+    cost: 2,
+    unlockedBy: 'w5-03',
+    world: 5,
+    category: 'machines',
+  },
+  {
+    name: 'receive',
+    params: [],
+    returns: 'string | null',
+    doc: 'Reads the next queued packet out of the listening post buffer, or null when the buffer is empty. What arrives, and when, is defined by the level and stated in its brief.',
+    example: `let packet = receive();
+while (packet !== null) {
+  print(packet);
+  packet = receive();
+}`,
+    cost: 0,
+    unlockedBy: 'w6-01',
+    world: 6,
+    category: 'signal',
+  },
+  {
+    name: 'transmit',
+    params: [{ name: 'text', type: 'string', doc: 'The payload to send.' }],
+    returns: 'boolean',
+    doc: 'Sends `text` back out over the antenna and returns whether it was accepted. Rejection usually means the antenna is unpowered or the payload is malformed; the exact acceptance rule is defined by the level.',
+    example: `const packet = receive();
+if (packet !== null && !transmit(packet)) {
+  print('antenna rejected the payload');
+}`,
+    cost: 1,
+    unlockedBy: 'w6-02',
+    world: 6,
+    category: 'signal',
+  },
+  {
+    name: 'decode',
+    params: [
+      { name: 'text', type: 'string', doc: 'The raw payload.' },
+      { name: 'key', type: 'number', doc: "The level's decoding key." },
+    ],
+    returns: 'string',
+    doc: "Applies the level's decoding scheme to `text` using `key` and returns the plain result. Free, because it is arithmetic rather than an action. The cipher itself is defined by the level and stated in its brief.",
+    example: `const raw = receive();
+if (raw !== null) {
+  transmit(decode(raw, 7));
+}`,
+    cost: 0,
+    unlockedBy: 'w6-03',
+    world: 6,
+    category: 'signal',
+  },
+  {
+    name: 'bots',
+    params: [],
+    returns: 'number[]',
+    doc: 'Lists the ids of every living bot in ascending order, including the one running this program. Dead bots are omitted.',
+    example: `const crew = bots();
+print(\`\${crew.length} units online\`);`,
+    cost: 0,
+    unlockedBy: 'w7-01',
+    world: 7,
+    category: 'swarm',
+  },
+  {
+    name: 'sync',
+    params: [],
+    returns: 'number',
+    doc: 'Advances every living bot to the highest clock in the swarm and returns that tick, so the whole crew continues from the same moment. It costs nothing itself, but bots that were running ahead of the rest lose the lead they had built up.',
+    example: `const t = sync();
+print(\`swarm aligned at tick \${t}\`);`,
+    cost: 0,
+    unlockedBy: 'w7-01',
+    world: 7,
+    category: 'swarm',
+  },
+  {
+    name: 'send',
+    params: [
+      { name: 'to', type: 'number', doc: 'The id of the receiving bot.' },
+      { name: 'body', type: 'string | number', doc: 'The payload to deliver.' },
+    ],
+    returns: 'boolean',
+    doc: "Queues a message in another bot's inbox, stamped with the sender's clock. Returns false when `to` is not a living bot.",
+    example: `for (const id of bots()) {
+  if (id !== 0) {
+    send(id, 'go');
+  }
+}`,
+    cost: 1,
+    unlockedBy: 'w7-02',
+    world: 7,
+    category: 'swarm',
+  },
+  {
+    name: 'recv',
+    params: [],
+    returns: 'Message | null',
+    doc: "Pops the oldest message from this bot's inbox, or null when the inbox is empty. Reading is free, so a bot can drain its whole inbox without spending a tick.",
+    example: `const msg = recv();
+if (msg !== null && msg.body === 'go') {
+  move(Dir.North);
+}`,
+    cost: 0,
+    unlockedBy: 'w7-02',
+    world: 7,
+    category: 'swarm',
+    requiresTypes: ['Message'],
+  },
+  {
+    name: 'spawn',
+    params: [
+      { name: 'dir', type: 'Dir', doc: 'Which adjacent tile the new bot appears on.' },
+      {
+        name: 'options',
+        type: '{ name?: string; capacity?: number }',
+        optional: true,
+        doc: 'Optional name and inventory limit. Both default from the parent: the capacity is inherited and the name becomes `bot-<id>`.',
+      },
+    ],
+    returns: 'number',
+    doc: 'Creates a new bot on the adjacent tile in `dir` and returns its id. Returns -1 when that tile is out of bounds, not walkable, or already taken, and the failed spawn still costs the full price.',
+    example: `const helper = spawn(Dir.East, { name: 'mule', capacity: 8 });
+if (helper >= 0) {
+  send(helper, 'harvest');
+}`,
+    cost: 5,
+    unlockedBy: 'w7-03',
+    world: 7,
+    category: 'swarm',
+    requiresTypes: ['Dir'],
+  },
+];
+
+export const PLAYER_API: PlayerApiSpec = {
+  version: 1,
+  types: TYPES,
+  functions: FUNCTIONS,
+};
+
+export function apiFunction(name: string): ApiFunctionSpec | undefined {
+  return PLAYER_API.functions.find((fn) => fn.name === name);
+}
+
+export function apiForWorld(world: number): ApiFunctionSpec[] {
+  return PLAYER_API.functions.filter((fn) => fn.world === world);
+}
+
+/** Every function unlocked at or before the given level id, in unlock order. */
+export function apiUnlockedBy(levelId: string): ApiFunctionSpec[] {
+  return PLAYER_API.functions.filter((fn) => fn.unlockedBy <= levelId);
+}
+
+/** Names unlocked exactly at this level id — feeds LevelDef.hardware. */
+export function apiUnlockedAt(levelId: string): string[] {
+  return PLAYER_API.functions.filter((fn) => fn.unlockedBy === levelId).map((fn) => fn.name);
+}

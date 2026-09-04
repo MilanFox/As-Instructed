@@ -1,0 +1,1066 @@
+# BOOTSTRAP — Curriculum
+
+> Companion to `docs/DESIGN.md` §5 and §6. **DESIGN.md wins every conflict.**
+> 40 levels, 8 worlds × 5. This document specifies *what each level teaches and why it is
+> hard*. It contains **no solutions and no solution code**, deliberately and permanently.
+> Reference solutions live in `src/levels/**/__solutions__/` and are test fixtures only.
+
+---
+
+## 0. How to read a level block
+
+Every level uses the same fields, in the same order. Content agents fill `LevelDef`
+(DESIGN.md §5) from these.
+
+| Field | Meaning |
+|---|---|
+| `premise` | The one-line ask, in plain language. Becomes the non-joke half of `brief`. |
+| `teaches` | **The single concept.** If you can't say it in one sentence, the level is two levels. |
+| `assumes` | What the player must already have from earlier levels. |
+| `hardware` | New API unlocked *by* this level (DESIGN.md §6). Blank = no new hardware. |
+| `heritage` | The classic algorithm this is lifted from, named plainly. `—` = original. **Never appears in player-facing text.** |
+| `world` | Grid size and contents. |
+| `varies` | What changes across seeds. |
+| `anti-hardcode` | The specific randomization that defeats a memorized path. Mandatory field. |
+| `naive-fails` | Why the obvious approach fails or is expensive. If this is empty, the level is a chore. |
+| `generalize` | What the multi-seed rule is actually enforcing. |
+| `seeds` | Seed list. `>= 3` from World 2 onward (DESIGN.md §5). |
+| `size` | Rough reference-solution length in lines. A planning figure, not a target. |
+| `difficulty` | 1–10, honest. See §1. |
+| `bonus` | Optional objective worth a star, or `—`. |
+
+---
+
+## 1. The Difficulty Curve
+
+**The curve is the product.** Levels 1–5 are solvable by someone who has written a `for` loop
+and nothing else. w8-05 should be a real evening's work for an Advent of Code veteran.
+
+```
+10 |          |          |          |          |          |          |          |        ##
+ 9 |          |          |          |          |          |          |        ##|    ######
+ 8 |          |          |          |        ##|        ##|        ##|      ####|  ########
+ 7 |          |        ##|        ##|      ####|      ####|      ####|    ######|  ########
+ 6 |          |      ####|      ####|      ####|    ######|      ####|    ######|  ########
+ 5 |          |      ####|    ######|  ########|    ######|    ######|  ########|##########
+ 4 |        ##|    ######|  ########|  ########|  ########|  ########|  ########|##########
+ 3 |      ####|  ########|  ########|##########|##########|  ########|##########|##########
+ 2 |    ######|##########|##########|##########|##########|##########|##########|##########
+ 1 |##########|##########|##########|##########|##########|##########|##########|##########
+   +----------+----------+----------+----------+----------+----------+----------+----------
+    1 2 3 4 5  1 2 3 4 5  1 2 3 4 5  1 2 3 4 5  1 2 3 4 5  1 2 3 4 5  1 2 3 4 5  1 2 3 4 5
+       W1         W2         W3         W4         W5         W6         W7         W8
+```
+
+```
+W1  1  1  2  3  4        W5  3  4  6  7  8
+W2  2  3  4  6  7        W6  2  4  5  7  8
+W3  2  4  5  6  7        W7  3  5  7  8  9
+W4  3  5  5  7  8        W8  5  8  9  9 10
+```
+
+Mean 5.3. Per-world means: 2.2, 4.4, 4.8, 5.6, 5.6, 5.2, 6.4, 8.2.
+
+### 1.1 The sawtooth, and why
+
+The curve is **not** monotonic and must not be flattened into one. Every world resets down at
+its opener and climbs to its finale. That produces seven drops, and every one of them is
+load-bearing: a new world's opener is where a new piece of hardware is taught in isolation, and
+a player fighting a hard puzzle *and* an unfamiliar API at the same time learns neither.
+
+| Drop | From → to | Justification |
+|---|---|---|
+| w2-05 → w3-01 | 7 → 2 | Biggest early relief. W2's finale is a genuine planning problem; W3 opens by handing you a new verb and a trivial errand. |
+| w3-05 → w4-01 | 7 → 3 | `look()` changes the player's mental model from "I know the map" to "I don't". That deserves an easy level to itself. |
+| w4-05 → w5-01 | 8 → 3 | After online exploration, a level that is a straight line, on purpose. |
+| **w5-05 → w6-01** | **8 → 2** | **The single biggest drop in the game, and the most important.** W5 ends on a minimum spanning tree; W6 opens with a ten-line echo loop that has no movement in it at all. This is the game's rest beat. Content agents must not make w6-01 clever. |
+| w6-05 → w7-01 | 8 → 3 | Parallel clocks are a genuinely disorienting model change. Teach them on two corridors. |
+| w7-05 → w8-01 | 9 → 5 | A breather with teeth: familiar puzzle, brutal budgets. |
+
+### 1.2 Plateaus, and why
+
+Plateaus are as deliberate as spikes. Three explicit ones:
+
+- **w4-02 / w4-03, both 5.** Same difficulty, opposite techniques: state stored *in the world*
+  (marks) vs. state stored *in the algorithm* (a wall-following invariant). Putting these
+  adjacent at equal difficulty is the entire point — the player gets to notice that two
+  unrelated ideas solve overlapping problems. Do not raise w4-03 to 6.
+- **w2-03 / w2-04 at 4 / 6 with w1-05 at 4 behind them.** The run 4, 2, 3, 4 across the W1→W2
+  boundary is intentional: three easy levels in a row while a whole sensing model is introduced.
+- **w8-01 at 5.** A dip inside the finale world. Without it, W8 reads as 8-9-9-10 and the
+  player arrives at the monster already tired.
+
+### 1.3 Spikes, and why
+
+| Spike | Jump | Justification |
+|---|---|---|
+| w2-04 (6) | +2 | First level requiring the player to save and resume their own traversal state. This is a real conceptual step and it should feel like one. |
+| w4-04 (7) | +2 | First "build a data structure, *then* act" level. The hardest single step in the first half of the game. Heavily scaffolded — see §11. |
+| w5-05 (8) | +1 from an already-high 7 | MST with union-find is the hardest pure-algorithm ask in the game. Justified because it is immediately followed by the largest drop. |
+| w7-03 (7) | +2 | Concurrency bugs. Justified: this is the one level where the player must reason about *time*, and no amount of easing avoids that. |
+| w8-05 (10) | +1 | It is the monster. Bronze must remain reachable — see the level block. |
+
+### 1.4 Rough hour budget
+
+W1 ≈ 40 min · W2 ≈ 1.5 h · W3 ≈ 2 h · W4 ≈ 3 h · W5 ≈ 3 h · W6 ≈ 2.5 h · W7 ≈ 4 h ·
+W8 ≈ 6 h. Total ≈ 22 h to bronze-complete, considerably more to gold everything. These are
+planning figures for pacing, not promises.
+
+---
+
+## 2. Global rules for level authors
+
+1. **One concept per level.** The `teaches` field is one sentence. Two sentences means split it.
+2. **`anti-hardcode` is mandatory and specific.** "The world is random" is not an answer.
+   Name the axis. Exception: `w1-01` and `w1-02` only (see §3).
+3. **Seeds must include the awkward cases.** Empty sets, single-element sets, the target at
+   index 0 and at index n-1, the degenerate layout. A seed list of five pleasant middles
+   teaches the player that edge cases don't happen here.
+4. **Par comes from the reference solution minus ~10%** (DESIGN.md §5), and the reference
+   solution uses the *intended technique*, not an optimal solver. Where a level's heritage is
+   an NP-hard problem (`w3-05`, `w5-04`, `w5-05`, `w7-04`), par **must** be derived from the
+   named heuristic. Setting par from an optimal solver turns a teaching level into a research
+   project.
+5. **Never require optimality.** Require "good enough that the naive thing fails".
+6. **Failure must be legible.** If the player cannot tell from the trace *why* they failed,
+   the level is broken regardless of how elegant it is.
+7. **The brief never names the algorithm.** `heritage:` is for us. See NARRATIVE.md §1.5.
+8. **Every level's bonus should absorb ambition**, not add grind. A good bonus is "do the same
+   thing but properly"; a bad bonus is "now do it 50 times".
+
+---
+
+## 3. World 1 — Boot Sector
+
+Theme: a dusty test hangar. Unlocks `move` `pos` `canMove` `print` `wait`.
+Constraint: **must be completable by someone who has written a `for` loop and nothing else.**
+
+> **Note on `print`.** `print` is never a level objective anywhere in the game. It is introduced
+> as a debugging tool in w1-03's starter comment and in the docs panel. No objective, in any of
+> the 40 levels, is satisfied by printing something.
+
+> **The two declared hardcoding exceptions.** `w1-01` and `w1-02` are single-seed and *are*
+> solvable by a memorized path. This is intentional: the first two minutes of the game must be
+> about "the button works", not about generalization. `w1-03` is where the multi-seed rule
+> bites for the first time, and it must bite visibly.
+
+---
+
+### w1-01 — Cold Start
+- `premise` The bot is in the corner facing a wall. Drive it to the charging pad.
+- `teaches` Issuing an action, and the coordinate model: x grows East, **y grows South**, North is `y-1`.
+- `assumes` Nothing.
+- `hardware` `move`
+- `heritage` —
+- `world` 8×3. One open row at y=1, wall everywhere else. Bot at (1,1), pad at (6,1).
+- `varies` Nothing.
+- `anti-hardcode` **None — declared exception.** The level is a hardcoded path by design.
+- `naive-fails` Nothing fails. The only mistake available is confusing North and South, which is the lesson.
+- `generalize` —
+- `seeds` `[1]`
+- `size` ~5 lines · `difficulty` **1/10**
+- `bonus` — (the first level offers no optional goal; do not add one)
+
+### w1-02 — Twenty Metres of Corridor
+- `premise` Same bay, longer route: three straight legs with two right-angle turns.
+- `teaches` Bounded repetition — a counted `for` loop instead of repeated statements.
+- `assumes` `move`.
+- `hardware` —
+- `heritage` —
+- `world` 24×14. Legs of 12, 6, 9 tiles: East, South, East.
+- `varies` Nothing.
+- `anti-hardcode` **None — declared exception.** Defeated instead by the **char par**: 27 `move` calls passes bronze; gold requires three loops. Scoring teaches the lesson, not failure.
+- `naive-fails` Writing it out passes and feels bad, which is the intended pedagogy. The char counter is visible while typing.
+- `generalize` —
+- `seeds` `[1]`
+- `size` ~7 lines · `difficulty` **1/10**
+- `bonus` Under 60 characters.
+
+### w1-03 — Length Unknown
+- `premise` A corridor of unknown length. Reach the end of it.
+- `teaches` Conditional repetition — loop on a sensed condition (`while (canMove(...))`) rather than a count.
+- `assumes` `for` loops.
+- `hardware` `canMove` `print`
+- `heritage` —
+- `world` 30×3. One straight leg, pad at the end.
+- `varies` Corridor length, 8–27.
+- `anti-hardcode` Length is drawn per seed; no integer constant satisfies all three seeds.
+- `naive-fails` A counted loop passes seed 1 and fails seeds 2 and 3. **This is the game's first multi-seed failure and the UI must show it clearly** — seed 1 green, seed 2 red, side by side.
+- `generalize` Over corridor length.
+- `seeds` `[1,2,3]`
+- `size` ~4 lines · `difficulty` **2/10**
+- `bonus` Zero blocked moves (a blocked move still costs a tick — DESIGN.md §4.4).
+
+### w1-04 — Grid Reference
+- `premise` The pad is at a grid reference. Both you and it start somewhere different every shift.
+- `teaches` Absolute coordinates: read `pos()`, compare against a target, derive a direction from the sign of the difference.
+- `assumes` `while` loops, `canMove`.
+- `hardware` `pos`
+- `heritage` —
+- `world` 11×11 open floor, solid border, nothing in the interior.
+- `varies` Start position and pad position, both interior.
+- `anti-hardcode` Both endpoints move. A fixed direction sequence cannot work; nor can a fixed count.
+- `naive-fails` The obvious "all the way East, then all the way South" is **correct here on purpose** — the room is open and this is the level where that habit is built. It is broken deliberately in w1-05.
+- `generalize` Over both endpoints. **At least one seed must place the pad strictly North *and* West of the start**, so a player who only handled positive deltas fails.
+- `seeds` `[1,2,3,4]`
+- `size` ~10 lines · `difficulty` **3/10**
+- `bonus` Arrive in exactly Manhattan-distance ticks — no wasted or blocked moves.
+
+### w1-05 — Floor Inspection  *(synthesis)*
+- `premise` Inspect every floor tile in the bay. There is a door in the middle and it is on a timer.
+- `teaches` Nested iteration over a 2-D area (systematic coverage), plus a timing loop against a cycling obstacle.
+- `assumes` All of World 1.
+- `hardware` `wait`
+- `heritage` — (boustrophedon/serpentine coverage)
+- `world` A rectangular bay split by an interior wall with one airlock door. Bot starts in the west half. Every floor tile in both halves must be entered.
+- `varies` Bay width 6–10, height 5–8, door row, door **phase**. The door cycle is always 9 ticks.
+- `anti-hardcode` Dimensions vary, so serpentine leg lengths cannot be constants; the door phase varies, so a fixed `wait(n)` fails.
+- `naive-fails` Hardcoded sweep widths fail on other seeds. Hammering the shut door costs one tick per attempt and blows the tick par; the player must either `wait` for the phase or do useful work while the door is shut.
+- `generalize` Over room dimensions and door phase.
+- `seeds` `[1,2,3,4]`
+- `size` ~20 lines · `difficulty` **4/10**
+- `bonus` Complete the sweep with zero blocked moves.
+- `defuse` Dot's brief states the cycle length outright ("nine ticks, always has been"). The puzzle is *phase*, not *period*. Discovering an unknown period by experiment is a World 5 skill and does not belong here.
+
+---
+
+## 4. World 2 — Regolith Fields
+
+Theme: agriculture on a hostile rock. Unlocks `scan` `harvest` `plant` `inventory`.
+From here on, `seeds.length >= 3` is mandatory (DESIGN.md §5).
+
+---
+
+### w2-01 — The Sensor Package  *(hardware in isolation)*
+- `premise` One planted row. Harvest what is ripe and nothing else.
+- `teaches` `scan()` — sensing is **free** (0 ticks) and acting is not, so look before you act.
+- `assumes` W1 loops and traversal.
+- `hardware` `scan` `harvest`
+- `heritage` —
+- `world` 12×3, single planted row of 10 tiles, each ripe / unripe / empty.
+- `varies` Which tiles are ripe (4–8 of them).
+- `anti-hardcode` Ripe positions are redrawn per seed; a fixed index list fails.
+- `naive-fails` Harvesting every tile costs 2 ticks each and misses par by ~2×. Harvesting a memorized set fails other seeds.
+- `generalize` Over the ripeness distribution, including a seed with a ripe tile at each end of the row.
+- `seeds` `[1,2,3]`
+- `size` ~8 lines · `difficulty` **2/10**
+- `bonus` Exactly as many `harvest` calls as there are ripe tiles.
+
+### w2-02 — Rotation
+- `premise` Harvest the field and replant every tile you take from, in the same visit.
+- `teaches` A two-phase per-cell cycle where **the world changes underneath you** — the state you sensed is stale the instant you act.
+- `assumes` Scan-guarded action.
+- `hardware` `plant` `inventory`
+- `heritage` —
+- `world` 6×6 field, fully planted, mixed ripeness. Silo in one corner.
+- `varies` Ripeness map, **which corner** the silo is in.
+- `anti-hardcode` The silo corner moves, so the sweep's start and direction cannot be constants; ripeness varies, so the action per tile cannot be.
+- `naive-fails` Scanning the whole field once, building a plan, then executing it: the plan replants tiles it hasn't harvested and harvests tiles it just planted. Order *within* a cell matters and only re-scanning catches it.
+- `generalize` Over ripeness and silo corner.
+- `seeds` `[1,2,3]`
+- `size` ~14 lines · `difficulty` **3/10**
+- `bonus` Every tile planted at end of run **and** at or under par.
+
+### w2-03 — Ripening
+- `premise` The crops mature at different rates. Fill the quota without standing around.
+- `teaches` Time-dependent world state: the right action for a tile depends on *when* you arrive, so you must plan a revisit.
+- `assumes` Harvest/plant cycle, `wait`.
+- `hardware` — (uses the `growth` field already on `Tile`, DESIGN.md §4.2)
+- `heritage` — (nearest cousin: a round-robin service loop)
+- `world` 10×6 field. Growth stages 0–3; only stage 3 harvests. Each row advances one stage every K ticks.
+- `varies` Initial stage map; per-row K (3–12).
+- `anti-hardcode` Both the initial stages and the growth rates vary, so neither a fixed route nor a fixed `wait` schedule generalizes.
+- `naive-fails` A single pass collects only what was already ripe and misses quota. Sitting on one tile with `wait` until everything ripens exceeds the tick par by ~3×. The player must keep moving and come back.
+- `generalize` Over stages and rates. **One seed must make waiting genuinely optimal for one row**, so "never wait" is also punished.
+- `seeds` `[1,2,3,4]`
+- `size` ~22 lines · `difficulty` **4/10**
+- `bonus` Harvest every tile within 3 ticks of it reaching stage 3.
+- `defuse` Requires a renderer growth-stage overlay to be readable at all. Flagged to RENDER as a dependency, not a nice-to-have.
+
+### w2-04 — Capacity
+- `premise` The bot holds a limited load. The field holds more than that.
+- `teaches` Interrupt and resume: check a resource *before* acting, break out of a traversal, and re-enter it where you left off.
+- `assumes` Sweeps, `inventory`.
+- `hardware` —
+- `heritage` —
+- `world` 12×8 field, silo on one edge, yield well above one load.
+- `varies` Capacity 6–10 (readable only via `inventory()`), silo edge, ripeness map.
+- `anti-hardcode` Capacity is not a constant the player may write down; it must be read from the world each run.
+- `naive-fails` A blind sweep silently drops units once full (`harvest` returns false and the tick is still spent). Returning to the silo after every harvest is correct and 4–5× over par. Batching is the only route to gold.
+- `generalize` Over capacity, which is the point of the level.
+- `seeds` `[1,2,3,4]`
+- `size` ~28 lines · `difficulty` **6/10**
+- `bonus` Zero failed harvests due to a full inventory.
+
+### w2-05 — Harvest Quota  *(synthesis)*
+- `premise` Two crops, one quota, one shift. Only one of them counts.
+- `teaches` Prioritisation under a hard deadline — you cannot visit everything, so choose.
+- `assumes` All of World 2.
+- `hardware` —
+- `heritage` Orienteering / prize-collecting route under a budget. **A greedy nearest-ripe heuristic must suffice**; par is set from one.
+- `world` 14×10, two crop types interleaved, capacity limit, ripening active, silo in a corner. `maxTicks` allows roughly 70% of the field to be reached.
+- `varies` Crop layout, ripeness, capacity, and the quota itself (±20%).
+- `anti-hardcode` The quota varies, so even the *amount* of work cannot be assumed; the crop layout varies, so no route is reusable.
+- `naive-fails` Any fixed route. Any solution that treats both crops as harvestable wastes half its budget. Any solution that ignores capacity strands units in a full hopper.
+- `generalize` Over layout, quota, capacity and ripening simultaneously — the first four-axis level.
+- `seeds` `[1,2,3,4,5]`
+- `size` ~40 lines · `difficulty` **7/10**
+- `bonus` Hit quota with 15% of the tick budget unspent.
+
+---
+
+## 5. World 3 — The Sorting Yards
+
+Theme: logistics depot. Unlocks `pickup` `drop` `carrying` `use`.
+
+---
+
+### w3-01 — Pick and Place  *(hardware in isolation)*
+- `premise` Crates on the west siding, pads on the east. Move each crate to a pad.
+- `teaches` `pickup` / `drop` / `carrying` — **the bot has one carry slot**, and picking up while full fails.
+- `assumes` W1/W2 traversal.
+- `hardware` `pickup` `drop` `carrying`
+- `heritage` —
+- `world` 14×5. 3–6 crates west, the same number of pads east.
+- `varies` Crate count, crate rows, pad rows.
+- `anti-hardcode` Counts and rows vary; no fixed sequence of trips works.
+- `naive-fails` "Collect everything, then deliver everything" — there is exactly one slot. This failure should happen within the first thirty seconds and be completely legible in the trace.
+- `generalize` Over count and placement, including a seed with a single crate.
+- `seeds` `[1,2,3]`
+- `size` ~14 lines · `difficulty` **2/10**  *(deliberate plateau after w2-05)*
+- `bonus` Par ticks with no failed `pickup`.
+
+### w3-02 — Sorted by Colour
+- `premise` Crates come in classes. Each class has a depot. The depots move between shifts.
+- `teaches` A **lookup table** — map a datum to a destination, instead of a chain of `if`s with baked-in coordinates.
+- `assumes` `pickup`/`drop`.
+- `hardware` —
+- `heritage` Dispatch table / associative array.
+- `world` 16×12 yard, 8–14 crates of 4–5 classes scattered, one depot per class.
+- `varies` Crate classes and positions, depot positions, **and the class→depot assignment itself**, plus how many classes exist (4 or 5).
+- `anti-hardcode` The mapping is the randomized axis. Coordinates baked into an `if` chain die on seed 2; a 4-branch chain dies on a 5-class seed.
+- `naive-fails` Everything about the hardcoded approach works perfectly on seed 1, which is what makes the lesson land.
+- `generalize` Over the mapping — the player must *read* it from the world rather than know it.
+- `seeds` `[1,2,3,4]`
+- `size` ~25 lines · `difficulty` **4/10**
+- `bonus` Beat par by 10% (achieved by batching deliveries by proximity, not by moving faster).
+
+### w3-03 — Manifest
+- `premise` Shipping want a count of everything in the Yards, by class, by end of shift.
+- `teaches` Aggregation into a frequency map — **and that sensing is free, so the bot barely has to move.** This is the first level whose lesson is *don't move*.
+- `assumes` Lookup tables.
+- `hardware` `use`
+- `heritage` Frequency map / histogram.
+- `world` 20×14 yard, 30–60 crates across 5–7 classes, manifest terminal at a randomized position. Counts are declared into `world.vars` and committed with `use()` on the terminal.
+- `varies` Crate counts and classes, **which classes are present at all**, terminal position.
+- `anti-hardcode` The class set varies between seeds, so the shape of the answer varies, not just its values.
+- `naive-fails` Physically visiting every crate costs thousands of ticks against a par in the low tens. The gap is deliberately absurd so that the player questions the premise rather than optimising the route.
+- `generalize` Over the class set. **The brief must state explicitly whether a zero-count class is reported as 0 or omitted.** Pick one; do not make the player guess.
+- `seeds` `[1,2,3,4]`
+- `size` ~20 lines · `difficulty` **5/10**
+- `bonus` Submit a correct manifest in under 20 ticks.
+- `defuse` "Sensing costs 0 ticks" is already in the docs (DESIGN.md §4.4) but must also appear as Dot's first hint here, phrased as observation not instruction.
+
+### w3-04 — First In, First Out
+- `premise` The conveyor doesn't care which crate is nearest. It cares which arrived first.
+- `teaches` Order-preserving processing — the next correct action is determined by arrival order, not proximity.
+- `assumes` Aggregation, routing.
+- `hardware` —
+- `heritage` FIFO queue discipline; producer/consumer.
+- `world` 18×10. An inbound conveyor deposits crates at a mouth tile on a schedule; each crate carries an arrival index. An outbound bay rejects a crate if any lower index is still unshipped. The mouth blocks if it is not cleared.
+- `varies` Arrival order, arrival timing, destinations, crate count 8–16.
+- `anti-hardcode` Arrival schedule and order are both drawn per seed; there is no fixed correct sequence of trips.
+- `naive-fails` Greedy nearest-crate ordering gets the drop rejected. Clearing the mouth eagerly means idling; clearing it lazily means it backs up and blocks. The player must hold a queue and service it.
+- `generalize` Over the arrival schedule, including a seed where all crates arrive at tick 0 and one where they trickle in slowly enough to force idling.
+- `seeds` `[1,2,3,4]`
+- `size` ~35 lines · `difficulty` **6/10**
+- `bonus` Zero rejected drops.
+
+### w3-05 — The Night Shift  *(synthesis)*
+- `premise` A rack was fitted. You can carry several crates now. Clear the yard before the shift ends.
+- `teaches` Capacitated multi-stop routing — choose *which* crates to carry together, and in what order to drop them.
+- `assumes` All of World 3.
+- `hardware` —
+- `heritage` Capacitated vehicle routing. **Nearest-neighbour with a light 2-opt pass is more than enough, and par must be derived from exactly that** — never from an optimal solver.
+- `world` 22×16 yard, 12–18 crates, 4–6 depots, rack capacity 2–4.
+- `varies` Crate positions and classes, depot positions, rack capacity.
+- `anti-hardcode` Capacity varies, so the grouping size cannot be fixed; positions vary, so the groups cannot be.
+- `naive-fails` One-at-a-time delivery passes and sits ~2× over par. Any fixed grouping fails other seeds. Filling the rack greedily with the nearest crates regardless of class produces long drop tours.
+- `generalize` Over layout and capacity.
+- `seeds` `[1,2,3,4,5]`
+- `size` ~50 lines · `difficulty` **7/10**
+- `bonus` Beat par by 15%.
+
+---
+
+## 6. World 4 — Cave Systems
+
+Theme: unmapped tunnels. Unlocks `look` `mark` `readMark`.
+This world's whole subject is **acting without knowing the map** — the largest mental shift in
+the first half of the game.
+
+---
+
+### w4-01 — Headlamp  *(hardware in isolation)*
+- `premise` A single tunnel. No map, no branches. Find the far end.
+- `teaches` `look()` — local sensing of the four neighbours, and the difference between *seeing a tile* and *knowing the map*.
+- `assumes` W1 traversal.
+- `hardware` `look`
+- `heritage` —
+- `world` A single winding tunnel, no branches, no cycles, length 30–60, exit at the far end.
+- `varies` The turn sequence.
+- `anti-hardcode` The tunnel shape is generated per seed; no direction list works twice.
+- `naive-fails` Any fixed sequence. `canMove` alone almost suffices, which is intentional — the level's job is to make `look()` feel like a strictly better `canMove` and to establish the "don't go back the way you came" rule that w4-02 then breaks.
+- `generalize` Over tunnel shape, including one seed that starts with a turn on the first tile.
+- `seeds` `[1,2,3]`
+- `size` ~15 lines · `difficulty` **3/10**
+- `bonus` Reach the exit without ever re-entering a tile.
+
+### w4-02 — Breadcrumbs
+- `premise` The tunnels loop back on themselves now. Reach the ore vein anyway.
+- `teaches` **External memory** — `mark`/`readMark` as a visited set, because the world is the only place to keep state that survives a wrong turn.
+- `assumes` `look`, tunnel following.
+- `hardware` `mark` `readMark`
+- `heritage` Visited-set graph traversal (DFS with an explicit visited marker).
+- `world` 20×20 cave with 2–4 cycles and one ore vein.
+- `varies` Topology, cycle placement, vein position.
+- `anti-hardcode` The topology is generated per seed; the cycle positions are what break the memorized route.
+- `naive-fails` The w4-01 rule loops forever and hits the tick budget. **The teaching moment is the failure**, so the trace must make the loop visible — the replay should show the bot going round and round.
+- `generalize` Over topology, including one acyclic seed (where w4-01's rule still works, so the player learns that marks are insurance, not ceremony).
+- `seeds` `[1,2,3,4]`
+- `size` ~30 lines · `difficulty` **5/10**
+- `bonus` Solve it having placed fewer than *N* marks (forces thinking about *what* needs marking).
+
+### w4-03 — Left Hand on the Wall
+- `premise` A large maze. Your marks would work. You are not going to need them.
+- `teaches` An **invariant-based traversal that stores no state in the world at all** — the deliberate mirror of w4-02: state in the algorithm rather than state in the map.
+- `assumes` `look`, direction arithmetic.
+- `hardware` —
+- `heritage` Wall follower (left-hand rule). The Pledge algorithm is what the bonus gestures at.
+- `world` A simply-connected maze (no islands, no detached wall segments), 25×25, entrance and exit both on the boundary.
+- `varies` Maze layout, which boundary wall the exit is on.
+- `anti-hardcode` Maze generation is seeded; the exit wall varies, so even the initial turn direction cannot be assumed.
+- `naive-fails` A mark-based search from w4-02 works but is long to write and runs well over par at this size. The level rewards the constant-memory walk on ticks and on chars simultaneously.
+- `generalize` Over maze layout and exit wall.
+- `seeds` `[1,2,3,4]`
+- `size` ~20 lines · `difficulty` **5/10**  *(plateau by design — see §1.2. Do not raise this to 6.)*
+- `bonus` Solve it with zero marks placed.
+- `note` The maze **must** be simply connected. A wall-follower fails on a maze with a detached island, and shipping such a seed would make the level's own lesson a lie. This is the single most important seed-generation constraint in the document.
+
+### w4-04 — Map First, Move Second
+- `premise` Three collection points, one lift, and a budget that only allows you to get lost once.
+- `teaches` Separating **exploration from execution**: build an internal representation of what you have seen, then compute a route over the *known* graph and walk it once.
+- `assumes` Visited sets, traversal, arrays/objects as data.
+- `hardware` —
+- `heritage` DFS exploration followed by BFS shortest path over the discovered adjacency.
+- `world` 30×30 cave, 3 collection points, one Lift. Tick budget ≈ one full exploration pass plus one efficient circuit — not two circuits.
+- `varies` Topology, collection-point positions, Lift position.
+- `anti-hardcode` Topology and all four points of interest are drawn per seed.
+- `naive-fails` Wandering to each collection point in turn costs 3–4× par because the same corridors get re-walked. The player has to pay for exploration once, keep what they learned, and then move deliberately.
+- `generalize` Over topology and point placement, including a seed where two points are adjacent and one where all three are maximally spread.
+- `seeds` `[1,2,3,4]`
+- `size` ~70 lines · `difficulty` **7/10**
+- `bonus` Visit the three points in the optimal order — a 3-point tour, brute-forceable in six permutations. **The bonus is cheap on purpose**: it absorbs ambition without adding a second hard problem.
+- `frustration` **HIGH RISK — see §11.**
+
+### w4-05 — The Deep Shaft  *(synthesis)*
+- `premise` Five veins, one lift, and enough fuel to get back if you stop looking in time.
+- `teaches` Online exploration under a budget — deciding **when to stop exploring**, because the same fuel pays for finding things and for coming home.
+- `assumes` All of World 4.
+- `hardware` —
+- `heritage` Online graph exploration; the explore-vs-exploit "cow path" family.
+- `world` 40×40 cave, 6–10 veins, one Lift. Quota 5 veins. Fuel ≈ 55% of a full exploration. Running dry away from the Lift fails the run.
+- `varies` Topology, vein count and placement, fuel budget.
+- `anti-hardcode` The fuel budget itself varies, so no fixed "explore for N ticks then turn around" constant survives.
+- `naive-fails` Exhaustive mapping runs dry. Pure greedy nearest-unknown strands the bot at maximum depth with an empty cell. A reserved return budget is the only shape that works, and computing it requires knowing the path home — which requires having kept the map.
+- `generalize` Over topology and budget.
+- `seeds` `[1,2,3,4,5]`
+- `size` ~90 lines · `difficulty` **8/10**
+- `bonus` Return to the Lift with 20% of fuel unspent.
+
+---
+
+## 7. World 5 — The Grid
+
+Theme: power infrastructure. Unlocks `power` `probe` `link`.
+This is the game's most algorithmically classical world; three of its five levels have a named
+textbook heritage and should be authored as honest, well-scaffolded versions of them.
+
+---
+
+### w5-01 — Mains  *(hardware in isolation)*
+- `premise` A line of substations and one reactor. Energise all of them.
+- `teaches` `power()` and **preconditions** — a node only energises if its upstream is already live.
+- `assumes` Traversal.
+- `hardware` `power`
+- `heritage` —
+- `world` 20×5, 6–9 substations in a line, reactor at one end.
+- `varies` Chain length, station spacing, **and which end the reactor is on**.
+- `anti-hardcode` The reactor end flips between seeds, so a fixed West-to-East loop fails half of them.
+- `naive-fails` Powering in index order when the reactor is at the far end: every call fails, every failed call costs ticks, and nothing is energised. Small, but it establishes "read the direction from the world".
+- `generalize` Over chain length and reactor end.
+- `seeds` `[1,2,3]`
+- `size` ~12 lines · `difficulty` **3/10**
+- `bonus` Zero failed `power()` calls.
+
+### w5-02 — Continuity Test
+- `premise` Two hundred segments of feeder. One break. Ten probes.
+- `teaches` **Binary search** — halving a search space instead of scanning it.
+- `assumes` `power`, loops with computed indices.
+- `hardware` `probe`
+- `heritage` Binary search.
+- `world` A 200-segment feeder run laid out as a long corridor. `probe(a,b)` reports whether the span between two points is continuous, at a tick cost. Probe budget: 10 (log₂200 ≈ 7.6).
+- `varies` Break position.
+- `anti-hardcode` The break position is the only variable and it is uniformly drawn; there is nothing else to memorize.
+- `naive-fails` Probing every segment needs 200 probes against a budget of 10. There is no middle ground and no partial credit, which is exactly right for this idea.
+- `generalize` Over break position. **Seeds must include position 0 and position n−1** — off-by-one is the entire difficulty of binary search and the level should say so through its seeds.
+- `seeds` `[1,2,3,4,5]`
+- `size` ~15 lines · `difficulty` **4/10**
+- `bonus` Locate it in ≤ 8 probes on every seed.
+
+### w5-03 — Order of Operations
+- `premise` Sixteen substations, each with prerequisites. Energise all of them, once each.
+- `teaches` **Topological sort** — turning a dependency graph into a valid linear order.
+- `assumes` Preconditions, reading structured data from the world.
+- `hardware` —
+- `heritage` Topological sort (Kahn's algorithm, or DFS post-order).
+- `world` 24×18, 10–16 substations with 1–3 prerequisites each, dependencies readable at zero tick cost.
+- `varies` The DAG (shape, depth, fan-out) and station positions.
+- `anti-hardcode` The graph itself is regenerated per seed; no static order exists across seeds.
+- `naive-fails` Any static order. The "retry the whole list until nothing changes" loop **passes but sits far over par**, because every failed `power()` costs ticks — a deliberately tempting near-miss that teaches the difference between correct and good.
+- `generalize` Over graph shape. Seeds must include: one deep chain, one wide shallow graph, one node with three prerequisites, and one graph with two disconnected components.
+- `seeds` `[1,2,3,4]`
+- `size` ~35 lines · `difficulty` **6/10**
+- `bonus` Choose a valid topological order that also minimises travel between stations.
+
+### w5-04 — Load Balance
+- `premise` Every consumer needs a feeder. Every feeder has a ceiling. There is not much slack.
+- `teaches` **Assignment under capacity constraints** — and that the *order you consider items in* determines whether a greedy method works.
+- `assumes` Structured data, sorting.
+- `hardware` —
+- `heritage` Bin packing, first-fit-decreasing. **Par derives from an FFD reference solution. Optimality is never required.**
+- `world` 26×20. 5–8 feeders with capacities, 12–20 consumers with draws. Total slack ≈ 8%.
+- `varies` Capacities, draws, both counts.
+- `anti-hardcode` All the numbers are drawn per seed; there is no assignment to memorize, only a rule.
+- `naive-fails` First-fit in world order overflows on most seeds. Sorting descending first fixes it. The level exists to make that one line matter.
+- `generalize` Over the numbers. **One seed must be constructed so that plain first-fit fails and first-fit-decreasing succeeds. One seed must have comfortable slack**, so the player's first honest attempt is rewarded before it is broken.
+- `seeds` `[1,2,3,4,5]`
+- `size` ~40 lines · `difficulty` **7/10**
+- `bonus` Complete the assignment leaving the single largest feeder entirely unused.
+- `narrative` This is where the Appendix C payoff lands (NARRATIVE.md §3.2).
+
+### w5-05 — Blackout  *(synthesis)*
+- `premise` The cabling is gone. Reconnect every substation to the reactor, then bring it all up in order.
+- `teaches` **Network construction under a budget** — `link(a,b)` costs cable proportional to distance, and connecting everything cheaply is a different problem from connecting everything.
+- `assumes` Topological sort, graphs, budgets.
+- `hardware` `link`
+- `heritage` Minimum spanning tree (Prim, or Kruskal + union-find). The union-find requirement is why this is an 8 rather than a 7.
+- `world` 30×24, 10–14 substations at randomized positions, fixed reactor. Cable budget ≈ **108% of the MST weight** for that seed.
+- `varies` Node positions, node count, budget.
+- `anti-hardcode` Positions are drawn per seed, so the tree shape is different every time; the budget is computed *from* the seed's MST, so no absolute cable figure is meaningful.
+- `naive-fails` A star topology (everything direct to the reactor) overshoots the budget by 50–100%. Nearest-neighbour chaining overshoots by 10–30% on most seeds. The 8% slack means a genuinely MST-shaped answer is needed, but a slightly imperfect one still passes.
+- `generalize` Over point sets, including one clustered set and one near-uniform set.
+- `seeds` `[1,2,3,4,5]`
+- `size` ~70 lines · `difficulty` **8/10**
+- `bonus` Come in within 2% of the true MST weight.
+- `frustration` **HIGH RISK — see §11.**
+
+---
+
+## 8. World 6 — Deep Signal
+
+Theme: a listening post. Unlocks `receive` `transmit` `decode`.
+This world is mostly **data, not movement**. That contrast is the reason it sits after World 5:
+it reads as a holiday even though its finale is an 8.
+
+---
+
+### w6-01 — Carrier Wave  *(hardware in isolation)*
+- `premise` Packets are queued on the band. Read each one and send it back.
+- `teaches` The receive/transmit loop: drain a queue until it is empty, and handle "empty" without crashing.
+- `assumes` `while` loops.
+- `hardware` `receive` `transmit`
+- `heritage` —
+- `world` 10×6 listening post. No traversal at all. 5–15 packets queued.
+- `varies` Packet count and contents.
+- `anti-hardcode` The packet count varies, so a counted loop fails; the contents vary, so nothing can be echoed from a literal.
+- `naive-fails` A fixed-count loop; and assuming `receive()` never returns null, which it does the moment the queue empties.
+- `generalize` Over queue length, including an **empty queue seed** — the level should be passable by a program that does nothing but must not crash.
+- `seeds` `[1,2,3]`
+- `size` ~8 lines · `difficulty` **2/10**
+- `bonus` — (none. This one is a rest. Do not add a bonus.)
+- `note` **This is the biggest deliberate difficulty drop in the game** (8 → 2), placed directly after `w5-05`. Content agents must not make it clever. If it takes more than five minutes, it is wrong.
+
+### w6-02 — Checksum
+- `premise` Some of the traffic is corrupt. Acting on corrupt traffic is how the south field harvested itself in 2207.
+- `teaches` Validation — compute a checksum over a payload, compare, and **reject** rather than act.
+- `assumes` Arrays, arithmetic, loops.
+- `hardware` —
+- `heritage` Additive mod-256 checksum and parity. (Deliberately **not** CRC — too much machinery for the payoff.)
+- `world` Listening post. 20–40 packets, 10–30% corrupt. Acting on a corrupt packet commands the field bot to do something visibly, comically destructive in the replay.
+- `varies` Corruption rate, which packets are corrupt, the checksum constant.
+- `anti-hardcode` Which packets are corrupt is drawn per seed; an index list of "bad ones" fails immediately.
+- `naive-fails` Acting on everything fails loudly. Rejecting everything fails the quota. The level requires an actual test.
+- `generalize` Over the corruption pattern. **One seed must have zero corrupt packets; one must have the first packet corrupt.**
+- `seeds` `[1,2,3,4]`
+- `size` ~20 lines · `difficulty` **4/10**
+- `bonus` Report *which byte* is wrong in each corrupt packet.
+
+### w6-03 — Compression
+- `premise` The route comes in compressed. The field either side of it is not survivable.
+- `teaches` Decoding a compressed instruction stream and executing it — the encoded form is much shorter than the thing it describes.
+- `assumes` Parsing loops, string/array handling.
+- `hardware` `decode`
+- `heritage` Run-length encoding.
+- `world` 20×20 obstacle field plus an inbound RLE stream describing a safe route through it. Off-route tiles fail the run.
+- `varies` The route, the obstacle field, **and the run-length magnitudes** — including runs of 1 and runs above 9.
+- `anti-hardcode` The stream differs per seed and describes a different field; nothing is reusable.
+- `naive-fails` Parsing one character per count breaks the moment a run has two digits — a bug that passes seed 1 and fails seed 3. Ignoring the stream and pathing independently fails because the field is not fully sensable from the route.
+- `generalize` Over stream content and run magnitude.
+- `seeds` `[1,2,3,4]`
+- `size` ~25 lines · `difficulty` **5/10**
+- `bonus` Transmit an RLE encoding of your own route back, shorter than the one you received.
+
+### w6-04 — The Cipher
+- `premise` The payload is enciphered. Nobody has the key. Every packet starts with the same four bytes.
+- `teaches` **Key search against a checkable property** — generate candidates, test each with something you can verify, keep the one that passes.
+- `assumes` `decode`, checksums, loops over a candidate space.
+- `hardware` —
+- `heritage` Brute-force key search + known-plaintext attack. (Frequency analysis is the *bonus*, never the requirement.)
+- `world` Listening post. Keyspace ≤ 256 (single-byte XOR or Caesar shift), payload 40–200 bytes, with a known 4-byte magic header **always at offset 0**.
+- `varies` Key, payload contents, payload length.
+- `anti-hardcode` The key is drawn per seed. A hardcoded key fails on the second seed, immediately and unambiguously.
+- `naive-fails` There is no key anywhere in the level. The player must accept that trying all 256 is not cheating — it is the answer. That reframe is the whole lesson.
+- `generalize` Over key and payload. **Include a seed where the key is 0** (the payload is already plaintext), which breaks any solution that assumes the answer must be "interesting".
+- `seeds` `[1,2,3,4]`
+- `size` ~25 lines · `difficulty` **7/10**
+- `bonus` Recover a key from a 2¹⁶ keyspace using letter-frequency scoring rather than the magic header.
+- `frustration` **HIGH RISK — see §11.**
+
+### w6-05 — Telemetry  *(synthesis)*
+- `premise` The old station format nests. Some of it is corrupt. One block is still enciphered.
+- `teaches` Parsing a **nested grammar** into a plan — a structure a flat loop cannot handle.
+- `assumes` RLE decoding, checksums, key recovery.
+- `hardware` —
+- `heritage` Recursive descent parsing.
+- `world` Obstacle field plus a stream of nested command groups with repeat counts, nestable to depth 4. Each group is independently checksummed; some are corrupt; one is enciphered.
+- `varies` Grammar instance, nesting depth 2–4, which groups are corrupt, the key.
+- `anti-hardcode` The grammar instance is generated per seed and its depth varies, so no fixed unrolling works.
+- `naive-fails` A flat RLE-style parser succeeds at depth 1 and fails at depth 2. Recursion, or an explicit stack, becomes necessary and the level is built so the player discovers that from a failing seed rather than from the brief.
+- `generalize` Over grammar shape and depth. Include a **depth-1 seed** so the flat parser passes once first.
+- `seeds` `[1,2,3,4,5]`
+- `size` ~60 lines · `difficulty` **8/10**
+- `bonus` Repair one corrupt group using redundancy in the surrounding stream rather than discarding it.
+
+---
+
+## 9. World 7 — Swarm
+
+Theme: a hundred cheap robots. Unlocks `bots` `spawn` `sync` `send`/`recv`.
+Score is `max(bot.clock)` — **makespan** (DESIGN.md §4.3). Every level in this world is about
+that number and nothing else.
+
+---
+
+### w7-01 — Two Bots  *(hardware in isolation)*
+- `premise` Two corridors, two pads, two bots. Both pads by end of shift.
+- `teaches` The virtual-clock model: issuing `b1.move()` then `b2.move()` moves them **in parallel**, and the score is the maximum clock, not the sum.
+- `assumes` W1 traversal.
+- `hardware` `bots` `sync`
+- `heritage` —
+- `world` Two separate corridors of different lengths, one bot and one pad in each. Physically trivial.
+- `varies` The two corridor lengths.
+- `anti-hardcode` Lengths vary, so each bot's loop must be condition-driven; but the real content of the level is *ordering*, which no memorization helps with.
+- `naive-fails` Driving bot 1 all the way, then bot 2, produces a makespan of `len1 + len2` and misses par. Par sits just above `max(len1, len2)`, so only interleaving reaches gold.
+- `generalize` Over lengths. Include a seed where both lengths are equal and one where they differ by 3×.
+- `seeds` `[1,2,3]`
+- `size` ~12 lines · `difficulty` **3/10**
+- `bonus` Reach gold with a single loop body shared by both bots.
+- `dependency` **The trace viewer must visibly show both bots moving at once.** If the replay serialises them, this level teaches the wrong model. Flagged to RENDER as a blocking dependency.
+
+### w7-02 — Divide the Field
+- `premise` The depot will spawn you as many bots as the requisition allows. The requisition changes weekly.
+- `teaches` Static partitioning by **work**, not by area, when the number of workers is unknown until runtime.
+- `assumes` Parallel clocks.
+- `hardware` `spawn`
+- `heritage` Static load balancing / partitioning.
+- `world` 24×16 field, 3–8 spawnable bots, harvestable tiles distributed in **clusters**, not uniformly.
+- `varies` Bot count, cluster positions and sizes, total work.
+- `anti-hardcode` The bot count varies per seed, so no fixed number of partitions can be written down; the clustering varies, so no fixed partition boundary works.
+- `naive-fails` Splitting the field into N equal *rectangles* hands one bot 50–60% of the crops, and makespan is set by the slowest bot. Equal area is the trap; equal work is the answer.
+- `generalize` Over N and over cluster layout. Include a seed with one bot (the partition logic must degrade gracefully) and one where the work is genuinely uniform (where equal-area is fine, so the player learns the *condition*).
+- `seeds` `[1,2,3,4]`
+- `size` ~35 lines · `difficulty` **5/10**
+- `bonus` Makespan within 10% of `total_work / N`.
+
+### w7-03 — Right of Way
+- `premise` One tunnel, one bot wide, and everybody needs to be on the other side.
+- `teaches` Mutual exclusion — a shared resource that fits one user, where "try again if blocked" produces a livelock rather than a delay.
+- `assumes` Partitioning, `sync`.
+- `hardware` `send` `recv`
+- `heritage` Mutual exclusion; token / turnstile discipline; livelock avoidance.
+- `world` Two work areas joined by a single-width tunnel of length 6–12. 4–6 bots, each needing to cross at least twice.
+- `varies` Tunnel length, bot count, work placement on each side.
+- `anti-hardcode` Bot count and tunnel length both vary, so no fixed crossing schedule can be written; the work placement decides who needs to cross when.
+- `naive-fails` "Move, and retry on false" produces sustained mutual blocking, each retry costing `BLOCKED_COST`, for a makespan 3–5× par. A global `sync()` before every crossing is correct but serialises the entire fleet and misses gold by a wide margin. The answer lives between the two.
+- `generalize` Over fleet size and tunnel length. Include a **two-bot seed**, which is small enough to reason about by hand and should be the seed the player debugs on.
+- `seeds` `[1,2,3,4]`
+- `size` ~45 lines · `difficulty` **7/10**
+- `bonus` Zero blocked moves across the entire run.
+- `frustration` **HIGH RISK — see §11.**
+
+### w7-04 — Dispatch
+- `premise` Thirty jobs, eight bots, and jobs that take anywhere from one tick to twenty.
+- `teaches` **Dynamic scheduling** — assign the next job to whichever bot becomes free first, rather than dealing all the jobs out in advance.
+- `assumes` Partitioning, clocks, per-bot state.
+- `hardware` —
+- `heritage` List scheduling; LPT (longest-processing-time-first); job-shop scheduling.
+- `world` 28×20 run out to Depot 0. 15–30 jobs with costs of 1–20 ticks, 4–8 bots.
+- `varies` Job costs, job positions, bot count, **and the cost distribution's shape**.
+- `anti-hardcode` Costs and positions are drawn per seed, and the distribution shape changes between seeds, so a strategy tuned to one shape is visibly punished on another.
+- `naive-fails` Round-robin dealing is fine on a uniform cost distribution and terrible on a skewed one — one bot ends up holding three twenty-tick jobs. Dealing in world order is worse. Longest-job-first to the earliest-free bot is dramatically better and is the intended shape.
+- `generalize` Over cost distributions. **One seed must be near-uniform (round-robin is fine) and one heavily skewed (round-robin is 2× par)**, so the player learns the condition rather than the rule.
+- `seeds` `[1,2,3,4,5]`
+- `size` ~50 lines · `difficulty` **8/10**
+- `bonus` Makespan within 4/3 of the load lower bound. (Label the bonus with the ratio, never with "LPT".)
+
+### w7-05 — Chain of Command  *(synthesis)*
+- `premise` The targets are invisible until somebody stands next to them. You have scouts and you have workers.
+- `teaches` **Message passing** — `send`/`recv` so that a bot which discovers something can inform bots that never saw it.
+- `assumes` All of World 7, plus World 4's exploration.
+- `hardware` —
+- `heritage` Scout/worker (master–worker) with a shared work queue.
+- `world` 36×28 partially-unknown hybrid of cave and field. 1–2 scouts, 4–8 workers. Targets invisible until adjacent.
+- `varies` Topology, target placement, fleet composition (scout/worker split).
+- `anti-hardcode` Topology and targets are drawn per seed and are unknowable at program-write time by construction — this level cannot be hardcoded even in principle.
+- `naive-fails` Every bot exploring independently duplicates coverage and blows makespan. One scout followed by idle workers wastes the fleet. The scout must publish findings *as it goes* and workers must consume them without waiting for exploration to finish.
+- `generalize` Over topology and fleet composition, including a seed with two scouts (so the publish channel must tolerate two producers).
+- `seeds` `[1,2,3,4,5]`
+- `size` ~90 lines · `difficulty` **9/10**
+- `bonus` Workers idle for under 10% of the makespan.
+
+---
+
+## 10. World 8 — The Kessler Contract
+
+Theme: the finale. Unlocks nothing (DESIGN.md §6). Four large levels plus one monster.
+
+> **The opener rule still applies.** World 8 has no new hardware, so `w8-01` teaches World 8's
+> genuinely new *mechanic* — the dual budget — in isolation, on a task the player already knows.
+
+---
+
+### w8-01 — Efficiency Audit  *(new mechanic in isolation)*
+- `premise` A field job you could already do. Finance have halved what you may spend doing it.
+- `teaches` **Optimisation as a skill separate from problem-solving** — ticks *and* characters are both hard gates now, not a primary and a secondary.
+- `assumes` Worlds 1–3.
+- `hardware` —
+- `heritage` Code golf, as a discipline.
+- `world` A compact 14×10 field-and-silo task, deliberately familiar and deliberately small. Char budget ≈ 60% of a straightforward World 2 solution; tick budget ≈ 90% of a naive sweep.
+- `varies` Layout, ripeness, capacity.
+- `anti-hardcode` Standard layout randomization, but the level's teeth are the budgets, not the seeds.
+- `naive-fails` A perfectly correct World 2-style solution passes **neither** budget. The player must golf and route at the same time, and discover that the two pressures sometimes pull in opposite directions.
+- `generalize` Over layout.
+- `seeds` `[1,2,3,4]`
+- `size` reference **under 15 lines** — smallness is the point · `difficulty` **5/10**
+- `bonus` Come in under half the character budget.
+- `note` **Deliberate plateau** after `w7-05` (9). Without it, World 8 reads 8-9-9-10 and the player reaches the monster already spent.
+
+### w8-02 — Full Stack
+- `premise` A subsurface depot nobody has inventoried. Find it, sort it, ship it.
+- `teaches` **Pipeline composition** — sequencing your own subsystems (explore → route → deliver) without letting the seams leak. Nothing new is taught; the skill is integration.
+- `assumes` Worlds 3 and 4.
+- `hardware` —
+- `heritage` — (composition level)
+- `world` 34×26 subsurface depot. Unknown topology, 10–16 crates of 4–6 classes, depots discoverable only by exploring.
+- `varies` Topology, crate and depot placement, the class→depot mapping.
+- `anti-hardcode` The map is unknown at write time; the mapping is drawn per seed.
+- `naive-fails` Explore-fully-then-route is correct and misses par: the tick budget is set so that delivering opportunistically *during* exploration is required. The clean phase separation the player learned in `w4-04` is the thing this level asks them to give up.
+- `generalize` Over topology and mapping.
+- `seeds` `[1,2,3,4,5]`
+- `size` ~120 lines · `difficulty` **8/10**
+- `bonus` Deliver at least half the crates before exploration is complete.
+
+### w8-03 — The Grid Goes Down
+- `premise` Twenty substations, a dependency graph, a fleet, and a deadline a single bot cannot meet.
+- `teaches` That a topological order is a **partial** order — independent branches can be energised simultaneously by different bots.
+- `assumes` World 5 (topological sort, capacity) and World 7 (fleets, makespan).
+- `hardware` —
+- `heritage` Parallel scheduling under precedence constraints; critical path; list scheduling on a DAG.
+- `world` 32×24 grid. 14–20 substations in a DAG, 4–8 bots, feeder capacity limits still active, hard tick deadline.
+- `varies` DAG shape, station positions, bot count, feeder capacities.
+- `anti-hardcode` The DAG and the fleet size both vary; the correct parallel schedule is a function of both.
+- `naive-fails` A single-bot topological walk is correct and misses the deadline by 2–3×. A naive even split across bots violates dependencies and burns ticks on failed `power()` calls. The player must extract levels from the graph rather than a line.
+- `generalize` Over DAG shape and fleet size. Include a seed whose DAG is a single chain (where parallelism buys nothing and the player must recognise that) and one that is fully parallel.
+- `seeds` `[1,2,3,4,5]`
+- `size` ~110 lines · `difficulty` **9/10**
+- `bonus` Achieve a makespan equal to the DAG's critical path length.
+
+### w8-04 — Signal from 4470
+- `premise` An eleven-month-old route description. Most of it is still true.
+- `teaches` **Reconciling a decoded plan against observed reality** — decode and execution interleave, because some of the plan's landmarks have moved and you only find out by standing where they used to be.
+- `assumes` World 6 (parsing, checksums, key recovery) and World 4 (unknown maps).
+- `hardware` —
+- `heritage` — (nearest cousin: map-matching / localisation against a stale map)
+- `world` 30×30 subsurface. An enciphered, checksummed route description in the World 6 format. 15–30% of its landmarks have collapsed, moved, or been re-marked.
+- `varies` Which landmarks are stale, the drift pattern, the key, the underlying topology.
+- `anti-hardcode` The drift set is drawn per seed, so trusting the plan and distrusting the plan both fail on some seed; the key varies, so the plan is not even readable without World 6's technique.
+- `naive-fails` Following the decoded plan literally walks into a collapsed section and fails. Discarding it and exploring from scratch blows the budget by ~2×. The shape required is *trust, verify, and re-plan locally on mismatch*.
+- `generalize` Over drift pattern. Include a **zero-drift seed** (the plan is perfect) and a **heavy-drift seed** (over a third stale), so neither blind trust nor blind distrust survives.
+- `seeds` `[1,2,3,4,5]`
+- `size` ~110 lines · `difficulty` **9/10**
+- `bonus` Complete without re-exploring any section the plan already described correctly.
+- `narrative` This is World 8's story beat: the locker, the unsigned form, the Charter. See NARRATIVE.md §3.1–3.2. The level must be authored *with* the narrative agent's copy, not around it.
+
+### w8-05 — The Kessler Contract  *(the monster)*
+- `premise` Everything. Tonight. Under budget.
+- `teaches` Nothing new. It is an integration exam and it should feel like one.
+- `assumes` All thirty-nine previous levels.
+- `hardware` —
+- `heritage` Every heritage in this document, once: MST, topological sort, list scheduling, recursive-descent parsing, online exploration, capacitated routing.
+- `world` 48×40. 6–12 bots. An unknown subsurface region. An infrastructure DAG to energise. A quota of material to route to depots by class. An inbound enciphered, partly-corrupt signal stream revealing part of the map and part of the graph. A hard deadline, a fuel budget and a character budget.
+- `varies` Every axis above, independently drawn.
+- `anti-hardcode` Seven seeds across six independent axes. The brief states the reason in-fiction: *"the Yards run this every night."*
+- `naive-fails` Any solution that solves one subproblem well and the rest naively misses the deadline. The only shape that reaches gold is a fleet with **roles** — scouts, haulers, electricians — coordinated over `send`/`recv`.
+- `generalize` Over everything at once. This is the only level in the game where that sentence is allowed.
+- `seeds` `[1,2,3,4,5,6,7]` — the highest count in the game.
+- `size` ~250 lines · `difficulty` **10/10**
+- `bonus` **Three separate stars:** (a) beat the deadline by 20%; (b) come in a third under the character budget; (c) zero blocked moves across a 12-bot fleet.
+- `note` **This level must be beatable at bronze by a patient player with a slow, ugly solution.** Bronze's deadline is generous; gold is where it bites. Gating the ending behind gold ends the game for most players one level before the payoff, and the payoff (NARRATIVE.md §3.3) is the reason the other 39 levels exist.
+
+---
+
+## 11. Frustration Watch
+
+Four levels are at genuine risk of being **frustrating rather than hard** — where the player is
+stuck on something that isn't the lesson. Each gets a named mitigation. Content agents must
+implement the mitigation, not just note it.
+
+### w4-04 — Map First, Move Second *(the biggest risk in the game)*
+**Why it's risky.** It is the first level requiring a data structure the player invents
+themselves. A player who has never represented a graph in code has to invent adjacency
+representation, exploration, *and* shortest-path in one sitting, and the failure mode is a blank
+editor — the worst kind, because there is nothing to debug.
+
+**Defuse:**
+1. **Starter code ships an empty `Map<string, string[]>` and a `key(x,y)` helper**, already
+   typed, with a `// NOTE(4470)` above it saying he kept his the same way. This removes the
+   representation question entirely and leaves the actual lesson intact.
+2. Hint 1 separates the two halves explicitly: *"You are being asked to do two different things.
+   Doing them at the same time is what is expensive."*
+3. The bonus (optimal 3-point order) is deliberately trivial to brute-force — six permutations —
+   so an ambitious player has somewhere to put their energy that isn't "rewrite the exploration".
+4. The tick budget allows one wasteful exploration pass. A player who explores clumsily but
+   routes well still passes.
+
+### w5-05 — Blackout
+**Why it's risky.** MST is the most textbook-shaped ask in the game and the fail state is
+numerically opaque: you are 9% over a budget and the run says no, with no indication of *which*
+cable was the mistake.
+
+**Defuse:**
+1. **The verdict must report cable spent vs. budget vs. the best possible**, and the replay must
+   draw the laid cable so an overshoot is visible as a shape, not a number. Without this the
+   level is guesswork. Flagged to RENDER and RUNTIME.
+2. The 8% slack is generous on purpose — a correct-but-imperfect Prim passes comfortably.
+3. Hint 2 points at the invariant without naming it: *"Every cable you lay either connects
+   something new, or it doesn't."*
+4. The 2%-of-optimal bonus is where perfectionism goes, so the pass bar can stay soft.
+
+### w6-04 — The Cipher
+**Why it's risky.** It's the only level where the player might reasonably conclude that the
+game has not given them enough information. A player who does not think of brute force will sit
+there hunting for a key that does not exist anywhere in the level, which feels like a bug rather
+than a puzzle.
+
+**Defuse:**
+1. **The brief states the keyspace size outright**: "single-byte key" is in Vance's memo as a
+   procurement complaint about cheap radios. Knowing the space is 256 wide is what makes brute
+   force thinkable, and it costs the puzzle nothing.
+2. The magic header is stated in the brief too — the player is told *what* they are looking
+   for, and must work out *how*.
+3. Hint 1: *"There are not many keys. There is exactly one way to know when you have the right
+   one."*
+4. Frequency analysis, which genuinely is a leap, is moved entirely into the bonus.
+
+### w7-03 — Right of Way
+**Why it's risky.** Concurrency failures look like the *engine* misbehaving rather than the
+program. A player watching two bots politely bounce off each other forever will suspect a bug in
+the game before they suspect a livelock in their code — and they will be wrong, which is a
+uniquely bad place to leave someone.
+
+**Defuse:**
+1. **A dedicated failure code and message for sustained mutual blocking**, not a generic
+   timeout — the game must name what happened. NARRATIVE.md §5 line 21 exists for this, and
+   memo KD-2704 sets it up one level in advance so the player has heard the words "sustained
+   mutual courtesy" before it happens to them.
+2. **A two-bot seed is the first seed**, small enough to trace by hand.
+3. The replay must render blocked moves distinctly (a bump, a spark) so the player *sees* the
+   collisions rather than inferring them from a tick count. Flagged to RENDER.
+4. Hint 2: *"Both bots are being polite. Politeness is symmetric. Something here needs to not
+   be."*
+
+**Honourable mention — w2-03 Ripening.** Not high risk, but it fails silently in a boring way:
+you arrive, the crop isn't ready, nothing visible happens. Mitigation is a renderer growth-stage
+overlay (already listed as a dependency in the level block). Without it the level is opaque; with
+it, it is a 4.
+
+---
+
+## 12. Duplicate Concepts Caught and Replaced
+
+The bar is **40 distinct ideas**. Five drafted levels duplicated an earlier concept and were
+replaced. Recorded here so nobody re-introduces them.
+
+| Level | Rejected draft | Duplicated | Replacement | New concept |
+|---|---|---|---|---|
+| `w3-03` | "Sort crates by size as well as class" | `w3-02` (dispatch table with an extra key) | **Manifest** | Aggregation into a frequency map; the "sensing is free, don't move" insight |
+| `w4-03` | "A larger breadcrumb maze" | `w4-02` (same visited-set technique, more of it) | **Left Hand on the Wall** | Constant-memory invariant traversal — the deliberate opposite of `w4-02` |
+| `w5-02` | "Power a longer, branching chain" | `w5-01` (preconditions again) | **Continuity Test** | Binary search; the only halving-a-space idea in the game |
+| `w7-02` | "Spawn more bots and do `w7-01` again" | `w7-01` (parallel clocks, scaled) | **Divide the Field** | Partitioning by work when the worker count is unknown at write time |
+| `w8-01` | "A medium mixed level" | Everything and nothing | **Efficiency Audit** | Optimisation under a dual budget as a skill in its own right |
+
+**Near-duplicates that were kept, with the distinction stated:**
+
+- `w2-04` (capacity → return to silo) vs `w5-04` (bin packing). Adjacent but distinct:
+  w2-04 is *one* resource consumed over time and resumed; w5-04 is *many* containers filled
+  simultaneously with an ordering decision. Keep both; never let their briefs use the same
+  vocabulary.
+- `w1-04` (walk to a coordinate) vs `w4-04` (shortest path). Distinct: open room vs. discovered
+  graph. w1-04 exists partly so that w4-04 can subvert it.
+- `w3-05` (spatial routing) vs `w7-04` (temporal scheduling). Both look like "assign work
+  well"; one optimises distance for one agent, the other optimises finish time across many.
+- `w4-02` vs `w4-03` — deliberate paired opposition, documented in §1.2. Not a duplicate; a
+  diptych.
+
+---
+
+## 13. Concept Ledger — the 40 distinct ideas
+
+| # | Level | Concept |
+|---|---|---|
+| 1 | w1-01 | Issuing an action; the coordinate model |
+| 2 | w1-02 | Bounded repetition |
+| 3 | w1-03 | Conditional repetition on a sensed predicate |
+| 4 | w1-04 | Coordinate arithmetic and signed deltas |
+| 5 | w1-05 | Nested iteration for systematic coverage; timed retry |
+| 6 | w2-01 | Free sensing vs. costly action; conditional action |
+| 7 | w2-02 | Multi-phase per-cell cycle; stale state after acting |
+| 8 | w2-03 | Time-dependent world state; planned revisits |
+| 9 | w2-04 | Resource cap; interrupt and resume a traversal |
+| 10 | w2-05 | Prioritisation under a deadline you cannot beat exhaustively |
+| 11 | w3-01 | Carry semantics; a single-slot resource |
+| 12 | w3-02 | Dispatch table keyed by data read from the world |
+| 13 | w3-03 | Aggregation into a frequency map; not moving |
+| 14 | w3-04 | Order-preserving processing; a queue |
+| 15 | w3-05 | Capacitated multi-stop routing |
+| 16 | w4-01 | Local sensing in an unknown map |
+| 17 | w4-02 | External memory as a visited set |
+| 18 | w4-03 | Constant-memory invariant traversal |
+| 19 | w4-04 | Build a graph, then plan over it |
+| 20 | w4-05 | Explore vs. exploit under a shared budget |
+| 21 | w5-01 | Preconditions; direction read from the world |
+| 22 | w5-02 | Binary search |
+| 23 | w5-03 | Topological sort |
+| 24 | w5-04 | Assignment under capacity; order of consideration matters |
+| 25 | w5-05 | Minimum-cost network construction |
+| 26 | w6-01 | Drain a queue; handle the empty case |
+| 27 | w6-02 | Validation; rejecting untrusted input |
+| 28 | w6-03 | Decoding a compressed instruction stream |
+| 29 | w6-04 | Candidate search against a checkable property |
+| 30 | w6-05 | Parsing a recursive grammar |
+| 31 | w7-01 | Parallel clocks; makespan as the metric |
+| 32 | w7-02 | Partitioning by work with an unknown worker count |
+| 33 | w7-03 | Mutual exclusion; livelock |
+| 34 | w7-04 | Dynamic scheduling by earliest-free worker |
+| 35 | w7-05 | Message passing; scout/worker |
+| 36 | w8-01 | Optimisation under a dual budget |
+| 37 | w8-02 | Pipeline composition with interleaved phases |
+| 38 | w8-03 | Precedence constraints executed in parallel |
+| 39 | w8-04 | Reconciling a stale plan against observation |
+| 40 | w8-05 | Integration under simultaneous constraints |
+
+---
+
+## 14. Anti-Hardcode Audit
+
+DESIGN.md §5: *"Randomized worlds kill hardcoded solutions."* Every level must name the
+randomization that does the killing. The two declared exceptions are `w1-01` and `w1-02`
+(§3), where the tutorial matters more than the rule.
+
+| Randomized axis | Levels |
+|---|---|
+| Distance / length | w1-03, w4-01, w5-02, w7-01, w7-03 |
+| Endpoint positions | w1-04, w1-05, w2-02, w3-01, w5-01 |
+| Object distribution | w2-01, w2-03, w3-01, w3-02, w3-05, w7-02, w8-01 |
+| **A mapping the player must read, not know** | w3-02, w8-02 |
+| Set membership / which classes exist | w3-03, w6-02 |
+| Arrival or event schedule | w3-04, w1-05 (door phase), w2-03 (growth rates) |
+| Topology of an unknown map | w4-02, w4-03, w4-04, w4-05, w7-05, w8-02, w8-04 |
+| Graph shape (DAG) | w5-03, w8-03 |
+| Numeric parameters (capacity, budget, quota, key) | w2-04, w2-05, w3-05, w4-05, w5-04, w5-05, w6-04 |
+| Worker count | w7-02, w7-04, w7-05, w8-03, w8-05 |
+| Distribution *shape* (not just values) | w7-04, w8-04 |
+| Grammar instance and depth | w6-03, w6-05 |
+
+**The strongest anti-hardcode guarantee in the game** is `w7-05`, where the targets are
+invisible until a bot stands next to them. That level cannot be hardcoded even in principle,
+and it is worth having one such level as an existence proof.
+
+---
+
+## 15. Seed Policy
+
+1. `seeds.length >= 3` from World 2 (DESIGN.md §5). World 1 uses 1, 1, 3, 4, 4.
+2. **Seed 1 is the teaching seed.** It should be the friendliest instance: the layout where the
+   player's first honest idea works or nearly works. Every other seed is there to break it.
+3. **Every level's seed list must contain at least one degenerate case.** Empty set, single
+   element, index 0, index n−1, depth 1, one bot, zero corrupt packets, key = 0. These are
+   named in the individual level blocks and are not optional.
+4. **Seed order matters in the UI.** Run seed 1 first and stop on first failure, so the player
+   gets the most legible failure rather than the last one.
+5. Never author a seed whose only distinction is different numbers. If a seed does not test a
+   different *decision*, it is padding and should be removed.
+
+---
+
+## 16. Authoring Checklist
+
+Before a level is considered done:
+
+- [ ] `teaches` is one sentence and does not duplicate any row in §13.
+- [ ] `anti-hardcode` names a specific axis, not "it's random".
+- [ ] `naive-fails` describes a real approach a real player would try first.
+- [ ] The seed list contains the degenerate case named in the level block.
+- [ ] Reference solution exists in `src/levels/**/__solutions__/` and passes **every** seed.
+- [ ] `par.ticks` = reference ticks − ~10%, and the reference uses the *intended heuristic*,
+      not an optimal solver (§2 rule 4).
+- [ ] `brief` is readable by someone who skipped the flavour; no requirement is hidden in a joke.
+- [ ] `hints` are nudges. No hint contains code. No hint names the algorithm.
+- [ ] `heritage` does not appear anywhere in player-facing text.
+- [ ] Nothing in the brief, hints, docs, or starter reveals the solution shape beyond the
+      scaffolding explicitly authorised in §11.
+- [ ] The failure a player is most likely to hit produces a legible message from
+      NARRATIVE.md §5, not a generic one.
+- [ ] `bonus` absorbs ambition rather than adding grind.
+
+---
+
+## 17. Open Questions for the Orchestrator
+
+Not changes — flags. DESIGN.md is the contract and this document does not amend it.
+
+1. **DESIGN.md §6, World 4 hardware.** `mark`/`readMark` is a great fit for `w4-02`, but
+   `w4-04` and `w4-05` need the player to keep a **map in program memory**, which the current
+   hardware list doesn't gate or teach. Consider whether the docs should explicitly state that
+   ordinary JS objects persist for the run's duration. This is a documentation gap, not a
+   mechanic gap.
+2. **DESIGN.md §6, World 5 `link`.** `link` is listed as a World 5 unlock but is only used by
+   `w5-05`. That is a lot of engine surface for one level. Either accept it as a finale-only
+   verb, or give `w5-04` a link-based variant.
+3. **DESIGN.md §6, World 7 fuel.** `w4-05` and `w8-05` both depend on a **fuel budget** that
+   DESIGN.md's cost model (§4.4) does not define. It could be expressed as a per-bot `maxTicks`,
+   which would need no new mechanic. Orchestrator's call.
+4. **DESIGN.md §7, medal points.** The Performance Review tiers in NARRATIVE.md §7 assume
+   gold = 3, silver = 2, bronze = 1, bonus star = +1. If scoring picks different weights, the
+   tier thresholds need updating with them.

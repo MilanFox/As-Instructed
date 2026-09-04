@@ -1,0 +1,100 @@
+/*
+ * Design tokens. DESIGN.md §8 is the source of truth for the palette; change it there first.
+ * Owned by the UI agent from here on — FOUNDATION only seeded it.
+ */
+
+:root {
+  /* Surfaces */
+  --bg-void: #0a0e14;
+  --bg-panel: #121820;
+  --bg-raised: #1b2430;
+
+  /* Text */
+  --ink: #c9d5e3;
+  --ink-dim: #6a7a8c;
+
+  /* Signal */
+  --accent: #35e0c8;
+  --accent-2: #ffb020;
+  --danger: #ff5d5d;
+  --ok: #7ee06a;
+
+  /* Medals */
+  --gold: #ffd166;
+  --silver: #c0cbd8;
+  --bronze: #cd8b52;
+
+  /* Chrome */
+  --border: #223041;
+  --border-strong: #2f4157;
+  --radius: 3px;
+  --tile: 48px;
+
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --font-prose: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg-void);
+  color: var(--ink);
+  font-family: var(--font-prose);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+code,
+kbd,
+samp,
+pre,
+.numeric {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Very subtle. It must never make text harder to read (DESIGN.md §8). */
+.scanlines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgb(255 255 255 / 1.5%) 0 1px,
+    transparent 1px 3px
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

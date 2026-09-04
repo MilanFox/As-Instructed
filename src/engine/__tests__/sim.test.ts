@@ -1,0 +1,1463 @@
+import { describe, expect, test } from 'vitest';
+import type { GatherEvent, MoveEvent, TraceEvent, TransferEvent, UseEvent } from '../index.ts';
+import {
+  DEFAULT_COSTS,
+  DEFAULT_GROW_TIME,
+  DEFAULT_MAX_OPS,
+  DEFAULT_MAX_TICKS,
+  Dir,
+  HaltError,
+  IllegalActionError,
+  ItemKind,
+  MachineKind,
+  OpLimitError,
+  Sim,
+  Terrain,
+  addBot,
+  addGroundItems,
+  countItemsAt,
+  describeBlock,
+  isSimError,
+  itemsAt,
+  machineById,
+  maturity,
+  setTile,
+  tileAt,
+  vec,
+} from '../index.ts';
+import { asciiWorld, bot, must, openWorld, placeMachine } from './helpers.ts';
+
+function eventsOfKind<K extends TraceEvent['kind']>(
+  events: readonly TraceEvent[],
+  kind: K,
+): Extract<TraceEvent, { kind: K }>[] {
+  return events.filter((e): e is Extract<TraceEvent, { kind: K }> => e.kind === kind);
+}
+
+describe('Sim construction', () => {
+  test('exposes the default budgets and cost table', () => {
+    const sim = new Sim(openWorld(3, 3, 1));
+    expect(sim.maxTicks).toBe(DEFAULT_MAX_TICKS);
+    expect(sim.maxOps).toBe(DEFAULT_MAX_OPS);
+    expect(sim.costs).toEqual(DEFAULT_COSTS);
+    expect(sim.ticks).toBe(0);
+    expect(sim.ops).toBe(0);
+  });
+
+  test('per-level cost overrides are merged over the defaults', () => {
+    const sim = new Sim(openWorld(3, 3, 1), { costs: { move: 4, mine: 10 } });
+    expect(sim.costs.move).toBe(4);
+    expect(sim.costs.mine).toBe(10);
+    expect(sim.costs.harvest).toBe(DEFAULT_COSTS.harvest);
+  });
+
+  test('adopts the highest pre-set bot clock as the makespan', () => {
+    const world = openWorld(3, 3, 2);
+    bot(world, 1).clock = 12;
+    const sim = new Sim(world);
+    expect(sim.ticks).toBe(12);
+    expect(world.tick).toBe(12);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// move
+// ---------------------------------------------------------------------------
+
+describe('move', () => {
+  test('succeeds, costs costs.move, and moves occupancy with the bot', () => {
+    const world = openWorld(3, 3, 1);
+    const sim = new Sim(world);
+
+    expect(sim.move(0, Dir.East)).toBe(true);
+    expect(bot(world).at).toEqual({ x: 1, y: 0 });
+    expect(bot(world).clock).toBe(DEFAULT_COSTS.move);
+    expect(sim.ticks).toBe(DEFAULT_COSTS.move);
+    expect(must(tileAt(world, vec(0, 0))).occupant).toBeUndefined();
+    expect(must(tileAt(world, vec(1, 0))).occupant).toBe(0);
+  });
+
+  test('South is y+1 and North is y-1', () => {
+    const world = openWorld(3, 3, 1);
+    const sim = new Sim(world);
+    sim.move(0, Dir.South);
+    expect(bot(world).at).toEqual({ x: 0, y: 1 });
+    sim.move(0, Dir.North);
+    expect(bot(world).at).toEqual({ x: 0, y: 0 });
+  });
+
+  test('fails out of bounds, charges moveBlocked, and still updates facing', () => {
+    const world = openWorld(3, 3, 1);
+    const sim = new Sim(world);
+
+    expect(sim.move(0, Dir.North)).toBe(false);
+    expect(bot(world).at).toEqual({ x: 0, y: 0 });
+    expect(bot(world).facing).toBe(Dir.North);
+    expect(bot(world).clock).toBe(DEFAULT_COSTS.moveBlocked);
+
+    const moves = eventsOfKind(sim.finish().events, 'move');
+    expect(moves).toHaveLength(1);
+    expect(must(moves[0]).ok).toBe(false);
+    expect(must(moves[0]).reason).toBe('bounds');
+  });
+
+  test('fails against a wall, charges moveBlocked, and still updates facing', () => {
+    const world = asciiWorld(['.#.'], { bots: [vec(0, 0)] });
+    const sim = new Sim(world);
+
+    expect(sim.move(0, Dir.East)).toBe(false);
+    expect(bot(world).at).toEqual({ x: 0, y: 0 });
+    expect(bot(world).facing).toBe(Dir.East);
+    expect(bot(world).clock).toBe(DEFAULT_COSTS.moveBlocked);
+    expect(must(eventsOfKind(sim.finish().events, 'move')[0]).reason).toBe('terrain');
+  });
+
+  test('fails against another bot, charges moveBlocked', () => {
+    const world = openWorld(3, 3, 2);
+    const sim = new Sim(world);
+
+    expect(sim.move(0, Dir.East)).toBe(false);
+    expect(bot(world, 0).at).toEqual({ x: 0, y: 0 });
+    expect(bot(world, 0).clock).toBe(DEFAULT_COSTS.moveBlocked);
+    expect(must(eventsOfKind(sim.finish().events, 'move')[0]).reason).toBe('bot');
+  });
+
+  test('honours a per-level move cost', () => {
+    const world = openWorld(3, 3, 1);
+    const sim = new Sim(world, { costs: { move: 3, moveBlocked: 7 } });
+    sim.move(0, Dir.East);
+    expect(bot(world).clock).toBe(3);
+    sim.move(0, Dir.North);
+    expect(bot(world).clock).toBe(10);
+  });
+
+  test('a bot that walks into a Pit dies and can no longer be commanded', () => {
+    const world = asciiWorld(['.X.'], { bots: [vec(0, 0)] });
+    const sim = new Sim(world);
+
+    expect(sim.move(0, Dir.East)).toBe(true);
+    expect(bot(world).alive).toBe(false);
+    expect(must(tileAt(world, vec(1, 0))).occupant).toBeUndefined();
+    expect(() => sim.move(0, Dir.East)).toThrow(IllegalActionError);
+
+    const trace = sim.finish();
+    expect(eventsOfKind(trace.events, 'die')).toHaveLength(1);
+    expect(must(eventsOfKind(trace.events, 'die')[0]).reason).toContain('pit');
+  });
+
+  test('commanding an unknown bot throws IllegalActionError', () => {
+    const sim = new Sim(openWorld(3, 3, 1));
+    expect(() => sim.move(7, Dir.East)).toThrow(IllegalActionError);
+    try {
+      sim.move(7, Dir.East);
+    } catch (error) {
+      expect(isSimError(error)).toBe(true);
+    }
+  });
+
+  test('describeBlock renders each failure reason', () => {
+    expect(describeBlock('bounds', Dir.North)).toContain('North');
+    expect(describeBlock('terrain', Dir.East)).toContain('solid');
+    expect(describeBlock('bot', Dir.South)).toContain('Another bot');
+    expect(describeBlock('dead', Dir.West)).toContain('failed');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// turn / wait
+// ---------------------------------------------------------------------------
+
+describe('turn', () => {
+  test('rotates in place, is free by default, and is traced', () => {
+    const world = openWorld(3, 3, 1);
+    const sim = new Sim(world);
+    sim.turn(0, Dir.South);
+    expect(bot(world).facing).toBe(Dir.South);
+    expect(bot(world).at).toEqual({ x: 0, y: 0 });
+    expect(bot(world).clock).toBe(0);
+
+    const turns = eventsOfKind(sim.finish().events, 'turn');
+    expect(turns).toHaveLength(1);
+    expect(must(turns[0]).facing).toBe(Dir.South);
+  });
+
+  test('charges a per-level turn cost when one is set', () => {
+    const world = openWorld(3, 3, 1);
+    const sim = new Sim(world, { costs: { turn: 2 } });
+    sim.turn(0, Dir.West);
+    expect(bot(world).clock).toBe(2);
+  });
+});
+
+describe('wait', () => {
+  test('burns n ticks', () => {
+    const world = openWorld(3, 3, 1);
+    const sim = new Sim(world);
+    sim.wait(0, 5);
+    expect(bot(world).clock).toBe(5);
+    expect(sim.ticks).toBe(5);
+  });
+
+  test('defaults to one tick', () => {
+    const world = openWorld(3, 3, 1);
+    new Sim(world).wait(0);
+    expect(bot(world).clock).toBe(1);
+  });
+
+  test('wait(0) costs nothing but is still traced', () => {
+    const world = openWorld(3, 3, 1);
+    const sim = new Sim(world);
+    sim.wait(0, 0);
+    expect(bot(world).clock).toBe(0);
+    const waits = eventsOfKind(sim.finish().events, 'wait');
+    expect(waits).toHaveLength(1);
+    expect(must(waits[0]).ticks).toBe(0);
+    expect(must(waits[0]).dt).toBe(0);
+  });
+
+  test('a negative argument throws IllegalActionError', () => {
+    const sim = new Sim(openWorld(3, 3, 1));
+    expect(() => sim.wait(0, -1)).toThrow(IllegalActionError);
+    expect(() => sim.wait(0, Number.NaN)).toThrow(IllegalActionError);
+    expect(() => sim.wait(0, Number.POSITIVE_INFINITY)).toThrow(IllegalActionError);
+  });
+
+  test('the wait multiplier is applied', () => {
+    const world = openWorld(3, 3, 1);
+    new Sim(world, { costs: { wait: 3 } }).wait(0, 4);
+    expect(bot(world).clock).toBe(12);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// harvest / plant
+// ---------------------------------------------------------------------------
+
+function farmWorld(): ReturnType<typeof openWorld> {
+  const world = asciiWorld(['S..'], { bots: [vec(0, 0)] });
+  return world;
+}
+
+describe('harvest', () => {
+  test('takes a mature crop and clears the tile', () => {
+    const world = farmWorld();
+    setTile(world, vec(0, 0), {
+      terrain: Terrain.Soil,
+      crop: ItemKind.Crop,
+      growth: 4,
+      maxGrowth: 4,
+    });
+    const sim = new Sim(world);
+
+    expect(sim.harvest(0)).toBe(ItemKind.Crop);
+    expect(bot(world).clock).toBe(DEFAULT_COSTS.harvest);
+    expect(sim.inventory(0, ItemKind.Crop)).toBe(1);
+
+    const tile = must(tileAt(world, vec(0, 0)));
+    expect(tile.crop).toBeUndefined();
+    expect(tile.maxGrowth).toBeUndefined();
+    expect(tile.growth).toBe(0);
+
+    const trace = sim.finish();
+    const gathers = eventsOfKind(trace.events, 'harvest') as GatherEvent[];
+    expect(must(gathers[0]).ok).toBe(true);
+    expect(must(gathers[0]).count).toBe(1);
+    expect(eventsOfKind(trace.events, 'tileChange')).toHaveLength(1);
+    expect(must(eventsOfKind(trace.events, 'fx')[0]).fx).toBe('harvest');
+  });
+
+  test('returns null on bare ground but still charges', () => {
+    const world = farmWorld();
+    const sim = new Sim(world);
+    expect(sim.harvest(0)).toBeNull();
+    expect(bot(world).clock).toBe(DEFAULT_COSTS.harvest);
+    const gathers = eventsOfKind(sim.finish().events, 'harvest');
+    expect(must(gathers[0]).ok).toBe(false);
+    expect(must(gathers[0]).item).toBeNull();
+  });
+
+  test('returns null on an immature crop', () => {
+    const world = farmWorld();
+    setTile(world, vec(0, 0), {
+      terrain: Terrain.Soil,
+      crop: ItemKind.Crop,
+      growth: 1,
+      maxGrowth: 4,
+    });
+    const sim = new Sim(world);
+    expect(sim.harvest(0)).toBeNull();
+    expect(must(tileAt(world, vec(0, 0))).crop).toBe(ItemKind.Crop);
+  });
+
+  test('returns null when the inventory is full, leaving the crop standing', () => {
+    const world = asciiWorld(['S..'], {
+      bots: [vec(0, 0)],
+      capacity: 1,
+      inventory: [{ kind: ItemKind.Stone, count: 1 }],
+    });
+    setTile(world, vec(0, 0), {
+      terrain: Terrain.Soil,
+      crop: ItemKind.Crop,
+      growth: 4,
+      maxGrowth: 4,
+    });
+    const sim = new Sim(world);
+
+    expect(sim.harvest(0)).toBeNull();
+    expect(bot(world).clock).toBe(DEFAULT_COSTS.harvest);
+    expect(must(tileAt(world, vec(0, 0))).crop).toBe(ItemKind.Crop);
+  });
+});
+
+describe('plant', () => {
+  test('plants a seed into soil and records the planting time', () => {
+    const world = asciiWorld(['S..'], {
+      bots: [vec(0, 0)],
+      inventory: [{ kind: ItemKind.Seed, count: 2 }],
+    });
+    const sim = new Sim(world);
+    sim.wait(0, 3);
+
+    expect(sim.plant(0)).toBe(true);
+    expect(sim.inventory(0, ItemKind.Seed)).toBe(1);
+    expect(bot(world).clock).toBe(3 + DEFAULT_COSTS.plant);
+
+    const tile = must(tileAt(world, vec(0, 0)));
+    expect(tile.crop).toBe(ItemKind.Crop);
+    expect(tile.maxGrowth).toBe(DEFAULT_GROW_TIME);
+    expect(must(tile.meta)['plantedAt']).toBe(3);
+    expect(maturity(tile, 3)).toBe(0);
+    expect(maturity(tile, 3 + DEFAULT_GROW_TIME)).toBe(DEFAULT_GROW_TIME);
+  });
+
+  test('a planted crop becomes harvestable once grow time has passed', () => {
+    const world = asciiWorld(['S..'], {
+      bots: [vec(0, 0)],
+      inventory: [{ kind: ItemKind.Seed, count: 1 }],
+    });
+    const sim = new Sim(world);
+    sim.plant(0);
+    expect(sim.harvest(0)).toBeNull();
+    sim.wait(0, DEFAULT_GROW_TIME);
+    expect(sim.harvest(0)).toBe(ItemKind.Crop);
+  });
+
+  test('fails on non-plantable terrain but still charges', () => {
+    const world = asciiWorld(['..S'], {
+      bots: [vec(0, 0)],
+      inventory: [{ kind: ItemKind.Seed, count: 1 }],
+    });
+    const sim = new Sim(world);
+    expect(sim.plant(0)).toBe(false);
+    expect(bot(world).clock).toBe(DEFAULT_COSTS.plant);
+    expect(sim.inventory(0, ItemKind.Seed)).toBe(1);
+    expect(must(eventsOfKind(sim.finish().events, 'plant')[0]).ok).toBe(false);
+  });
+
+  test('fails without a seed', () => {
+    const world = asciiWorld(['S..'], { bots: [vec(0, 0)] });
+    const sim = new Sim(world);
+    expect(sim.plant(0)).toBe(false);
+    expect(must(tileAt(world, vec(0, 0))).crop).toBeUndefined();
+  });
+
+  test('fails when the tile is already planted', () => {
+    const world = asciiWorld(['S..'], {
+      bots: [vec(0, 0)],
+      inventory: [{ kind: ItemKind.Seed, count: 2 }],
+    });
+    const sim = new Sim(world);
+    expect(sim.plant(0)).toBe(true);
+    expect(sim.plant(0)).toBe(false);
+    expect(sim.inventory(0, ItemKind.Seed)).toBe(1);
+  });
+
+  test('a custom grow time is honoured', () => {
+    const world = asciiWorld(['S..'], {
+      bots: [vec(0, 0)],
+      inventory: [{ kind: ItemKind.Seed, count: 1 }],
+    });
+    const sim = new Sim(world);
+    sim.plant(0, ItemKind.Seed, 2);
+    expect(must(tileAt(world, vec(0, 0))).maxGrowth).toBe(2);
+    sim.wait(0, 2);
+    expect(sim.harvest(0)).toBe(ItemKind.Crop);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// mine
+// ---------------------------------------------------------------------------
+
+describe('mine', () => {
+  test('mines the adjacent tile in dir, yielding the item and leaving minesTo terrain', () => {
+    const world = asciiWorld(['.R.'], { bots: [vec(0, 0)] });
+    const sim = new Sim(world);
+
+    expect(sim.mine(0, Dir.East)).toBe(ItemKind.Stone);
+    expect(must(tileAt(world, vec(1, 0))).terrain).toBe(Terrain.Floor);
+    expect(sim.inventory(0, ItemKind.Stone)).toBe(1);
+    expect(bot(world).clock).toBe(DEFAULT_COSTS.mine);
+
+    const trace = sim.finish();
+    expect(must(eventsOfKind(trace.events, 'mine')[0]).ok).toBe(true);
+    expect(eventsOfKind(trace.events, 'tileChange')).toHaveLength(1);
+  });
+
+  test('mines the bot own tile when dir is omitted', () => {
+    const world = asciiWorld(['G..'], { bots: [vec(0, 0)] });
+    const sim = new Sim(world);
+
+    expect(sim.mine(0)).toBe(ItemKind.Regolith);
+    expect(must(tileAt(world, vec(0, 0))).terrain).toBe(Terrain.Floor);
+    expect(must(tileAt(world, vec(0, 0))).occupant).toBe(0);
+  });
+
+  test.each([
+    [Terrain.Ore, ItemKind.Ore],
+    [Terrain.Rubble, ItemKind.Scrap],
+    [Terrain.Ice, ItemKind.Ice],
+  ])('%s mines into %s', (terrain, item) => {
+    const world = openWorld(3, 1, 1);
+    setTile(world, vec(1, 0), { terrain });
+    const sim = new Sim(world);
+    expect(sim.mine(0, Dir.East)).toBe(item);
+    expect(must(tileAt(world, vec(1, 0))).terrain).toBe(Terrain.Floor);
+  });
+
+  test('fails on non-mineable terrain but still charges', () => {
+    const world = openWorld(3, 1, 1);
+    const sim = new Sim(world);
+    expect(sim.mine(0, Dir.East)).toBeNull();
+    expect(bot(world).clock).toBe(DEFAULT_COSTS.mine);
+    expect(must(eventsOfKind(sim.finish().events, 'mine')[0]).ok).toBe(false);
+  });
+
+  test('fails out of bounds', () => {
+    const world = openWorld(3, 1, 1);
+    const sim = new Sim(world);
+    expect(sim.mine(0, Dir.West)).toBeNull();
+  });
+
+  test('fails when the inventory is full, leaving the terrain intact', () => {
+    const world = asciiWorld(['.R.'], {
+      bots: [vec(0, 0)],
+      capacity: 2,
+      inventory: [{ kind: ItemKind.Stone, count: 2 }],
+    });
+    const sim = new Sim(world);
+    expect(sim.mine(0, Dir.East)).toBeNull();
+    expect(must(tileAt(world, vec(1, 0))).terrain).toBe(Terrain.Rock);
+    expect(bot(world).clock).toBe(DEFAULT_COSTS.mine);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// pickup / drop
+// ---------------------------------------------------------------------------
+
+describe('pickup', () => {
+  test('takes one of whatever is underfoot when no kind is given', () => {
+    const world = openWorld(3, 1, 1);
+    addGroundItems(world, vec(0, 0), ItemKind.Crate, 3);
+    const sim = new Sim(world);
+
+    expect(sim.pickup(0)).toBe(1);
+    expect(sim.inventory(0, ItemKind.Crate)).toBe(1);
+    expect(countItemsAt(world, vec(0, 0), ItemKind.Crate)).toBe(2);
+    expect(bot(world).clock).toBe(DEFAULT_COSTS.pickup);
+  });
+
+  test('takes an explicit kind past the first stack on the tile', () => {
+    const world = openWorld(3, 1, 1);
+    addGroundItems(world, vec(0, 0), ItemKind.Crate, 1);
+    addGroundItems(world, vec(0, 0), ItemKind.Ore, 4);
+    const sim = new Sim(world);
+
+    expect(sim.pickup(0, ItemKind.Ore, 3)).toBe(3);
+    expect(sim.inventory(0, ItemKind.Ore)).toBe(3);
+    expect(countItemsAt(world, vec(0, 0), ItemKind.Crate)).toBe(1);
+  });
+
+  test('is clamped by what is actually on the ground', () => {
+    const world = openWorld(3, 1, 1);
+    addGroundItems(world, vec(0, 0), ItemKind.Ore, 2);
+    const sim = new Sim(world);
+    expect(sim.pickup(0, ItemKind.Ore, 10)).toBe(2);
+    expect(itemsAt(world, vec(0, 0))).toEqual([]);
+  });
+
+  test('is clamped by inventory capacity', () => {
+    const world = openWorld(3, 1, 1, { capacity: 2 });
+    addGroundItems(world, vec(0, 0), ItemKind.Ore, 5);
+    const sim = new Sim(world);
+    expect(sim.pickup(0, ItemKind.Ore, 5)).toBe(2);
+    expect(sim.inventory(0)).toBe(2);
+    expect(countItemsAt(world, vec(0, 0), ItemKind.Ore)).toBe(3);
+  });
+
+  test('returns 0 on an empty tile but still charges', () => {
+    const world = openWorld(3, 1, 1);
+    const sim = new Sim(world);
+    expect(sim.pickup(0)).toBe(0);
+    expect(bot(world).clock).toBe(DEFAULT_COSTS.pickup);
+    const events = eventsOfKind(sim.finish().events, 'pickup') as TransferEvent[];
+    expect(must(events[0]).ok).toBe(false);
+    expect(must(events[0]).item).toBeNull();
+  });
+
+  test('returns 0 when the requested kind is not there', () => {
+    const world = openWorld(3, 1, 1);
+    addGroundItems(world, vec(0, 0), ItemKind.Crate, 3);
+    const sim = new Sim(world);
+    expect(sim.pickup(0, ItemKind.Ore, 1)).toBe(0);
+    expect(countItemsAt(world, vec(0, 0), ItemKind.Crate)).toBe(3);
+  });
+
+  test('a negative count throws IllegalActionError', () => {
+    const world = openWorld(3, 1, 1);
+    addGroundItems(world, vec(0, 0), ItemKind.Ore, 3);
+    const sim = new Sim(world);
+    expect(() => sim.pickup(0, ItemKind.Ore, -1)).toThrow(IllegalActionError);
+    expect(bot(world).clock).toBe(0);
+  });
+
+  test('a zero count is a no-op that still charges', () => {
+    const world = openWorld(3, 1, 1);
+    addGroundItems(world, vec(0, 0), ItemKind.Ore, 3);
+    const sim = new Sim(world);
+    expect(sim.pickup(0, ItemKind.Ore, 0)).toBe(0);
+    expect(bot(world).clock).toBe(DEFAULT_COSTS.pickup);
+  });
+});
+
+describe('drop', () => {
+  test('drops the first held kind when none is given', () => {
+    const world = openWorld(3, 1, 1, { inventory: [{ kind: ItemKind.Ore, count: 3 }] });
+    const sim = new Sim(world);
+
+    expect(sim.drop(0)).toBe(1);
+    expect(sim.inventory(0, ItemKind.Ore)).toBe(2);
+    expect(countItemsAt(world, vec(0, 0), ItemKind.Ore)).toBe(1);
+    expect(bot(world).clock).toBe(DEFAULT_COSTS.drop);
+  });
+
+  test('drops a partial count of an explicit kind', () => {
+    const world = openWorld(3, 1, 1, {
+      inventory: [
+        { kind: ItemKind.Ore, count: 3 },
+        { kind: ItemKind.Crate, count: 2 },
+      ],
+    });
+    const sim = new Sim(world);
+
+    expect(sim.drop(0, ItemKind.Crate, 2)).toBe(2);
+    expect(sim.inventory(0, ItemKind.Crate)).toBe(0);
+    expect(sim.inventory(0, ItemKind.Ore)).toBe(3);
+    expect(countItemsAt(world, vec(0, 0), ItemKind.Crate)).toBe(2);
+  });
+
+  test('is clamped by what is held', () => {
+    const world = openWorld(3, 1, 1, { inventory: [{ kind: ItemKind.Ore, count: 2 }] });
+    const sim = new Sim(world);
+    expect(sim.drop(0, ItemKind.Ore, 10)).toBe(2);
+    expect(sim.inventory(0)).toBe(0);
+  });
+
+  test('returns 0 with an empty inventory but still charges', () => {
+    const world = openWorld(3, 1, 1);
+    const sim = new Sim(world);
+    expect(sim.drop(0)).toBe(0);
+    expect(bot(world).clock).toBe(DEFAULT_COSTS.drop);
+    expect(must(eventsOfKind(sim.finish().events, 'drop')[0]).ok).toBe(false);
+  });
+
+  test('returns 0 when the requested kind is not held', () => {
+    const world = openWorld(3, 1, 1, { inventory: [{ kind: ItemKind.Ore, count: 2 }] });
+    const sim = new Sim(world);
+    expect(sim.drop(0, ItemKind.Crate, 1)).toBe(0);
+  });
+
+  test('a negative count throws IllegalActionError', () => {
+    const world = openWorld(3, 1, 1, { inventory: [{ kind: ItemKind.Ore, count: 2 }] });
+    const sim = new Sim(world);
+    expect(() => sim.drop(0, ItemKind.Ore, -2)).toThrow(IllegalActionError);
+    expect(bot(world).clock).toBe(0);
+  });
+
+  test('dropped items merge into an existing ground stack', () => {
+    const world = openWorld(3, 1, 1, { inventory: [{ kind: ItemKind.Ore, count: 2 }] });
+    addGroundItems(world, vec(0, 0), ItemKind.Ore, 1);
+    const sim = new Sim(world);
+    sim.drop(0, ItemKind.Ore, 2);
+    expect(itemsAt(world, vec(0, 0))).toHaveLength(1);
+    expect(countItemsAt(world, vec(0, 0), ItemKind.Ore)).toBe(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// use / power
+// ---------------------------------------------------------------------------
+
+describe('use', () => {
+  test('advances a machine through its cycle and wraps around', () => {
+    const world = openWorld(3, 1, 1);
+    placeMachine(world, {
+      id: 'lever',
+      kind: MachineKind.Lever,
+      at: vec(0, 0),
+      state: 'off',
+      cycle: ['off', 'on', 'blinking'],
+    });
+    const sim = new Sim(world);
+
+    expect(sim.use(0)).toBe(true);
+    expect(must(machineById(world, 'lever')).state).toBe('on');
+    expect(bot(world).clock).toBe(DEFAULT_COSTS.use);
+    sim.use(0);
+    expect(must(machineById(world, 'lever')).state).toBe('blinking');
+    sim.use(0);
+    expect(must(machineById(world, 'lever')).state).toBe('off');
+
+    const trace = sim.finish();
+    expect(eventsOfKind(trace.events, 'machineChange')).toHaveLength(3);
+    const uses = eventsOfKind(trace.events, 'use') as UseEvent[];
+    expect(must(uses[0]).machineId).toBe('lever');
+    expect(must(uses[0]).ok).toBe(true);
+  });
+
+  test('operates the adjacent machine when dir is given', () => {
+    const world = openWorld(3, 1, 1);
+    placeMachine(world, {
+      id: 'press',
+      kind: MachineKind.Press,
+      at: vec(1, 0),
+      state: 'idle',
+      cycle: ['idle', 'busy'],
+    });
+    const sim = new Sim(world);
+    expect(sim.use(0, Dir.East)).toBe(true);
+    expect(must(machineById(world, 'press')).state).toBe('busy');
+  });
+
+  test('a Door with links flips those tiles between Floor and Wall', () => {
+    const world = asciiWorld(['..#'], { bots: [vec(0, 0)] });
+    placeMachine(world, {
+      id: 'door',
+      kind: MachineKind.Door,
+      at: vec(1, 0),
+      state: 'closed',
+      cycle: ['closed', 'open'],
+      links: [vec(2, 0)],
+    });
+    const sim = new Sim(world);
+
+    expect(must(tileAt(world, vec(2, 0))).terrain).toBe(Terrain.Wall);
+    sim.use(0, Dir.East);
+    expect(must(machineById(world, 'door')).state).toBe('open');
+    expect(must(tileAt(world, vec(2, 0))).terrain).toBe(Terrain.Floor);
+
+    sim.use(0, Dir.East);
+    expect(must(machineById(world, 'door')).state).toBe('closed');
+    expect(must(tileAt(world, vec(2, 0))).terrain).toBe(Terrain.Wall);
+
+    expect(eventsOfKind(sim.finish().events, 'tileChange')).toHaveLength(2);
+  });
+
+  test('a machine with no cycle is a no-op that still costs ticks', () => {
+    const world = openWorld(3, 1, 1);
+    placeMachine(world, { id: 'sink', kind: MachineKind.Sink, at: vec(0, 0), state: 'idle' });
+    const sim = new Sim(world);
+    expect(sim.use(0)).toBe(true);
+    expect(must(machineById(world, 'sink')).state).toBe('idle');
+    expect(bot(world).clock).toBe(DEFAULT_COSTS.use);
+  });
+
+  test('returns false with no machine present, and still charges', () => {
+    const world = openWorld(3, 1, 1);
+    const sim = new Sim(world);
+    expect(sim.use(0)).toBe(false);
+    expect(bot(world).clock).toBe(DEFAULT_COSTS.use);
+    const uses = eventsOfKind(sim.finish().events, 'use') as UseEvent[];
+    expect(must(uses[0]).ok).toBe(false);
+    expect(must(uses[0]).machineId).toBeNull();
+  });
+});
+
+describe('power', () => {
+  test('sets a machine state directly', () => {
+    const world = openWorld(3, 1, 1);
+    placeMachine(world, { id: 'node', kind: MachineKind.Node, at: vec(2, 0), state: 'off' });
+    const sim = new Sim(world);
+
+    expect(sim.power(0, 'node', 'on')).toBe(true);
+    expect(must(machineById(world, 'node')).state).toBe('on');
+    expect(bot(world).clock).toBe(DEFAULT_COSTS.power);
+
+    const trace = sim.finish();
+    expect(eventsOfKind(trace.events, 'machineChange')).toHaveLength(1);
+    const acts = eventsOfKind(trace.events, 'act');
+    expect(must(acts[0]).name).toBe('power');
+    expect(must(acts[0]).detail).toBe('on');
+  });
+
+  test('returns false for an unknown machine but still charges', () => {
+    const world = openWorld(3, 1, 1);
+    const sim = new Sim(world);
+    expect(sim.power(0, 'ghost', 'on')).toBe(false);
+    expect(bot(world).clock).toBe(DEFAULT_COSTS.power);
+    expect(must(eventsOfKind(sim.finish().events, 'act')[0]).ok).toBe(false);
+  });
+
+  test('power on a linked Door also flips its tiles', () => {
+    const world = asciiWorld(['..#'], { bots: [vec(0, 0)] });
+    placeMachine(world, {
+      id: 'door',
+      kind: MachineKind.Door,
+      at: vec(1, 0),
+      state: 'closed',
+      links: [vec(2, 0)],
+    });
+    const sim = new Sim(world);
+    sim.power(0, 'door', 'open');
+    expect(must(tileAt(world, vec(2, 0))).terrain).toBe(Terrain.Floor);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// mark / readMark / print
+// ---------------------------------------------------------------------------
+
+describe('mark and readMark', () => {
+  test('mark writes a breadcrumb and costs costs.mark; readMark is free', () => {
+    const world = openWorld(3, 1, 1);
+    const sim = new Sim(world);
+
+    expect(sim.readMark(0)).toBeNull();
+    sim.mark(0, 'visited');
+    expect(bot(world).clock).toBe(DEFAULT_COSTS.mark);
+    expect(sim.readMark(0)).toBe('visited');
+    expect(must(tileAt(world, vec(0, 0))).mark).toBe('visited');
+
+    const clockBefore = bot(world).clock;
+    sim.readMark(0);
+    expect(bot(world).clock).toBe(clockBefore);
+  });
+
+  test('mark(null) erases', () => {
+    const world = openWorld(3, 1, 1);
+    const sim = new Sim(world);
+    sim.mark(0, 'x');
+    sim.mark(0, null);
+    expect(sim.readMark(0)).toBeNull();
+    expect(must(tileAt(world, vec(0, 0))).mark).toBeUndefined();
+    const marks = eventsOfKind(sim.finish().events, 'mark');
+    expect(marks.map((m) => m.text)).toEqual(['x', null]);
+  });
+
+  test('marks are per-tile', () => {
+    const world = openWorld(3, 1, 1);
+    const sim = new Sim(world);
+    sim.mark(0, 'start');
+    sim.move(0, Dir.East);
+    expect(sim.readMark(0)).toBeNull();
+    sim.move(0, Dir.West);
+    expect(sim.readMark(0)).toBe('start');
+  });
+});
+
+describe('print', () => {
+  test('is free and lands in the trace with an optional source line', () => {
+    const world = openWorld(3, 1, 1);
+    const sim = new Sim(world);
+    sim.wait(0, 2);
+    sim.print(0, 'hello');
+    sim.print(0, 'world', 12);
+
+    expect(bot(world).clock).toBe(2);
+    const prints = eventsOfKind(sim.finish().events, 'print');
+    expect(prints.map((p) => p.text)).toEqual(['hello', 'world']);
+    expect(must(prints[0]).t).toBe(2);
+    expect(must(prints[0]).line).toBeUndefined();
+    expect(must(prints[1]).line).toBe(12);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// send / recv
+// ---------------------------------------------------------------------------
+
+describe('send and recv', () => {
+  test('send queues a message and costs costs.send; recv pops it and is free', () => {
+    const world = openWorld(3, 3, 2);
+    const sim = new Sim(world);
+
+    expect(sim.send(0, 1, 'go north')).toBe(true);
+    expect(bot(world, 0).clock).toBe(DEFAULT_COSTS.send);
+    expect(bot(world, 1).inbox).toHaveLength(1);
+
+    const clockBefore = bot(world, 1).clock;
+    const message = sim.recv(1);
+    expect(message).toEqual({ from: 0, body: 'go north', t: 0 });
+    expect(bot(world, 1).clock).toBe(clockBefore);
+    expect(bot(world, 1).inbox).toHaveLength(0);
+  });
+
+  test('recv on an empty inbox returns null and is traced', () => {
+    const world = openWorld(3, 3, 2);
+    const sim = new Sim(world);
+    expect(sim.recv(1)).toBeNull();
+    const recvs = eventsOfKind(sim.finish().events, 'recv');
+    expect(must(recvs[0]).from).toBeNull();
+    expect(must(recvs[0]).body).toBeNull();
+  });
+
+  test('messages are delivered FIFO', () => {
+    const world = openWorld(3, 3, 2);
+    const sim = new Sim(world);
+    sim.send(0, 1, 'first');
+    sim.send(0, 1, 'second');
+    expect(must(sim.recv(1)).body).toBe('first');
+    expect(must(sim.recv(1)).body).toBe('second');
+  });
+
+  test('send to an unknown bot returns false but still charges', () => {
+    const world = openWorld(3, 3, 1);
+    const sim = new Sim(world);
+    expect(sim.send(0, 99, 'anyone?')).toBe(false);
+    expect(bot(world, 0).clock).toBe(DEFAULT_COSTS.send);
+    const acts = eventsOfKind(sim.finish().events, 'act');
+    expect(must(acts[0]).name).toBe('send');
+    expect(must(acts[0]).ok).toBe(false);
+  });
+
+  test('send to a dead bot returns false', () => {
+    const world = asciiWorld(['..X'], { bots: [vec(0, 0), vec(1, 0)] });
+    const sim = new Sim(world);
+    sim.move(1, Dir.East);
+    expect(bot(world, 1).alive).toBe(false);
+    expect(sim.send(0, 1, 'still there?')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spawn / sync
+// ---------------------------------------------------------------------------
+
+describe('spawn', () => {
+  test('creates a bot on the adjacent tile with the next free id', () => {
+    const world = openWorld(3, 3, 1);
+    const sim = new Sim(world);
+
+    const id = sim.spawn(0, Dir.South, { name: 'helper', capacity: 3 });
+    expect(id).toBe(1);
+    expect(bot(world, 0).clock).toBe(DEFAULT_COSTS.spawn);
+
+    const child = bot(world, 1);
+    expect(child.at).toEqual({ x: 0, y: 1 });
+    expect(child.name).toBe('helper');
+    expect(child.capacity).toBe(3);
+    expect(child.facing).toBe(Dir.South);
+    expect(child.clock).toBe(DEFAULT_COSTS.spawn);
+    expect(must(tileAt(world, vec(0, 1))).occupant).toBe(1);
+    expect(sim.botIds()).toEqual([0, 1]);
+
+    const spawns = eventsOfKind(sim.finish().events, 'spawn');
+    expect(must(spawns[0]).bot.id).toBe(1);
+  });
+
+  test('inherits the parent capacity by default', () => {
+    const world = openWorld(3, 3, 1, { capacity: 5 });
+    const sim = new Sim(world);
+    sim.spawn(0, Dir.South);
+    expect(bot(world, 1).capacity).toBe(5);
+  });
+
+  test('returns -1 when the target tile is blocked, and still charges', () => {
+    const world = asciiWorld(['.#.'], { bots: [vec(0, 0)] });
+    const sim = new Sim(world);
+    expect(sim.spawn(0, Dir.East)).toBe(-1);
+    expect(bot(world, 0).clock).toBe(DEFAULT_COSTS.spawn);
+    expect(world.bots).toHaveLength(1);
+    const acts = eventsOfKind(sim.finish().events, 'act');
+    expect(must(acts[0]).name).toBe('spawn');
+    expect(must(acts[0]).ok).toBe(false);
+  });
+
+  test('returns -1 when another bot already holds the tile', () => {
+    const world = openWorld(3, 3, 2);
+    const sim = new Sim(world);
+    expect(sim.spawn(0, Dir.East)).toBe(-1);
+    expect(world.bots).toHaveLength(2);
+  });
+
+  test('returns -1 out of bounds', () => {
+    const world = openWorld(3, 3, 1);
+    const sim = new Sim(world);
+    expect(sim.spawn(0, Dir.North)).toBe(-1);
+  });
+});
+
+describe('sync', () => {
+  test('levels every clock up to the makespan and emits sync events', () => {
+    const world = openWorld(4, 4, 3);
+    const sim = new Sim(world);
+    sim.wait(0, 3);
+    sim.wait(1, 11);
+
+    expect(sim.sync()).toBe(11);
+    expect(bot(world, 0).clock).toBe(11);
+    expect(bot(world, 1).clock).toBe(11);
+    expect(bot(world, 2).clock).toBe(11);
+    expect(world.tick).toBe(11);
+
+    const syncs = eventsOfKind(sim.finish().events, 'sync');
+    expect(syncs.map((s) => ({ botId: s.botId, t: s.t, dt: s.dt, to: s.to }))).toEqual([
+      { botId: 0, t: 3, dt: 8, to: 11 },
+      { botId: 2, t: 0, dt: 11, to: 11 },
+    ]);
+  });
+
+  test('is a no-op when every clock already agrees', () => {
+    const world = openWorld(3, 3, 2);
+    const sim = new Sim(world);
+    expect(sim.sync()).toBe(0);
+    expect(eventsOfKind(sim.finish().events, 'sync')).toHaveLength(0);
+  });
+
+  test('leaves dead bots alone', () => {
+    const world = asciiWorld(['..X.'], { bots: [vec(0, 0), vec(1, 0)] });
+    const sim = new Sim(world);
+    sim.move(1, Dir.East);
+    sim.wait(0, 10);
+    sim.sync();
+    expect(bot(world, 1).clock).toBe(1);
+    expect(bot(world, 0).clock).toBe(10);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// sensing
+// ---------------------------------------------------------------------------
+
+describe('sensing', () => {
+  test('pos reports a copy of the bot position', () => {
+    const world = openWorld(3, 3, 1);
+    const sim = new Sim(world);
+    const position = sim.pos(0);
+    expect(position).toEqual({ x: 0, y: 0 });
+    position.x = 99;
+    expect(bot(world).at).toEqual({ x: 0, y: 0 });
+  });
+
+  test('canMove reflects bounds, terrain and bots', () => {
+    const world = asciiWorld(['.#.', '...', '...'], { bots: [vec(0, 0), vec(0, 1)] });
+    const sim = new Sim(world);
+    expect(sim.canMove(0, Dir.North)).toBe(false); // out of bounds
+    expect(sim.canMove(0, Dir.East)).toBe(false); // wall
+    expect(sim.canMove(0, Dir.South)).toBe(false); // bot #1
+    expect(sim.canMove(1, Dir.South)).toBe(true);
+  });
+
+  test('scan of the own tile reports terrain, items, occupant and machine', () => {
+    const world = asciiWorld(['P..'], { bots: [vec(0, 0)] });
+    addGroundItems(world, vec(0, 0), ItemKind.Crate, 2);
+    placeMachine(world, { id: 'sink', kind: MachineKind.Sink, at: vec(0, 0) });
+    const sim = new Sim(world);
+
+    const view = sim.scan(0);
+    expect(view.at).toEqual({ x: 0, y: 0 });
+    expect(view.inBounds).toBe(true);
+    expect(view.terrain).toBe(Terrain.Pad);
+    expect(view.walkable).toBe(true);
+    expect(view.botId).toBe(0);
+    expect(view.machineId).toBe('sink');
+    expect(view.items).toEqual([{ kind: ItemKind.Crate, count: 2 }]);
+    expect(view.crop).toBeNull();
+    expect(view.mark).toBeNull();
+  });
+
+  test('scan of a direction looks at the adjacent tile', () => {
+    const world = asciiWorld(['.#.'], { bots: [vec(0, 0)] });
+    const sim = new Sim(world);
+    const view = sim.scan(0, Dir.East);
+    expect(view.at).toEqual({ x: 1, y: 0 });
+    expect(view.terrain).toBe(Terrain.Wall);
+    expect(view.walkable).toBe(false);
+  });
+
+  test('scan out of bounds reports void and inBounds false', () => {
+    const world = openWorld(3, 3, 1);
+    const sim = new Sim(world);
+    const view = sim.scan(0, Dir.North);
+    expect(view.inBounds).toBe(false);
+    expect(view.terrain).toBe(Terrain.Void);
+    expect(view.walkable).toBe(false);
+    expect(view.items).toEqual([]);
+    expect(view.botId).toBeNull();
+    expect(view.machineId).toBeNull();
+  });
+
+  test('scan reports crop maturity relative to the observing bot clock', () => {
+    const world = asciiWorld(['S..'], {
+      bots: [vec(0, 0)],
+      inventory: [{ kind: ItemKind.Seed, count: 1 }],
+    });
+    const sim = new Sim(world);
+    sim.plant(0);
+    expect(sim.scan(0).growth).toBe(0);
+    expect(sim.scan(0).maxGrowth).toBe(DEFAULT_GROW_TIME);
+    sim.wait(0, DEFAULT_GROW_TIME);
+    expect(sim.scan(0).growth).toBe(DEFAULT_GROW_TIME);
+  });
+
+  test('look stops at the first opaque tile, which is included', () => {
+    const world = asciiWorld(['....#...'], { bots: [vec(0, 0)] });
+    const sim = new Sim(world);
+    const ray = sim.look(0, Dir.East);
+    expect(ray.map((v) => v.at.x)).toEqual([1, 2, 3, 4]);
+    expect(must(ray[3]).terrain).toBe(Terrain.Wall);
+  });
+
+  test('look respects range', () => {
+    const world = asciiWorld(['........'], { bots: [vec(0, 0)] });
+    const sim = new Sim(world);
+    expect(sim.look(0, Dir.East, 3)).toHaveLength(3);
+    expect(sim.look(0, Dir.East, 0)).toHaveLength(0);
+    expect(sim.look(0, Dir.East)).toHaveLength(7);
+  });
+
+  test('look clips at the world edge, reporting the out-of-bounds tile last', () => {
+    const world = asciiWorld(['...'], { bots: [vec(1, 0)] });
+    const sim = new Sim(world);
+    const ray = sim.look(0, Dir.East, 5);
+    expect(ray).toHaveLength(2);
+    expect(must(ray[0]).inBounds).toBe(true);
+    expect(must(ray[1]).inBounds).toBe(false);
+    expect(must(ray[1]).terrain).toBe(Terrain.Void);
+  });
+
+  test('inventory totals everything or one kind, and carrying lists the kinds', () => {
+    const world = openWorld(3, 1, 1, {
+      inventory: [
+        { kind: ItemKind.Ore, count: 2 },
+        { kind: ItemKind.Crate, count: 1 },
+      ],
+    });
+    const sim = new Sim(world);
+    expect(sim.inventory(0)).toBe(3);
+    expect(sim.inventory(0, ItemKind.Ore)).toBe(2);
+    expect(sim.inventory(0, ItemKind.Seed)).toBe(0);
+    expect(sim.carrying(0)).toEqual([ItemKind.Ore, ItemKind.Crate]);
+    expect(sim.capacity(0)).toBe(8);
+  });
+
+  test('carrying reflects pickup order and drops emptied kinds', () => {
+    const world = openWorld(3, 1, 1);
+    addGroundItems(world, vec(0, 0), ItemKind.Crate, 1);
+    addGroundItems(world, vec(0, 0), ItemKind.Ore, 1);
+    const sim = new Sim(world);
+    sim.pickup(0, ItemKind.Ore, 1);
+    sim.pickup(0, ItemKind.Crate, 1);
+    expect(sim.carrying(0)).toEqual([ItemKind.Ore, ItemKind.Crate]);
+    sim.drop(0, ItemKind.Ore, 1);
+    expect(sim.carrying(0)).toEqual([ItemKind.Crate]);
+  });
+
+  test('probe finds the machine underfoot, then the one the bot faces', () => {
+    const world = openWorld(3, 1, 1);
+    placeMachine(world, {
+      id: 'ahead',
+      kind: MachineKind.Furnace,
+      at: vec(1, 0),
+      state: 'hot',
+      vars: { fuel: 2 },
+      inventory: [{ kind: ItemKind.Ore, count: 1 }],
+    });
+    const sim = new Sim(world);
+
+    const view = must(sim.probe(0));
+    expect(view.id).toBe('ahead');
+    expect(view.kind).toBe(MachineKind.Furnace);
+    expect(view.state).toBe('hot');
+    expect(view.vars).toEqual({ fuel: 2 });
+    expect(view.inventory).toEqual([{ kind: ItemKind.Ore, count: 1 }]);
+  });
+
+  test('probe by id works from anywhere, and unknown ids give null', () => {
+    const world = openWorld(3, 3, 1);
+    placeMachine(world, { id: 'far', kind: MachineKind.Node, at: vec(2, 2), state: 'off' });
+    const sim = new Sim(world);
+    expect(must(sim.probe(0, 'far')).state).toBe('off');
+    expect(sim.probe(0, 'nope')).toBeNull();
+    expect(sim.probe(0)).toBeNull();
+  });
+
+  test('probe returns copies, not live machine internals', () => {
+    const world = openWorld(3, 1, 1);
+    placeMachine(world, { id: 'm', kind: MachineKind.Node, at: vec(0, 0), vars: { fuel: 1 } });
+    const sim = new Sim(world);
+    const view = must(sim.probe(0));
+    view.vars['fuel'] = 99;
+    view.at.x = 99;
+    expect(must(machineById(world, 'm')).vars).toEqual({ fuel: 1 });
+    expect(must(machineById(world, 'm')).at).toEqual({ x: 0, y: 0 });
+  });
+
+  test('botIds lists only living bots', () => {
+    const world = asciiWorld(['..X'], { bots: [vec(0, 0), vec(1, 0)] });
+    const sim = new Sim(world);
+    expect(sim.botIds()).toEqual([0, 1]);
+    sim.move(1, Dir.East);
+    expect(sim.botIds()).toEqual([0]);
+  });
+
+  test('every sensing call costs 0 ticks but does increment ops', () => {
+    const world = openWorld(3, 3, 2);
+    addGroundItems(world, vec(0, 0), ItemKind.Crate, 1);
+    placeMachine(world, { id: 'm', kind: MachineKind.Node, at: vec(0, 0) });
+    const sim = new Sim(world);
+
+    const senses: { name: string; run: () => void }[] = [
+      { name: 'pos', run: () => void sim.pos(0) },
+      { name: 'facing', run: () => void sim.facing(0) },
+      { name: 'clock', run: () => void sim.clock(0) },
+      { name: 'canMove', run: () => void sim.canMove(0, Dir.South) },
+      { name: 'scan(own)', run: () => void sim.scan(0) },
+      { name: 'scan(dir)', run: () => void sim.scan(0, Dir.East) },
+      { name: 'look', run: () => void sim.look(0, Dir.South, 3) },
+      { name: 'inventory', run: () => void sim.inventory(0) },
+      { name: 'carrying', run: () => void sim.carrying(0) },
+      { name: 'capacity', run: () => void sim.capacity(0) },
+      { name: 'readMark', run: () => void sim.readMark(0) },
+      { name: 'probe', run: () => void sim.probe(0) },
+      { name: 'botIds', run: () => void sim.botIds() },
+      { name: 'recv', run: () => void sim.recv(0) },
+      { name: 'print', run: () => sim.print(0, 'noise') },
+    ];
+
+    for (const sense of senses) {
+      const clockBefore = bot(world, 0).clock;
+      const ticksBefore = sim.ticks;
+      const opsBefore = sim.ops;
+      sense.run();
+      expect(`${sense.name}: clock ${bot(world, 0).clock}`).toBe(`${sense.name}: clock ${clockBefore}`);
+      expect(`${sense.name}: ticks ${sim.ticks}`).toBe(`${sense.name}: ticks ${ticksBefore}`);
+      expect(`${sense.name}: ops ${sim.ops > opsBefore}`).toBe(`${sense.name}: ops true`);
+    }
+    expect(sim.ticks).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// budgets
+// ---------------------------------------------------------------------------
+
+describe('budgets', () => {
+  test('exceeding maxTicks throws HaltError', () => {
+    const world = openWorld(10, 1, 1);
+    const sim = new Sim(world, { maxTicks: 3 });
+    sim.move(0, Dir.East);
+    sim.move(0, Dir.East);
+    sim.move(0, Dir.East);
+    expect(() => sim.move(0, Dir.East)).toThrow(HaltError);
+  });
+
+  test('the offending action is recorded before the HaltError is thrown', () => {
+    const world = openWorld(10, 1, 1);
+    const sim = new Sim(world, { maxTicks: 2 });
+    expect(() => {
+      for (let i = 0; i < 10; i++) sim.move(0, Dir.East);
+    }).toThrow(HaltError);
+
+    const trace = sim.finish();
+    const moves = eventsOfKind(trace.events, 'move');
+    expect(moves).toHaveLength(3);
+    expect(must(moves[2]).t).toBe(2);
+    expect(bot(world).at).toEqual({ x: 3, y: 0 });
+    expect(trace.endTick).toBe(3);
+  });
+
+  test('HaltError carries the budget and the offending bot', () => {
+    const sim = new Sim(openWorld(10, 1, 1), { maxTicks: 1 });
+    try {
+      sim.wait(0, 5);
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toBeInstanceOf(HaltError);
+      if (error instanceof HaltError) {
+        expect(error.maxTicks).toBe(1);
+        expect(error.botId).toBe(0);
+        expect(error.code).toBe('halt');
+      }
+    }
+  });
+
+  test('sync also enforces maxTicks', () => {
+    const world = openWorld(4, 4, 2);
+    const sim = new Sim(world, { maxTicks: 100 });
+    bot(world, 0).clock = 500;
+    expect(() => sim.sync()).toThrow(HaltError);
+  });
+
+  test('exceeding maxOps throws OpLimitError', () => {
+    const sim = new Sim(openWorld(3, 3, 1), { maxOps: 5 });
+    for (let i = 0; i < 5; i++) sim.pos(0);
+    expect(sim.ops).toBe(5);
+    expect(() => sim.pos(0)).toThrow(OpLimitError);
+  });
+
+  test('a sense-only loop hits the op limit without ever hitting the tick limit', () => {
+    const world = openWorld(3, 3, 1);
+    const sim = new Sim(world, { maxOps: 50, maxTicks: 1_000_000 });
+    expect(() => {
+      for (let i = 0; i < 10_000; i++) sim.canMove(0, Dir.East);
+    }).toThrow(OpLimitError);
+    expect(sim.ticks).toBe(0);
+    expect(bot(world).clock).toBe(0);
+    expect(sim.ops).toBe(51);
+  });
+
+  test('OpLimitError carries the budget', () => {
+    const sim = new Sim(openWorld(3, 3, 1), { maxOps: 1 });
+    sim.pos(0);
+    try {
+      sim.pos(0);
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toBeInstanceOf(OpLimitError);
+      if (error instanceof OpLimitError) {
+        expect(error.maxOps).toBe(1);
+        expect(error.code).toBe('oplimit');
+      }
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// multi-bot clocks and collisions
+// ---------------------------------------------------------------------------
+
+describe('virtual clocks and collisions', () => {
+  test('sim.ticks is the makespan, not the sum of the bot clocks', () => {
+    const world = openWorld(4, 4, 2);
+    const sim = new Sim(world);
+    sim.wait(0, 5);
+    sim.wait(1, 7);
+    expect(bot(world, 0).clock).toBe(5);
+    expect(bot(world, 1).clock).toBe(7);
+    expect(sim.ticks).toBe(7);
+    expect(world.tick).toBe(7);
+    expect(sim.finish().endTick).toBe(7);
+  });
+
+  test('two bots contending for the same tile: the loser is blocked at moveBlocked cost', () => {
+    const world = asciiWorld(['...', '...', '...'], { bots: [vec(0, 1), vec(2, 1)] });
+    const sim = new Sim(world);
+
+    expect(sim.move(0, Dir.East)).toBe(true);
+    expect(sim.move(1, Dir.West)).toBe(false);
+
+    expect(bot(world, 0).at).toEqual({ x: 1, y: 1 });
+    expect(bot(world, 1).at).toEqual({ x: 2, y: 1 });
+    expect(bot(world, 1).clock).toBe(DEFAULT_COSTS.moveBlocked);
+    expect(must(eventsOfKind(sim.finish().events, 'move')[1]).reason).toBe('bot');
+  });
+
+  test('a bot running behind cannot walk through a tile another bot held at that time', () => {
+    const world = asciiWorld(['...', '...', '...'], { bots: [vec(1, 1), vec(1, 0)] });
+    const sim = new Sim(world);
+
+    // Bot #0 squats on (1,1) until t = 50, then leaves East.
+    sim.wait(0, 50);
+    expect(sim.move(0, Dir.East)).toBe(true);
+    expect(bot(world, 0).at).toEqual({ x: 2, y: 1 });
+    expect(must(tileAt(world, vec(1, 1))).occupant).toBeUndefined();
+
+    // Bot #1 is still back at t = 0, so from its point of view (1,1) is very much taken.
+    expect(sim.move(1, Dir.South)).toBe(false);
+    expect(bot(world, 1).at).toEqual({ x: 1, y: 0 });
+    expect(bot(world, 1).clock).toBe(DEFAULT_COSTS.moveBlocked);
+
+    // Once its clock passes the moment bot #0 vacated, the same move succeeds.
+    sim.wait(1, 50);
+    expect(sim.move(1, Dir.South)).toBe(true);
+    expect(bot(world, 1).at).toEqual({ x: 1, y: 1 });
+  });
+
+  test('a bot may re-enter a tile it vacated itself', () => {
+    const world = openWorld(3, 3, 1);
+    const sim = new Sim(world);
+    expect(sim.move(0, Dir.East)).toBe(true);
+    expect(sim.move(0, Dir.West)).toBe(true);
+    expect(bot(world).at).toEqual({ x: 0, y: 0 });
+  });
+
+  test('a follower can occupy the tile the leader has already left', () => {
+    const world = asciiWorld(['....'], { bots: [vec(1, 0), vec(0, 0)] });
+    const sim = new Sim(world);
+    expect(sim.move(0, Dir.East)).toBe(true);
+    expect(sim.move(1, Dir.East)).toBe(true);
+    expect(bot(world, 1).at).toEqual({ x: 1, y: 0 });
+  });
+
+  test('running the identical program twice yields identical traces and worlds', () => {
+    const drive = (sim: Sim): void => {
+      sim.move(0, Dir.East);
+      sim.move(1, Dir.West);
+      sim.wait(0, 3);
+      sim.move(1, Dir.West);
+      sim.mark(0, 'a');
+      sim.send(0, 1, 7);
+      sim.recv(1);
+      sim.sync();
+      sim.move(1, Dir.North);
+    };
+
+    const worldA = asciiWorld(['...', '...', '...'], { bots: [vec(0, 1), vec(2, 1)] });
+    const simA = new Sim(worldA);
+    drive(simA);
+    const traceA = simA.finish();
+
+    const worldB = asciiWorld(['...', '...', '...'], { bots: [vec(0, 1), vec(2, 1)] });
+    const simB = new Sim(worldB);
+    drive(simB);
+    const traceB = simB.finish();
+
+    expect(traceB).toEqual(traceA);
+    expect(simB.snapshot()).toEqual(simA.snapshot());
+    expect(simB.ticks).toBe(simA.ticks);
+    expect(simB.ops).toBe(simA.ops);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// extension points
+// ---------------------------------------------------------------------------
+
+describe('extension points', () => {
+  test('applyMachineChange mutates and traces, and reports unknown machines', () => {
+    const world = openWorld(3, 1, 1);
+    placeMachine(world, { id: 'm', kind: MachineKind.Node, at: vec(0, 0), vars: { charge: 0 } });
+    const sim = new Sim(world);
+
+    expect(
+      sim.applyMachineChange(
+        0,
+        'm',
+        (machine) => {
+          machine.vars['charge'] = 5;
+          machine.state = 'live';
+        },
+        3,
+      ),
+    ).toBe(true);
+    expect(bot(world).clock).toBe(3);
+    expect(must(machineById(world, 'm')).state).toBe('live');
+
+    expect(sim.applyMachineChange(0, 'ghost', () => undefined, 2)).toBe(false);
+    expect(bot(world).clock).toBe(5);
+    expect(eventsOfKind(sim.finish().events, 'machineChange')).toHaveLength(1);
+  });
+
+  test('applyTileChange edits a tile for free and traces the before/after', () => {
+    const world = openWorld(3, 1, 1);
+    const sim = new Sim(world);
+    sim.applyTileChange(vec(1, 0), (tile) => {
+      tile.terrain = Terrain.Cable;
+    });
+    expect(must(tileAt(world, vec(1, 0))).terrain).toBe(Terrain.Cable);
+    expect(bot(world).clock).toBe(0);
+
+    const changes = eventsOfKind(sim.finish().events, 'tileChange');
+    expect(must(changes[0]).before.terrain).toBe(Terrain.Floor);
+    expect(must(changes[0]).after.terrain).toBe(Terrain.Cable);
+  });
+
+  test('applyTileChange out of bounds is a no-op', () => {
+    const world = openWorld(3, 1, 1);
+    const sim = new Sim(world);
+    sim.applyTileChange(vec(9, 9), (tile) => {
+      tile.terrain = Terrain.Cable;
+    });
+    expect(eventsOfKind(sim.finish().events, 'tileChange')).toHaveLength(0);
+  });
+
+  test('noteObjective lands in the trace at the current makespan', () => {
+    const world = openWorld(3, 1, 1);
+    const sim = new Sim(world);
+    sim.wait(0, 4);
+    sim.noteObjective('reach-pad', 'met');
+    const objectives = eventsOfKind(sim.finish().events, 'objective');
+    expect(objectives).toEqual([{ t: 4, kind: 'objective', id: 'reach-pad', state: 'met' }]);
+  });
+
+  test('snapshot is a detached deep copy', () => {
+    const world = openWorld(3, 1, 1);
+    const sim = new Sim(world);
+    const snapshot = sim.snapshot();
+    sim.move(0, Dir.East);
+    expect(must(snapshot.bots[0]).at).toEqual({ x: 0, y: 0 });
+    expect(bot(world).at).toEqual({ x: 1, y: 0 });
+  });
+});
+
+describe('maturity', () => {
+  test('derives growth from meta.plantedAt when present', () => {
+    const tile = { terrain: Terrain.Soil, maxGrowth: 5, meta: { plantedAt: 10 } };
+    expect(maturity(tile, 10)).toBe(0);
+    expect(maturity(tile, 13)).toBe(3);
+    expect(maturity(tile, 15)).toBe(5);
+    expect(maturity(tile, 100)).toBe(5);
+    expect(maturity(tile, 5)).toBe(0);
+  });
+
+  test('falls back to a hand-authored growth value', () => {
+    expect(maturity({ terrain: Terrain.Soil, growth: 4, maxGrowth: 4 }, 0)).toBe(4);
+    expect(maturity({ terrain: Terrain.Floor }, 99)).toBe(0);
+  });
+});
+
+describe('bot identity', () => {
+  test('addBot ids drive every command lookup', () => {
+    const world = openWorld(3, 3, 0);
+    addBot(world, { at: vec(0, 0), id: 5 });
+    addBot(world, { at: vec(1, 0), id: 2 });
+    const sim = new Sim(world);
+    expect(sim.pos(5)).toEqual({ x: 0, y: 0 });
+    expect(sim.pos(2)).toEqual({ x: 1, y: 0 });
+    expect(() => sim.pos(0)).toThrow(IllegalActionError);
+  });
+
+  test.fails('botIds() returns living bot ids in ascending order, as documented', () => {
+    const world = openWorld(3, 3, 0);
+    addBot(world, { at: vec(0, 0), id: 5 });
+    addBot(world, { at: vec(1, 0), id: 2 });
+    expect(new Sim(world).botIds()).toEqual([2, 5]);
+  });
+});
+
+/** Trace events double as the failure-reporting channel, so their shape is part of the contract. */
+describe('trace event shapes', () => {
+  test('bot actions carry botId and dt so replay can restore the clock', () => {
+    const world = openWorld(3, 3, 1);
+    const sim = new Sim(world);
+    sim.move(0, Dir.East);
+    sim.wait(0, 2);
+
+    const events = sim.finish().events;
+    const move = must(eventsOfKind(events, 'move')[0]) as MoveEvent;
+    expect(move).toEqual({
+      t: 0,
+      botId: 0,
+      dt: DEFAULT_COSTS.move,
+      kind: 'move',
+      from: { x: 0, y: 0 },
+      to: { x: 1, y: 0 },
+      dir: Dir.East,
+      ok: true,
+    });
+    const wait = must(eventsOfKind(events, 'wait')[0]);
+    expect(wait).toEqual({ t: 1, botId: 0, dt: 2, kind: 'wait', ticks: 2 });
+  });
+});

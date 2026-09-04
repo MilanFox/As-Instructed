@@ -1,0 +1,114 @@
+import { FailureCode } from './errors.ts';
+import type { Objective, ObjectiveContext } from './objectives.ts';
+import { evaluateObjectives } from './objectives.ts';
+import type { Vec } from './types.ts';
+
+/** DESIGN.md §4.6. */
+export interface Verdict {
+  passed: boolean;
+  objectives: { id: string; label: string; met: boolean; progress?: [number, number] }[];
+  failure?: { code: FailureCode; message: string; at?: Vec; line?: number };
+  stats: {
+    /** `max(bot.clock)` — the makespan. The primary score. */
+    ticks: number;
+    ops: number;
+    /** Source length after stripping comments and leading whitespace. DESIGN.md §7. */
+    chars: number;
+    /** How many seeds this verdict covers. */
+    seeds: number;
+    /**
+     * Level-defined resource totals, e.g. `{ cable: 34 }`. The engine never interprets the keys;
+     * commands and levels populate it via `Sim.spend`. DESIGN.md §11 A5.
+     */
+    spend: Record<string, number>;
+  };
+}
+
+export interface VerdictInput extends ObjectiveContext {
+  objectives: readonly Objective[];
+  ops: number;
+  chars: number;
+  seeds: number;
+  /** Defaults to `{}`. Pass `sim.spendTotals()`. */
+  spend?: Record<string, number>;
+  /** Set when the run ended badly. Objectives are still reported, for partial-credit UI. */
+  failure?: { code: FailureCode; message: string; at?: Vec; line?: number };
+}
+
+export function buildVerdict(input: VerdictInput): Verdict {
+  const ctx: ObjectiveContext = {
+    world: input.world,
+    trace: input.trace,
+    initialWorld: input.initialWorld,
+  };
+  const objectives = evaluateObjectives(input.objectives, ctx);
+  const allMet = objectives.every((o) => o.met);
+  const passed = allMet && input.failure === undefined;
+
+  const failure =
+    input.failure ??
+    (allMet
+      ? undefined
+      : {
+          code: FailureCode.ObjectivesUnmet,
+          message: unmetMessage(objectives.filter((o) => !o.met).map((o) => o.label)),
+        });
+
+  const verdict: Verdict = {
+    passed,
+    objectives,
+    stats: {
+      ticks: input.trace.endTick,
+      ops: input.ops,
+      chars: input.chars,
+      seeds: input.seeds,
+      spend: { ...(input.spend ?? {}) },
+    },
+  };
+  if (failure) verdict.failure = failure;
+  return verdict;
+}
+
+function unmetMessage(labels: readonly string[]): string {
+  if (labels.length === 0) return 'The contract was not fulfilled.';
+  if (labels.length === 1) return `Contract not fulfilled: ${labels[0]}.`;
+  return `Contract not fulfilled. Outstanding: ${labels.join('; ')}.`;
+}
+
+/** DESIGN.md §7: source length after stripping comments and leading whitespace. */
+export function scoreChars(source: string): number {
+  const withoutBlockComments = source.replace(/\/\*[\s\S]*?\*\//g, '');
+  const withoutLineComments = withoutBlockComments.replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+  return withoutLineComments
+    .split('\n')
+    .map((line) => line.replace(/^[ \t]+/, ''))
+    .filter((line) => line.length > 0)
+    .join('\n').length;
+}
+
+/** DESIGN.md §11 A4. The Performance Review tiers assume exactly these weights. */
+export const MEDAL_WEIGHT: Readonly<Record<Medal, number>> = Object.freeze({
+  gold: 3,
+  silver: 2,
+  bronze: 1,
+  none: 0,
+});
+
+/** DESIGN.md §11 A4: a bonus objective is worth one extra star on top of the medal. */
+export const BONUS_STAR_WEIGHT = 1;
+
+export const Medal = {
+  Gold: 'gold',
+  Silver: 'silver',
+  Bronze: 'bronze',
+  None: 'none',
+} as const;
+export type Medal = (typeof Medal)[keyof typeof Medal];
+
+/** DESIGN.md §7: `<= par` gold, `<= par * 1.25` silver, a pass is bronze. */
+export function medalFor(passed: boolean, ticks: number, parTicks: number): Medal {
+  if (!passed) return Medal.None;
+  if (ticks <= parTicks) return Medal.Gold;
+  if (ticks <= parTicks * 1.25) return Medal.Silver;
+  return Medal.Bronze;
+}
