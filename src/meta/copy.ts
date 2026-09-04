@@ -54,7 +54,7 @@ export const LIBRARY_EMPTY_STARTER =
   '// The Shared Subroutines Repository.\n' +
   '// Anything exported here can be imported by any work order.\n' +
   '//\n' +
-  "// NOTE(4470): whatever you put here, you will be reading it in eleven months\n" +
+  '// NOTE(4470): whatever you put here, you will be reading it in eleven months\n' +
   '\n' +
   'export {};\n';
 
@@ -116,9 +116,7 @@ export const REFACTOR = {
   projection: (delta: number, name: string, levels: number, upgrades: number): string => {
     const orders = `${levels} work ${levels === 1 ? 'order' : 'orders'}`;
     if (upgrades === 0) return `${delta} ticks off \`${name}\` improves ${orders}.`;
-    return (
-      `${delta} ticks off \`${name}\` improves ${orders}, ${upgrades} of them to a better medal.`
-    );
+    return `${delta} ticks off \`${name}\` improves ${orders}, ${upgrades} of them to a better medal.`;
   },
   projectionMedals: (from: Medal, to: Medal, count: number): string =>
     `${count} ${count === 1 ? 'work order goes' : 'work orders go'} from ${from} to ${to}.`,
@@ -133,7 +131,8 @@ export const REFACTOR = {
 
 export const REGRESSION = {
   title: 'REGRESSION',
-  running: (done: number, total: number): string => `Re-running closed work orders. ${done}/${total}.`,
+  running: (done: number, total: number): string =>
+    `Re-running closed work orders. ${done}/${total}.`,
   clean: 'Every work order that reads the Repository still closes. Nothing has been raised.',
   nothingToCheck: 'No closed work order reads the Repository. There is nothing to re-run.',
   /** Given verbatim in the brief, and it is the right line. */

@@ -60,13 +60,7 @@ export interface LevelProfile {
 
 /** How one re-run of a completed work order turned out. */
 export type RegressionState =
-  | 'pending'
-  | 'running'
-  | 'nominal'
-  | 'improved'
-  | 'degraded'
-  | 'broken'
-  | 'skipped';
+  'pending' | 'running' | 'nominal' | 'improved' | 'degraded' | 'broken' | 'skipped';
 
 export interface RegressionEntry {
   levelId: string;

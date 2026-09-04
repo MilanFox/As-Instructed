@@ -88,7 +88,8 @@ export function runSeed(options: SeedRunOptions): SeedRun {
       wrapperOffset: wrapperOffset(),
       unlocked: unlockedHardware,
       locate: (stack) => resolveModuleLocation(stack, wrapperOffset(), maps),
-      describeStack: (stack) => moduleStack(stack, wrapperOffset(), maps, options.library !== undefined),
+      describeStack: (stack) =>
+        moduleStack(stack, wrapperOffset(), maps, options.library !== undefined),
       ...(options.lineMap !== undefined ? { lineMap: options.lineMap } : {}),
     });
   }

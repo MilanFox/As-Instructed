@@ -48,18 +48,38 @@ export type {
   CompileResult,
   CompileSuccess,
   LanguageOptions,
+  LibraryCompileResult,
+  LibraryCompileSuccess,
   MonacoApi,
 } from './compile.ts';
 export {
+  LIB_FILE_PATH,
   PLAYER_FILE_PATH,
+  compileLibrary,
   compilePlayerCode,
+  emitOnly,
   configurePlayerLanguage,
   getPlayerDiagnostics,
+  setLibraryTypes,
+  toAmbientModule,
   toCompileDiagnostics,
 } from './compile.ts';
 
 export type { RunnerOptions, WorkerLike } from './host.ts';
 export { Runner } from './host.ts';
+
+export type { StackFrame } from './errors.ts';
+export { parseStackFrames, topFrameLine } from './errors.ts';
+
+export {
+  DEFAULT_WRAPPER_OFFSET,
+  PLAYER_FRAME_NAME,
+  WRAPPER_PREAMBLE_LINES,
+  measureWrapperOffset,
+  toPlayerLine,
+} from './wrapper.ts';
+
+export { decodeLineMap, toSourceLine } from './sourcemap.ts';
 
 export type {
   LibraryModule,

@@ -54,4 +54,70 @@ export {
   UNLOCK_NOTE,
 } from './copy.ts';
 
-export { LIBRARY_REQUIREMENTS, LIBRARY_UNLOCK_LEVEL, isLibraryUnlocked, requirementsFor } from './unlock.ts';
+export type { LibraryRequirement } from './unlock.ts';
+export {
+  LIBRARY_FIRST_WORLD,
+  LIBRARY_REQUIREMENTS,
+  LIBRARY_UNLOCK_LEVEL,
+  isLibraryUnlocked,
+  requirementsFor,
+} from './unlock.ts';
+
+export type { Declaration, PublishPlan, PublishSelection } from './publish.ts';
+export {
+  isValidName,
+  libraryExportNames,
+  planPublication,
+  publishableDeclarations,
+  renameIdentifier,
+  withLibraryImport,
+} from './publish.ts';
+
+export type { CallerFact, FunctionReport, MedalUpgrade, Projection } from './profile.ts';
+export {
+  bestProjection,
+  buildReports,
+  medalThresholds,
+  projectSavings,
+  projectedTicks,
+  upgradeSummary,
+} from './profile.ts';
+
+export type {
+  MetaRunOutcome,
+  MetaRunRequest,
+  MetaRunner,
+  RegressionSummary,
+  RegressionTarget,
+  SuiteOptions,
+  SuiteResult,
+} from './regression.ts';
+export {
+  applySuite,
+  cachedRun,
+  keyFor,
+  needsAttention,
+  runSuite,
+  summarise,
+  summaryLine,
+  withCachedRun,
+} from './regression.ts';
+
+export type { DiscrepancyCandidate, ProbeResult } from './discrepancy.ts';
+export {
+  COMPLETIONS_PER_DISCREPANCY,
+  MIN_CLOSED_BEFORE_FIRST,
+  offScheduleSeeds,
+  openDiscrepancies,
+  patchDiscrepancy,
+  pickCandidate,
+  probe,
+  shouldProbe,
+  withDiscrepancy,
+} from './discrepancy.ts';
+
+export type { RunnerLike } from './adapters.ts';
+export { createMetaRunner, libraryHashOf, prepareLibrary, toOutcome } from './adapters.ts';
+
+export type { MetaHost, MetaPanel, MetaState, PublishOffer } from './store.ts';
+export { suiteSummary, useLibrary } from './store.ts';

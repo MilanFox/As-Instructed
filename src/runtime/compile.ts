@@ -314,7 +314,8 @@ export interface LibraryCompileSuccess {
 
 export type LibraryCompileResult = LibraryCompileSuccess | CompileFailure;
 
-const EXPORTED_NAME = /^\s*export\s+(?:declare\s+)?(?:async\s+)?(?:function\s*\*?\s*|class\s+|const\s+|let\s+|var\s+|abstract\s+class\s+)([A-Za-z_$][\w$]*)/gm;
+const EXPORTED_NAME =
+  /^\s*export\s+(?:declare\s+)?(?:async\s+)?(?:function\s*\*?\s*|class\s+|const\s+|let\s+|var\s+|abstract\s+class\s+)([A-Za-z_$][\w$]*)/gm;
 
 function exportedNames(dts: string): string[] {
   const names = new Set<string>();
@@ -381,5 +382,46 @@ export async function compileLibrary(
     declaration: toAmbientModule(dtsText),
     exports: exportedNames(dtsText),
     diagnostics: diagnostics.filter((diagnostic) => diagnostic.severity !== 'error'),
+  };
+}
+
+/**
+ * Emit without asking the type checker's opinion.
+ *
+ * The regression suite re-compiles work orders the player has already closed, under whatever
+ * hardware the *current* level unlocked — so a World 7 solution re-checked while the player sits
+ * in World 4 would be full of `Cannot find name` errors that mean nothing. Those errors were
+ * answered when the work order was closed. Only syntax can still be wrong here, and syntax is
+ * still checked, because emitting from a file that does not parse would produce nonsense.
+ */
+export async function emitOnly(monaco: MonacoApi, model: TextModel): Promise<CompileResult> {
+  const source = model.getValue();
+  const worker = await workerFor(monaco, model);
+  const fileName = model.uri.toString();
+
+  const syntactic = await worker.getSyntacticDiagnostics(fileName);
+  const diagnostics = toCompileDiagnostics(source, syntactic);
+  const errors = diagnostics.filter((diagnostic) => diagnostic.severity === 'error');
+  if (errors.length > 0) {
+    const first = errors[0] as CompileDiagnostic;
+    return { ok: false, diagnostics, error: compileFailure(first.message, first) };
+  }
+
+  const emit = await worker.getEmitOutput(fileName);
+  const js = emit.outputFiles.find((file) => file.name.endsWith('.js'));
+  const map = emit.outputFiles.find((file) => file.name.endsWith('.js.map'));
+  if (!js) {
+    return {
+      ok: false,
+      diagnostics,
+      error: compileFailure('The compiler could not produce a program from this source.'),
+    };
+  }
+
+  return {
+    ok: true,
+    js: js.text.replace(SOURCE_MAP_COMMENT, '\n'),
+    lineMap: map ? decodeLineMap(map.text) : [],
+    diagnostics: [],
   };
 }

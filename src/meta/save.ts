@@ -319,9 +319,7 @@ export function mergeLibrary(current: LibrarySave, incoming: unknown): LibrarySa
   const next = migrateLibrary(incoming);
   const byId = new Map<string, LibraryRevision>();
   for (const revision of [...current.revisions, ...next.revisions]) byId.set(revision.id, revision);
-  const revisions = [...byId.values()]
-    .sort((a, b) => a.at - b.at)
-    .slice(-MAX_REVISIONS);
+  const revisions = [...byId.values()].sort((a, b) => a.at - b.at).slice(-MAX_REVISIONS);
 
   return {
     ...next,
@@ -361,5 +359,7 @@ function isReason(value: unknown): value is LibraryRevision['reason'] {
 }
 
 function stringsOf(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string')
+    : [];
 }

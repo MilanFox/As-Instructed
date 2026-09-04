@@ -38,6 +38,15 @@ export const LIB_SPECIFIER = 'lib';
 /** The binding the rewritten imports destructure from. Reserved; the linter rejects it in player code. */
 export const LIB_BINDING = '__lib__';
 
+/**
+ * The binding the library's own footer calls to install its meters. Reserved, like `LIB_BINDING`.
+ *
+ * It exists because attribution has to survive a library function calling another one. Wrapping
+ * only the exports handed to the level would leave a shared inner helper reporting zero calls, and
+ * the Refactor screen would then tell the player that making it faster changes nothing.
+ */
+export const METER_BINDING = '__meter__';
+
 /** Frame name for the library's top-level body, mirroring `PLAYER_FRAME_NAME`. */
 export const LIBRARY_FRAME_NAME = '__library__';
 
@@ -357,16 +366,31 @@ export interface ModuleProblem {
   message: string;
 }
 
+/** One thing the library publishes. */
+export interface LibraryExport {
+  /** The name a work order imports. */
+  name: string;
+  /** The binding inside `lib.ts`. Differs from `name` only for `export { a as b }`. */
+  local: string;
+  /**
+   * True when the binding can be reassigned, which is what lets a meter be installed *inside* the
+   * library so calls between library functions are attributed too.
+   */
+  mutable: boolean;
+}
+
 export interface LibraryModule {
   /** Emitted JS with every `export` keyword removed. Line count identical to the input. */
   js: string;
   /** Exported binding names, in declaration order. */
   exports: string[];
+  /** The same exports with their local bindings, in declaration order. */
+  entries: LibraryExport[];
   problems: ModuleProblem[];
 }
 
 const DECLARATION_HEAD =
-  /^(?:(?:async\s+)?function\s*\*?\s*([A-Za-z_$][\w$]*)|class\s+([A-Za-z_$][\w$]*)|(?:const|let|var)\s+([\s\S]*))/;
+  /^(?:(?:async\s+)?function\s*\*?\s*([A-Za-z_$][\w$]*)|class\s+([A-Za-z_$][\w$]*)|(const|let|var)\s+([\s\S]*))/;
 
 /** `a, b = 1, { c, d }` -> the identifiers it introduces. */
 function bindingNames(declarators: string): string[] {
@@ -385,7 +409,11 @@ function bindingNames(declarators: string): string[] {
     /* Destructuring: `{ a, b: c }` / `[a, b]`. Take each binding's local name. */
     for (const part of head.replace(/^[{[]|[}\]]$/g, '').split(',')) {
       const local = part.includes(':') ? part.split(':').pop() : part;
-      const cleaned = (local ?? '').replace(/^\.\.\./, '').split('=')[0]?.trim() ?? '';
+      const cleaned =
+        (local ?? '')
+          .replace(/^\.\.\./, '')
+          .split('=')[0]
+          ?.trim() ?? '';
       if (/^[A-Za-z_$][\w$]*$/.test(cleaned)) names.push(cleaned);
     }
   };
@@ -405,17 +433,31 @@ function bindingNames(declarators: string): string[] {
   return names;
 }
 
-/** `{ a, b as c }` -> the names the module exposes. */
-function exportClauseNames(clause: string): string[] {
-  const names: string[] = [];
+/** `{ a, b as c }` -> the local binding and the name the module exposes, per entry. */
+function exportClausePairs(clause: string): { local: string; name: string }[] {
+  const pairs: { local: string; name: string }[] = [];
   for (const part of clause.split(',')) {
     const trimmed = part.trim();
     if (trimmed === '') continue;
-    const exported = trimmed.includes(' as ') ? trimmed.split(/\s+as\s+/).pop() : trimmed;
-    const cleaned = (exported ?? '').trim();
-    if (/^[A-Za-z_$][\w$]*$/.test(cleaned)) names.push(cleaned);
+    const halves = trimmed.split(/\s+as\s+/);
+    const local = (halves[0] ?? '').trim();
+    const name = (halves.length > 1 ? (halves[1] ?? '') : local).trim();
+    if (/^[A-Za-z_$][\w$]*$/.test(local) && /^[A-Za-z_$][\w$]*$/.test(name)) {
+      pairs.push({ local, name });
+    }
   }
-  return names;
+  return pairs;
+}
+
+export interface StripOptions {
+  /**
+   * Rewrite `export const` to `export let` — same width, same columns, same lines — so the export
+   * can be reassigned to its metered wrapper from inside the library.
+   *
+   * Off by default, because it is a semantic change and only the metered path needs it. TypeScript
+   * still refuses an assignment to a `const` in the editor, so the player never sees the widening.
+   */
+  mutableExports?: boolean;
 }
 
 /**
@@ -424,10 +466,10 @@ function exportClauseNames(clause: string): string[] {
  * `export ` on a declaration is replaced by spaces of the same width, which keeps columns as well
  * as lines intact. An `export { … }` statement is blanked entirely.
  */
-export function stripLibraryExports(emittedJs: string): LibraryModule {
+export function stripLibraryExports(emittedJs: string, options: StripOptions = {}): LibraryModule {
   const statements = findModuleStatements(emittedJs);
   const problems: ModuleProblem[] = [];
-  const exports: string[] = [];
+  const entries: LibraryExport[] = [];
   const edits: { start: number; end: number; text: string }[] = [];
 
   for (const statement of statements) {
@@ -473,7 +515,9 @@ export function stripLibraryExports(emittedJs: string): LibraryModule {
         });
         continue;
       }
-      exports.push(...exportClauseNames(clause));
+      for (const pair of exportClausePairs(clause)) {
+        entries.push({ name: pair.name, local: pair.local, mutable: false });
+      }
       edits.push({ start: statement.start, end: statement.end, text: blank(statement.text) });
       continue;
     }
@@ -489,9 +533,19 @@ export function stripLibraryExports(emittedJs: string): LibraryModule {
       continue;
     }
 
+    const keyword = head[3];
+    const widen = keyword === 'const' && options.mutableExports === true;
     const named = head[1] ?? head[2];
-    if (named) exports.push(named);
-    else exports.push(...bindingNames(head[3] ?? ''));
+    /* A `function` or `class` declaration binding is reassignable; so is `let`/`var`; `const` only
+       once it has been widened. */
+    const mutable = named !== undefined || keyword !== 'const' || widen;
+
+    if (named) entries.push({ name: named, local: named, mutable });
+    else {
+      for (const name of bindingNames(head[4] ?? '')) {
+        entries.push({ name, local: name, mutable });
+      }
+    }
 
     /* Blank exactly `export` plus the whitespace that followed it: same width, same lines. */
     edits.push({
@@ -499,17 +553,32 @@ export function stripLibraryExports(emittedJs: string): LibraryModule {
       end: statement.start + leading,
       text: blank(statement.text.slice(0, leading)),
     });
+    if (widen) {
+      const keywordStart = statement.start + leading;
+      edits.push({ start: keywordStart, end: keywordStart + 5, text: 'let  ' });
+    }
   }
 
-  const duplicates = exports.filter((name, index) => exports.indexOf(name) !== index);
-  for (const name of new Set(duplicates)) {
-    problems.push({
-      line: 1,
-      message: `\`${name}\` is published twice. The repository keeps one subroutine per name.`,
-    });
+  const seen = new Set<string>();
+  const unique: LibraryExport[] = [];
+  for (const entry of entries) {
+    if (seen.has(entry.name)) {
+      problems.push({
+        line: 1,
+        message: `\`${entry.name}\` is published twice. The repository keeps one subroutine per name.`,
+      });
+      continue;
+    }
+    seen.add(entry.name);
+    unique.push(entry);
   }
 
-  return { js: applyEdits(emittedJs, edits), exports: [...new Set(exports)], problems };
+  return {
+    js: applyEdits(emittedJs, edits),
+    exports: unique.map((entry) => entry.name),
+    entries: unique,
+    problems,
+  };
 }
 
 function applyEdits(
@@ -695,6 +764,10 @@ export interface LinkedProgram {
   problems: { file: SourceFile; problem: ModuleProblem }[];
 }
 
+function quote(name: string): string {
+  return JSON.stringify(name);
+}
+
 function wrap(body: string, frameName: string, sourceUrl: string, footer: string): string {
   return (
     `'use strict';\nreturn (function ${frameName}() {\n${body}\n${footer}\n})();\n` +
@@ -737,6 +810,9 @@ function meterExport(
   depth: { value: number },
 ): unknown {
   if (typeof fn !== 'function') return fn;
+  /* A class is a function and cannot be wrapped in one: the wrapper would be called without
+     `new` and the constructor would throw. Published classes are handed over unmetered. */
+  if (/^class[\s{]/.test(Function.prototype.toString.call(fn))) return fn;
   const target = fn as (...args: unknown[]) => unknown;
   const wrapped = function (this: unknown, ...args: unknown[]): unknown {
     const before = meter.now();
@@ -775,7 +851,9 @@ export function linkProgram(options: LinkOptions): LinkedProgram {
 
   /* Stripping is pure, so it happens now: the caller learns what the library publishes, and what
      is wrong with it, without having to run anything. */
-  const library = hasLibrary ? stripLibraryExports(libraryJs) : undefined;
+  const library = hasLibrary
+    ? stripLibraryExports(libraryJs, { mutableExports: options.meter !== undefined })
+    : undefined;
   if (library) for (const problem of library.problems) problems.push({ file: 'lib', problem });
 
   const run = (): void => {
@@ -786,17 +864,36 @@ export function linkProgram(options: LinkOptions): LinkedProgram {
     let bindings: Record<string, unknown> = {};
 
     if (library) {
-      const footer = `;return { ${library.exports.map((n) => `${n}: ${n}`).join(', ')} };`;
+      const meter = options.meter;
+      const depth = { value: 0 };
+      const install = (name: string, fn: unknown): unknown =>
+        meter ? meterExport(name, fn, meter, usage, depth) : fn;
+
+      /* Reassigning the binding inside the library is what makes an intra-library call go through
+         the meter: `sweep` looks `step` up at call time and finds the wrapper. Exports that cannot
+         be reassigned are wrapped on the way out instead, which still attributes every call the
+         *level* makes — it only misses calls the library makes to itself. */
+      const installs = meter
+        ? library.entries
+            .filter((entry) => entry.mutable)
+            .map((entry) => `${entry.local}=${METER_BINDING}(${quote(entry.name)},${entry.local});`)
+            .join('')
+        : '';
+      const returns = library.entries
+        .map((entry) => `${quote(entry.name)}: ${entry.local}`)
+        .join(', ');
+      const footer = `;${installs}return { ${returns} };`;
+
       const body = wrap(library.js, LIBRARY_FRAME_NAME, LIBRARY_SOURCE_URL, footer);
-      const produced = evaluate(body, options.scope, {}) as Record<string, unknown>;
+      const produced = evaluate(body, options.scope, { [METER_BINDING]: install }) as Record<
+        string,
+        unknown
+      >;
 
       bindings = {};
-      const depth = { value: 0 };
-      for (const name of library.exports) {
-        const value = produced[name];
-        bindings[name] = options.meter
-          ? meterExport(name, value, options.meter, usage, depth)
-          : value;
+      for (const entry of library.entries) {
+        const value = produced[entry.name];
+        bindings[entry.name] = entry.mutable ? value : install(entry.name, value);
       }
     }
 
@@ -878,7 +975,9 @@ export function resolveModuleLocation(
     const map = file === 'program' ? maps.program : maps.lib;
     const line = toSourceLine(emitted, map);
     const remapped = map !== undefined && map.length > 0;
-    return frame.column === undefined || remapped ? { file, line } : { file, line, column: frame.column };
+    return frame.column === undefined || remapped
+      ? { file, line }
+      : { file, line, column: frame.column };
   }
 
   return undefined;
