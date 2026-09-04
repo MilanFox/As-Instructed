@@ -8,7 +8,6 @@ import {
   addBot,
   addMachine,
   createWorld,
-  machineById,
   manhattan,
   setTerrain,
   vec,
