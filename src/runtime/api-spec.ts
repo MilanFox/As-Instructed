@@ -387,11 +387,11 @@ print(\`loaded \${taken} ore\`);`,
         type: 'number',
         optional: true,
         defaultValue: '8',
-        doc: 'How many tiles to look ahead at most.',
+        doc: 'The most tile views to return. The tile that stops the cast counts as one of them.',
       },
     ],
     returns: 'TileView[]',
-    doc: "Casts a ray from the bot along `dir` and returns up to `range` tile views, nearest first. The bot's own tile is excluded, and the cast stops after the first sight-blocking or out-of-bounds tile, which is still included in the result.",
+    doc: "Casts a ray from the bot along `dir` and returns at most `range` tile views, nearest first. The bot's own tile is excluded. The cast stops after the first sight-blocking or out-of-bounds tile, which is included in the result and counts against `range` — so a ray that runs off the edge of the site returns the tiles it crossed plus one view with `inBounds: false`.",
     example: `const corridor = look(Dir.East, 5);
 const blockedAt = corridor.findIndex((tile) => !tile.walkable);
 print(\`clear for \${blockedAt < 0 ? corridor.length : blockedAt} tiles\`);`,
@@ -590,12 +590,13 @@ print(\`swarm aligned at tick \${t}\`);`,
       { name: 'body', type: 'string | number', doc: 'The payload to deliver.' },
     ],
     returns: 'boolean',
-    doc: "Queues a message in another bot's inbox, stamped with the sender's clock. Returns false when `to` is not a living bot.",
+    doc: "Queues a message in another bot's inbox, stamped with the sender's clock. Returns false when `to` is not a living bot. Delivery is causal: a bot only sees a message once its own clock has reached the moment the message was sent, so the working idiom is `send`, then `sync()`, then `recv()` on the receiving side. Skipping the `sync` leaves a receiver that is behind in virtual time with an empty inbox.",
     example: `for (const id of bots()) {
   if (id !== 0) {
     send(id, 'go');
   }
-}`,
+}
+sync();`,
     cost: 1,
     unlockedBy: 'w7-02',
     world: 7,
@@ -605,8 +606,9 @@ print(\`swarm aligned at tick \${t}\`);`,
     name: 'recv',
     params: [],
     returns: 'Message | null',
-    doc: "Pops the oldest message from this bot's inbox, or null when the inbox is empty. Reading is free, so a bot can drain its whole inbox without spending a tick.",
-    example: `const msg = recv();
+    doc: "Pops the oldest message from this bot's inbox, or null when the inbox is empty. Reading is free, so a bot can drain its whole inbox without spending a tick. Only messages the bot's own clock has caught up to are visible, so call `sync()` between the `send` and the `recv` when the receiver is running behind — otherwise the inbox looks empty even though the message was sent.",
+    example: `sync();
+const msg = recv();
 if (msg !== null && msg.body === 'go') {
   move(Dir.North);
 }`,

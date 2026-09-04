@@ -7,8 +7,8 @@ import {
   OpLimitError,
   OutOfFuelError,
 } from './errors.ts';
-import type { Trace } from './trace.ts';
-import { KEYFRAME_INTERVAL, TraceBuilder } from './trace.ts';
+import type { SenseEvent, Trace } from './trace.ts';
+import { KEYFRAME_INTERVAL, MAX_SENSE_EVENTS, TraceBuilder } from './trace.ts';
 import type { Bot, Dir, ItemKind, ItemStack, Machine, Message, Tile, Vec, World } from './types.ts';
 import { Terrain } from './types.ts';
 import {
@@ -20,6 +20,7 @@ import {
   cloneTile,
   cloneWorld,
   dirName,
+  enqueueMessage,
   indexOf,
   inBounds,
   inventoryCount,
@@ -47,6 +48,8 @@ export interface SimOptions {
   costs?: CostOverrides;
   keyframeInterval?: number;
   livelockRounds?: number;
+  /** How many individual sensing reads the trace keeps before it starts aggregating them. */
+  maxSenseEvents?: number;
 }
 
 /** What a bot perceives about one tile. All sensing is free (0 ticks). */
@@ -76,8 +79,10 @@ export interface MachineView {
 
 const OUT_OF_BOUNDS_TERRAIN = Terrain.Void;
 
+/** One bot's residence on one tile, over the half-open clock interval `[from, to)`. */
 interface Occupancy {
   botId: number;
+  /** The bot's own clock at the moment it took the tile, i.e. when its arriving move completed. */
   from: number;
   /** Exclusive. `Infinity` while the bot is still standing there. */
   to: number;
@@ -89,6 +94,10 @@ interface Occupancy {
  * Nothing in this engine ticks on its own — there is no global update loop — so growth is derived
  * from when the crop was planted rather than advanced by a scheduler. Tiles authored with a
  * `growth` value and no `meta.plantedAt` are simply always at that maturity.
+ *
+ * `meta.plantedAt` is the tick the seed reached the soil, i.e. the moment `plant` *finished*.
+ * A crop therefore reads 0/max to the bot that just planted it, rather than having quietly grown
+ * during the two ticks that bot spent kneeling over it.
  */
 export function maturity(tile: Tile, t: number): number {
   const max = tile.maxGrowth ?? 0;
@@ -121,6 +130,7 @@ export class Sim {
   private readonly keyframeInterval: number;
   private readonly occupancy = new Map<number, Occupancy[]>();
   private readonly spendLedger = new Map<string, number>();
+  private readonly senseLedger = new Map<string, number>();
   private readonly livelockRounds: number;
   private readonly blockedSince = new Set<number>();
   private blockedStreak = 0;
@@ -134,7 +144,7 @@ export class Sim {
     this.maxOps = options.maxOps ?? DEFAULT_MAX_OPS;
     this.keyframeInterval = options.keyframeInterval ?? KEYFRAME_INTERVAL;
     this.livelockRounds = options.livelockRounds ?? DEFAULT_LIVELOCK_ROUNDS;
-    this.builder = new TraceBuilder(world);
+    this.builder = new TraceBuilder(world, options.maxSenseEvents ?? MAX_SENSE_EVENTS);
 
     for (const bot of world.bots) {
       if (!bot.alive) continue;
@@ -174,37 +184,58 @@ export class Sim {
   }
 
   // -------------------------------------------------------------------------
-  // Sensing (0 ticks)
+  // Sensing (0 ticks, but counted)
   // -------------------------------------------------------------------------
+  //
+  // Sensing stays free in ticks (DESIGN.md §4.4) and is *observable*: one op against `maxOps`,
+  // one `sense` trace event, one tally in `senseTotals()`. That is what lets a level budget
+  // information — "find the break in ten probes" — the way it already budgets time.
+  //
+  // `recv` is excluded on purpose: it consumes a message rather than reading the world, and it
+  // has carried its own event since World 7. So is `botIds`, which reads the roster, not the site.
 
   pos(botId: number): Vec {
     const bot = this.requireBot(botId);
+    this.sense(bot, 'pos', true, `${bot.at.x},${bot.at.y}`);
     return { x: bot.at.x, y: bot.at.y };
   }
 
   facing(botId: number): Dir {
-    return this.requireBot(botId).facing;
+    const bot = this.requireBot(botId);
+    this.sense(bot, 'facing', true, dirName(bot.facing));
+    return bot.facing;
   }
 
   clock(botId: number): number {
-    return this.requireBot(botId).clock;
+    const bot = this.requireBot(botId);
+    this.sense(bot, 'clock', true, bot.clock);
+    return bot.clock;
   }
 
   canMove(botId: number, dir: Dir): boolean {
     const bot = this.requireBot(botId);
-    return this.blockReason(bot, step(bot.at, dir), bot.clock) === null;
+    const free = this.blockReason(bot, step(bot.at, dir), bot.clock + this.costs.move) === null;
+    this.sense(bot, 'canMove', free, dirName(dir));
+    return free;
   }
 
   /** The bot's own tile when `dir` is omitted, otherwise the adjacent tile in `dir`. */
   scan(botId: number, dir?: Dir): TileView {
     const bot = this.requireBot(botId);
     const at = dir === undefined ? bot.at : step(bot.at, dir);
-    return this.view(at, bot.clock);
+    const view = this.view(at, bot.clock);
+    this.sense(bot, 'scan', view.inBounds, `${at.x},${at.y}`);
+    return view;
   }
 
   /**
-   * Ray-cast from the bot in `dir` up to `range` tiles, stopping after the first opaque tile
-   * (which is included). World 4's map-discovery primitive.
+   * Ray-cast from the bot in `dir`, nearest first, excluding the bot's own tile. World 4's
+   * map-discovery primitive.
+   *
+   * `range` caps the number of views returned, and the tile that stops the cast — the first
+   * opaque one, or the first out-of-bounds one — is included and counts against that cap. A ray
+   * that runs off the edge therefore ends in a view with `inBounds: false`, which is how a player
+   * tells "the tunnel continues past my sensor" from "the site ends here".
    */
   look(botId: number, dir: Dir, range = 8): TileView[] {
     const bot = this.requireBot(botId);
@@ -218,30 +249,41 @@ export class Sim {
       const tile = tileAt(this.world, at);
       if (tile && terrainProps(tile.terrain).opaque) break;
     }
+    this.sense(bot, 'look', out.length > 0, `${dirName(dir)}:${out.length}`);
     return out;
   }
 
   inventory(botId: number, kind?: ItemKind): number {
     const bot = this.requireBot(botId);
-    return inventoryCount(bot, kind);
+    const held = inventoryCount(bot, kind);
+    this.sense(bot, 'inventory', held > 0, kind ?? '*');
+    return held;
   }
 
   /** Distinct item kinds the bot is holding, in pickup order. */
   carrying(botId: number): ItemKind[] {
     const bot = this.requireBot(botId);
-    return bot.inventory.filter((s) => s.count > 0).map((s) => s.kind);
+    const kinds = bot.inventory.filter((s) => s.count > 0).map((s) => s.kind);
+    this.sense(bot, 'carrying', kinds.length > 0, kinds.length);
+    return kinds;
   }
 
   capacity(botId: number): number {
-    return this.requireBot(botId).capacity;
+    const bot = this.requireBot(botId);
+    this.sense(bot, 'capacity', true, bot.capacity);
+    return bot.capacity;
   }
 
   fuel(botId: number): number {
-    return this.requireBot(botId).fuel;
+    const bot = this.requireBot(botId);
+    this.sense(bot, 'fuel', Number.isFinite(bot.fuel), finiteDetail(bot.fuel));
+    return bot.fuel;
   }
 
   fuelMax(botId: number): number {
-    return this.requireBot(botId).fuelMax;
+    const bot = this.requireBot(botId);
+    this.sense(bot, 'fuelMax', Number.isFinite(bot.fuelMax), finiteDetail(bot.fuelMax));
+    return bot.fuelMax;
   }
 
   /** Resource totals for `Verdict.stats.spend`. DESIGN.md §11 A5. */
@@ -249,15 +291,26 @@ export class Sim {
     return Object.fromEntries(this.spendLedger);
   }
 
+  /**
+   * How many times each sensing command ran, keyed by command name. Feeds `Verdict.stats.senses`,
+   * and is exact regardless of how much detail the trace folded away.
+   */
+  senseTotals(): Record<string, number> {
+    return Object.fromEntries(this.senseLedger);
+  }
+
   readMark(botId: number): string | null {
     const bot = this.requireBot(botId);
-    return tileAt(this.world, bot.at)?.mark ?? null;
+    const mark = tileAt(this.world, bot.at)?.mark ?? null;
+    this.sense(bot, 'readMark', mark !== null, mark === null ? undefined : clip(mark));
+    return mark;
   }
 
   probe(botId: number, machineId?: string): MachineView | null {
     const bot = this.requireBot(botId);
     const machine =
       machineId === undefined ? this.machineNear(bot) : machineById(this.world, machineId);
+    this.sense(bot, 'probe', machine !== undefined, machine?.id ?? machineId);
     if (!machine) return null;
     return {
       id: machine.id,
@@ -283,7 +336,7 @@ export class Sim {
     const t = bot.clock;
     const from = { x: bot.at.x, y: bot.at.y };
     const to = step(from, dir);
-    const reason = this.blockReason(bot, to, t);
+    const reason = this.blockReason(bot, to, t + this.costs.move);
     const dt = reason === null ? this.costs.move : this.costs.moveBlocked;
     this.requireFuel(bot, dt, 'move');
     bot.facing = dir;
@@ -300,7 +353,7 @@ export class Sim {
     bot.at = to;
     const toTile = tileAt(this.world, to);
     if (toTile) toTile.occupant = botId;
-    this.reserve(to, botId, t);
+    this.reserve(to, botId, t + dt);
 
     this.builder.push({ t, botId, dt, kind: 'move', from, to, dir, ok: true });
     this.charge(bot, dt);
@@ -405,7 +458,7 @@ export class Sim {
     tile.crop = PLANT_YIELD[kind] ?? kind;
     tile.growth = 0;
     tile.maxGrowth = growTime;
-    tile.meta = { ...(tile.meta ?? {}), plantedAt: t };
+    tile.meta = { ...(tile.meta ?? {}), plantedAt: t + dt };
 
     this.builder.push({ t, botId, dt, kind: 'plant', at, item: kind, ok: true });
     this.builder.push({ t, kind: 'tileChange', at, before, after: cloneTile(tile) });
@@ -656,20 +709,29 @@ export class Sim {
     this.requireFuel(bot, dt, 'send');
     const target = botById(this.world, to);
     if (!target || !target.alive) {
-      this.builder.push({ t, botId, dt, kind: 'act', name: 'send', ok: false, detail: to });
+      this.builder.push({ t, botId, dt, kind: 'send', to, body, ok: false });
       this.charge(bot, dt);
       return false;
     }
-    target.inbox.push({ from: botId, body, t });
-    this.builder.push({ t, botId, dt, kind: 'send', to, body });
+    enqueueMessage(target, { from: botId, body, t });
+    this.builder.push({ t, botId, dt, kind: 'send', to, body, ok: true });
     this.charge(bot, dt);
     return true;
   }
 
-  /** Pops the oldest message from this bot's inbox. Free. */
+  /**
+   * Pops the oldest message this bot has actually received by now. Free.
+   *
+   * A message is still in flight until the receiver's own clock reaches the sender's clock at
+   * `send`: a bot lagging at t = 300 has not yet heard what another bot said at t = 1300, however
+   * early the player's program happened to issue the call. Without that rule a live run and its
+   * replay disagree, because a replay only knows about the sends it has already applied. It is
+   * also why the World 7 idiom is `send`, then `sync`, then `recv`.
+   */
   recv(botId: number): Message | null {
     const bot = this.requireBot(botId);
-    const message = bot.inbox[0] ?? null;
+    const head = bot.inbox[0];
+    const message = head !== undefined && head.t <= bot.clock ? head : null;
     if (message) bot.inbox.shift();
     this.builder.push({
       t: bot.clock,
@@ -690,7 +752,7 @@ export class Sim {
     this.requireFuel(parent, dt, 'spawn');
     const at = step(parent.at, dir);
 
-    if (this.blockReason(parent, at, t) !== null) {
+    if (this.blockReason(parent, at, t + dt) !== null) {
       this.builder.push({ t, botId, dt, kind: 'act', name: 'spawn', at, ok: false });
       this.charge(parent, dt);
       return -1;
@@ -714,7 +776,7 @@ export class Sim {
     this.world.bots.push(child);
     const tile = tileAt(this.world, at);
     if (tile) tile.occupant = id;
-    this.reserve(at, id, t);
+    this.reserve(at, id, child.clock);
 
     this.builder.push({ t, botId, dt, kind: 'spawn', bot: cloneBot(child) });
     this.builder.push({ t, kind: 'fx', at, fx: 'spawn', botId: id });
@@ -723,19 +785,38 @@ export class Sim {
     return id;
   }
 
-  /** Advances every living bot's clock to `max(clock)`. The World 7 rendezvous primitive. */
+  /**
+   * Advances every living bot's clock to `max(clock)`. The World 7 rendezvous primitive.
+   *
+   * Emits one `sync` event per bot that actually idled, stamped at that bot's own clock and
+   * carrying the idle span as `dt`, so the renderer can show exactly who waited and for how long.
+   * A bot already at the makespan produces nothing.
+   *
+   * Idling burns no fuel, but it does spend the level's tick budget: `maxTicks` is enforced here
+   * exactly as it is on every acting command, or a level could blow its whole allowance through
+   * `sync()` alone and never be stopped.
+   */
   sync(): number {
     this.op();
-    const target = this.peakClock;
+    let target = this.peakClock;
+    let furthest: number | undefined;
+    for (const bot of this.world.bots) {
+      if (bot.alive && bot.clock > target) {
+        target = bot.clock;
+        furthest = bot.id;
+      }
+    }
+    if (target > this.maxTicks) throw new HaltError(this.maxTicks, furthest);
+
+    this.peakClock = target;
+    this.world.tick = target;
     for (const bot of this.world.bots) {
       if (!bot.alive || bot.clock >= target) continue;
       const t = bot.clock;
       const dt = target - t;
       this.builder.push({ t, botId: bot.id, dt, kind: 'sync', to: target });
-      bot.clock = target;
+      this.chargeIdle(bot, dt);
     }
-    this.world.tick = target;
-    if (target > this.maxTicks) throw new HaltError(this.maxTicks);
     return target;
   }
 
@@ -775,8 +856,13 @@ export class Sim {
     return true;
   }
 
-  /** Escape hatch for world-specific tile logic. Emits a `tileChange` event. Charges 0 ticks. */
+  /**
+   * Escape hatch for world-specific tile logic. Emits a `tileChange` event. Charges 0 ticks, but
+   * still counts against `maxOps` — a world command built on this would otherwise let a player
+   * loop grow the trace forever without ever tripping a budget.
+   */
   applyTileChange(at: Vec, mutate: (tile: Tile) => void): void {
+    this.op();
     const tile = tileAt(this.world, at);
     if (!tile) return;
     const before = cloneTile(tile);
@@ -864,19 +950,25 @@ export class Sim {
   }
 
   /**
-   * null when the move is legal, otherwise the reason. Occupancy is checked over the half-open
-   * interval [t, t + move) against every other bot's residence interval on that tile, so a bot
-   * running behind on its own clock cannot walk through a tile someone else held at that time.
+   * null when the move is legal, otherwise the reason.
+   *
+   * A bot holds a tile over the half-open interval `[the clock it arrived, the clock it left)`,
+   * and `arriveAt` is when the caller would take possession — the tick its action *completes*,
+   * not the tick it was issued. The tile is free when no other bot's residence extends past that
+   * instant. Two consequences, both intended by DESIGN.md §4.3:
+   *
+   * - a convoy works, because the leader's residence ends exactly when the follower's begins;
+   * - a bot running behind on its own clock still cannot walk through a tile someone else held
+   *   at that time, even though the tile looks empty in the live world.
    */
-  private blockReason(bot: Bot, to: Vec, t: number): string | null {
+  private blockReason(bot: Bot, to: Vec, arriveAt: number): string | null {
     if (!bot.alive) return 'dead';
     if (!inBounds(this.world, to)) return 'bounds';
     const tile = tileAt(this.world, to);
     if (!tile || !terrainProps(tile.terrain).walkable) return 'terrain';
-    const end = t + this.costs.move;
     for (const held of this.occupancy.get(indexOf(this.world, to)) ?? []) {
       if (held.botId === bot.id) continue;
-      if (held.from < end && t < held.to) return 'bot';
+      if (held.to > arriveAt) return 'bot';
     }
     return null;
   }
@@ -975,6 +1067,25 @@ export class Sim {
     );
   }
 
+  /**
+   * Tallies one sensing read and records it. Free in ticks, so `bot.clock` is untouched and the
+   * event carries `dt: 0` — replay applies it as a no-op.
+   */
+  private sense(bot: Bot, name: string, ok: boolean, detail?: string | number): void {
+    this.senseLedger.set(name, (this.senseLedger.get(name) ?? 0) + 1);
+    const event: SenseEvent = {
+      t: bot.clock,
+      botId: bot.id,
+      dt: 0,
+      kind: 'sense',
+      name,
+      ok,
+      count: 1,
+    };
+    if (detail !== undefined) event.detail = detail;
+    this.builder.pushSense(event);
+  }
+
   private op(): void {
     this.opCount += 1;
     if (this.opCount > this.maxOps) throw new OpLimitError(this.maxOps);
@@ -1016,4 +1127,14 @@ export function describeBlock(reason: string, dir: Dir): string {
     default:
       return `The move ${dirName(dir)} failed.`;
   }
+}
+
+/** `Infinity` does not survive a `postMessage` round trip, so an unlimited reading has no detail. */
+function finiteDetail(value: number): number | undefined {
+  return Number.isFinite(value) ? value : undefined;
+}
+
+/** Marks are player-written and can be long. A trace only needs enough to recognise one. */
+function clip(text: string): string {
+  return text.length <= 48 ? text : `${text.slice(0, 48)}…`;
 }

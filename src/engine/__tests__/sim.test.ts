@@ -1,5 +1,13 @@
 import { describe, expect, test } from 'vitest';
-import type { GatherEvent, MoveEvent, TraceEvent, TransferEvent, UseEvent } from '../index.ts';
+import type {
+  GatherEvent,
+  MoveEvent,
+  SimOptions,
+  TraceEvent,
+  TransferEvent,
+  UseEvent,
+  World,
+} from '../index.ts';
 import {
   DEFAULT_COSTS,
   DEFAULT_GROW_TIME,
@@ -9,12 +17,17 @@ import {
   HaltError,
   IllegalActionError,
   ItemKind,
+  LivelockError,
   MachineKind,
+  Objectives,
   OpLimitError,
+  OutOfFuelError,
   Sim,
   Terrain,
   addBot,
   addGroundItems,
+  buildVerdict,
+  cloneWorld,
   countItemsAt,
   describeBlock,
   isSimError,
@@ -23,9 +36,10 @@ import {
   maturity,
   setTile,
   tileAt,
+  usesFuel,
   vec,
 } from '../index.ts';
-import { asciiWorld, bot, must, openWorld, placeMachine } from './helpers.ts';
+import { ASCII_LEGEND, asciiWorld, bot, must, openWorld, placeMachine } from './helpers.ts';
 
 function eventsOfKind<K extends TraceEvent['kind']>(
   events: readonly TraceEvent[],
@@ -322,12 +336,14 @@ describe('plant', () => {
     expect(sim.inventory(0, ItemKind.Seed)).toBe(1);
     expect(bot(world).clock).toBe(3 + DEFAULT_COSTS.plant);
 
+    // The seed is in the soil when planting *finishes*, so growth starts from t + costs.plant.
+    const sown = 3 + DEFAULT_COSTS.plant;
     const tile = must(tileAt(world, vec(0, 0)));
     expect(tile.crop).toBe(ItemKind.Crop);
     expect(tile.maxGrowth).toBe(DEFAULT_GROW_TIME);
-    expect(must(tile.meta)['plantedAt']).toBe(3);
-    expect(maturity(tile, 3)).toBe(0);
-    expect(maturity(tile, 3 + DEFAULT_GROW_TIME)).toBe(DEFAULT_GROW_TIME);
+    expect(must(tile.meta)['plantedAt']).toBe(sown);
+    expect(maturity(tile, sown)).toBe(0);
+    expect(maturity(tile, sown + DEFAULT_GROW_TIME)).toBe(DEFAULT_GROW_TIME);
   });
 
   test('a planted crop becomes harvestable once grow time has passed', () => {
@@ -812,13 +828,40 @@ describe('send and recv', () => {
     expect(must(recvs[0]).body).toBeNull();
   });
 
-  test('messages are delivered FIFO', () => {
+  test('messages are delivered in send order once the receiver clock has caught up', () => {
     const world = openWorld(3, 3, 2);
     const sim = new Sim(world);
     sim.send(0, 1, 'first');
     sim.send(0, 1, 'second');
+    sim.sync();
     expect(must(sim.recv(1)).body).toBe('first');
     expect(must(sim.recv(1)).body).toBe('second');
+    expect(sim.recv(1)).toBeNull();
+  });
+
+  test('a message is still in flight until the receiver clock reaches the send', () => {
+    const world = openWorld(3, 3, 2);
+    const sim = new Sim(world);
+    sim.wait(0, 40);
+    sim.send(0, 1, 'from the future');
+
+    // Bot #1 is still back at t = 0 and cannot have heard this yet, whatever order the player
+    // happened to issue the calls in. Anything else desyncs the replay, which only knows about
+    // the sends it has already applied.
+    expect(sim.recv(1)).toBeNull();
+    sim.wait(1, 41);
+    expect(must(sim.recv(1)).body).toBe('from the future');
+  });
+
+  test('the inbox is ordered by send time, not by the order the calls were issued', () => {
+    const world = openWorld(3, 3, 3);
+    const sim = new Sim(world);
+    sim.wait(0, 40);
+    sim.send(0, 2, 'late');
+    sim.send(1, 2, 'early');
+    sim.sync();
+    expect(must(sim.recv(2)).body).toBe('early');
+    expect(must(sim.recv(2)).body).toBe('late');
   });
 
   test('send to an unknown bot returns false but still charges', () => {
@@ -826,9 +869,9 @@ describe('send and recv', () => {
     const sim = new Sim(world);
     expect(sim.send(0, 99, 'anyone?')).toBe(false);
     expect(bot(world, 0).clock).toBe(DEFAULT_COSTS.send);
-    const acts = eventsOfKind(sim.finish().events, 'act');
-    expect(must(acts[0]).name).toBe('send');
-    expect(must(acts[0]).ok).toBe(false);
+    const sends = eventsOfKind(sim.finish().events, 'send');
+    expect(must(sends[0]).ok).toBe(false);
+    expect(must(sends[0]).to).toBe(99);
   });
 
   test('send to a dead bot returns false', () => {
@@ -911,10 +954,12 @@ describe('sync', () => {
     expect(bot(world, 2).clock).toBe(11);
     expect(world.tick).toBe(11);
 
+    // One event per bot that idled, stamped at that bot's own clock. A finished trace is sorted
+    // by `t`, so bot #2 (idle from 0) precedes bot #0 (idle from 3).
     const syncs = eventsOfKind(sim.finish().events, 'sync');
     expect(syncs.map((s) => ({ botId: s.botId, t: s.t, dt: s.dt, to: s.to }))).toEqual([
-      { botId: 0, t: 3, dt: 8, to: 11 },
       { botId: 2, t: 0, dt: 11, to: 11 },
+      { botId: 0, t: 3, dt: 8, to: 11 },
     ]);
   });
 
@@ -1024,7 +1069,12 @@ describe('sensing', () => {
     const sim = new Sim(world);
     expect(sim.look(0, Dir.East, 3)).toHaveLength(3);
     expect(sim.look(0, Dir.East, 0)).toHaveLength(0);
-    expect(sim.look(0, Dir.East)).toHaveLength(7);
+    // `range` caps the number of views returned, and the terminating out-of-bounds view counts
+    // against it: seven floor tiles ahead plus the void at x = 8 fills the default range of 8.
+    const ray = sim.look(0, Dir.East);
+    expect(ray).toHaveLength(8);
+    expect(ray.filter((v) => v.inBounds)).toHaveLength(7);
+    expect(must(ray[7]).inBounds).toBe(false);
   });
 
   test('look clips at the world edge, reporting the out-of-bounds tile last', () => {
@@ -1141,7 +1191,9 @@ describe('sensing', () => {
       const ticksBefore = sim.ticks;
       const opsBefore = sim.ops;
       sense.run();
-      expect(`${sense.name}: clock ${bot(world, 0).clock}`).toBe(`${sense.name}: clock ${clockBefore}`);
+      expect(`${sense.name}: clock ${bot(world, 0).clock}`).toBe(
+        `${sense.name}: clock ${clockBefore}`,
+      );
       expect(`${sense.name}: ticks ${sim.ticks}`).toBe(`${sense.name}: ticks ${ticksBefore}`);
       expect(`${sense.name}: ops ${sim.ops > opsBefore}`).toBe(`${sense.name}: ops true`);
     }
@@ -1231,6 +1283,267 @@ describe('budgets', () => {
         expect(error.code).toBe('oplimit');
       }
     }
+  });
+
+  test('wait enforces maxTicks even though it burns no fuel', () => {
+    const world = openWorld(3, 3, 1, { fuel: 100 });
+    const sim = new Sim(world, { maxTicks: 10 });
+    expect(() => sim.wait(0, 11)).toThrow(HaltError);
+    expect(bot(world).fuel).toBe(100);
+  });
+
+  test('refuel enforces maxTicks', () => {
+    const sim = new Sim(openWorld(3, 3, 1), { maxTicks: 1 });
+    expect(() => sim.refuel(0)).toThrow(HaltError);
+  });
+
+  test('sync levels a lagging bot right up to the budget without tripping it', () => {
+    const world = openWorld(4, 4, 2);
+    const sim = new Sim(world, { maxTicks: 20 });
+    sim.wait(0, 20);
+    expect(sim.sync()).toBe(20);
+    expect(bot(world, 1).clock).toBe(20);
+  });
+
+  test('sync counts against maxOps', () => {
+    const sim = new Sim(openWorld(4, 4, 2), { maxOps: 3 });
+    sim.sync();
+    sim.sync();
+    sim.sync();
+    expect(() => sim.sync()).toThrow(OpLimitError);
+  });
+
+  test('applyTileChange is free in ticks but not in ops', () => {
+    const world = openWorld(3, 1, 1);
+    const sim = new Sim(world, { maxOps: 2 });
+    const paint = (): void =>
+      sim.applyTileChange(vec(1, 0), (tile) => {
+        tile.terrain = Terrain.Cable;
+      });
+    paint();
+    paint();
+    expect(() => paint()).toThrow(OpLimitError);
+    expect(sim.ticks).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fuel (DESIGN.md §11 A1)
+// ---------------------------------------------------------------------------
+
+describe('fuel', () => {
+  test('defaults to Infinity, so a level that ignores the mechanic never sees it', () => {
+    const world = openWorld(4, 1, 1);
+    const sim = new Sim(world);
+    for (let i = 0; i < 3; i++) sim.move(0, Dir.East);
+    expect(sim.fuel(0)).toBe(Number.POSITIVE_INFINITY);
+    expect(usesFuel(world)).toBe(false);
+  });
+
+  test('acting burns fuel equal to the tick cost', () => {
+    const world = openWorld(4, 1, 1, { fuel: 10 });
+    const sim = new Sim(world);
+    sim.move(0, Dir.East);
+    expect(sim.fuel(0)).toBe(10 - DEFAULT_COSTS.move);
+    sim.mine(0);
+    expect(sim.fuel(0)).toBe(10 - DEFAULT_COSTS.move - DEFAULT_COSTS.mine);
+    expect(usesFuel(world)).toBe(true);
+  });
+
+  test('a blocked move still burns fuel', () => {
+    const world = asciiWorld(['.#'], { bots: [vec(0, 0)], fuel: 6 });
+    const sim = new Sim(world);
+    expect(sim.move(0, Dir.East)).toBe(false);
+    expect(sim.fuel(0)).toBe(6 - DEFAULT_COSTS.moveBlocked);
+  });
+
+  test('idling and sensing are free', () => {
+    const world = openWorld(4, 4, 2, { fuel: 12 });
+    const sim = new Sim(world);
+    sim.wait(0, 5);
+    sim.scan(0);
+    sim.look(0, Dir.East);
+    sim.sync();
+    expect(sim.fuel(0)).toBe(12);
+    expect(sim.fuel(1)).toBe(12);
+    expect(bot(world, 1).clock).toBe(5);
+  });
+
+  test('running dry throws OutOfFuelError before anything is mutated', () => {
+    const world = asciiWorld(['G..'], { bots: [vec(0, 0)], fuel: 1 });
+    const sim = new Sim(world);
+
+    expect(() => sim.mine(0)).toThrow(OutOfFuelError);
+    expect(must(tileAt(world, vec(0, 0))).terrain).toBe(Terrain.Regolith);
+    expect(sim.inventory(0)).toBe(0);
+    expect(bot(world).clock).toBe(0);
+    expect(eventsOfKind(sim.finish().events, 'mine')).toHaveLength(0);
+  });
+
+  test('OutOfFuelError names the bot, the action and the shortfall', () => {
+    const world = openWorld(3, 1, 1, { fuel: 0 });
+    const sim = new Sim(world);
+    try {
+      sim.move(0, Dir.East);
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toBeInstanceOf(OutOfFuelError);
+      if (error instanceof OutOfFuelError) {
+        expect(error.code).toBe('out-of-fuel');
+        expect(error.botId).toBe(0);
+        expect(error.action).toBe('move');
+        expect(error.required).toBe(DEFAULT_COSTS.move);
+        expect(error.remaining).toBe(0);
+      }
+    }
+  });
+
+  test('every fuel-burning event kind has a command that checks fuel first', () => {
+    const drained = (options: SimOptions = {}, build?: (world: World) => void): Sim => {
+      const world = asciiWorld(['SR.'], {
+        bots: [vec(0, 0), vec(2, 0)],
+        inventory: [{ kind: ItemKind.Seed, count: 1 }],
+        fuel: 0,
+      });
+      build?.(world);
+      return new Sim(world, options);
+    };
+
+    expect(() => drained().move(0, Dir.East)).toThrow(OutOfFuelError);
+    expect(() => drained({ costs: { turn: 2 } }).turn(0, Dir.South)).toThrow(OutOfFuelError);
+    expect(() => drained().harvest(0)).toThrow(OutOfFuelError);
+    expect(() => drained().plant(0)).toThrow(OutOfFuelError);
+    expect(() => drained().mine(0, Dir.East)).toThrow(OutOfFuelError);
+    expect(() => drained().pickup(0)).toThrow(OutOfFuelError);
+    expect(() => drained().drop(0)).toThrow(OutOfFuelError);
+    expect(() => drained().use(0)).toThrow(OutOfFuelError);
+    expect(() => drained().mark(0, 'x')).toThrow(OutOfFuelError);
+    expect(() => drained().send(0, 1, 'hi')).toThrow(OutOfFuelError);
+    expect(() => drained().spawn(0, Dir.South)).toThrow(OutOfFuelError);
+    expect(() =>
+      drained({}, (world) => {
+        placeMachine(world, { id: 'm', kind: MachineKind.Node, at: vec(0, 0) });
+      }).power(0, 'm', 'on'),
+    ).toThrow(OutOfFuelError);
+    expect(() => drained().applyMachineChange(0, 'm', () => undefined, 2)).toThrow(OutOfFuelError);
+  });
+
+  test('refuel restores to fuelMax, but only on a depot tile', () => {
+    const world = asciiWorld(['.D'], {
+      bots: [vec(0, 0)],
+      fuel: 20,
+      legend: { ...ASCII_LEGEND, D: Terrain.Depot },
+    });
+    bot(world).fuel = 2;
+    const sim = new Sim(world);
+
+    expect(sim.refuel(0)).toBe(false);
+    expect(sim.fuel(0)).toBe(2);
+
+    sim.move(0, Dir.East);
+    expect(sim.refuel(0)).toBe(true);
+    expect(sim.fuel(0)).toBe(20);
+    expect(must(eventsOfKind(sim.finish().events, 'refuel')[1]).to).toBe(20);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// livelock (DESIGN.md §11 A6)
+// ---------------------------------------------------------------------------
+
+describe('livelock', () => {
+  test('two bots blocking each other forever throw LivelockError naming them', () => {
+    const world = asciiWorld(['..'], { bots: [vec(0, 0), vec(1, 0)] });
+    const sim = new Sim(world, { livelockRounds: 3, maxTicks: 1_000_000 });
+    try {
+      for (let i = 0; i < 100; i++) {
+        sim.move(0, Dir.East);
+        sim.move(1, Dir.West);
+      }
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toBeInstanceOf(LivelockError);
+      if (error instanceof LivelockError) {
+        expect(error.code).toBe('blocked-livelock');
+        expect(error.botIds).toEqual([0, 1]);
+        expect(error.message).toContain('Livelock');
+      }
+    }
+  });
+
+  test('one successful move resets the streak', () => {
+    const world = asciiWorld(['...', '...'], { bots: [vec(0, 0), vec(1, 0)] });
+    const sim = new Sim(world, { livelockRounds: 2, maxTicks: 1_000_000 });
+    for (let i = 0; i < 10; i++) {
+      sim.move(0, Dir.East);
+      sim.move(1, Dir.West);
+      sim.move(0, Dir.South);
+      sim.move(0, Dir.North);
+    }
+    expect(bot(world, 0).alive).toBe(true);
+  });
+
+  test('a lone bot bumping a wall is a bug, not a livelock, and dies of HaltError', () => {
+    const world = asciiWorld(['.#'], { bots: [vec(0, 0)] });
+    const sim = new Sim(world, { livelockRounds: 2, maxTicks: 20 });
+    expect(() => {
+      for (let i = 0; i < 100; i++) sim.move(0, Dir.East);
+    }).toThrow(HaltError);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spend (DESIGN.md §11 A5)
+// ---------------------------------------------------------------------------
+
+describe('spend', () => {
+  test('accumulates per resource and traces each call', () => {
+    const world = openWorld(3, 1, 1);
+    const sim = new Sim(world);
+    sim.spend('cable', 3);
+    sim.spend('cable', 4, 0);
+    sim.spend('cells', 1);
+    expect(sim.spendTotals()).toEqual({ cable: 7, cells: 1 });
+    expect(eventsOfKind(sim.finish().events, 'spend')).toHaveLength(3);
+  });
+
+  test('stamps a bot-scoped spend at that bot clock, and an unscoped one at the makespan', () => {
+    const world = openWorld(4, 4, 2);
+    const sim = new Sim(world);
+    sim.wait(1, 6);
+    sim.spend('cable', 1, 0);
+    sim.spend('cable', 1);
+    const spends = eventsOfKind(sim.finish().events, 'spend');
+    expect(must(spends[0]).t).toBe(0);
+    expect(must(spends[0]).botId).toBe(0);
+    expect(must(spends[1]).t).toBe(6);
+  });
+
+  test('reaches Verdict.stats.spend through the harness path', () => {
+    const world = openWorld(3, 1, 1);
+    const initialWorld = cloneWorld(world);
+    const sim = new Sim(world);
+    sim.spend('cable', 12);
+    sim.move(0, Dir.East);
+
+    const verdict = buildVerdict({
+      objectives: [Objectives.botAt(vec(1, 0))],
+      world: sim.world,
+      trace: sim.finish(),
+      initialWorld,
+      ops: sim.ops,
+      chars: 0,
+      seeds: 1,
+      spend: sim.spendTotals(),
+    });
+    expect(verdict.passed).toBe(true);
+    expect(verdict.stats.spend).toEqual({ cable: 12 });
+    expect(verdict.stats.ticks).toBe(DEFAULT_COSTS.move);
+  });
+
+  test('a non-finite amount throws IllegalActionError', () => {
+    const sim = new Sim(openWorld(3, 1, 1));
+    expect(() => sim.spend('cable', Number.NaN)).toThrow(IllegalActionError);
   });
 });
 

@@ -1,0 +1,124 @@
+import { useEffect, useState } from 'react';
+import type * as React from 'react';
+import { currentLevel, unlockedHardware, useGame } from '../../game/store.ts';
+import { worldMeta } from '../../levels/index.ts';
+import { Markdown } from '../components/Markdown.tsx';
+import '../styles/docs.css';
+
+/** Revealed hints survive a panel unmount and a trip to the level list, but not a reload. */
+const revealedByLevel = new Map<string, number>();
+
+function openDocs(name: string): void {
+  useGame.getState().setDocsOpen(true);
+  useGame.getState().setPanel('docs');
+  window.dispatchEvent(new CustomEvent('bootstrap:docs-focus', { detail: { name } }));
+}
+
+function HardwareChip({ name, fresh }: { name: string; fresh: boolean }): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      className={fresh ? 'hw-chip hw-chip--fresh' : 'hw-chip'}
+      onClick={() => openDocs(name)}
+      title={`Open the reference for ${name}`}
+    >
+      {name}
+    </button>
+  );
+}
+
+export function BriefPanel(): React.JSX.Element {
+  const level = useGame(currentLevel);
+  const levelId = level?.id ?? '';
+  const [revealed, setRevealed] = useState(() => revealedByLevel.get(levelId) ?? 0);
+
+  useEffect(() => {
+    setRevealed(revealedByLevel.get(levelId) ?? 0);
+  }, [levelId]);
+
+  if (!level) {
+    return (
+      <section className="doc-pane brief">
+        <p className="brief-empty">No work order is open. Pick one from the board.</p>
+      </section>
+    );
+  }
+
+  const world = worldMeta(level.world);
+  const fitted = unlockedHardware(level.id).filter((name) => !level.hardware.includes(name));
+  const hints = level.hints;
+
+  function reveal(count: number): void {
+    revealedByLevel.set(levelId, count);
+    setRevealed(count);
+  }
+
+  return (
+    <section className="doc-pane brief">
+      <header className="brief-head">
+        <div className="brief-stamp">
+          <span className="brief-stamp-label">Work order</span>
+          <span className="brief-stamp-id numeric">{level.id}</span>
+        </div>
+        <h2 className="brief-title">{level.title}</h2>
+        <p className="brief-site">
+          {world ? world.name : `World ${level.world}`}
+          {world ? <span className="brief-site-sub"> — {world.subtitle}</span> : null}
+        </p>
+      </header>
+
+      <Markdown source={level.brief} className="brief-body" />
+
+      <section className="brief-section">
+        <h3 className="brief-section-title">Hardware requisition</h3>
+        {level.hardware.length > 0 ? (
+          <div className="hw-group">
+            <p className="hw-label">Delivered with this order</p>
+            <div className="hw-row">
+              {level.hardware.map((name) => (
+                <HardwareChip key={name} name={name} fresh />
+              ))}
+            </div>
+          </div>
+        ) : (
+          <p className="hw-label">Nothing new fitted for this order.</p>
+        )}
+        {fitted.length > 0 ? (
+          <div className="hw-group hw-group--quiet">
+            <p className="hw-label">Already on the bot</p>
+            <div className="hw-row">
+              {fitted.map((name) => (
+                <HardwareChip key={name} name={name} fresh={false} />
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </section>
+
+      {hints.length > 0 ? (
+        <section className="brief-section">
+          <h3 className="brief-section-title">Field notes</h3>
+          <p className="hint-from">
+            <span className="hint-who">D. Halloran</span>
+            <span className="hint-aside">field engineering. asking costs you nothing.</span>
+          </p>
+          <ol className="hint-list">
+            {hints.slice(0, revealed).map((hint, index) => (
+              <li className="hint" key={hint}>
+                <span className="hint-mark numeric">dot {index + 1}</span>
+                <Markdown source={hint} className="hint-body" />
+              </li>
+            ))}
+          </ol>
+          {revealed < hints.length ? (
+            <button type="button" className="hint-ask" onClick={() => reveal(revealed + 1)}>
+              Request hint {revealed + 1} of {hints.length}
+            </button>
+          ) : (
+            <p className="hint-done">That is everything she wrote down.</p>
+          )}
+        </section>
+      ) : null}
+    </section>
+  );
+}

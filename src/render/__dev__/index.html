@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BOOTSTRAP · renderer harness</title>
+    <link rel="preload" href="/fonts/JetBrainsMono-latin-var.woff2" as="font" type="font/woff2" crossorigin />
+    <style>
+      @font-face {
+        font-family: 'JetBrains Mono';
+        font-style: normal;
+        font-weight: 400 800;
+        font-display: swap;
+        src: url('/fonts/JetBrainsMono-latin-var.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Inter';
+        font-style: normal;
+        font-weight: 100 900;
+        font-display: swap;
+        src: url('/fonts/Inter-latin-var.woff2') format('woff2');
+      }
+      :root {
+        --bg-void: #0a0e14;
+        --bg-panel: #121820;
+        --bg-raised: #1b2430;
+        --ink: #c9d5e3;
+        --ink-dim: #6a7a8c;
+        --accent: #35e0c8;
+        --accent-2: #ffb020;
+        --danger: #ff5d5d;
+        --ok: #7ee06a;
+        --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        --font-prose: 'Inter', system-ui, sans-serif;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; }
+      body {
+        background: var(--bg-void);
+        color: var(--ink);
+        font-family: var(--font-prose);
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        overflow: hidden;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 10px 16px;
+        background: var(--bg-panel);
+        border-bottom: 1px solid #22303e;
+        font-family: var(--font-mono);
+        font-size: 12px;
+      }
+      header .title { color: var(--accent); font-weight: 700; letter-spacing: 0.08em; }
+      header .spacer { flex: 1; }
+      select, button {
+        background: var(--bg-raised);
+        color: var(--ink);
+        border: 1px solid #2c3a4a;
+        border-radius: 3px;
+        padding: 5px 10px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        cursor: pointer;
+      }
+      button:hover, select:hover { border-color: var(--accent); color: var(--accent); }
+      button.on { border-color: var(--accent); color: var(--bg-void); background: var(--accent); }
+      main { position: relative; min-height: 0; }
+      canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+      #hud {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        background: rgba(10, 14, 20, 0.82);
+        border: 1px solid #22303e;
+        border-radius: 3px;
+        padding: 8px 12px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        line-height: 1.7;
+        color: var(--ink-dim);
+        pointer-events: none;
+        min-width: 210px;
+      }
+      #hud b { color: var(--ink); font-weight: 600; }
+      #hud .good { color: var(--ok); }
+      #hud .warn { color: var(--danger); }
+      #readout {
+        position: absolute;
+        bottom: 12px;
+        left: 12px;
+        background: rgba(10, 14, 20, 0.82);
+        border: 1px solid #22303e;
+        border-radius: 3px;
+        padding: 6px 10px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--accent);
+        pointer-events: none;
+      }
+      footer {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 16px;
+        background: var(--bg-panel);
+        border-top: 1px solid #22303e;
+        font-family: var(--font-mono);
+        font-size: 12px;
+      }
+      input[type='range'] { flex: 1; accent-color: var(--accent); }
+      #tickLabel { min-width: 120px; color: var(--accent-2); }
+    </style>
+  </head>
+  <body>
+    <header>
+      <span class="title">BOOTSTRAP · RENDER HARNESS</span>
+      <select id="scene"></select>
+      <button id="fit">fit</button>
+      <button id="follow">follow</button>
+      <button id="grid">grid</button>
+      <span class="spacer"></span>
+      <button id="bench">benchmark 5s</button>
+    </header>
+    <main>
+      <canvas id="stage"></canvas>
+      <div id="hud"></div>
+      <div id="readout">hover a tile</div>
+    </main>
+    <footer>
+      <button id="playPause">play</button>
+      <button id="stepBack">&laquo;</button>
+      <button id="stepFwd">&raquo;</button>
+      <input id="scrub" type="range" min="0" max="1000" step="1" value="0" />
+      <span id="tickLabel">t 0.00 / 0</span>
+      <select id="speed">
+        <option value="1">1x</option>
+        <option value="2">2x</option>
+        <option value="4" selected>4x</option>
+        <option value="8">8x</option>
+        <option value="16">16x</option>
+      </select>
+    </footer>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

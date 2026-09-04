@@ -59,9 +59,10 @@ const verdict = buildVerdict({
 produce byte-identical results; if it does not, the harness is right.
 
 Each acting method validates, mutates, advances **the acting bot's clock**, appends a timestamped
-event, checks budgets, and returns the player-visible value. Sensing (`pos`, `canMove`, `scan`,
-`look`, `inventory`, `carrying`, `readMark`, `probe`, `botIds`, `recv`, `print`) costs 0 ticks but
-still counts against `maxOps`.
+event, checks budgets, and returns the player-visible value. Sensing (`pos`, `facing`, `clock`,
+`canMove`, `scan`, `look`, `inventory`, `carrying`, `capacity`, `fuel`, `fuelMax`, `readMark`,
+`probe`, `botIds`, `recv`, `print`) costs 0 ticks but still counts against `maxOps` — and, since
+§3b, is counted and traced as well.
 
 Two failure philosophies, applied consistently:
 
@@ -124,6 +125,37 @@ never trip it — a lone bot bumping a wall is an ordinary bug and hits `HaltErr
 
 **Medals (A4).** `MEDAL_WEIGHT` = gold 3, silver 2, bronze 1, none 0; `BONUS_STAR_WEIGHT` = 1.
 Both exported from `verdict.ts`. The Performance Review tiers assume exactly these.
+
+---
+
+## 3b. Sensing is free, but it is not invisible
+
+Sensing still costs **0 ticks** (DESIGN.md §4.4 is unchanged) and still counts **1 op**. On top of
+that, every read now:
+
+- tallies into `sim.senseTotals()` — `{ probe: 7, scan: 240 }`, keyed by command name — which
+  `buildVerdict` surfaces as `Verdict.stats.senses`;
+- appends a `sense` trace event: `{ t, botId, dt: 0, kind: 'sense', name, ok, detail?, count }`.
+  `ok` means "the read found something" (a machine for `probe`, a mark for `readMark`, a tile in
+  bounds for `scan`), and `detail` is a small flat value — `"3,4"`, a direction name, an id.
+
+That gives levels a third scoring axis next to ticks and characters: **information**. Budget it
+with `Objectives.withinSenses(name, n)` (`progress()` reports `7 / 10`), or the whole op count with
+`Objectives.withinOps(n)`.
+
+`recv` and `botIds` are deliberately *not* senses: the first consumes a message and has carried its
+own event since World 7, the second reads the fleet roster rather than the site. Both still cost
+an op, as before.
+
+**Trace size.** A tight `while (true) { scan(); }` would otherwise produce a million objects, so
+`TraceBuilder.pushSense` folds. Identical back-to-back reads merge into one event with a higher
+`count`; past `MAX_SENSE_EVENTS` (20 000) stored reads, everything further collapses into one
+running aggregate per sense name. **The counts stay exact either way** — `senseTotals(trace)`
+always equals `sim.senseTotals()`. Only per-read `detail` and interleaving are lossy, and only on
+traces no human was going to scrub. Tune it per Sim with `SimOptions.maxSenseEvents`.
+
+`sense` events are not in `FUEL_BURNING` and `applyEvent` treats them as no-ops, so replay is
+bit-identical with or without them.
 
 ---
 
@@ -195,7 +227,7 @@ Register new levels in `src/levels/index.ts` (`LEVELS`) and new solutions in the
 Objective builders live behind a namespace — `Objectives.botAt(pad)` — because `botAt(world, pos)`
 is a world query and having both flat would be a trap. Available: `botAt`, `allTilesAre`,
 `tileCount`, `inventoryAtLeast`, `machineState`, `itemsDelivered`, `printedSequence`, `withinTicks`,
-`machinesAllIn`, `custom`. Each takes an optional `{ id, label }`; every one that can show
+`withinSenses`, `withinOps`, `machinesAllIn`, `custom`. Each takes an optional `{ id, label }`; every one that can show
 "7 / 12" implements `progress()`.
 
 Solutions are **test fixtures**. `vite.config.ts` hard-fails the production build the moment a

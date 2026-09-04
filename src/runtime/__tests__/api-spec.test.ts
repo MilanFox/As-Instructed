@@ -37,7 +37,10 @@ describe('PLAYER_API', () => {
     for (const fn of PLAYER_API.functions) {
       const firstOptional = fn.params.findIndex((p) => p.optional);
       if (firstOptional === -1) continue;
-      expect(fn.params.slice(firstOptional).every((p) => p.optional), fn.name).toBe(true);
+      expect(
+        fn.params.slice(firstOptional).every((p) => p.optional),
+        fn.name,
+      ).toBe(true);
     }
   });
 
@@ -53,7 +56,11 @@ describe('PLAYER_API', () => {
   test('costs are non-negative numbers or a named argument', () => {
     for (const fn of PLAYER_API.functions) {
       if (typeof fn.cost === 'number') expect(fn.cost, fn.name).toBeGreaterThanOrEqual(0);
-      else expect(fn.params.some((p) => p.name === fn.cost), fn.name).toBe(true);
+      else
+        expect(
+          fn.params.some((p) => p.name === fn.cost),
+          fn.name,
+        ).toBe(true);
     }
   });
 

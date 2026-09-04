@@ -30,7 +30,7 @@ export const w1_01: LevelDef = {
   id: 'w1-01',
   world: 1,
   index: 1,
-  title: 'Hello, Regolith',
+  title: 'Cold Start',
   hardware: ['move', 'pos'],
   brief: [
     '**FROM:** Onboarding, Kessler & Daughters Terraforming Ltd.',
@@ -57,7 +57,6 @@ export const w1_01: LevelDef = {
   objectives: [
     Objectives.botAt(PAD, { id: 'reach-pad', label: 'Park the bot on the landing pad' }),
   ],
-  bonus: [Objectives.withinTicks(6, { id: 'optimal-route', label: 'Do it in 6 ticks or fewer' })],
   starter: [
     '// Drive the bot onto the landing pad at the far end of the hangar.',
     '// x grows East, y grows South. Dir.North is y - 1.',

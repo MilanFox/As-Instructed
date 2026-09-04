@@ -1,0 +1,17 @@
+/* Self-hosted per DESIGN.md §8. Both files are variable fonts, latin subset. */
+
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/Inter-latin-var.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono-latin-var.woff2') format('woff2-variations');
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+}

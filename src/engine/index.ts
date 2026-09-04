@@ -45,6 +45,7 @@ export {
   dirBetween,
   dirDelta,
   dirName,
+  enqueueMessage,
   eq,
   inBounds,
   indexOf,
@@ -81,8 +82,12 @@ export type {
   WaitEvent,
   SyncEvent,
   GatherEvent,
+  HarvestEvent,
+  MineEvent,
   PlantEvent,
   TransferEvent,
+  PickupEvent,
+  DropEvent,
   ActEvent,
   UseEvent,
   MarkEvent,
@@ -96,16 +101,18 @@ export type {
   ObjectiveEvent,
   FxEvent,
 } from './trace.ts';
-export type { RefuelEvent, SpendEvent } from './trace.ts';
+export type { RefuelEvent, SenseEvent, SpendEvent } from './trace.ts';
 export {
   FUEL_BURNING,
   KEYFRAME_INTERVAL,
+  MAX_SENSE_EVENTS,
   TraceBuilder,
   applyEvent,
   eventIndexAt,
   printsUpTo,
   replayTo,
   reviveTrace,
+  senseTotals,
 } from './trace.ts';
 
 export type { SimOptions, TileView, MachineView } from './sim.ts';

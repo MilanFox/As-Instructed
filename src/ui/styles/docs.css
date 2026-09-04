@@ -1,0 +1,650 @@
+/*
+ * Brief + reference panels, and the markdown renderer they share.
+ * Palette comes from tokens.css (DESIGN.md §8); nothing here invents a colour.
+ */
+
+.doc-pane {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--bg-panel);
+  scrollbar-color: var(--border-strong) transparent;
+  scrollbar-width: thin;
+}
+
+.doc-pane::-webkit-scrollbar {
+  width: 10px;
+}
+
+.doc-pane::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border: 3px solid var(--bg-panel);
+  border-radius: 6px;
+}
+
+/* --------------------------------------------------------------- markdown */
+
+.md {
+  color: var(--ink);
+}
+
+.md > :first-child {
+  margin-top: 0;
+}
+
+.md > :last-child {
+  margin-bottom: 0;
+}
+
+.md-p {
+  margin: 0 0 0.9em;
+}
+
+.md-h {
+  margin: 1.6em 0 0.5em;
+  font-family: var(--font-prose);
+  font-weight: 600;
+  line-height: 1.3;
+  color: color-mix(in srgb, var(--ink) 80%, white);
+}
+
+.md-h1 {
+  font-size: 1.2em;
+  letter-spacing: -0.01em;
+}
+
+.md-h2 {
+  font-size: 1.08em;
+}
+
+.md-h3 {
+  font-size: 1em;
+}
+
+.md-h4 {
+  margin-bottom: 0.35em;
+  font-family: var(--font-mono);
+  font-size: 0.78em;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.md strong {
+  font-weight: 600;
+  color: color-mix(in srgb, var(--ink) 75%, white);
+}
+
+.md em {
+  font-style: italic;
+  color: inherit;
+}
+
+.md-code {
+  padding: 0.1em 0.38em;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: var(--bg-void);
+  font-size: 0.88em;
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+
+.md-pre,
+.code-block {
+  margin: 0 0 0.9em;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-void);
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: color-mix(in srgb, var(--ink) 88%, var(--accent));
+  tab-size: 2;
+}
+
+.md-list {
+  margin: 0 0 0.9em;
+  padding-left: 1.35em;
+}
+
+.md-list li {
+  margin: 0 0 0.28em;
+}
+
+.md-list li::marker {
+  color: var(--ink-dim);
+}
+
+.md-quote {
+  margin: 0 0 0.9em;
+  padding: 0.1em 0 0.1em var(--space-3);
+  border-left: 2px solid var(--border-strong);
+  color: var(--ink-dim);
+}
+
+.md-rule {
+  margin: var(--space-4) 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+/* ------------------------------------------------------------------ brief */
+
+.brief {
+  padding: var(--space-5);
+}
+
+.brief-empty {
+  margin: 0;
+  color: var(--ink-dim);
+}
+
+.brief-head {
+  max-width: 68ch;
+  padding-bottom: var(--space-4);
+  margin-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.brief-stamp {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.brief-stamp-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.brief-stamp-id {
+  padding: 1px 6px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-radius: 2px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+}
+
+.brief-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: color-mix(in srgb, var(--ink) 70%, white);
+}
+
+.brief-site {
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.brief-site-sub {
+  letter-spacing: 0.06em;
+  text-transform: none;
+  opacity: 0.75;
+}
+
+.brief-body {
+  max-width: 68ch;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.brief-section {
+  max-width: 68ch;
+  padding-top: var(--space-4);
+  margin-top: var(--space-5);
+  border-top: 1px solid var(--border);
+}
+
+.brief-section-title {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+/* --------------------------------------------------------------- hardware */
+
+.hw-group + .hw-group {
+  margin-top: var(--space-3);
+}
+
+.hw-label {
+  margin: 0 0 var(--space-2);
+  font-size: 11.5px;
+  color: var(--ink-dim);
+}
+
+.hw-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.hw-chip {
+  padding: 3px 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink);
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    color 120ms ease,
+    transform 120ms ease;
+}
+
+.hw-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.hw-chip--fresh {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-raised));
+  color: var(--accent);
+}
+
+.hw-group--quiet .hw-chip {
+  border-color: var(--border);
+  background: transparent;
+  color: var(--ink-dim);
+}
+
+.hw-group--quiet .hw-chip:hover {
+  border-color: var(--border-strong);
+  color: var(--ink);
+}
+
+/* ------------------------------------------------------------------ hints */
+
+.hint-from {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: -4px 0 var(--space-3);
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.hint-who {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--accent-2) 70%, var(--ink-dim));
+}
+
+.hint-aside {
+  opacity: 0.9;
+}
+
+.hint-list {
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+
+.hint {
+  padding: 2px 0 2px var(--space-3);
+  margin-bottom: var(--space-3);
+  border-left: 2px solid color-mix(in srgb, var(--accent-2) 60%, var(--border));
+}
+
+.hint-mark {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+}
+
+.hint-body {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+
+.hint-ask {
+  padding: 6px 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-dim);
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.hint-ask:hover {
+  border-color: var(--accent-2);
+  color: var(--accent-2);
+}
+
+.hint-done {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--ink-dim);
+}
+
+/* -------------------------------------------------------------- reference */
+
+.docs-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-panel);
+}
+
+.docs-head-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.docs-heading {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.docs-count {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--ink-dim);
+}
+
+.docs-search {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-void);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--ink);
+}
+
+.docs-search::placeholder {
+  color: var(--ink-dim);
+}
+
+.docs-search:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.docs-jump {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.docs-jump-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.docs-jump-chip {
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ink);
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.docs-jump-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.docs-body {
+  max-width: 78ch;
+  padding: var(--space-4);
+}
+
+.docs-group {
+  margin-top: var(--space-5);
+}
+
+.docs-group-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.docs-group-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.docs-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.docs-card-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: color-mix(in srgb, var(--ink) 70%, white);
+}
+
+.docs-prose {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+/* The Memory page. DESIGN.md §11 A3 — always rendered, never behind a filter. */
+.docs-card--guide {
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+}
+
+.docs-card--required {
+  border-left: 2px solid var(--accent-2);
+}
+
+.docs-flag {
+  flex: none;
+  padding: 2px 7px;
+  border: 1px solid color-mix(in srgb, var(--accent-2) 45%, var(--border));
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+}
+
+.docs-caption {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.docs-entry {
+  padding: var(--space-4) var(--space-3);
+  border: 1px solid transparent;
+  border-bottom-color: var(--border);
+  border-radius: var(--radius);
+  scroll-margin: var(--space-6);
+}
+
+.docs-entry:last-child {
+  border-bottom-color: transparent;
+}
+
+.docs-entry.is-focused,
+.docs-card--guide.is-focused {
+  border-color: var(--accent);
+  animation: docs-flash 1600ms ease-out;
+}
+
+@keyframes docs-flash {
+  from {
+    background: color-mix(in srgb, var(--accent) 16%, var(--bg-panel));
+  }
+}
+
+.sig {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.sig-fn {
+  color: var(--accent);
+}
+
+.sig-param {
+  color: var(--ink);
+}
+
+.sig-type {
+  color: color-mix(in srgb, var(--accent-2) 65%, var(--ink));
+}
+
+.sig-lit {
+  color: var(--ok);
+}
+
+.sig-punct {
+  color: var(--ink-dim);
+}
+
+.cost {
+  flex: none;
+  padding: 2px 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.cost--free {
+  border-color: color-mix(in srgb, var(--ok) 35%, var(--border));
+  color: var(--ok);
+}
+
+.params {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-1) var(--space-3);
+  margin: 0 0 var(--space-3);
+}
+
+.params dt {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.params dt code {
+  color: var(--accent);
+}
+
+.params dd {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ink-dim);
+}
+
+.params dd .docs-prose {
+  font-size: inherit;
+  color: inherit;
+}
+
+.docs-meta {
+  margin: 0;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--ink-dim);
+}
+
+.docs-empty {
+  margin: var(--space-5) 0 0;
+  font-size: 13px;
+  color: var(--ink-dim);
+}
+
+@media (width <= 620px) {
+  .params {
+    grid-template-columns: 1fr;
+    gap: 0 0;
+  }
+
+  .params dd {
+    margin-bottom: var(--space-2);
+  }
+}

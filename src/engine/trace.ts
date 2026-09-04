@@ -6,6 +6,7 @@ import {
   cloneBot,
   cloneTile,
   cloneWorld,
+  enqueueMessage,
   machineById,
   makespan,
   removeFromInventory,
@@ -17,6 +18,15 @@ import {
 
 /** DESIGN.md §4.5. A keyframe is written every this many ticks. */
 export const KEYFRAME_INTERVAL = 500;
+
+/**
+ * How many distinct `sense` events a trace stores before it stops keeping them individually.
+ *
+ * Sensing is free in ticks, so a tight loop can issue millions of reads without ever advancing
+ * the clock. Beyond this many stored reads the builder keeps one running aggregate per sense
+ * name instead: the *counts* stay exact, only the per-read `detail` is dropped.
+ */
+export const MAX_SENSE_EVENTS = 20_000;
 
 interface AtTick {
   t: number;
@@ -45,26 +55,31 @@ export type TurnEvent = BotAction & { kind: 'turn'; facing: Dir };
 export type WaitEvent = BotAction & { kind: 'wait'; ticks: number };
 export type SyncEvent = BotAction & { kind: 'sync'; to: number };
 
-/** `harvest` and `mine` credit the bot's inventory. The tile edit rides on a separate tileChange. */
-export type GatherEvent = BotAction & {
-  kind: 'harvest' | 'mine';
-  at: Vec;
-  item: ItemKind | null;
-  count: number;
-  ok: boolean;
-};
-
-export type PlantEvent = BotAction & { kind: 'plant'; at: Vec; item: ItemKind; ok: boolean };
-
-/** `pickup` moves ground -> inventory, `drop` moves inventory -> ground. */
-export type TransferEvent = BotAction & {
-  kind: 'pickup' | 'drop';
+/**
+ * Payload shared by every event that moves a quantity of one item kind somewhere.
+ *
+ * Each `kind` gets its own member of the union rather than one member with a `kind` union, so
+ * that `Extract<TraceEvent, { kind: 'mine' }>` resolves to the event instead of `never`.
+ */
+interface ItemTransfer extends BotAction {
   at: Vec;
   /** null only when the action failed because there was nothing to transfer. */
   item: ItemKind | null;
   count: number;
   ok: boolean;
-};
+}
+
+export type HarvestEvent = ItemTransfer & { kind: 'harvest' };
+export type MineEvent = ItemTransfer & { kind: 'mine' };
+/** `harvest` and `mine` credit the bot's inventory. The tile edit rides on a separate tileChange. */
+export type GatherEvent = HarvestEvent | MineEvent;
+
+export type PlantEvent = BotAction & { kind: 'plant'; at: Vec; item: ItemKind; ok: boolean };
+
+export type PickupEvent = ItemTransfer & { kind: 'pickup' };
+export type DropEvent = ItemTransfer & { kind: 'drop' };
+/** `pickup` moves ground -> inventory, `drop` moves inventory -> ground. */
+export type TransferEvent = PickupEvent | DropEvent;
 
 /**
  * Generic bot action, for world-specific commands added later (World 5's `link`, World 6's
@@ -77,6 +92,25 @@ export type ActEvent = BotAction & {
   at?: Vec;
   ok: boolean;
   detail?: string | number;
+};
+
+/**
+ * A read of the world. Sensing costs 0 ticks (DESIGN.md §4.4) but is *observable*: it counts one
+ * op and leaves this behind, so a level can budget information the way it budgets time.
+ *
+ * `count` is how many identical consecutive reads this one event stands for — a loop that probes
+ * the same machine a hundred thousand times collapses to a single event with `count: 100000`
+ * rather than a hundred thousand objects. Summing `count` per `name` is always exact.
+ */
+export type SenseEvent = BotAction & {
+  kind: 'sense';
+  name: string;
+  /** Whether the read found anything: a machine for `probe`, a mark for `readMark`, and so on. */
+  ok: boolean;
+  /** What came back, kept small and flat: a `"x,y"`, a direction name, a count, an id. */
+  detail?: string | number;
+  /** Always >= 1. */
+  count: number;
 };
 
 export type UseEvent = BotAction & {
@@ -96,9 +130,19 @@ export type SpendEvent = AtTick & {
   amount: number;
   botId?: number;
 };
+/**
+ * Only a successful spawn produces one — there is no `bot` to describe otherwise, so a refused
+ * spawn is reported as an `act` named 'spawn' with `ok: false`.
+ */
 export type SpawnEvent = BotAction & { kind: 'spawn'; bot: Bot };
 export type DieEvent = BotAction & { kind: 'die'; at: Vec; reason: string };
-export type SendEvent = BotAction & { kind: 'send'; to: number; body: string | number };
+/** `ok` is false when `to` names no bot, or a dead one. The message is then never delivered. */
+export type SendEvent = BotAction & {
+  kind: 'send';
+  to: number;
+  body: string | number;
+  ok: boolean;
+};
 export type RecvEvent = BotAction & {
   kind: 'recv';
   from: number | null;
@@ -125,6 +169,7 @@ export type TraceEvent =
   | PlantEvent
   | TransferEvent
   | ActEvent
+  | SenseEvent
   | UseEvent
   | MarkEvent
   | RefuelEvent
@@ -239,6 +284,7 @@ export function applyEvent(world: World, event: TraceEvent): void {
     }
     case 'use':
     case 'act':
+    case 'sense':
       break;
     case 'mark': {
       const tile = tileAt(world, event.at);
@@ -265,8 +311,9 @@ export function applyEvent(world: World, event: TraceEvent): void {
       break;
     }
     case 'send': {
+      if (!event.ok) break;
       const target = botById(world, event.to);
-      if (target) target.inbox.push({ from: event.botId, body: event.body, t: event.t });
+      if (target) enqueueMessage(target, { from: event.botId, body: event.body, t: event.t });
       break;
     }
     case 'recv': {
@@ -345,12 +392,65 @@ export class TraceBuilder {
   readonly initialWorld: World;
   readonly events: TraceEvent[] = [];
 
-  constructor(initialWorld: World) {
+  private readonly maxSenseEvents: number;
+  private senseEventCount = 0;
+  /** One running aggregate per sense name, used once `maxSenseEvents` individual reads are stored. */
+  private readonly senseOverflow = new Map<string, SenseEvent>();
+
+  constructor(initialWorld: World, maxSenseEvents: number = MAX_SENSE_EVENTS) {
     this.initialWorld = cloneWorld(initialWorld);
+    this.maxSenseEvents = maxSenseEvents;
   }
 
   push(event: TraceEvent): void {
     this.events.push(event);
+  }
+
+  /**
+   * Appends a sensing read, folding it away wherever that costs no accuracy.
+   *
+   * Two levels of folding, in order: an identical read issued back-to-back bumps the previous
+   * event's `count`; past `maxSenseEvents` distinct stored reads, everything else collapses into
+   * one running aggregate per sense name. Either way the summed `count` per name is exact — only
+   * the per-read `detail` and interleaving are lossy, and only on traces nobody could read anyway.
+   */
+  pushSense(event: SenseEvent): void {
+    const last = this.events[this.events.length - 1];
+    if (
+      last !== undefined &&
+      last.kind === 'sense' &&
+      last.t === event.t &&
+      last.botId === event.botId &&
+      last.name === event.name &&
+      last.ok === event.ok &&
+      last.detail === event.detail
+    ) {
+      last.count += event.count;
+      return;
+    }
+
+    if (this.senseEventCount >= this.maxSenseEvents) {
+      const running = this.senseOverflow.get(event.name);
+      if (running) {
+        running.count += event.count;
+        return;
+      }
+      const aggregate: SenseEvent = {
+        t: event.t,
+        botId: event.botId,
+        dt: 0,
+        kind: 'sense',
+        name: event.name,
+        ok: event.ok,
+        count: event.count,
+      };
+      this.senseOverflow.set(event.name, aggregate);
+      this.events.push(aggregate);
+      return;
+    }
+
+    this.events.push(event);
+    this.senseEventCount += 1;
   }
 
   get length(): number {
@@ -401,6 +501,19 @@ export function reviveTrace(trace: Trace): Trace {
   reviveWorld(trace.initialWorld);
   for (const keyframe of trace.keyframes) reviveWorld(keyframe.world);
   return trace;
+}
+
+/**
+ * How many times each sensing command ran, keyed by command name. Exact even when the trace
+ * folded reads away, because every `sense` event carries the `count` it stands for.
+ */
+export function senseTotals(trace: Trace): Record<string, number> {
+  const totals: Record<string, number> = {};
+  for (const event of trace.events) {
+    if (event.kind !== 'sense') continue;
+    totals[event.name] = (totals[event.name] ?? 0) + event.count;
+  }
+  return totals;
 }
 
 /** All print output up to `tick`, in order. Convenience for the console panel. */

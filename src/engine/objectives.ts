@@ -1,4 +1,5 @@
 import type { PrintEvent, Trace } from './trace.ts';
+import { senseTotals } from './trace.ts';
 import type { ItemKind, Machine, Tile, Vec, World } from './types.ts';
 import { botById, countItemsAt, eq, inventoryCount, machineById, tileAt } from './world.ts';
 
@@ -9,6 +10,13 @@ export interface ObjectiveContext {
   trace: Trace;
   /** The world as `LevelDef.build(seed)` produced it, before a single command ran. */
   initialWorld: World;
+  /** Ops the run consumed. `buildVerdict` always supplies it; `withinOps` reads nothing else. */
+  ops?: number;
+  /**
+   * Sensing reads per command name. `buildVerdict` supplies it; when absent, `withinSenses` falls
+   * back to counting the trace, which is exact for the same reason `Verdict.stats.senses` is.
+   */
+  senses?: Record<string, number>;
 }
 
 export interface Objective {
@@ -202,6 +210,37 @@ export function withinTicks(n: number, options?: ObjectiveOptions): Objective {
     options,
     (ctx) => ctx.trace.endTick <= n,
     (ctx) => [Math.min(ctx.trace.endTick, n), n],
+  );
+}
+
+/**
+ * The run called `name` (a sensing command: 'probe', 'scan', 'look', …) at most `n` times.
+ *
+ * The information budget, and the third scoring axis after ticks and characters. Sensing is still
+ * free in ticks — this only makes it *countable*, so a level can ask for the answer in ten probes
+ * rather than a hundred. `progress()` reports "7 / 10" so the cost is visible while playing.
+ */
+export function withinSenses(name: string, n: number, options?: ObjectiveOptions): Objective {
+  const used = (ctx: ObjectiveContext): number =>
+    ctx.senses?.[name] ?? senseTotals(ctx.trace)[name] ?? 0;
+  return define(
+    `within-${n}-${name}`,
+    `Use ${name} at most ${n} times`,
+    options,
+    (ctx) => used(ctx) <= n,
+    (ctx) => [Math.min(used(ctx), n), n],
+  );
+}
+
+/** The whole run finished within `n` operations — every command, sensing included. */
+export function withinOps(n: number, options?: ObjectiveOptions): Objective {
+  const used = (ctx: ObjectiveContext): number => ctx.ops ?? 0;
+  return define(
+    `within-${n}-ops`,
+    `Finish within ${n} operations`,
+    options,
+    (ctx) => used(ctx) <= n,
+    (ctx) => [Math.min(used(ctx), n), n],
   );
 }
 

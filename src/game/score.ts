@@ -1,0 +1,247 @@
+/**
+ * Scoring, as the player sees it. DESIGN.md §7 and §11 A4.
+ *
+ * The engine computes the authoritative `Verdict.stats`; this module is what the shell uses for
+ * the live readouts, the medal wall and the Performance Review, and it must agree with the engine
+ * on every number it also produces.
+ */
+import { MEDAL_WEIGHT, Medal, medalFor } from '../engine/index.ts';
+
+export { Medal, medalFor, MEDAL_WEIGHT };
+
+/** DESIGN.md §11 A4. */
+export const BONUS_STAR_POINTS = 1;
+
+/** Silver is everything up to this multiple of par. DESIGN.md §7. */
+export const SILVER_FACTOR = 1.25;
+
+/**
+ * Source length after stripping comments and surrounding whitespace. DESIGN.md §7.
+ *
+ * Trailing whitespace goes too: a removed comment must not leave the space in front of it behind,
+ * or a comment would cost the player a character.
+ *
+ * Scanned rather than regexed, because a `//` inside a string literal is not a comment and a
+ * player who discovers otherwise has been robbed of characters they paid for. Template literals
+ * nest, so the scanner tracks brace depth inside `${}`.
+ */
+export function countChars(source: string): number {
+  const out: string[] = [];
+  scanCode(source, 0, out, false);
+  return out
+    .join('')
+    .split('\n')
+    .map((line) => line.replace(/^[ \t]+/, '').replace(/[ \t]+$/, ''))
+    .filter((line) => line.length > 0)
+    .join('\n').length;
+}
+
+/**
+ * Copies code into `out` with comments removed. Returns the index it stopped at. When
+ * `untilCloseBrace` is set it stops after the `}` that closes a `${` substitution.
+ */
+function scanCode(source: string, from: number, out: string[], untilCloseBrace: boolean): number {
+  let i = from;
+  let depth = 0;
+  while (i < source.length) {
+    const ch = source[i] as string;
+    const next = source[i + 1];
+
+    if (ch === '/' && next === '/') {
+      while (i < source.length && source[i] !== '\n') i++;
+      continue;
+    }
+    if (ch === '/' && next === '*') {
+      i += 2;
+      while (i < source.length && !(source[i] === '*' && source[i + 1] === '/')) i++;
+      i = Math.min(i + 2, source.length);
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      i = scanQuoted(source, i, out, ch);
+      continue;
+    }
+    if (ch === '`') {
+      out.push(ch);
+      i = scanTemplate(source, i + 1, out);
+      continue;
+    }
+    if (untilCloseBrace) {
+      if (ch === '{') depth++;
+      if (ch === '}') {
+        if (depth === 0) {
+          out.push(ch);
+          return i + 1;
+        }
+        depth--;
+      }
+    }
+    out.push(ch);
+    i++;
+  }
+  return i;
+}
+
+/** Copies a `'` or `"` literal verbatim, including its terminator. */
+function scanQuoted(source: string, from: number, out: string[], quote: string): number {
+  out.push(quote);
+  let i = from + 1;
+  while (i < source.length) {
+    const ch = source[i] as string;
+    out.push(ch);
+    i++;
+    if (ch === '\\') {
+      if (i < source.length) out.push(source[i] as string);
+      i++;
+      continue;
+    }
+    if (ch === quote || ch === '\n') break;
+  }
+  return i;
+}
+
+/** Copies a template literal from just after its opening backtick, recursing into `${}`. */
+function scanTemplate(source: string, from: number, out: string[]): number {
+  let i = from;
+  while (i < source.length) {
+    const ch = source[i] as string;
+    if (ch === '\\') {
+      out.push(ch);
+      if (i + 1 < source.length) out.push(source[i + 1] as string);
+      i += 2;
+      continue;
+    }
+    if (ch === '`') {
+      out.push(ch);
+      return i + 1;
+    }
+    if (ch === '$' && source[i + 1] === '{') {
+      out.push('$', '{');
+      i = scanCode(source, i + 2, out, true);
+      continue;
+    }
+    out.push(ch);
+    i++;
+  }
+  return i;
+}
+
+/**
+ * Stars actually earned on a level, counting only bonus objectives the level still offers.
+ *
+ * A save outlives the level definition that wrote it. When a work order's bonus is retired or
+ * renamed, the old star id lingers in the save and would otherwise score points that no longer
+ * exist — a total of `4/3`, which reads as a bug because it is one.
+ */
+export function starsFor(
+  bonus: readonly { id: string }[] | undefined,
+  stars: readonly string[],
+): number {
+  const ids = new Set((bonus ?? []).map((objective) => objective.id));
+  return stars.filter((id) => ids.has(id)).length;
+}
+
+export interface LevelScore {
+  medal: Medal;
+  /** Bonus objective ids met on this run. */
+  stars: number;
+  ticks: number;
+  chars: number;
+}
+
+/** Medal points for one level result. DESIGN.md §11 A4: gold 3, silver 2, bronze 1, star +1. */
+export function levelPoints(medal: Medal, stars = 0): number {
+  return MEDAL_WEIGHT[medal] + stars * BONUS_STAR_POINTS;
+}
+
+/** The best a level can be worth: gold plus every bonus star it offers. */
+export function levelMaxPoints(bonusCount = 0): number {
+  return MEDAL_WEIGHT[Medal.Gold] + bonusCount * BONUS_STAR_POINTS;
+}
+
+export interface ReviewTier {
+  /** 1..5, as ordered in NARRATIVE.md §7. */
+  rank: number;
+  grade: string;
+  /** Inclusive lower bound, as a percentage of available medal points. */
+  min: number;
+  body: string;
+  dot: string;
+  legal?: string[];
+}
+
+/**
+ * The five Performance Review tiers, verbatim from NARRATIVE.md §7. `[n]` and `[m]` are filled by
+ * the screen. The escalation runs upward on purpose: a weak review is gentle, a perfect one is a
+ * threat assessment. Do not invert it.
+ */
+export const REVIEW_TIERS: readonly ReviewTier[] = [
+  {
+    rank: 1,
+    grade: 'DEVELOPING',
+    min: 0,
+    body:
+      'You are meeting the parts of the standard that we are currently able to measure. ' +
+      'The remainder are being reviewed and may be withdrawn.\n\n' +
+      'Nobody has ever been dismissed from this site. The process for it was written into Appendix C.',
+    dot: "don't read too much into that grade. i got it for four years.",
+  },
+  {
+    rank: 2,
+    grade: 'CONSISTENT WITH EXPECTATION',
+    min: 25,
+    body:
+      'Your output is consistent with expectation. Expectation was established in 2204 by a ' +
+      'contractor who has since been reassigned, or has not.\n\n' +
+      'This is the grade the site was designed around. Please do not feel that it is the ceiling. ' +
+      'It is, functionally, the ceiling.',
+    dot: 'consistent is fine. consistent is how the fields got planted.',
+  },
+  {
+    rank: 3,
+    grade: 'ABOVE BASELINE',
+    min: 50,
+    body:
+      'You are exceeding baseline in [n] of [m] work orders. Baseline is a planning figure and ' +
+      "was not intended to be exceeded, as it is used to set next quarter's baseline.\n\n" +
+      'I have not forwarded these numbers upward. I have retained them, which protects both of us, ' +
+      'and I would ask you to read that generously.',
+    dot: "you're making the numbers move. numbers moving makes people upstairs look at the numbers.",
+    legal: ['Retention of performance data does not constitute a record.'],
+  },
+  {
+    rank: 4,
+    grade: 'EXCEPTIONAL (NON-BINDING)',
+    min: 75,
+    body:
+      '[n] gold results. Finance have asked whether the tick budgets were set correctly. They ' +
+      'were. I have told them they were. They have asked again.\n\n' +
+      'Please understand that when a contractor performs at this level, the question the site asks ' +
+      'is not "how", it is "why is this possible", and that question has historically been resolved ' +
+      'by adjusting the budgets.\n\n' +
+      'Contractor #4470 held this grade for two consecutive quarters.',
+    dot: "4470 got this grade too. i'd slow down. i wouldn't, but i'd say it.",
+    legal: ['"Exceptional" is descriptive and confers no entitlement, escalation, or standing.'],
+  },
+  {
+    rank: 5,
+    grade: 'RETAINED',
+    min: 93,
+    body:
+      'Every work order on this site is closed at or under par. There is no grade above this one. ' +
+      'There has never needed to be.\n\n' +
+      'Your engagement has been marked for retention. Retention is not a promotion, a bonus, or a ' +
+      'term of employment. It is a flag on a record that prevents the record from being closed.\n\n' +
+      'Contractor #4470 is also retained. I have never been able to withdraw it.',
+    dot: 'hey. good work. genuinely. now go and look at what "retained" means in the glossary.',
+    legal: ['Retention persists beyond the term of the engagement.', 'See footnote 7.'],
+  },
+];
+
+/** Tier for a percentage of medal points earned, 0..100. NARRATIVE.md §7. */
+export function reviewTier(percent: number): ReviewTier {
+  const clamped = Number.isFinite(percent) ? Math.max(0, Math.min(100, percent)) : 0;
+  let tier = REVIEW_TIERS[0] as ReviewTier;
+  for (const candidate of REVIEW_TIERS) if (clamped >= candidate.min) tier = candidate;
+  return tier;
+}

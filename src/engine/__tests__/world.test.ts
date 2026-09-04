@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import type { ItemStack, Tile } from '../index.ts';
+import type { ItemStack, Message, Tile } from '../index.ts';
 import {
   ALL_DIRS,
   Dir,
@@ -22,6 +22,7 @@ import {
   dirBetween,
   dirDelta,
   dirName,
+  enqueueMessage,
   eq,
   inBounds,
   indexOf,
@@ -353,6 +354,24 @@ describe('bots', () => {
     must(world.bots[1]).clock = 11;
     must(world.bots[2]).clock = 7;
     expect(makespan(world)).toBe(11);
+  });
+});
+
+describe('enqueueMessage', () => {
+  test('orders by send time so a live inbox and a replayed one agree', () => {
+    const bot = { inbox: [] as Message[] };
+    enqueueMessage(bot, { from: 0, body: 'late', t: 40 });
+    enqueueMessage(bot, { from: 1, body: 'early', t: 0 });
+    enqueueMessage(bot, { from: 2, body: 'middle', t: 12 });
+    expect(bot.inbox.map((m) => m.body)).toEqual(['early', 'middle', 'late']);
+  });
+
+  test('breaks ties on sender id, then keeps insertion order', () => {
+    const bot = { inbox: [] as Message[] };
+    enqueueMessage(bot, { from: 3, body: 'c', t: 5 });
+    enqueueMessage(bot, { from: 1, body: 'a', t: 5 });
+    enqueueMessage(bot, { from: 1, body: 'b', t: 5 });
+    expect(bot.inbox.map((m) => m.body)).toEqual(['a', 'b', 'c']);
   });
 });
 

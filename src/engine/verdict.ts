@@ -1,6 +1,7 @@
 import { FailureCode } from './errors.ts';
 import type { Objective, ObjectiveContext } from './objectives.ts';
 import { evaluateObjectives } from './objectives.ts';
+import { senseTotals } from './trace.ts';
 import type { Vec } from './types.ts';
 
 /** DESIGN.md §4.6. */
@@ -21,6 +22,14 @@ export interface Verdict {
      * commands and levels populate it via `Sim.spend`. DESIGN.md §11 A5.
      */
     spend: Record<string, number>;
+    /**
+     * How many times each sensing command ran, e.g. `{ probe: 7, scan: 240 }`. Sensing is free in
+     * ticks but not invisible: this is what a `withinSenses` information budget scores against.
+     *
+     * Always present on a Verdict from `buildVerdict`. Optional only so that hand-built and
+     * aggregated Verdicts elsewhere in the codebase stay valid without a coordinated edit.
+     */
+    senses?: Record<string, number>;
   };
 }
 
@@ -31,15 +40,20 @@ export interface VerdictInput extends ObjectiveContext {
   seeds: number;
   /** Defaults to `{}`. Pass `sim.spendTotals()`. */
   spend?: Record<string, number>;
+  /** Defaults to the exact counts recovered from the trace. Pass `sim.senseTotals()`. */
+  senses?: Record<string, number>;
   /** Set when the run ended badly. Objectives are still reported, for partial-credit UI. */
   failure?: { code: FailureCode; message: string; at?: Vec; line?: number };
 }
 
 export function buildVerdict(input: VerdictInput): Verdict {
+  const senses = input.senses ?? senseTotals(input.trace);
   const ctx: ObjectiveContext = {
     world: input.world,
     trace: input.trace,
     initialWorld: input.initialWorld,
+    ops: input.ops,
+    senses,
   };
   const objectives = evaluateObjectives(input.objectives, ctx);
   const allMet = objectives.every((o) => o.met);
@@ -63,6 +77,7 @@ export function buildVerdict(input: VerdictInput): Verdict {
       chars: input.chars,
       seeds: input.seeds,
       spend: { ...(input.spend ?? {}) },
+      senses: { ...senses },
     },
   };
   if (failure) verdict.failure = failure;

@@ -5,6 +5,7 @@ import type {
   ItemKind,
   ItemStack,
   Machine,
+  Message,
   Terrain,
   TerrainProps,
   Tile,
@@ -297,6 +298,21 @@ export function inventoryCount(holder: { inventory: ItemStack[] }, kind?: ItemKi
     (sum, s) => (kind === undefined || s.kind === kind ? sum + s.count : sum),
     0,
   );
+}
+
+/**
+ * Queues a message in send-time order, ties broken by sender id.
+ *
+ * A live run appends in the order the player issued the calls; a replay appends in `t` order.
+ * Sorting on insert is what makes those two produce the same inbox, which matters as soon as one
+ * bot sends from far ahead on its own clock and another sends from far behind.
+ */
+export function enqueueMessage(bot: { inbox: Message[] }, message: Message): void {
+  const at = bot.inbox.findIndex(
+    (queued) => queued.t > message.t || (queued.t === message.t && queued.from > message.from),
+  );
+  if (at < 0) bot.inbox.push(message);
+  else bot.inbox.splice(at, 0, message);
 }
 
 export function addToInventory(

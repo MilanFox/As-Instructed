@@ -54,6 +54,8 @@ export interface WorldOptions {
   capacity?: number;
   fill?: Terrain;
   inventory?: ItemStack[];
+  /** Opts every bot into the fuel mechanic. Omit for the `Infinity` default. DESIGN.md §11 A1. */
+  fuel?: number;
 }
 
 /**
@@ -68,6 +70,7 @@ export function openWorld(w: number, h: number, botCount = 1, options: WorldOpti
       facing: Dir.East,
       capacity: options.capacity ?? 8,
       inventory: options.inventory?.map((s) => ({ kind: s.kind, count: s.count })) ?? [],
+      ...(options.fuel === undefined ? {} : { fuel: options.fuel }),
     });
   }
   return world;
@@ -91,6 +94,7 @@ export function asciiWorld(rows: readonly string[], options: AsciiOptions = {}):
       facing: Dir.East,
       capacity: options.capacity ?? 8,
       inventory: options.inventory?.map((s) => ({ kind: s.kind, count: s.count })) ?? [],
+      ...(options.fuel === undefined ? {} : { fuel: options.fuel }),
     });
   }
   return world;

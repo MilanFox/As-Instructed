@@ -1,0 +1,282 @@
+/**
+ * Demo scenes for the renderer harness. Dev-only: nothing here is reachable from `src/main.tsx`.
+ *
+ * Every scene produces a *real* Trace by driving the real `Sim`, because a renderer verified
+ * against a hand-written fake trace is a renderer verified against nothing.
+ */
+
+import {
+  Dir,
+  Sim,
+  Terrain,
+  addBot,
+  addGroundItems,
+  addMachine,
+  cloneWorld,
+  createWorld,
+  paintAscii,
+  rebuildOccupancy,
+  setTile,
+  vec,
+} from '../../engine/index.ts';
+import type { Trace, World } from '../../engine/index.ts';
+import { w1_01 } from '../../levels/world-1/w1-01.ts';
+import { solution as w1_01_solution } from '../../levels/world-1/__solutions__/w1-01.ts';
+
+export interface Scene {
+  id: string;
+  label: string;
+  world: number;
+  trace: Trace;
+  /** Cells the objective is about, for `Renderer.setHighlights`. */
+  highlights: { x: number; y: number }[];
+}
+
+function finish(world: World, drive: (sim: Sim) => void): Trace {
+  const sim = new Sim(world, { maxTicks: 60_000, maxOps: 5_000_000, livelockRounds: 1_000 });
+  try {
+    drive(sim);
+  } catch (error) {
+    console.warn('[scenes] driver stopped early:', error);
+  }
+  return sim.finish();
+}
+
+/** The real tutorial level, run through its real reference solution. */
+export function sceneW101(): Scene {
+  const world = w1_01.build(1);
+  const trace = finish(world, (sim) => {
+    const botId = sim.world.bots[0]?.id ?? 0;
+    w1_01_solution.run(sim, botId);
+    // A deliberate wall bump after the solution, so the harness always shows the blocked-move
+    // treatment required by DESIGN.md §11 A5.
+    sim.move(botId, Dir.East);
+    sim.move(botId, Dir.East);
+    sim.move(botId, Dir.North);
+    sim.move(botId, Dir.West);
+  });
+  return { id: 'w1-01', label: 'w1-01 · reference solution', world: 1, trace, highlights: [vec(5, 2)] };
+}
+
+const SHOWCASE_MAP = [
+  '##############',
+  '#....#.......#',
+  '#.,,,#..o.r..#',
+  '#.,,,#.......#',
+  '#....D...c...#',
+  '#.p..#...c...#',
+  '#....#...c...#',
+  '#............#',
+  '##############',
+];
+
+/**
+ * Everything the renderer can draw, on one grid: growth stages, mining chips, ground items, a
+ * machine, a conveyor run, a fuel depot, three bots on independent clocks, and a bot that spends
+ * its whole life bumping into a wall.
+ */
+export function sceneShowcase(): Scene {
+  const world = createWorld({ w: 14, h: 9, seed: 7, fill: Terrain.Floor });
+  paintAscii(world, SHOWCASE_MAP, {
+    '#': Terrain.Wall,
+    '.': Terrain.Regolith,
+    ',': Terrain.Soil,
+    o: Terrain.Ore,
+    r: Terrain.Rock,
+    c: Terrain.Conveyor,
+    D: Terrain.Depot,
+    p: Terrain.Pad,
+  });
+
+  // Six crops planted at staggered ticks, so the whole maturity ladder is on screen at once and
+  // visibly advances as the playhead moves (ENGINE.md §6.4: growth is derived, not scheduled).
+  const plantedAt = [0, 4, 8, 12, 16, 20];
+  const cells = [vec(2, 2), vec(3, 2), vec(4, 2), vec(2, 3), vec(3, 3), vec(4, 3)];
+  cells.forEach((at, i) => {
+    setTile(world, at, {
+      terrain: Terrain.Soil,
+      growth: 0,
+      maxGrowth: 8,
+      crop: 'crop',
+      meta: { plantedAt: plantedAt[i] as number },
+    });
+  });
+
+  addGroundItems(world, vec(7, 7), 'crate', 3);
+  addGroundItems(world, vec(8, 7), 'ore', 1);
+  addGroundItems(world, vec(9, 7), 'cell', 2);
+  addGroundItems(world, vec(10, 7), 'chip', 5);
+
+  addMachine(world, {
+    id: 'silo',
+    kind: 'sink',
+    at: vec(12, 2),
+    state: 'on',
+    inventory: [],
+    vars: {},
+    cycle: ['on', 'off'],
+  });
+  addMachine(world, {
+    id: 'mast',
+    kind: 'antenna',
+    at: vec(12, 5),
+    state: 'off',
+    inventory: [],
+    vars: {},
+  });
+
+  addBot(world, { at: vec(1, 1), facing: Dir.East, name: 'RIG-01' });
+  addBot(world, { at: vec(1, 7), facing: Dir.East, name: 'RIG-02', fuel: 26, fuelMax: 26 });
+  addBot(world, { at: vec(11, 7), facing: Dir.North, name: 'RIG-03' });
+  rebuildOccupancy(world);
+
+  const trace = finish(world, (sim) => {
+    const [a, b, c] = sim.world.bots;
+    if (!a || !b || !c) return;
+
+    // Bot A: farm the plot, then run into the wall it cannot pass.
+    sim.move(a.id, Dir.South);
+    sim.move(a.id, Dir.East);
+    for (let i = 0; i < 3; i++) sim.move(a.id, Dir.East);
+    sim.harvest(a.id);
+    sim.move(a.id, Dir.South);
+    sim.harvest(a.id);
+    for (let i = 0; i < 4; i++) sim.move(a.id, Dir.East);
+    for (let i = 0; i < 3; i++) sim.move(a.id, Dir.North);
+
+    // Bot B: refuel, cross the map, mine the ore vein.
+    sim.move(b.id, Dir.North);
+    sim.move(b.id, Dir.North);
+    sim.move(b.id, Dir.North);
+    sim.move(b.id, Dir.East);
+    sim.move(b.id, Dir.East);
+    sim.move(b.id, Dir.East);
+    sim.move(b.id, Dir.East);
+    sim.refuel(b.id);
+    for (let i = 0; i < 3; i++) sim.move(b.id, Dir.East);
+    sim.move(b.id, Dir.North);
+    sim.move(b.id, Dir.North);
+    sim.mine(b.id, Dir.East);
+    sim.move(b.id, Dir.East);
+    sim.mine(b.id, Dir.East);
+
+    // Bot C: collect the ground items, then spend the rest of the run failing to walk East.
+    sim.move(c.id, Dir.West);
+    sim.pickup(c.id);
+    sim.move(c.id, Dir.West);
+    sim.pickup(c.id);
+    sim.move(c.id, Dir.West);
+    sim.pickup(c.id);
+    sim.move(c.id, Dir.South);
+    for (let i = 0; i < 6; i++) sim.move(c.id, Dir.South);
+
+    sim.use(a.id, Dir.East);
+    sim.send(a.id, b.id, 'plot cleared');
+    sim.send(a.id, 999, 'nobody home');
+    // `sync` emits one event per bot that actually idled, which is what drives the idle tell.
+    sim.sync();
+    sim.print(a.id, 'showcase complete');
+  });
+
+  return {
+    id: 'showcase',
+    label: 'showcase · growth, mining, blocked moves',
+    world: 2,
+    trace,
+    highlights: [vec(2, 5)],
+  };
+}
+
+/**
+ * The performance target from the brief: 30x30, 20 bots, particles active. Each bot walks its own
+ * loop, so every bot is on a different clock and the animation state genuinely differs per bot.
+ */
+export function sceneStress(): Scene {
+  const size = 30;
+  const world = createWorld({ w: size, h: size, seed: 3, fill: Terrain.Regolith });
+  for (let x = 0; x < size; x++) {
+    setTile(world, vec(x, 0), { terrain: Terrain.Wall });
+    setTile(world, vec(x, size - 1), { terrain: Terrain.Wall });
+    setTile(world, vec(0, x), { terrain: Terrain.Wall });
+    setTile(world, vec(size - 1, x), { terrain: Terrain.Wall });
+  }
+  for (let i = 0; i < 60; i++) {
+    const x = 2 + ((i * 7) % (size - 4));
+    const y = 2 + ((i * 13) % (size - 4));
+    setTile(world, vec(x, y), { terrain: i % 3 === 0 ? Terrain.Rock : Terrain.Ore });
+  }
+  for (let i = 0; i < 40; i++) {
+    addGroundItems(world, vec(3 + ((i * 11) % 24), 3 + ((i * 5) % 24)), 'ore', 1 + (i % 4));
+  }
+  const starts: { x: number; y: number }[] = [];
+  for (let i = 0; i < 20; i++) {
+    const at = vec(2 + (i % 5) * 5, 2 + Math.floor(i / 5) * 6);
+    if (world.tiles[at.y * size + at.x]?.terrain !== Terrain.Regolith) {
+      setTile(world, at, { terrain: Terrain.Regolith });
+    }
+    addBot(world, { at, facing: (i % 4) as Dir, name: `SWARM-${String(i).padStart(2, '0')}` });
+    starts.push(at);
+  }
+  rebuildOccupancy(world);
+
+  const trace = finish(world, (sim) => {
+    const bots = sim.world.bots.slice();
+    for (let round = 0; round < 24; round++) {
+      for (let i = 0; i < bots.length; i++) {
+        const bot = bots[i];
+        if (!bot) continue;
+        const dir = ((round + i) % 4) as Dir;
+        sim.move(bot.id, dir);
+        if (round % 5 === 2) sim.mine(bot.id);
+        if (round % 7 === 3) sim.pickup(bot.id);
+      }
+    }
+  });
+
+  return { id: 'stress', label: 'stress · 30x30, 20 bots', world: 7, trace, highlights: [] };
+}
+
+/** A biome contact sheet: every terrain, drawn under one world's palette. */
+export function sceneBiome(world: number, label: string): Scene {
+  const terrains: Terrain[] = [
+    Terrain.Floor,
+    Terrain.Wall,
+    Terrain.Pad,
+    Terrain.Regolith,
+    Terrain.Soil,
+    Terrain.Rock,
+    Terrain.Ore,
+    Terrain.Rubble,
+    Terrain.Ice,
+    Terrain.Pit,
+    Terrain.Cable,
+    Terrain.Depot,
+    Terrain.Conveyor,
+  ];
+  const cols = 13;
+  const grid = createWorld({ w: cols, h: 5, seed: 1, fill: Terrain.Floor });
+  terrains.forEach((terrain, i) => {
+    setTile(grid, vec(i, 1), { terrain });
+    setTile(grid, vec(i, 2), { terrain });
+  });
+  addBot(grid, { at: vec(0, 4), facing: Dir.East, name: 'PROBE' });
+  rebuildOccupancy(grid);
+  const snapshot = cloneWorld(grid);
+  const trace = finish(snapshot, (sim) => {
+    const botId = sim.world.bots[0]?.id ?? 0;
+    for (let i = 0; i < cols - 1; i++) sim.move(botId, Dir.East);
+  });
+  return { id: `biome-${world}`, label, world, trace, highlights: [] };
+}
+
+export function allScenes(): Scene[] {
+  return [
+    sceneW101(),
+    sceneShowcase(),
+    sceneStress(),
+    sceneBiome(1, 'biome · Boot Sector'),
+    sceneBiome(4, 'biome · Cave Systems'),
+    sceneBiome(5, 'biome · The Grid'),
+    sceneBiome(8, 'biome · Kessler Contract'),
+  ];
+}
