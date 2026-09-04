@@ -36,3 +36,27 @@ Paused mid-build at the 5h usage window. Resume from here.
 - `w4-04` is the game's biggest difficulty cliff; split it if playtesting stalls there.
 - `w6-04` only works if the brief states the keyspace size and header outright.
 - `w7-03` depends on livelock (A6) being reported explicitly and on RENDER drawing blocked moves distinctly.
+
+## Step 0 on resume — the tree is not green
+
+Three agents were stopped mid-flight at the usage limit. `main` compiles with 3 TS errors and
+fails 5 of 219 tests. Fix this before Wave 2; everything else builds on the engine.
+
+The engine and its test suite were written by two different agents that never finished
+reconciling. Each failure below is a genuine disagreement — decide which side is right, do not
+just make the test pass:
+
+1. `sync` levels every clock up to the makespan and emits sync events — expected 2 events, got a
+   different shape.
+2. `scan` reports crop maturity relative to the observing bot's clock — off by the harvest cost.
+3. `look` respects range — returns 8 tiles where the test expects 7 (inclusive vs. exclusive bound).
+4. `maxTicks` is not enforced inside `sync` — expected a throw, got none. This one is a real
+   engine bug: a level could exceed its budget through `sync` alone.
+5. A follower may occupy the tile the leader has already left — collision resolution disagrees
+   with DESIGN.md §4.3.
+
+Plus: `TraceEvent` has no `ok` field on its `mine` and `drop` variants, but the sim and the tests
+both expect one. Add it to the union.
+
+`wip/wave1-interrupted` holds the same work with an earlier, dirtier history; `main` supersedes
+it and the branch can be deleted once the above is fixed.
