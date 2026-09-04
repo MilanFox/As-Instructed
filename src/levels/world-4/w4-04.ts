@@ -75,7 +75,7 @@ function build(seed: number): World {
   const world = createWorld({ w: SIZE, h: SIZE, seed, fill: Terrain.Rock });
   const rng = world.rng;
   const grid = carvePerfectMaze(rng, CELLS, CELLS);
-  addCycles(rng, grid, rng.int(3, 6));
+  addCycles(rng, grid, rng.int(1, 3));
   paintCave(world, grid);
 
   const chambers = deadEndCells(grid).map((cell) => cellTile(cell.i, cell.j));
