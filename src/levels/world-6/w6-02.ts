@@ -99,9 +99,9 @@ const reported = (ctx: ObjectiveContext): string[] =>
  * only readable from the antenna, so a memorised check fails on the next shift.
  *
  * Par: the reference transmits every clean packet and nothing else, so its tick count is the
- * clean-packet count. Seed 2 has no corruption and the longest band, and costs 39 ticks; that is
+ * clean-packet count. Seed 2 has no corruption and costs 37 ticks, the most of any seed; that is
  * `par.ticks`. No shave is available — a packet cannot be relayed for less than one transmit.
- * `par.chars` is scoreChars(source) = 701, rounded up.
+ * `par.chars` is scoreChars(source) = 707, rounded up.
  */
 export const w6_02: LevelDef = {
   id: 'w6-02',
@@ -139,7 +139,7 @@ export const w6_02: LevelDef = {
     "packet's payload, counting from 0.",
   ].join('\n'),
   seeds: [1, 2, 3, 4],
-  par: { ticks: 39, chars: 800 },
+  par: { ticks: 37, chars: 800 },
   build(seed: number): World {
     const world = createWorld({ w: 12, h: 6, seed, fill: Terrain.Floor });
     paintAscii(world, SHACK, LEGEND);

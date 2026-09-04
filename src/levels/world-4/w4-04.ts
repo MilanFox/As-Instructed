@@ -145,8 +145,8 @@ function visitedCount(ctx: ObjectiveContext): number {
  * well above a full survey plus a clean circuit — a player who wanders while mapping and then
  * routes properly still passes.
  *
- * The lift is a depot tile rather than a pad so that the three collection points and the lift are
- * telling apart by sight, which they have to be for the route to be plannable at all.
+ * The lift is a depot tile rather than a pad so that the three collection points and the lift can
+ * be told apart by sight, which they have to be for a route to be plannable at all.
  */
 export const w4_04: LevelDef = {
   id: 'w4-04',
@@ -185,8 +185,8 @@ export const w4_04: LevelDef = {
     'three separate trips.',
   ].join('\n'),
   seeds: [1, 2, 3, 4],
-  par: { ticks: 1200, chars: 1400 },
-  budget: { maxTicks: 2000 },
+  par: { ticks: 970, chars: 2500 },
+  budget: { maxTicks: 1350 },
   build,
   objectives: [
     Objectives.custom(

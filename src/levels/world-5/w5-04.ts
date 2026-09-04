@@ -77,8 +77,7 @@ export function yardPlan(seed: number): YardPlan {
   capacities.push(Math.max(10, left));
 
   const largest = capacities.reduce((best, capacity) => Math.max(best, capacity), 0);
-  capacities.push(largest + rng.int(2, 6));
-  return { capacities: rng.shuffle(capacities.slice(0, working)).concat(capacities[working] ?? 0), draws };
+  return { capacities: rng.shuffle([...capacities, largest + rng.int(2, 6)]), draws };
 }
 
 const feeders = (world: World): Machine[] =>

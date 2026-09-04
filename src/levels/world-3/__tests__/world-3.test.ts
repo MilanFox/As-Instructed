@@ -179,7 +179,7 @@ describe('w3-01 — one clamp', () => {
         const found = survey(sim, botId);
         for (const crate of found.crates) {
           goTo(sim, botId, crate.at);
-          sim.pickup(sim.botIds()[0] ?? botId, 'crate', 1);
+          sim.pickup(botId, 'crate', 1);
         }
         for (const pad of found.pads) {
           goTo(sim, botId, pad);
