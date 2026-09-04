@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BOOTSTRAP · audio harness</title>
+    <style>
+      :root {
+        --bg-void: #0a0e14;
+        --bg-panel: #121820;
+        --bg-raised: #1b2430;
+        --ink: #c9d5e3;
+        --ink-dim: #6a7a8c;
+        --accent: #35e0c8;
+        --accent-2: #ffb020;
+        --danger: #ff5d5d;
+        --ok: #7ee06a;
+        --gold: #ffd166;
+        --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; }
+      body {
+        background: var(--bg-void);
+        color: var(--ink);
+        font-family: var(--font-mono);
+        font-size: 12px;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+      }
+      header, footer {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 10px 16px;
+        background: var(--bg-panel);
+        border-bottom: 1px solid #22303e;
+        flex-wrap: wrap;
+      }
+      footer { border-bottom: none; border-top: 1px solid #22303e; }
+      .title { color: var(--accent); font-weight: 700; letter-spacing: 0.08em; }
+      main { padding: 16px; overflow: auto; }
+      h2 {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: var(--ink-dim);
+        margin: 20px 0 8px;
+        font-weight: 400;
+      }
+      h2:first-child { margin-top: 0; }
+      .grid { display: flex; flex-wrap: wrap; gap: 6px; }
+      button, select {
+        background: var(--bg-raised);
+        color: var(--ink);
+        border: 1px solid #2c3a4a;
+        border-radius: 3px;
+        padding: 6px 11px;
+        font-family: inherit;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      button:hover, select:hover { border-color: var(--accent); color: var(--accent); }
+      button.gold { border-color: #4a3d1c; color: var(--gold); }
+      button.loud { border-color: #4a2626; color: var(--danger); }
+      label { display: flex; align-items: center; gap: 6px; color: var(--ink-dim); }
+      input[type='range'] { accent-color: var(--accent); }
+      #scrub { flex: 1; min-width: 200px; }
+      #hud {
+        margin-left: auto;
+        color: var(--ink-dim);
+        display: flex;
+        gap: 16px;
+      }
+      #hud b { color: var(--accent-2); font-weight: 500; }
+      .note { color: var(--ink-dim); max-width: 70ch; line-height: 1.6; margin: 4px 0 0; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <span class="title">BOOTSTRAP · AUDIO HARNESS</span>
+      <label>master <input id="master" type="range" min="0" max="1" step="0.01" value="0.7" /></label>
+      <label>sfx <input id="sfx" type="range" min="0" max="1" step="0.01" value="0.8" /></label>
+      <label>ui <input id="ui" type="range" min="0" max="1" step="0.01" value="0.6" /></label>
+      <label>ambience <input id="amb" type="range" min="0" max="1" step="0.01" value="0.35" /></label>
+      <button id="mute">mute</button>
+      <button id="ambToggle">ambience: off</button>
+      <select id="biome"></select>
+      <div id="hud">
+        <span>voices <b id="voices">0</b></span>
+        <span>events/s <b id="rate">0</b></span>
+        <span>texture <b id="texture">0.00</b></span>
+      </div>
+    </header>
+    <main>
+      <h2>Actions</h2>
+      <div class="grid" id="actions"></div>
+      <h2>Outcomes</h2>
+      <div class="grid" id="outcomes"></div>
+      <h2>UI</h2>
+      <div class="grid" id="ui-sounds"></div>
+      <h2>Playback</h2>
+      <p class="note">
+        A synthetic trace: 4 bots, 600 ticks, roughly one action per bot per tick with a blocked
+        move every seventh. Play it at 64x to hear the rate limiter and the texture bed take over,
+        then drag the scrubber while it plays.
+      </p>
+    </main>
+    <footer>
+      <button id="play">play</button>
+      <button id="stop">stop</button>
+      <input id="scrub" type="range" min="0" max="600" step="0.1" value="0" />
+      <span id="tick">t 0 / 600</span>
+      <select id="speed">
+        <option value="1">0.25x</option>
+        <option value="2">0.5x</option>
+        <option value="4" selected>1x</option>
+        <option value="16">4x</option>
+        <option value="64">16x</option>
+        <option value="128">32x</option>
+        <option value="256">64x</option>
+      </select>
+      <button id="verdictGold" class="gold">pass + gold</button>
+      <button id="verdictFail" class="loud">fail</button>
+    </footer>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
