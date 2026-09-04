@@ -1,0 +1,314 @@
+import type { Machine, ObjectiveContext, Vec, World } from '../../engine/index.ts';
+import {
+  Dir,
+  MachineKind,
+  Objectives,
+  Rng,
+  Terrain,
+  addBot,
+  addMachine,
+  createWorld,
+  machineById,
+  manhattan,
+  setTerrain,
+  vec,
+} from '../../engine/index.ts';
+import type { LevelDef } from '../types.ts';
+
+const WIDTH = 30;
+const HEIGHT = 24;
+/** Fixed, and central, so a star topology is as cheap as it will ever be and still loses. */
+const REACTOR_AT = vec(14, 11);
+const LINK_PREFIX = 'link:';
+
+export type PointSet = 'uniform' | 'clustered' | 'mixed';
+
+/**
+ * One point-set shape per seed. CURRICULUM.md §7 requires a clustered set and a near-uniform set;
+ * the tree those two produce is a different shape, which is the point of running both.
+ */
+const POINT_SETS: Readonly<Record<number, { kind: PointSet; count: number }>> = Object.freeze({
+  1: { kind: 'uniform', count: 10 },
+  2: { kind: 'clustered', count: 12 },
+  3: { kind: 'uniform', count: 14 },
+  4: { kind: 'clustered', count: 11 },
+  5: { kind: 'mixed', count: 13 },
+});
+
+export interface BlackoutPlan {
+  kind: PointSet;
+  stations: Vec[];
+  mstWeight: number;
+  cableBudget: number;
+}
+
+function scatter(rng: Rng, kind: PointSet, count: number): Vec[] {
+  const taken = new Set<string>([`${REACTOR_AT.x},${REACTOR_AT.y}`]);
+  const stations: Vec[] = [];
+  const clusters: Vec[] = [];
+  const clusterCount = kind === 'clustered' ? 3 : 2;
+  for (let i = 0; i < clusterCount; i++) {
+    clusters.push(vec(rng.int(4, WIDTH - 5), rng.int(3, HEIGHT - 4)));
+  }
+
+  while (stations.length < count) {
+    const clustered = kind === 'clustered' || (kind === 'mixed' && stations.length % 2 === 0);
+    let at: Vec;
+    if (clustered) {
+      const centre = clusters[stations.length % clusters.length] as Vec;
+      at = vec(
+        Math.min(WIDTH - 2, Math.max(1, centre.x + rng.int(-5, 5))),
+        Math.min(HEIGHT - 2, Math.max(1, centre.y + rng.int(-4, 4))),
+      );
+    } else {
+      at = vec(rng.int(1, WIDTH - 2), rng.int(1, HEIGHT - 2));
+    }
+    const key = `${at.x},${at.y}`;
+    if (taken.has(key)) continue;
+    taken.add(key);
+    stations.push(at);
+  }
+  return stations;
+}
+
+/** Prim over the complete Manhattan graph. Ties do not matter: every spanning tree weighs this. */
+export function mstWeight(nodes: readonly Vec[]): number {
+  if (nodes.length < 2) return 0;
+  const inTree = new Array<boolean>(nodes.length).fill(false);
+  const best = new Array<number>(nodes.length).fill(Number.POSITIVE_INFINITY);
+  best[0] = 0;
+  let total = 0;
+
+  for (let step = 0; step < nodes.length; step++) {
+    let pick = -1;
+    for (let i = 0; i < nodes.length; i++) {
+      if (inTree[i]) continue;
+      if (pick < 0 || (best[i] as number) < (best[pick] as number)) pick = i;
+    }
+    inTree[pick] = true;
+    total += best[pick] as number;
+    for (let i = 0; i < nodes.length; i++) {
+      if (inTree[i]) continue;
+      const distance = manhattan(nodes[pick] as Vec, nodes[i] as Vec);
+      if (distance < (best[i] as number)) best[i] = distance;
+    }
+  }
+  return total;
+}
+
+export function blackoutPlan(seed: number): BlackoutPlan {
+  const rng = new Rng(seed * 2749 + 61);
+  const { kind, count } = POINT_SETS[seed] ?? { kind: 'uniform' as PointSet, count: 12 };
+  const stations = scatter(rng, kind, count);
+  const weight = mstWeight([REACTOR_AT, ...stations]);
+  return { kind, stations, mstWeight: weight, cableBudget: Math.ceil(weight * 1.08) };
+}
+
+const substations = (world: World): Machine[] =>
+  world.machines.filter((machine) => machine.id.startsWith('sub-'));
+
+/** `link` is directed in the world and undirected in the grid: a cable carries either way. */
+function neighbourhood(machines: readonly Machine[]): Map<string, Set<string>> {
+  const graph = new Map<string, Set<string>>();
+  const edge = (a: string, b: string): void => {
+    const set = graph.get(a) ?? new Set<string>();
+    set.add(b);
+    graph.set(a, set);
+  };
+  for (const machine of machines) {
+    for (const key of Object.keys(machine.vars)) {
+      if (!key.startsWith(LINK_PREFIX) || machine.vars[key] !== 1) continue;
+      const other = key.slice(LINK_PREFIX.length);
+      edge(machine.id, other);
+      edge(other, machine.id);
+    }
+  }
+  return graph;
+}
+
+function connectedCount(world: World): number {
+  const graph = neighbourhood(world.machines);
+  const seen = new Set<string>(['reactor']);
+  const queue: string[] = ['reactor'];
+  while (queue.length > 0) {
+    const id = queue.shift() as string;
+    for (const next of graph.get(id) ?? []) {
+      if (seen.has(next)) continue;
+      seen.add(next);
+      queue.push(next);
+    }
+  }
+  return substations(world).filter((machine) => seen.has(machine.id)).length;
+}
+
+export function cableSpent(ctx: ObjectiveContext): number {
+  let total = 0;
+  for (const event of ctx.trace.events) {
+    if (event.kind === 'spend' && event.resource === 'cable') total += event.amount;
+  }
+  return total;
+}
+
+/**
+ * Walks the trace once. `machineChange` events reveal each new cable as it is laid; `power` events
+ * reveal each energisation by position. A station counts only when a cable already joined it to
+ * the part of the grid that is already live.
+ */
+function liveOrderCount(ctx: ObjectiveContext): number {
+  const ids = new Map(
+    ctx.initialWorld.machines.map((machine) => [`${machine.at.x},${machine.at.y}`, machine.id]),
+  );
+  const graph = new Map<string, Set<string>>();
+  const join = (a: string, b: string): void => {
+    const set = graph.get(a) ?? new Set<string>();
+    set.add(b);
+    graph.set(a, set);
+  };
+  const live = new Set<string>(['reactor']);
+  const valid = new Set<string>();
+
+  for (const event of ctx.trace.events) {
+    if (event.kind === 'machineChange') {
+      for (const key of Object.keys(event.after.vars)) {
+        if (!key.startsWith(LINK_PREFIX) || event.after.vars[key] !== 1) continue;
+        if (event.before.vars[key] === 1) continue;
+        const other = key.slice(LINK_PREFIX.length);
+        join(event.id, other);
+        join(other, event.id);
+      }
+      continue;
+    }
+    if (event.kind !== 'act' || event.name !== 'power' || !event.ok) continue;
+    if (event.detail !== 'on' || event.at === undefined) continue;
+    const id = ids.get(`${event.at.x},${event.at.y}`);
+    if (id === undefined || !id.startsWith('sub-')) continue;
+    const touchesLive = [...(graph.get(id) ?? [])].some((other) => live.has(other));
+    if (!touchesLive) continue;
+    live.add(id);
+    valid.add(id);
+  }
+  return valid.size;
+}
+
+/**
+ * Par: the reference lays one cable per substation and energises each once, so its clock is
+ * 4 × stations — 56 ticks on the fourteen-station seed. Prim leaves nothing to shave.
+ */
+export const w5_05: LevelDef = {
+  id: 'w5-05',
+  world: 5,
+  index: 5,
+  title: 'Blackout',
+  hardware: [],
+  brief: [
+    '**MEMO KD-2544**',
+    '**FROM:** Dep. Coordinator M. Vance',
+    '**RE:** District 9, reconnection',
+    '',
+    'District 9 lost its cabling on Tuesday. Stores have issued a drum against the works',
+    'order. The drum is the amount of cable the works order says the job takes, which is',
+    'the amount of cable the job took the last time anybody measured it.',
+    '',
+    'Re-cable District 9 so that every substation reaches the reactor, then bring them all up.',
+    '',
+    '- Substations are `sub-1` upward. `probe(id)` reads any machine for free and returns `null`',
+    '  for an id that does not exist.',
+    '- `link(a, b)` lays a cable between two machines. It costs 2 ticks and it spends cable equal',
+    '  to the grid distance between them: the difference in `x` plus the difference in `y`.',
+    '- A cable carries in both directions, and laying the same cable twice spends the drum twice.',
+    '- **The drum is finite.** The reactor reports the total cable you have in `vars.cableBudget`.',
+    '  Going over it fails the job.',
+    '- `power(id, "on")` brings a substation up, for 2 ticks. **A substation only comes up if a',
+    '  cable already joins it to the reactor through machines that are already on.**',
+    '',
+    'For the bonus: finish inside 102% of the shortest possible run of cable.',
+  ].join('\n'),
+  seeds: [1, 2, 3, 4, 5],
+  par: { ticks: 56, chars: 900 },
+  build(seed: number): World {
+    const { stations, mstWeight: weight, cableBudget } = blackoutPlan(seed);
+    const world = createWorld({
+      w: WIDTH,
+      h: HEIGHT,
+      seed,
+      fill: Terrain.Floor,
+      vars: { mstWeight: weight, cableBudget, tightBudget: Math.ceil(weight * 1.02) },
+    });
+
+    setTerrain(world, REACTOR_AT, Terrain.Cable);
+    addMachine(world, {
+      id: 'reactor',
+      kind: MachineKind.Node,
+      at: REACTOR_AT,
+      state: 'on',
+      inventory: [],
+      vars: { cableBudget },
+    });
+
+    stations.forEach((at, index) => {
+      setTerrain(world, at, Terrain.Cable);
+      addMachine(world, {
+        id: `sub-${index + 1}`,
+        kind: MachineKind.Node,
+        at,
+        state: 'off',
+        inventory: [],
+        vars: {},
+      });
+    });
+
+    addBot(world, { at: REACTOR_AT, facing: Dir.East, name: 'RIG-01' });
+    return world;
+  },
+  objectives: [
+    Objectives.custom(
+      'connected',
+      'Join every substation to the reactor',
+      (ctx) => connectedCount(ctx.world) === substations(ctx.world).length,
+      (ctx) => [connectedCount(ctx.world), substations(ctx.world).length],
+    ),
+    Objectives.custom(
+      'budget',
+      'Stay inside the cable drum',
+      (ctx) => cableSpent(ctx) <= (ctx.world.vars.cableBudget ?? 0),
+      (ctx) => {
+        const budget = ctx.world.vars.cableBudget ?? 0;
+        return [Math.min(cableSpent(ctx), budget), budget];
+      },
+    ),
+    Objectives.custom(
+      'energised',
+      'Bring every substation up on live cable',
+      (ctx) => {
+        const stations = substations(ctx.world);
+        return (
+          liveOrderCount(ctx) === stations.length &&
+          stations.every((machine) => machine.state === 'on')
+        );
+      },
+      (ctx) => [liveOrderCount(ctx), substations(ctx.world).length],
+    ),
+  ],
+  bonus: [
+    Objectives.custom('tight', 'Finish within 2% of the shortest possible run', (ctx) => {
+      const tight = ctx.world.vars.tightBudget ?? 0;
+      return cableSpent(ctx) <= tight;
+    }),
+  ],
+  starter: [
+    '// NOTE(4470): the drum runs out before the district does. it always has',
+    '// NOTE(4470): a cable to somewhere already on the grid buys you nothing',
+    '',
+    '// probe(id) reads any machine for free. link(a, b) spends cable equal to the',
+    '// grid distance. power(id, "on") only works on cable that is already live.',
+    '',
+    "const reactor = probe('reactor');",
+    '',
+  ].join('\n'),
+  hints: [
+    'Every position you need is readable before you spend anything. The whole problem is arithmetic on those positions, and arithmetic is free.',
+    "Every cable you lay either connects something new, or it doesn't.",
+    'Grow one network outward from the reactor. At each step there is a cheapest cable that reaches something not yet on the network, and it is not always the one that starts where you finished.',
+  ],
+  docs: ['probe', 'link', 'power'],
+};
