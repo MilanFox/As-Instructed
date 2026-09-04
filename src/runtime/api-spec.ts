@@ -230,6 +230,21 @@ if (ahead.walkable && ahead.botId === null) {
     requiresTypes: ['Dir', 'TileView'],
   },
   {
+    name: 'mine',
+    params: [{ name: 'dir', type: 'Dir', doc: 'Which adjacent tile to cut into.' }],
+    returns: 'ItemKind | null',
+    doc: 'Cuts ore out of the adjacent tile in the given direction and adds it to the inventory, returning the item kind recovered. Returns null when that tile holds no ore, which still costs the full price.',
+    example: `const ore = mine(Dir.North);
+if (ore === null) {
+  move(Dir.East);
+}`,
+    cost: 2,
+    unlockedBy: 'w4-05',
+    world: 4,
+    category: 'terraforming',
+    requiresTypes: ['ItemKind', 'Dir'],
+  },
+  {
     name: 'harvest',
     params: [],
     returns: 'ItemKind | null',
@@ -598,7 +613,7 @@ print(\`swarm aligned at tick \${t}\`);`,
 }
 sync();`,
     cost: 1,
-    unlockedBy: 'w7-02',
+    unlockedBy: 'w7-01',
     world: 7,
     category: 'swarm',
   },
@@ -613,7 +628,7 @@ if (msg !== null && msg.body === 'go') {
   move(Dir.North);
 }`,
     cost: 0,
-    unlockedBy: 'w7-02',
+    unlockedBy: 'w7-01',
     world: 7,
     category: 'swarm',
     requiresTypes: ['Message'],
@@ -636,7 +651,7 @@ if (helper >= 0) {
   send(helper, 'harvest');
 }`,
     cost: 5,
-    unlockedBy: 'w7-03',
+    unlockedBy: 'w7-02',
     world: 7,
     category: 'swarm',
     requiresTypes: ['Dir'],
