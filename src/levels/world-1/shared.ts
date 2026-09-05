@@ -1,5 +1,13 @@
-import type { Objective, ObjectiveContext, Vec, World } from '../../engine/index.ts';
+import type {
+  Divergence,
+  MoveEvent,
+  Objective,
+  ObjectiveContext,
+  Vec,
+  World,
+} from '../../engine/index.ts';
 import {
+  NOTHING,
   Objectives,
   Terrain,
   botById,
@@ -18,6 +26,11 @@ import {
  */
 
 const key = (at: Vec): string => `${at.x},${at.y}`;
+
+/** A coordinate, written the way the brief and the facts tables write one. */
+export function at(pos: Vec): string {
+  return `(${String(pos.x)}, ${String(pos.y)})`;
+}
 
 export function walkableTiles(world: World): Vec[] {
   const out: Vec[] = [];
@@ -45,13 +58,38 @@ export function blockedMoves(ctx: ObjectiveContext): number {
   return ctx.trace.events.filter((event) => event.kind === 'move' && !event.ok).length;
 }
 
+/**
+ * Where the run left the bot, against the pad it was asked to park on.
+ *
+ * The pad moves with the seed from w1-03 on, so the pair of coordinates separates two mistakes
+ * that look identical in the editor: a route that stopped short, and a route that drove past.
+ * Naming the pad cannot be memorized into a pass, because every declared seed has to pass and
+ * every declared seed puts the pad somewhere else.
+ */
+function endedOnPad(ctx: ObjectiveContext): Divergence | undefined {
+  const pad = padPosition(ctx.initialWorld);
+  if (pad === undefined) return undefined;
+  const bot = botById(ctx.world, 0);
+  if (bot === undefined) return { where: 'end of run', expected: at(pad), received: NOTHING };
+  return {
+    where: 'end of run',
+    expected: at(pad),
+    received: bot.alive ? at(bot.at) : `${at(bot.at)}, and not running`,
+  };
+}
+
 /** Bot #0 finished the run parked on the level's landing pad, wherever the seed put it. */
 export function parkedOnPad(label = 'Park the bot on the landing pad'): Objective {
-  return Objectives.custom('reach-pad', label, (ctx) => {
-    const bot = botById(ctx.world, 0);
-    if (!bot?.alive) return false;
-    return tileAt(ctx.world, bot.at)?.terrain === Terrain.Pad;
-  });
+  return Objectives.custom(
+    'reach-pad',
+    label,
+    (ctx) => {
+      const bot = botById(ctx.world, 0);
+      if (!bot?.alive) return false;
+      return tileAt(ctx.world, bot.at)?.terrain === Terrain.Pad;
+    },
+    { divergence: endedOnPad },
+  );
 }
 
 /** Every walkable tile in the bay was entered at least once. */
@@ -65,7 +103,15 @@ export function inspectedEveryTile(label = 'Enter every floor tile in the bay'):
     'inspect-all',
     label,
     (ctx) => done(ctx) === total(ctx).length,
-    (ctx) => [done(ctx), total(ctx).length],
+    {
+      progress: (ctx) => [done(ctx), total(ctx).length],
+      divergence: (ctx) => {
+        const seen = visitedTiles(ctx);
+        const skipped = total(ctx).find((tile) => !seen.has(key(tile)));
+        if (skipped === undefined) return undefined;
+        return { where: at(skipped), expected: 'entered at least once', received: 'never entered' };
+      },
+    },
   );
 }
 
@@ -109,13 +155,45 @@ export function rationedSurvey(reads: number, waste: number, label: string): Obj
     `within-${String(reads)}-canMove`,
     label,
     (ctx) => used(ctx) <= reads && wastedTicks(ctx) <= waste,
-    (ctx) => [Math.min(used(ctx), reads), reads],
+    {
+      progress: (ctx) => [Math.min(used(ctx), reads), reads],
+      divergence: (ctx) => {
+        if (used(ctx) > reads) {
+          return {
+            where: 'canMove()',
+            expected: `at most ${String(reads)} readings`,
+            received: `${String(used(ctx))} readings`,
+          };
+        }
+        return {
+          where: 'ticks beyond the shortest route',
+          expected: `at most ${String(waste)}`,
+          received: String(wastedTicks(ctx)),
+        };
+      },
+    },
   );
 }
 
 /** Every move the run issued, the ones that went nowhere included. */
 export function movesIssued(ctx: ObjectiveContext): number {
   return ctx.trace.events.filter((event) => event.kind === 'move').length;
+}
+
+/**
+ * The move filed one past `allowed`, with the tick and the tile it was filed from.
+ *
+ * A budget on moves that reports only its own total says nothing a player cannot count in the
+ * editor. Where the sweep was standing when it ran out is the part only the run knows.
+ */
+function moveAfter(ctx: ObjectiveContext, allowed: number): MoveEvent | undefined {
+  let filed = 0;
+  for (const event of ctx.trace.events) {
+    if (event.kind !== 'move') continue;
+    filed++;
+    if (filed > allowed) return event;
+  }
+  return undefined;
 }
 
 /**
@@ -132,7 +210,19 @@ export function oneMovePerFloorTile(label: string): Objective {
     'one-move-per-tile',
     label,
     (ctx) => movesIssued(ctx) <= budget(ctx),
-    (ctx) => [Math.min(movesIssued(ctx), budget(ctx)), budget(ctx)],
+    {
+      progress: (ctx) => [Math.min(movesIssued(ctx), budget(ctx)), budget(ctx)],
+      divergence: (ctx) => {
+        const allowed = budget(ctx);
+        const over = moveAfter(ctx, allowed);
+        if (over === undefined) return undefined;
+        return {
+          where: `tick ${String(over.t)} · ${at(over.from)}`,
+          expected: `${String(allowed)} moves, one per floor tile`,
+          received: `move ${String(allowed + 1)} of ${String(movesIssued(ctx))}`,
+        };
+      },
+    },
   );
 }
 

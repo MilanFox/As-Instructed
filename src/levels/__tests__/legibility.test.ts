@@ -35,21 +35,6 @@ function nameOf(level: LevelDef, objective: Objective): string {
  * `Objectives.custom` with it.
  */
 const AWAITING_A_DIFF: readonly string[] = [
-  'w1-01/reach-pad',
-  'w1-03/reach-pad',
-  'w1-03/within-7-canMove',
-  'w1-05/inspect-all',
-  'w1-05/one-move-per-tile',
-  'w2-01/park-ripest',
-  'w2-01/no-overshoot',
-  'w2-02/harvested-ripe',
-  'w2-02/all-planted',
-  'w2-02/no-wasted-fieldwork',
-  'w2-04/harvested-crops',
-  'w2-04/all-planted',
-  'w2-04/crop-spoilage',
-  'w2-05/hopper-full-crop',
-  'w2-05/tile-footprint',
   'w3-01/pads-loaded',
   'w3-01/clean-run',
   'w3-02/crates-sorted',
