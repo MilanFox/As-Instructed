@@ -73,6 +73,14 @@ layout geometry in the shots is exact**; the canvas is rasterised at the zoom fa
 tile pixels *in the images* are not. Tile sizes are therefore computed from the real `Camera`
 class instead (§6), not read off the screenshots.
 
+One trap worth writing down for whoever measures next: the driven tab reports
+`document.hidden === true`, and Chrome suspends rendering — and with it **all ResizeObserver
+delivery** — in a hidden tab. Every "the DOM has not updated" reading in this session was that,
+not the app. Taking a screenshot forces a frame and flushes the observer, so measure *after* a
+screenshot, never before. Verified directly: a fresh `ResizeObserver` on `.workspace` fired zero
+times across a size change, then fired once the instant a screenshot was taken, and the layout
+re-derived correctly in the same frame.
+
 The "before" shots are the current main layout reproduced in the same browser session: the saved
 fractions nudged off the constants by 1e-11 (which bypasses the new derivation and restores
 0.44/0.58 exactly) plus a style override restoring the pre-fix objective rail. Same build, same
@@ -215,13 +223,19 @@ fill goes 48% → 60% and `w4-05` goes from using 36% of the canvas width to 48%
 
 ## 8. Merged with main mid-flight
 
-Main moved while this was in progress (prose pass + Library unlock). Merged cleanly — no
-conflicts, since the layout work is a new file plus a few lines of `Workspace.tsx`. Everything
-in §5–§7 was re-measured afterwards against merged main, including re-deriving the grid table.
-Grid dimensions were unchanged by the merge. The shorter briefs and the new **Site data** facts
-table and **shift ends at** rail row are what set the 340px cap and the 268px rail here.
+Main moved twice while this was in progress: the prose pass plus the Library unlock, then the
+character-count removal. Both merged cleanly — the layout work is a new file plus a few lines of
+`Workspace.tsx` and one CSS selector. Everything in §5–§7 was re-measured after the first merge
+and re-checked after the second; grid dimensions were unchanged by both. The shorter briefs, the
+new **Site data** facts table and the **shift ends at** rail row are what set the 340px cap and
+made the 268px rail worth fixing.
 
 ## 9. Checks
 
-`npx tsc --noEmit` clean. `npx vitest run` 1426 passing (1417 on main + 9 new). `npm run build`
-clean. Nothing outside the owned paths was touched; nothing was needed there.
+`npx tsc --noEmit` clean. `npx vitest run` **1378 passing** (1369 on main after the
+character-count removal, + 9 new). `npm run build` clean. Nothing outside the owned paths was
+touched, and nothing was needed there — no proposed diffs for the orchestrator.
+
+Merged main twice mid-flight (prose + Library, then the character-count removal). Both merged
+without conflicts. Nothing here reads `par`, and nothing here displays or derives a character
+count.
