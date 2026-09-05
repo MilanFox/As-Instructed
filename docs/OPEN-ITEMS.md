@@ -416,3 +416,114 @@ consumer was `serve.ts` forwarding it into `source`. Removing them touches `prot
 `serve.ts`, `run-level.ts`, `src/ui/adapters.ts`, `src/meta/adapters.ts` and four test
 files, so it was correctly left as its own change rather than smuggled into a deletion.
 `LevelScore` in `score.ts` is also now an exported interface with no reference anywhere.
+
+### 2026-09-05, 16:00 — viewport merged (`d08dc45`)
+
+Green at **1378 tests** (1369 + 9), tsc / build clean.
+
+891x393 was never hard-coded and the camera was innocent — it is two independent
+constants on two axes: `DEFAULT_LAYOUT.editorFraction = 0.44` gives the 891, and
+`viewportFraction = 0.58` gives the 393. The finding that decided the design is that
+`tilePx = min(viewW/cols, viewH/rows)` and the box is 2.27:1 while nothing in the campaign
+exceeds 1.4:1 — **the viewport is always height-bound, so widening it buys zero tile
+size.** The "56% of width wasted" framing was right about the waste and wrong about the
+remedy.
+
+Also wrong in the old note: the grids are **not all square**. 8 of 34 are 1:1, 26 are
+wider, median 1.40 — but the largest (w4-05 40x40, w8-05 48x40, three 30x30) are the square
+ones, so the assumption fails in general and holds where it matters.
+
+New `useWorkspaceLayout` hook: detail panel capped at 340px, height claimed only up to what
+the grid can spend, right-column width targeting `viewportHeight x gridAspect`. **All of it
+applies only while the saved fraction is still the shipped default** — a dragged splitter is
+returned verbatim, so no player's saved layout is stomped and no migration was needed.
+
+Found while measuring: `.rail` carries `.panel`, so `.workspace__lower > .panel { flex: 1 }`
+was overriding the rail's own `width: 268px` and handing the objective rail **half the
+detail panel** (711px at 2560). One selector.
+
+Campaign-wide, driving the real `Camera` over all 34 levels: **no level's tiles get smaller
+at any size.** At 2560x1440 the site view goes 1.92:1 to 1.00:1, mean canvas fill 48% to
+69%, and w4-05/w8-05 go 18px to 24px tiles at 49% to 96% fill. Screenshots in
+`docs/shots/viewport/`.
+
+Known costs, accepted: wide-thin levels lose a few points of fill at 2560 against the
+deliberate 96px tile ceiling; the objective rail scrolls at 2560 where it did not before;
+and the editor now carries the surplus — 1576px of Monaco for a 40-line program. A
+max-width on the code column is the obvious next move and belongs to the UI audit.
+
+Measurement note for whoever drives a browser next, written up in `FIX-VIEWPORT.md` §4:
+`resize_window` does not work in this environment, and **Chrome suspends ResizeObserver
+delivery in a hidden tab** — so measure *after* forcing a frame with a screenshot. This
+cost the agent real time and looked like an app bug.
+
+### In flight
+
+- **Par recalibration** — measuring reference solutions against par across all 34 levels.
+- **`power()` silent failure** — engine/runtime.
+- **Incentive audit** — read-only, writes only `docs/AUDIT-INCENTIVES.md`.
+- **`w4-02` visited-tile trail** — started now that `src/render/**` is free. Also checking
+  whether DESIGN §11 A5's blocked-move and livelock visuals were ever implemented.
+
+### 2026-09-05, 16:10 — `power()` now speaks (`ebf533d`)
+
+Green at **1384 tests** (1369 + 6 new, none removed), tsc / build clean. The 86
+reference-solution tests and `finale.test.ts` pass unedited; no par, threshold, budget or
+tick cost moved.
+
+**Hard, explained failure, not a quiet `false`.** `Sim.power()` throws `IllegalActionError`
+on a `vars.manual: 1` machine; it still returns `false` for an unknown machine id, which
+had been conflated with it in a single branch. The deciding test — worth reusing for the
+sibling verbs below — is **"can the identical call succeed later in the same run?"** Every
+`false` case in this engine is transient (a wall opens, an inventory empties); every
+throwing case is permanent. Nothing clears `vars.manual`, so the call is wrong for the
+whole run, and a `false` that can only ever be `false` hands the player a branch that can
+never flip: a bug dressed as a control-flow option.
+
+The non-fatal-notice option was rejected on plumbing, not taste: the console carries only
+`print` events plus one closing line, so a notice would either corrupt
+`Objectives.printedSequence` or need a second parallel channel. The throw needed **zero new
+plumbing** — `runSeed` -> `toRuntimeFailure` -> `toVerdictFailure` already carries `code`,
+`at` and the player's line. Same mechanism as `LivelockError`.
+
+Confirmed in-browser on `w8-03`. The check caught a real error in the agent's own copy: the
+result panel shows the flavour line but *not* `failure.message`, so a first draft saying
+"the reason is the line above" was false and was rewritten to point at the console.
+
+### Mute verbs — ranked, none fixed, use the test above to rule on each
+
+1. **`plant()`** — worst. Three causes (not plantable / already cropped / no seed) collapse
+   to one bit. Correctly on the `false` side; wants a `reason` field, not a throw.
+2. **`send()`** — returns `false` for an unknown or dead bot id while every other verb
+   throws for exactly that. Both states are permanent, so it should throw. Strongest next
+   candidate.
+3. **`spawn()`** — calls `blockReason()` and discards it; `move()` makes the same call and
+   puts `reason` on its event. One field, already in hand.
+4. **`pickup()`/`drop()`** — mute in a different type, returning `0`.
+5. **`applyMachineChange()`** — consistent with the kept `false`, just terse.
+6. **`refuel()`** — arguably fine, `OutOfFuelError` explains it downstream.
+
+Flagged separately, needs a ruling: **`use()` on an empty or absent `cycle` returns `true`
+and does nothing.** A mute *success* is worse than a mute failure — the player's program
+cannot detect it at all.
+
+### The three World 8 findings, resolved
+
+1. **Dead `docs` ids on `w8-05` — dismissed.** All six resolve. FIX-PROSE's open gap is
+   also closed: all 34 levels audited, every `docs` id resolves campaign-wide.
+2. **`costs` overrides — confirmed, and there are three, not two.** `DocsPanel.tsx:230`
+   renders the flat `api-spec` cost and ignores per-level overrides: `w7-02` (`spawn` 2 vs
+   5), `w7-04` (`use` 1 vs 2) and **`w8-05` (`use` 1 vs 2)**, the last unlisted and the one
+   that matters, since `use` is the only way to work a manual station in the finale. The
+   player is shown a wrong number. Handed to the trail agent, which owns that file.
+3. **16000-vs-3000 — confirmed, but dead config rather than a visible contradiction.**
+   `deadlineFor()` returns exactly 3000 on all three seeds; the floor always binds, par is
+   1050, and `maxTicks: 16000` can never bite first. It only makes a doomed run 5x longer.
+
+### Queued, blocked only by the par agent holding `src/levels/**`
+
+`docs/FIX-POWER.md` carries exact diffs for two fact rows (`w8-03.ts:265`, `w8-05.ts:636`)
+that still promise the old silent `false`. **Ruling: delete them rather than correct them.**
+The prose pass kept those rows *because* the failure was mute; that condition is gone, and a
+row explaining what an error message now says out loud is the "told me" half of
+PLAYTEST-BEGINNER §9. Apply once par merges.

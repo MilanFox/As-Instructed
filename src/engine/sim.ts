@@ -611,25 +611,51 @@ export class Sim {
   }
 
   /**
-   * Directly sets a machine's state (World 5's `power`). Returns false for unknown machines, and
-   * for machines whose `vars.manual` is `1` — those are hand-operated and only `use()` moves them.
+   * Directly sets a machine's state (World 5's `power`). Returns false for an unknown machine id,
+   * and throws `IllegalActionError` for a machine whose `vars.manual` is `1` — those are
+   * hand-operated and only a `use()` at the tile moves them.
    *
    * The manual flag exists because `power` reaches any id anywhere on the map for a flat cost, so
    * a level whose whole subject is *getting a fleet to the machines* is defeated by a loop over
    * ids. Levels that want the travel back mark the machines rather than the command, so World 5,
    * where operating the grid from the desk is the point, is untouched.
+   *
+   * The two refusals are graded differently on purpose. An unknown id is a state of the world, so
+   * it takes the `false` the API gives every other "the world says no" (docs/ENGINE.md §2). A
+   * manual machine is not a state: nothing in the API clears the flag, so the same call is wrong
+   * for the whole run and a `false` the player could branch on would be a branch that can never
+   * flip. It is the same category as an unknown bot id, and it speaks the way `LivelockError`
+   * does — at the moment it bites, naming the machine and its tile.
    */
   power(botId: number, machineId: string, state: string): boolean {
     const bot = this.requireActiveBot(botId);
     const t = bot.clock;
     const dt = this.costs.power;
     this.requireFuel(bot, dt, 'power');
-    const found = machineById(this.world, machineId);
-    const machine = found?.vars[MANUAL_ONLY] === 1 ? undefined : found;
+    const machine = machineById(this.world, machineId);
     if (!machine) {
       this.builder.push({ t, botId, dt, kind: 'act', name: 'power', ok: false, detail: machineId });
       this.charge(bot, dt);
       return false;
+    }
+    if (machine.vars[MANUAL_ONLY] === 1) {
+      this.builder.push({
+        t,
+        botId,
+        dt,
+        kind: 'act',
+        name: 'power',
+        at: machine.at,
+        ok: false,
+        detail: machineId,
+      });
+      this.charge(bot, dt);
+      throw new IllegalActionError(
+        `power("${machineId}"): the machine at (${machine.at.x}, ${machine.at.y}) is ` +
+          `hand-operated, so only a use() at that tile moves it. ` +
+          `probe("${machineId}").vars.manual is 1 on every machine like it.`,
+        { botId, at: machine.at },
+      );
     }
     this.builder.push({
       t,

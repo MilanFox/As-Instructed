@@ -1,6 +1,7 @@
 import ts from 'typescript';
 import { describe, expect, test } from 'vitest';
 import type { PrintEvent, TraceEvent } from '../../engine/index.ts';
+import { MANUAL_ONLY } from '../../engine/index.ts';
 import { runLevel } from '../../levels/harness.ts';
 import { getLevel } from '../../levels/index.ts';
 import type { LevelDef } from '../../levels/index.ts';
@@ -188,5 +189,72 @@ describe('the sandbox', () => {
       (event: TraceEvent): event is PrintEvent => event.kind === 'print',
     );
     expect(prints[0]?.text).toBe('3');
+  });
+});
+
+/**
+ * docs/OPEN-ITEMS.md defect 1. `power()` on a hand-operated machine used to charge the tick,
+ * return false and say nothing, so the two levels built to teach *"this one has no grid
+ * connection"* could not teach it by failure. These assert the whole path a player actually
+ * reads: the sentence, the machine, its tile, and the line of their own code.
+ */
+describe('power() on a hand-operated machine', () => {
+  function firstManual(level: LevelDef, seed: number) {
+    const machine = level.build(seed).machines.find((m) => m.vars[MANUAL_ONLY] === 1);
+    if (!machine) throw new Error(`${level.id} has no manual machine`);
+    return machine;
+  }
+
+  for (const id of ['w8-03', 'w8-05']) {
+    test(`${id} tells the player which machine and where`, () => {
+      const level = getLevel(id) as LevelDef;
+      const seed = level.seeds[0] as number;
+      const machine = firstManual(level, seed);
+      const source = ['print("starting");', `power(${JSON.stringify(machine.id)}, "on");`].join(
+        '\n',
+      );
+      const { js, lineMap } = transpile(source);
+      const { result, verdict } = runSeed({
+        level,
+        seed,
+        js,
+        lineMap,
+        source,
+        unlockedHardware: unlockedApiNames(id),
+      });
+
+      expect(result.passed).toBe(false);
+      expect(verdict.failure?.code).toBe('illegal-action');
+
+      const message = verdict.failure?.message ?? '';
+      expect(message).toContain(`power("${machine.id}")`);
+      expect(message).toContain(`(${String(machine.at.x)}, ${String(machine.at.y)})`);
+      expect(message).toContain('hand-operated');
+      expect(message).toContain('use()');
+
+      expect(verdict.failure?.at).toEqual(machine.at);
+      expect(verdict.failure?.line).toBe(2);
+    });
+  }
+
+  test('an unknown machine id is still an ordinary false, not a stopped run', () => {
+    const level = getLevel('w8-03') as LevelDef;
+    const seed = level.seeds[0] as number;
+    const source = 'print("power ghost -> " + power("ghost", "on"));';
+    const { js, lineMap } = transpile(source);
+    const { result, trace } = runSeed({
+      level,
+      seed,
+      js,
+      lineMap,
+      source,
+      unlockedHardware: unlockedApiNames('w8-03'),
+    });
+
+    expect(result.failure).toBeUndefined();
+    const prints = trace.events.filter(
+      (event: TraceEvent): event is PrintEvent => event.kind === 'print',
+    );
+    expect(prints[0]?.text).toBe('power ghost -> false');
   });
 });
