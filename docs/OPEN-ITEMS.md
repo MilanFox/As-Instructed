@@ -276,3 +276,13 @@ copy that is already clear.
 **Deliverable.** Every player-facing term classified flavour / load-bearing / borderline,
 with the load-bearing ones rewritten and shown in context. A report that reclassifies
 everything as flavour is a failed report.
+
+### In flight at compaction (2026-09-05, ~89% of the usage window)
+
+- **Prose pass** — isolated worktree, uncommitted. Cutting all 34 briefs and hints from a
+  mean of 218 words to under 60, folding in the accessible-language item (same files).
+  Target: 2-3 sentences of roleplay then the task, HRM-style. Mechanical facts relocate to
+  structured UI rather than being deleted. Report appends per level to `docs/FIX-PROSE.md`.
+  If it died, its worktree is under `.claude/worktrees/` and the partial report is usable.
+
+All four earlier agents are merged. Main is at 34 levels, 1398 tests, tsc + build clean.
