@@ -440,7 +440,7 @@ the first half of the game.
 - `world` A simply-connected maze (no islands, no detached wall segments), 25×25, entrance and exit both on the boundary.
 - `varies` Maze layout, which boundary wall the exit is on.
 - `anti-hardcode` Maze generation is seeded; the exit wall varies, so even the initial turn direction cannot be assumed.
-- `naive-fails` A mark-based search from w4-02 works but is long to write and runs well over par at this size. The level rewards the constant-memory walk on ticks and on chars simultaneously.
+- `naive-fails` A mark-based search from w4-02 works but is long to write and runs well over par at this size. The level rewards the constant-memory walk on ticks. (Source length is not scored; see DESIGN.md §7.)
 - `generalize` Over maze layout and exit wall.
 - `seeds` `[1,2,3,4]`
 - `size` ~20 lines · `difficulty` **5/10**  *(plateau by design — see §1.2. Do not raise this to 6.)*

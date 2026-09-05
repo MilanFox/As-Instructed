@@ -35,8 +35,9 @@ The site map lists the work orders; one opens as you close the one before it. In
 **Run** is the button, or `Ctrl`/`Cmd`+`Enter`. Space plays and pauses, `,`/`.` step a tick,
 `Home`/`End` jump, `F1` opens the reference, `Esc` goes back to the site map.
 
-You are scored on **ticks** (gold at or under par, silver within 25%, bronze for a pass) and, as a
-tiedown, on **chars**. Some work orders carry a bonus objective worth a star. From World 2 onward
+You are scored on **ticks**: gold at or under par, silver within 25%, bronze for a pass. Source
+length is not scored - write it as readably as you like. Some work orders carry a bonus objective
+worth a star. From World 2 onward
 every work order runs on several random layouts and all of them have to pass, so a hardcoded route
 will not survive.
 
