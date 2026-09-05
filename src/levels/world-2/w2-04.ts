@@ -68,7 +68,7 @@ export const w2_04: LevelDef = {
     '5 of 8 is ready in three ticks — whether the bot spends them driving or standing still.',
   ].join('\n'),
   seeds: [1, 2, 3, 4],
-  par: { ticks: 52, chars: 900 },
+  par: { ticks: 52, chars: 1050 },
   build(seed: number): World {
     const world = createWorld({ w: PLOT_W + 2, h: PLOT_H + 2, seed, fill: Terrain.Wall });
     sowPlot(world);

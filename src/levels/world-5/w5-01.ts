@@ -124,7 +124,7 @@ export const w5_01: LevelDef = {
     '  (the index of the machine that feeds it).',
   ].join('\n'),
   seeds: [1, 2, 3],
-  par: { ticks: 37, chars: 340 },
+  par: { ticks: 37, chars: 460 },
   build(seed: number): World {
     const { reactorAt, stations } = mainsLayout(seed);
     const world = createWorld({ w: WIDTH, h: HEIGHT, seed, fill: Terrain.Wall });

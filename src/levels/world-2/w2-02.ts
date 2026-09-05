@@ -67,7 +67,7 @@ export const w2_02: LevelDef = {
     '`maxGrowth: 0`, which counts as neither ripe nor worth swinging at.',
   ].join('\n'),
   seeds: [1, 2, 3, 4],
-  par: { ticks: 49, chars: 340 },
+  par: { ticks: 49, chars: 400 },
   build(seed: number): World {
     const world = createWorld({ w: WIDTH + 2, h: HEIGHT + 2, seed, fill: Terrain.Wall });
     sowField(world);

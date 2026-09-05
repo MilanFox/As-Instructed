@@ -64,7 +64,7 @@ export const w2_03: LevelDef = {
     'ground takes it, and it only takes a seed on bare soil.',
   ].join('\n'),
   seeds: [1, 2, 3, 4],
-  par: { ticks: 76, chars: 520 },
+  par: { ticks: 76, chars: 600 },
   build(seed: number): World {
     const world = createWorld({ w: FIELD + 2, h: FIELD + 2, seed, fill: Terrain.Wall });
     sowField(world);

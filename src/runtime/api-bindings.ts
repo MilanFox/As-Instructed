@@ -182,6 +182,10 @@ const BINDERS: Record<string, Binder> = {
     (dir): unknown =>
       sim.scan(botId, dir as Dir | undefined),
   harvest: (sim, botId) => (): ItemKind | null => sim.harvest(botId),
+  mine:
+    (sim, botId) =>
+    (dir): ItemKind | null =>
+      sim.mine(botId, dir as Dir | undefined),
   plant:
     (sim, botId) =>
     (kind): boolean =>

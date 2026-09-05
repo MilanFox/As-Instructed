@@ -279,6 +279,40 @@ export function readPacket(text: string): { fields: string[]; valid: boolean } {
   return { fields: parts.slice(1, -1), valid };
 }
 
+/**
+ * What the runtime's `receive()` does, for a reference solution that drives the `Sim` directly.
+ *
+ * The inbound queue lives in the antenna tile's `meta` (`rx` newline-separated, `rxNext` the read
+ * cursor), and the cursor moves through `applyTileChange` so the read lands in the trace and a
+ * replay sees the same packets. Kept here rather than in a fixture so the level that authors the
+ * queue and the solution that drains it read the same two field names.
+ */
+export function receivePacket(sim: Sim, botId: number, antennaId = 'antenna'): string | null {
+  const antenna = sim.probe(botId, antennaId);
+  if (!antenna) return null;
+  const tile = tileAt(sim.world, antenna.at);
+  const queued = typeof tile?.meta?.['rx'] === 'string' ? tile.meta['rx'] : '';
+  if (queued === '') return null;
+  const packets = queued.split('\n');
+  const next = typeof tile?.meta?.['rxNext'] === 'number' ? tile.meta['rxNext'] : 0;
+  if (next >= packets.length) return null;
+  sim.applyTileChange(antenna.at, (target) => {
+    target.meta = { ...(target.meta ?? {}), rxNext: next + 1 };
+  });
+  return packets[next] as string;
+}
+
+/** Everything still queued on the antenna, in order. */
+export function drainAntenna(sim: Sim, botId: number, antennaId = 'antenna'): string[] {
+  const out: string[] = [];
+  for (;;) {
+    const packet = receivePacket(sim, botId, antennaId);
+    if (packet === null) break;
+    out.push(packet);
+  }
+  return out;
+}
+
 /** Loads an already-enciphered packet stream onto an antenna tile, where `receive()` finds it. */
 export function loadAntenna(world: World, at: Vec, packets: readonly string[]): void {
   const tile = tileAt(world, at);

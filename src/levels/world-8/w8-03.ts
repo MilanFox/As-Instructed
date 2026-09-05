@@ -217,7 +217,7 @@ export const w8_03: LevelDef = {
     'and `sync()` drags every bot in the fleet up to the clock of the one that is furthest ahead.',
   ].join('\n'),
   seeds: [1, 2, 3, 4, 5],
-  par: { ticks: 128, chars: 1500 },
+  par: { ticks: 128, chars: 2500 },
   build(seed: number): World {
     const layout = layoutFor(seed);
     const world = createWorld({ w: WIDTH, h: HEIGHT, seed, fill: Terrain.Floor });

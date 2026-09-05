@@ -1,5 +1,12 @@
 import type { LevelDef, WorldMeta } from './types.ts';
-import { w1_01 } from './world-1/w1-01.ts';
+import { WORLD_1_LEVELS } from './world-1/index.ts';
+import { WORLD_2_LEVELS } from './world-2/index.ts';
+import { WORLD_3_LEVELS } from './world-3/index.ts';
+import { WORLD_4_LEVELS } from './world-4/index.ts';
+import { WORLD_5_LEVELS } from './world-5/index.ts';
+import { WORLD_6_LEVELS } from './world-6/index.ts';
+import { WORLD_7_LEVELS } from './world-7/index.ts';
+import { WORLD_8_LEVELS } from './world-8/index.ts';
 
 export type { LevelDef, ReferenceSolution, WorldMeta } from './types.ts';
 export type { LevelRunResult } from './harness.ts';
@@ -71,7 +78,16 @@ export const WORLDS: readonly WorldMeta[] = [
  * The campaign, in play order. CONTENT owns this list; append level modules here as they land.
  * Order within a world follows `LevelDef.index`, not array position.
  */
-export const LEVELS: LevelDef[] = [w1_01];
+export const LEVELS: LevelDef[] = [
+  ...WORLD_1_LEVELS,
+  ...WORLD_2_LEVELS,
+  ...WORLD_3_LEVELS,
+  ...WORLD_4_LEVELS,
+  ...WORLD_5_LEVELS,
+  ...WORLD_6_LEVELS,
+  ...WORLD_7_LEVELS,
+  ...WORLD_8_LEVELS,
+];
 
 const byId = new Map<string, LevelDef>(LEVELS.map((level) => [level.id, level]));
 

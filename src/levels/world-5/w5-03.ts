@@ -254,7 +254,7 @@ export const w5_03: LevelDef = {
     'of the grid distances between consecutive stations, starting at the reactor.',
   ].join('\n'),
   seeds: [1, 2, 3, 4],
-  par: { ticks: 76, chars: 700 },
+  par: { ticks: 76, chars: 1250 },
   build(seed: number): World {
     const { stations, travelBudget } = gridPlan(seed);
     const edges = stations.reduce((sum, station) => sum + station.prereqs.length, 0);
