@@ -46,7 +46,6 @@ export function personalBestLine(previous: number, now: number): string {
   return `Your own record, lowered by ${previous - now}. The old figure has been retained.`;
 }
 
-export const STREAK_LABEL = 'consecutive closes, no failed runs';
 
 /**
  * A failed run costs the player nothing but the time it took, and the report says so in as many

@@ -63,7 +63,6 @@ function ResultsReport(): JSX.Element | null {
   const failureCursor = useGame((state) => state.failureCursor);
   const freshCommendations = useGame((state) => state.freshCommendations);
   const personalBest = useGame((state) => state.personalBest);
-  const streak = useGame((state) => state.save.stats.streak);
   const celebrations = useGame((state) => state.save.settings.celebrations);
   const setCelebrations = useGame((state) => state.setCelebrations);
   const dismiss = useGame((state) => state.dismissResults);
@@ -144,7 +143,7 @@ function ResultsReport(): JSX.Element | null {
   }, []);
 
   // `preventScroll` matters: without it the browser scrolls the footer button into view and takes
-  // the medal, the streak and the record callout off the top of a short window with it.
+  // the medal and the record callout off the top of a short window with it.
   useEffect(() => {
     if (done) primaryRef.current?.focus({ preventScroll: true });
   }, [done]);
@@ -245,12 +244,6 @@ function ResultsReport(): JSX.Element | null {
             </h2>
             <p className="modal__line">{headline}</p>
           </div>
-          {passed && streak >= 2 ? (
-            <span className="streak" title="Consecutive closes with no failed run">
-              <span className="streak__count numeric">{streak}</span>
-              <span className="streak__label">in a row</span>
-            </span>
-          ) : null}
         </header>
 
         <div className="modal__body">

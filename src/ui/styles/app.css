@@ -1719,33 +1719,6 @@
   font-size: 12px;
 }
 
-/* ---------------------------------------------------------------- streaks */
-
-.streak {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-left: auto;
-  padding: 2px var(--space-2);
-  border: 1px solid color-mix(in srgb, var(--accent-2) 45%, var(--border));
-  border-radius: var(--radius);
-  background: color-mix(in srgb, var(--accent-2) 8%, transparent);
-}
-
-.streak__count {
-  color: var(--accent-2);
-  font-family: var(--font-mono);
-  font-size: 18px;
-  line-height: 1.1;
-}
-
-.streak__label {
-  color: var(--ink-dim);
-  font-size: 9px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
 /* --------------------------------------------------------- commendations */
 
 .commend {
@@ -1968,7 +1941,7 @@
 }
 
 /*
- * The verdict, the medal and the streak stay pinned. On a short window the body scrolls under
+ * The verdict and the medal stay pinned. On a short window the body scrolls under
  * them rather than taking the result off the top of the screen.
  */
 .modal--report .modal__head,

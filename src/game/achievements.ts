@@ -106,18 +106,6 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     note: 'Bonus met. There is no bonus. There is a star.',
   },
   {
-    id: 'streak-3',
-    title: 'THREE NOMINAL SHIFTS',
-    requirement: 'Close three work orders in a row without a failed run.',
-    note: 'Three closed, none reopened. Scheduling would like to know how, and will not ask.',
-  },
-  {
-    id: 'streak-5',
-    title: 'AN UNINTERRUPTED WEEK',
-    requirement: 'Close five work orders in a row without a failed run.',
-    note: 'Five clean shifts. The last recorded instance was in 2204 and is disputed.',
-  },
-  {
     id: 'raised-again',
     title: 'RAISED, AND RAISED AGAIN',
     requirement: `Close a work order on your ${PERSISTENCE_ATTEMPTS}th run or later.`,
@@ -176,8 +164,6 @@ export interface RunFacts {
   senseBudgetMet: boolean;
   /** The recorded best before this run, when there was one. */
   previousBestTicks?: number;
-  /** Consecutive closes with no failed run in between, counting this one. */
-  streak: number;
   /** Medals across every issued work order in this world, with this result already folded in. */
   worldMedals: readonly Medal[];
 }
@@ -204,8 +190,6 @@ export function earnedBy(facts: RunFacts): string[] {
   if (facts.blockedMoves === 0) earned.push('no-contact');
   if (facts.senseBudgetMet) earned.push('minimal-observation');
   if (facts.stars > 0) earned.push('there-is-a-star');
-  if (facts.streak >= 3) earned.push('streak-3');
-  if (facts.streak >= 5) earned.push('streak-5');
   if (facts.attempt >= PERSISTENCE_ATTEMPTS) earned.push('raised-again');
 
   const world = facts.worldMedals;

@@ -73,8 +73,6 @@ export interface CampaignStats {
   passes: number;
   fails: number;
   /** Work orders closed in a row with no failed run in between. Reset by a failure, never by time. */
-  streak: number;
-  bestStreak: number;
 }
 
 export interface SaveFile {
@@ -92,7 +90,7 @@ export interface SaveFile {
 export const DEFAULT_LAYOUT: Layout = { editorFraction: 0.44, viewportFraction: 0.58 };
 
 export function emptyStats(): CampaignStats {
-  return { runs: 0, passes: 0, fails: 0, streak: 0, bestStreak: 0 };
+  return { runs: 0, passes: 0, fails: 0 };
 }
 
 export function emptySave(): SaveFile {
@@ -137,12 +135,12 @@ const MIGRATIONS: Record<number, Migration> = {
     settings: emptySave().settings,
   }),
   /*
-   * Commendations, streaks and requisition history arrive in version 2.
+   * Commendations and requisition history arrive in version 2.
    *
    * A version 1 save has closed work orders but no record of *how* they were closed, so the
    * commendations that can be reconstructed honestly are reconstructed and the rest are simply not
    * awarded. Handing a returning player fifteen commendations for runs nobody watched would be
-   * worth less than earning one, and pretending we know their streak would be a lie.
+   * worth less than earning one.
    */
   1: (raw) => ({
     ...raw,
@@ -276,9 +274,6 @@ function rescueStats(raw: unknown): CampaignStats {
   if (isPositive(raw['runs'])) stats.runs = raw['runs'];
   if (isPositive(raw['passes'])) stats.passes = raw['passes'];
   if (isPositive(raw['fails'])) stats.fails = raw['fails'];
-  if (isPositive(raw['streak'])) stats.streak = raw['streak'];
-  if (isPositive(raw['bestStreak'])) stats.bestStreak = raw['bestStreak'];
-  stats.bestStreak = Math.max(stats.bestStreak, stats.streak);
   return stats;
 }
 
@@ -369,14 +364,11 @@ export function importSave(current: SaveFile, text: string): SaveFile {
   };
 }
 
-/** The live streak comes from the incoming save — it is the one describing the more recent play. */
 export function mergeStats(current: CampaignStats, next: CampaignStats): CampaignStats {
   return {
     runs: Math.max(current.runs, next.runs),
     passes: Math.max(current.passes, next.passes),
     fails: Math.max(current.fails, next.fails),
-    streak: next.streak,
-    bestStreak: Math.max(current.bestStreak, next.bestStreak, next.streak),
   };
 }
 

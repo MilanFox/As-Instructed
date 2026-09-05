@@ -270,37 +270,15 @@ describe('rewards', () => {
     expect(useGame.getState().freshCommendations).not.toContain('filed');
   });
 
-  it('counts a streak of closes and drops it on the first failed run', async () => {
+  it('tallies a failed run without taking anything away', async () => {
     reset();
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
     await runOnce(W1_01_SOLUTION);
-    expect(useGame.getState().save.stats.streak).toBe(1);
-    expect(useGame.getState().save.stats.bestStreak).toBe(1);
+    expect(useGame.getState().save.stats.passes).toBe(1);
 
     await runOnce('move(Dir.South);');
-    expect(useGame.getState().save.stats.streak).toBe(0);
-    expect(useGame.getState().save.stats.bestStreak).toBe(1);
     expect(useGame.getState().save.stats.fails).toBe(1);
-  });
-
-  it('does not break a streak on a program that never compiled', async () => {
-    reset();
-    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
-    await runOnce(W1_01_SOLUTION);
-    expect(useGame.getState().save.stats.streak).toBe(1);
-
-    await runOnce('this is not valid javascript at all !!!');
-    expect(useGame.getState().failure?.kind).toBe('compile');
-    expect(useGame.getState().save.stats.streak).toBe(1);
-    expect(useGame.getState().save.stats.fails).toBe(1);
-  });
-
-  it('does not inflate the streak by re-closing the same work order', async () => {
-    reset();
-    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
-    await runOnce(W1_01_SOLUTION);
-    await runOnce(W1_01_SOLUTION);
-    expect(useGame.getState().save.stats.streak).toBe(1);
+    expect(useGame.getState().save.stats.passes).toBe(1);
   });
 
   it('costs a failed run nothing but the attempt', async () => {

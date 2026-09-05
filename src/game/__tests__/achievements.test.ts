@@ -13,7 +13,6 @@ function facts(patch: Partial<RunFacts> = {}): RunFacts {
     blockedMoves: 2,
     stars: 0,
     senseBudgetMet: false,
-    streak: 1,
     worldMedals: [Medal.Bronze, Medal.None],
     ...patch,
   };
@@ -43,7 +42,6 @@ describe('the commendation list', () => {
         stars: 2,
         senseBudgetMet: true,
         previousBestTicks: 9,
-        streak: 9,
         worldMedals: [Medal.Gold, Medal.Gold],
       }),
     );
@@ -84,16 +82,6 @@ describe('earnedBy', () => {
   it('awards a clean run only with zero blocked moves', () => {
     expect(earnedBy(facts({ blockedMoves: 0 }))).toContain('no-contact');
     expect(earnedBy(facts({ blockedMoves: 1 }))).not.toContain('no-contact');
-  });
-
-  it('awards the streaks at exactly three and five', () => {
-    expect(earnedBy(facts({ streak: 2 }))).not.toContain('streak-3');
-    expect(earnedBy(facts({ streak: 3 }))).toContain('streak-3');
-    expect(earnedBy(facts({ streak: 4 }))).not.toContain('streak-5');
-    expect(earnedBy(facts({ streak: 5 }))).toContain('streak-5');
-    expect(earnedBy(facts({ streak: 6 }))).toEqual(
-      expect.arrayContaining(['streak-3', 'streak-5']),
-    );
   });
 
   it('rewards persistence at the tenth attempt', () => {

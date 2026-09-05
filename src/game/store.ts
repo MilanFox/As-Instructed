@@ -206,11 +206,6 @@ export const useGame = create<GameState>((set, get) => {
    *
    * `failureCursor` advances on every failure and nothing else, which is what stops the flavour
    * line repeating while somebody debugs the same loop for the ninth time.
-   *
-   * The streak survives this. A program that did not compile was never dispatched, and the copy
-   * says so in as many words — breaking a five-order streak on a missing semicolon would be a
-   * penalty, and this game does not have those. A run that reached the simulator and failed there
-   * does reset it, in `recordResult`.
    */
   function failedReport(): Partial<GameState> {
     const save = get().save;
@@ -529,20 +524,15 @@ export const useGame = create<GameState>((set, get) => {
         levels[levelDef.id] = next;
 
         /*
-         * A failed run resets the streak and costs nothing else. It does not touch the medal, the
-         * best time, the stars, or a single commendation already earned. That is the whole
-         * penalty model of this game and it is deliberate.
+         * A failed run costs nothing. It does not touch the medal, the best time, the stars, or a
+         * single commendation already earned. That is the whole penalty model of this game and it
+         * is deliberate: the loop this game is made of is run, watch it fail, fix it.
          */
         const stats = { ...state.save.stats, runs: state.save.stats.runs + 1 };
         if (verdict.passed) {
           stats.passes += 1;
-          if (!previous.completed) {
-            stats.streak += 1;
-            stats.bestStreak = Math.max(stats.bestStreak, stats.streak);
-          }
         } else {
           stats.fails += 1;
-          stats.streak = 0;
         }
 
         const worldMedals = campaignOrder()
@@ -561,7 +551,6 @@ export const useGame = create<GameState>((set, get) => {
             (objective) => objective.met && isSenseBudget(objective.id),
           ),
           ...(previous.bestTicks !== undefined ? { previousBestTicks: previous.bestTicks } : {}),
-          streak: stats.streak,
           worldMedals,
         };
 

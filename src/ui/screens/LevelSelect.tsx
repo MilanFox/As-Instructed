@@ -198,7 +198,6 @@ function LockGlyph(): JSX.Element {
 
 export function LevelSelect(): JSX.Element {
   const save = useGame((state) => state.save);
-  const stats = useGame((state) => state.save.stats);
   const openLevel = useGame((state) => state.openLevel);
   const goto = useGame((state) => state.goto);
   const commendations = Object.keys(save.achievements).length;
@@ -297,13 +296,6 @@ export function LevelSelect(): JSX.Element {
           <div className="screen-stat">
             <dt>COMMENDATIONS</dt>
             <dd>{commendations}</dd>
-          </div>
-          <div className="screen-stat">
-            <dt>STREAK</dt>
-            <dd className={stats.streak > 1 ? 'screen-stat__streak' : undefined}>
-              {stats.streak}
-              <span className="screen-stat__best"> · best {stats.bestStreak}</span>
-            </dd>
           </div>
         </dl>
 
