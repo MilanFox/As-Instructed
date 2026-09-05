@@ -5,14 +5,13 @@ import {
   Rng,
   Terrain,
   addBot,
-  botById,
   createWorld,
   setTerrain,
   step,
   vec,
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
-import { decipher, installPost, postVar, queued, transmitted } from './signal.ts';
+import { decipher, installPost, postVar, queued, stayOnRoute, transmitted } from './signal.ts';
 
 const FIELD = 20;
 /**
@@ -191,11 +190,7 @@ export const w6_03: LevelDef = {
   },
   objectives: [
     Objectives.botAt(PAD, { id: 'reach-pad', label: 'Park the bot on the landing pad' }),
-    Objectives.custom(
-      'stay-on-route',
-      'Keep the bot out of the pits',
-      (ctx) => botById(ctx.world, 0)?.alive === true,
-    ),
+    stayOnRoute(),
   ],
   bonus: [
     Objectives.custom(

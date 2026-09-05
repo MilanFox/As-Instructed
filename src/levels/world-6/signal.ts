@@ -1,5 +1,13 @@
-import type { Machine, Vec, World } from '../../engine/index.ts';
-import { MachineKind, Terrain, addMachine, setTile, tileAt } from '../../engine/index.ts';
+import type { DieEvent, Machine, Objective, Vec, World } from '../../engine/index.ts';
+import {
+  MachineKind,
+  Objectives,
+  Terrain,
+  addMachine,
+  botById,
+  setTile,
+  tileAt,
+} from '../../engine/index.ts';
 
 /**
  * Shared plumbing for the listening post.
@@ -109,4 +117,32 @@ export function matchingPrefix(actual: readonly string[], expected: readonly str
   let i = 0;
   while (i < actual.length && i < expected.length && actual[i] === expected[i]) i++;
   return i;
+}
+
+/**
+ * The route is the only floor there is; everything else is a pit, so leaving it is fatal.
+ *
+ * Shared by `w6-03` and `w6-05` because the divergence is the point: "Keep the bot out of the
+ * pits — not met" was the whole report, and the tick and the cell it happened on are the two
+ * numbers that turn a re-read of the brief into a look at one move.
+ */
+export function stayOnRoute(): Objective {
+  return Objectives.custom(
+    'stay-on-route',
+    'Keep the bot out of the pits',
+    (ctx) => botById(ctx.world, 0)?.alive === true,
+    undefined,
+    (ctx) => {
+      const fall = ctx.trace.events.find(
+        (event): event is DieEvent => event.kind === 'die' && event.botId === 0,
+      );
+      if (!fall) return undefined;
+      const terrain = tileAt(ctx.initialWorld, fall.at)?.terrain ?? Terrain.Pit;
+      return {
+        where: `tick ${String(fall.t)} · (${String(fall.at.x)}, ${String(fall.at.y)})`,
+        expected: Terrain.Floor,
+        received: terrain,
+      };
+    },
+  );
 }

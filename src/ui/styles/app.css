@@ -1019,6 +1019,48 @@
   margin-left: 0;
 }
 
+/*
+ * The one-point diff. Show, do not tell: a coordinate or a line number, then the two values under
+ * each other so the eye finds the difference without reading a sentence about it. Green is what
+ * was wanted and red is what arrived, which is the only convention this needs to borrow.
+ */
+.cause__diff {
+  flex: 1 0 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0 var(--space-2);
+  margin-top: 5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.cause__diff-where {
+  grid-column: 1 / -1;
+  margin-bottom: 2px;
+  color: var(--ink-dim);
+  letter-spacing: 0.08em;
+}
+
+.cause__diff-tag {
+  color: var(--ink-dim);
+  text-align: right;
+}
+
+.cause__diff-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: pre;
+}
+
+.cause__diff-value--want {
+  color: var(--ok);
+}
+
+.cause__diff-value--got {
+  color: var(--danger);
+}
+
 .par-row {
   display: flex;
   justify-content: space-between;

@@ -1,5 +1,5 @@
 import type { CostOverrides, FailureCode, Vec } from '../engine/index.ts';
-import type { Trace, Verdict } from '../engine/index.ts';
+import type { ObjectiveReport, Trace, Verdict } from '../engine/index.ts';
 
 /**
  * The message contract between the main thread and the simulation worker.
@@ -70,7 +70,7 @@ export interface PerSeedResult {
   passed: boolean;
   ticks: number;
   ops: number;
-  objectives: { id: string; label: string; met: boolean; progress?: [number, number] }[];
+  objectives: ObjectiveReport[];
   failure?: RuntimeFailure;
   /** Present whenever a library was linked, even if the program never called it. */
   libraryUsage?: LibraryUsage;

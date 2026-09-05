@@ -95,7 +95,7 @@ export const w4_01: LevelDef = {
     '',
   ].join('\n'),
   hints: [
-    'The bot cannot see the tunnel. It can see one tile in each of four directions, for free, as often as it likes.',
+    'The bot cannot see the tunnel. It can see along each of four directions, for free, as often as it likes.',
     'Standing anywhere in the middle of the tunnel there are exactly two openings, and you arrived through one of them.',
     'So you already know one direction you do not want. Hold on to it across the loop, rather than working it out again.',
     'The pad is the only tile in the tunnel that is not plain floor. Check what is under the bot before you decide to move again.',

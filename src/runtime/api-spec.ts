@@ -259,7 +259,7 @@ if (ahead.walkable && ahead.botId === null) {
     name: 'mine',
     params: [{ name: 'dir', type: 'Dir', doc: 'Which adjacent tile to cut into.' }],
     returns: 'ItemKind | null',
-    doc: 'Cuts ore out of the adjacent tile in the given direction and adds it to the inventory, returning the item kind recovered. Returns null when that tile holds no ore, which still costs the full price.',
+    doc: 'Cuts into the adjacent tile in the given direction, clearing it to bare floor and adding what it yielded to the inventory: rock gives stone, rubble gives scrap, and ore, ice and regolith each give their own kind. Returns the kind recovered, or null when that tile is not mineable or the inventory is already full, which still costs the full price.',
     example: `const ore = mine(Dir.North);
 if (ore === null) {
   move(Dir.East);
@@ -274,7 +274,7 @@ if (ore === null) {
     name: 'harvest',
     params: [],
     returns: 'ItemKind | null',
-    doc: 'Harvests the mature crop on the tile under the bot and adds it to the inventory, returning the item kind gathered. Returns null when there is no crop or it is not ripe yet, which still costs the full harvest price.',
+    doc: 'Harvests the mature crop on the tile under the bot and adds it to the inventory, returning the item kind gathered. Returns null when there is no crop, when it is not ripe yet, or when the inventory is already full, which still costs the full harvest price.',
     example: `const picked = harvest();
 if (picked === null) {
   wait(4);
@@ -297,7 +297,7 @@ if (picked === null) {
       },
     ],
     returns: 'boolean',
-    doc: 'Plants one item of `kind` from the inventory into plantable ground under the bot. Returns false when the ground is not soil or the bot carries none of that kind, and costs the full price either way.',
+    doc: 'Plants one item of `kind` from the inventory into plantable ground under the bot. Returns false when the ground is not soil, when something is already growing there, or when the bot carries none of that kind, and costs the full price either way.',
     example: `if (scan().terrain === 'soil') {
   plant();
 }`,
@@ -508,11 +508,11 @@ refuel();`,
         name: 'machineId',
         type: 'string',
         optional: true,
-        doc: "Omit to probe the machine on or next to the bot, otherwise any machine's id.",
+        doc: "Omit to probe the machine under the bot, or the one on the tile it faces, otherwise any machine's id.",
       },
     ],
     returns: 'MachineView | null',
-    doc: 'Returns a read-only snapshot of the machine on or beside the bot, or of `machineId` anywhere in the world. Returns null when there is no such machine.',
+    doc: 'Returns a read-only snapshot of the machine under the bot, or of the one on the tile the bot faces, or of `machineId` anywhere in the world. Returns null when there is no such machine.',
     example: `const node = probe('node-1');
 if (node !== null && node.state === 'off') {
   print(\`\${node.id} is cold\`);

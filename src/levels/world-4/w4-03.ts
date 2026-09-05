@@ -90,7 +90,8 @@ export const w4_03: LevelDef = {
   starter: [
     '// One entrance, one exit, both in the outside wall.',
     '',
-    'print(pos());',
+    'const here = pos();',
+    'print(`${here.x},${here.y}`);',
     '',
   ].join('\n'),
   hints: [

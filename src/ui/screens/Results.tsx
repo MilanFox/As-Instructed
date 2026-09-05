@@ -265,6 +265,24 @@ function ResultsReport(): JSX.Element | null {
                       <BudgetBar budget={cause.budget} />
                     </>
                   ) : null}
+                  {/*
+                   * The diff, when the objective could name one point. `0 of 5 — 5 short` is the
+                   * count; this is the line, cell or tick it went wrong on, and it is deliberately
+                   * two values and three words rather than a sentence explaining them.
+                   */}
+                  {cause.divergence ? (
+                    <div className="cause__diff numeric">
+                      <span className="cause__diff-where">{cause.divergence.where}</span>
+                      <span className="cause__diff-tag">want</span>
+                      <span className="cause__diff-value cause__diff-value--want">
+                        {cause.divergence.expected}
+                      </span>
+                      <span className="cause__diff-tag">got</span>
+                      <span className="cause__diff-value cause__diff-value--got">
+                        {cause.divergence.received}
+                      </span>
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </section>

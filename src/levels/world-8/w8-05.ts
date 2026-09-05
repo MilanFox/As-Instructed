@@ -493,6 +493,24 @@ function gridTally(ctx: ObjectiveContext): [number, number] {
  * difference between a grid that came up in order and one that came up all at once.
  */
 function precedenceHolds(ctx: ObjectiveContext): boolean {
+  return firstBreach(ctx) === undefined;
+}
+
+interface Breach {
+  station: string;
+  feeder: string;
+  started: number;
+  /** The tick the feeder was done, or null when it was never energised at all. */
+  fedAt: number | null;
+}
+
+/**
+ * The earliest station started too early, and the feeder it jumped.
+ *
+ * A grid brought up in the wrong order broke the order once first, and that station is the one
+ * worth naming: everything downstream of it is a consequence, not a second mistake.
+ */
+function firstBreach(ctx: ObjectiveContext): Breach | undefined {
   const firstUse = new Map<string, number>();
   const lastDone = new Map<string, number>();
   for (const record of useLog(ctx)) {
@@ -501,15 +519,23 @@ function precedenceHolds(ctx: ObjectiveContext): boolean {
     const done = lastDone.get(record.machineId);
     if (done === undefined || record.done > done) lastDone.set(record.machineId, record.done);
   }
+  let earliest: Breach | undefined;
   for (const station of machinesWithPrefix(ctx.initialWorld, STATION_PREFIX)) {
     const start = firstUse.get(station.id);
     if (start === undefined) continue;
     for (const feeder of dependenciesOf(station)) {
       const finished = lastDone.get(feeder);
-      if (finished === undefined || start < finished) return false;
+      if (finished !== undefined && start >= finished) continue;
+      const breach: Breach = {
+        station: station.id,
+        feeder,
+        started: start,
+        fedAt: finished ?? null,
+      };
+      if (earliest === undefined || breach.started < earliest.started) earliest = breach;
     }
   }
-  return true;
+  return earliest;
 }
 
 /**
@@ -657,7 +683,24 @@ export const w8_05: LevelDef = {
       },
       gridTally,
     ),
-    Objectives.custom('precedence', 'Energise each station only after its feeders', precedenceHolds),
+    Objectives.custom(
+      'precedence',
+      'Energise each station only after its feeders',
+      precedenceHolds,
+      undefined,
+      (ctx) => {
+        const breach = firstBreach(ctx);
+        if (!breach) return undefined;
+        return {
+          where: `${breach.station} · feeder ${breach.feeder}`,
+          expected:
+            breach.fedAt === null
+              ? `feeder ${breach.feeder} energised first`
+              : `start at tick ${String(breach.fedAt)} or later`,
+          received: `started at tick ${String(breach.started)}`,
+        };
+      },
+    ),
     Objectives.custom(
       'quota',
       'Deliver every crate to its own class depot',

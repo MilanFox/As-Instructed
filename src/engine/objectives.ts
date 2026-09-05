@@ -19,6 +19,42 @@ export interface ObjectiveContext {
   senses?: Record<string, number>;
 }
 
+/**
+ * The first concrete point at which what an objective wanted and what the run did parted company.
+ *
+ * `docs/PLAYTEST-BEGINNER.md` §3: a manifest level that grades printed text answered four
+ * plausible lines and an empty program with the identical `0 of 5 — 5 short`. A count says an
+ * objective was missed; it never says where, so the only move left is to guess, and the level's
+ * lesson is lost to brute force. This is the number the count throws away.
+ *
+ * Three rules hold it to being feedback rather than an answer key:
+ *
+ *  - **First divergence only.** Not every mismatch, not a full expected/actual dump. One point.
+ *  - **`expected` describes that one point**, in the objective's own unit — one line, one cell,
+ *    one tick — never the whole target.
+ *  - **`received` is the run's own value there**, so what a player reads back is mostly their
+ *    own output. An objective with nothing to compare simply does not implement `divergence`.
+ */
+export interface Divergence {
+  /** The objective's own unit for "where": `line 3`, `tick 12`, `(4, 6)`, `sub-5 · tick 74`. */
+  where: string;
+  /** What that one point should have held. */
+  expected: string;
+  /** What it held instead. */
+  received: string;
+}
+
+/** One objective as the verdict reports it. */
+export interface ObjectiveReport {
+  id: string;
+  label: string;
+  met: boolean;
+  /** `[done, total]` for a "7/12" readout. Absent when the objective is binary. */
+  progress?: [number, number];
+  /** Only ever present on an unmet objective that opted into reporting one. */
+  divergence?: Divergence;
+}
+
 export interface Objective {
   /** Stable across edits — it is a save key and a trace event id. */
   id: string;
@@ -27,12 +63,28 @@ export interface Objective {
   evaluate(ctx: ObjectiveContext): boolean;
   /** `[done, total]` for a "7/12" readout. Omit when the objective is binary. */
   progress?(ctx: ObjectiveContext): [number, number];
+  /**
+   * Opt-in. Asked only after `evaluate` returned false, and free to return `undefined` when this
+   * particular failure has no single point to name.
+   */
+  divergence?(ctx: ObjectiveContext): Divergence | undefined;
 }
 
 export interface ObjectiveOptions {
   id?: string;
   label?: string;
 }
+
+/** How long a value may run in a divergence before it is cut. Two of these fit one report row. */
+export const DIVERGENCE_VALUE_CHARS = 44;
+
+/** Long values are cut rather than wrapped: a diff that reflows is not a diff any more. */
+export function clipValue(value: string, max = DIVERGENCE_VALUE_CHARS): string {
+  return value.length <= max ? value : `${value.slice(0, max - 1)}…`;
+}
+
+/** What `received` says when the run produced nothing at all at the point that diverged. */
+export const NOTHING = '(nothing)';
 
 export type Comparison = '==' | '!=' | '>=' | '<=' | '>' | '<';
 
@@ -59,6 +111,7 @@ function define(
   options: ObjectiveOptions | undefined,
   evaluate: (ctx: ObjectiveContext) => boolean,
   progress?: (ctx: ObjectiveContext) => [number, number],
+  divergence?: (ctx: ObjectiveContext) => Divergence | undefined,
 ): Objective {
   const objective: Objective = {
     id: options?.id ?? fallbackId,
@@ -66,6 +119,7 @@ function define(
     evaluate,
   };
   if (progress) objective.progress = progress;
+  if (divergence) objective.divergence = divergence;
   return objective;
 }
 
@@ -81,6 +135,16 @@ export function botAt(pos: Vec, options?: ObjectiveOptions & { botId?: number })
     (ctx) => {
       const bot = botById(ctx.world, botId);
       return bot !== undefined && bot.alive && eq(bot.at, pos);
+    },
+    undefined,
+    (ctx) => {
+      const bot = botById(ctx.world, botId);
+      if (bot === undefined) return undefined;
+      return {
+        where: 'end of run',
+        expected: `(${pos.x}, ${pos.y})`,
+        received: bot.alive ? `(${bot.at.x}, ${bot.at.y})` : `dead at (${bot.at.x}, ${bot.at.y})`,
+      };
     },
   );
 }
@@ -157,6 +221,15 @@ export function machineState(id: string, state: string, options?: ObjectiveOptio
     `Leave ${id} ${state}`,
     options,
     (ctx) => machineById(ctx.world, id)?.state === state,
+    undefined,
+    (ctx) => {
+      const machine = machineById(ctx.world, id);
+      return {
+        where: id,
+        expected: state,
+        received: machine ? machine.state : NOTHING,
+      };
+    },
   );
 }
 
@@ -177,7 +250,14 @@ export function itemsDelivered(
   );
 }
 
-/** The program's `print` output equals `expected`, in order, with nothing extra. */
+/**
+ * The program's `print` output equals `expected`, in order, with nothing extra.
+ *
+ * The `divergence` is a real one-line diff, and it is the whole reason this builder is worth
+ * having over a hand-rolled `custom`: a run that printed four plausible lines and a run that
+ * printed nothing used to be told the same thing. It names the first line that differs and shows
+ * both halves of it — never the lines after, so the level is still the level.
+ */
 export function printedSequence(
   expected: readonly string[],
   options?: ObjectiveOptions,
@@ -199,6 +279,18 @@ export function printedSequence(
       return actual.length === expected.length && matching(ctx.trace) === expected.length;
     },
     (ctx) => [matching(ctx.trace), expected.length],
+    (ctx) => {
+      const actual = printed(ctx.trace);
+      const i = matching(ctx.trace);
+      if (i >= expected.length && i >= actual.length) return undefined;
+      const want = expected[i];
+      const got = actual[i];
+      return {
+        where: `line ${String(i + 1)}`,
+        expected: want === undefined ? NOTHING : clipValue(want),
+        received: got === undefined ? NOTHING : clipValue(got),
+      };
+    },
   );
 }
 
@@ -250,8 +342,9 @@ export function custom(
   label: string,
   fn: (ctx: ObjectiveContext) => boolean,
   progress?: (ctx: ObjectiveContext) => [number, number],
+  divergence?: (ctx: ObjectiveContext) => Divergence | undefined,
 ): Objective {
-  return define(id, label, { id, label }, fn, progress);
+  return define(id, label, { id, label }, fn, progress, divergence);
 }
 
 /** Convenience for `allTilesAre` / `tileCount` predicates. */
@@ -271,21 +364,24 @@ export function machinesAllIn(state: string, options?: ObjectiveOptions): Object
   );
 }
 
-/** Evaluates a list of objectives into the shape `Verdict` wants. */
+/**
+ * Evaluates a list of objectives into the shape `Verdict` wants.
+ *
+ * `divergence` is asked for only when the objective was missed. A met objective has no point of
+ * divergence by definition, and an objective's own `divergence` is free to assume that.
+ */
 export function evaluateObjectives(
   objectives: readonly Objective[],
   ctx: ObjectiveContext,
-): { id: string; label: string; met: boolean; progress?: [number, number] }[] {
+): ObjectiveReport[] {
   return objectives.map((objective) => {
     const met = objective.evaluate(ctx);
     const progress = objective.progress?.(ctx);
-    return progress
-      ? { id: objective.id, label: objective.label, met, progress }
-      : {
-          id: objective.id,
-          label: objective.label,
-          met,
-        };
+    const divergence = met ? undefined : objective.divergence?.(ctx);
+    const report: ObjectiveReport = { id: objective.id, label: objective.label, met };
+    if (progress) report.progress = progress;
+    if (divergence) report.divergence = divergence;
+    return report;
   });
 }
 

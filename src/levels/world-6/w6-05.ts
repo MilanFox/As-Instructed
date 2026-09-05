@@ -13,7 +13,7 @@ import {
   vec,
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
-import { additive, charCodes, encipher, installPost, weighted } from './signal.ts';
+import { additive, charCodes, encipher, installPost, stayOnRoute, weighted } from './signal.ts';
 
 const FIELD = 30;
 /** Every seed's route is exactly this long, so par means the same thing on all five. */
@@ -318,11 +318,7 @@ export const w6_05: LevelDef = {
         return bot !== undefined && tileAt(ctx.world, bot.at)?.terrain === Terrain.Pad;
       },
     ),
-    Objectives.custom(
-      'stay-on-route',
-      'Keep the bot out of the pits',
-      (ctx) => botById(ctx.world, 0)?.alive === true,
-    ),
+    stayOnRoute(),
   ],
   bonus: [
     Objectives.custom(

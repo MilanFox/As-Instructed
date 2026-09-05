@@ -1,0 +1,306 @@
+/**
+ * What a failing objective says about *where* it failed.
+ *
+ * `docs/PLAYTEST-BEGINNER.md` §3 is the specification for this file: fifty-five minutes on
+ * `w3-03` because four plausible manifest lines and an empty program produced the identical
+ * `0 of 5 — 5 short`. Every test here is a program that is wrong in a specific way, asserting
+ * that the report now names that way.
+ */
+import { describe, expect, test } from 'vitest';
+import type { Machine, Objective, ObjectiveContext, Sim, Trace, Vec } from '../../engine/index.ts';
+import { ALL_DIRS, Dir, Terrain, cloneWorld, step, tileAt, vec } from '../../engine/index.ts';
+import { must } from '../../engine/__tests__/helpers.ts';
+import { runLevel } from '../harness.ts';
+import { dependenciesOf, machinesWithPrefix } from '../world-8/shared.ts';
+import { manifestFor, w3_03 } from '../world-3/w3-03.ts';
+import { w6_03 } from '../world-6/w6-03.ts';
+import { w6_05 } from '../world-6/w6-05.ts';
+import { w8_03 } from '../world-8/w8-03.ts';
+import { w8_05 } from '../world-8/w8-05.ts';
+import type { LevelDef } from '../types.ts';
+
+function objectiveIn(level: LevelDef, id: string): Objective {
+  return must(
+    level.objectives.find((objective) => objective.id === id),
+    `objective ${id}`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// w3-03 — the wall
+// ---------------------------------------------------------------------------
+
+describe('w3-03 tells a wrong manifest apart from no manifest at all', () => {
+  const expected = manifestFor(w3_03.build(1));
+
+  const reportOn = (lines: readonly string[]) => {
+    const result = runLevel(w3_03, 1, (sim, botId) => {
+      for (const line of lines) sim.print(botId, line);
+    });
+    return must(
+      result.verdict.objectives.find((objective) => objective.id === 'manifest-printed'),
+      'manifest-printed',
+    );
+  };
+
+  test('the manifest this test is written against is worth diffing', () => {
+    expect(expected.length).toBeGreaterThan(3);
+  });
+
+  test('a program that printed nothing is pointed at line 1', () => {
+    const report = reportOn([]);
+
+    expect(report.met).toBe(false);
+    expect(report.divergence).toEqual({
+      where: 'line 1',
+      expected: expected[0],
+      received: '(nothing)',
+    });
+  });
+
+  test("a program that miscounted one class is pointed at that class's line", () => {
+    const [kind = 'part', count = '0'] = must(expected[2], 'third manifest line').split(' ');
+    const undercounted = expected.slice();
+    undercounted[2] = `${kind} ${String(Number(count) - 1)}`;
+    const report = reportOn(undercounted);
+
+    expect(report.met).toBe(false);
+    expect(report.divergence).toEqual({
+      where: 'line 3',
+      expected: expected[2],
+      received: undercounted[2],
+    });
+  });
+
+  test('the two runs the playtest could not tell apart now read differently', () => {
+    const overcounted = expected.map((line) => {
+      const [kind = '', count = '0'] = line.split(' ');
+      return `${kind} ${String(Number(count) + 1)}`;
+    });
+    const silent = reportOn([]);
+    const plausible = reportOn(overcounted);
+
+    expect(silent.progress).toEqual(plausible.progress);
+    expect(silent.divergence).toEqual({
+      where: 'line 1',
+      expected: expected[0],
+      received: '(nothing)',
+    });
+    expect(plausible.divergence).toEqual({
+      where: 'line 1',
+      expected: expected[0],
+      received: overcounted[0],
+    });
+  });
+
+  test('the terminal objective names the state it was left in', () => {
+    const result = runLevel(w3_03, 1, () => undefined);
+    const report = must(
+      result.verdict.objectives.find((objective) => objective.id === 'manifest-filed'),
+      'manifest-filed',
+    );
+
+    expect(report.divergence).toEqual({ where: 'terminal', expected: 'filed', received: 'idle' });
+  });
+
+  test('a run that filed the right manifest reports no divergence anywhere', () => {
+    const result = runLevel(w3_03, 1, (sim, botId) => {
+      for (const line of expected) sim.print(botId, line);
+    });
+
+    expect(
+      result.verdict.objectives.find((objective) => objective.id === 'manifest-printed')?.met,
+    ).toBe(true);
+    expect(
+      result.verdict.objectives.find((objective) => objective.id === 'manifest-printed')
+        ?.divergence,
+    ).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// w6-03 — stay on route
+// ---------------------------------------------------------------------------
+
+describe('w6-03 names the tick and the cell the bot left the route on', () => {
+  test('a bot driven off the first tile reports the pit it fell into', () => {
+    const result = runLevel(w6_03, 1, (sim, botId) => {
+      sim.move(botId, Dir.North);
+    });
+    const report = must(
+      result.verdict.objectives.find((objective) => objective.id === 'stay-on-route'),
+      'stay-on-route',
+    );
+
+    expect(report.met).toBe(false);
+    expect(report.divergence).toEqual({
+      where: 'tick 1 · (1, 4)',
+      expected: Terrain.Floor,
+      received: Terrain.Pit,
+    });
+  });
+
+  test('a bot that never left the route has nothing to report', () => {
+    const result = runLevel(w6_03, 1, () => undefined);
+    const report = must(
+      result.verdict.objectives.find((objective) => objective.id === 'stay-on-route'),
+      'stay-on-route',
+    );
+
+    expect(report.met).toBe(true);
+    expect(report.divergence).toBeUndefined();
+  });
+
+  test('w6-05 grades the same route rule and reports it the same way', () => {
+    const world = w6_05.build(1);
+    const start = must(world.bots[0], 'w6-05 bot').at;
+    const offRoute = must(
+      ALL_DIRS.find((dir) => tileAt(world, step(start, dir))?.terrain === Terrain.Pit),
+      'a pit beside the start',
+    );
+    const fell = step(start, offRoute);
+    const result = runLevel(w6_05, 1, (sim, botId) => {
+      sim.move(botId, offRoute);
+    });
+    const report = must(
+      result.verdict.objectives.find((objective) => objective.id === 'stay-on-route'),
+      'stay-on-route',
+    );
+
+    expect(report.met).toBe(false);
+    expect(report.divergence).toEqual({
+      where: `tick 1 · (${String(fell.x)}, ${String(fell.y)})`,
+      expected: Terrain.Floor,
+      received: Terrain.Pit,
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// w8-03 / w8-05 — precedence
+// ---------------------------------------------------------------------------
+
+/** The first station in the grid that hangs off something, and the feeder it hangs off. */
+function pickChain(machines: readonly Machine[]): { station: Machine; feeder: Machine } {
+  for (const station of machines) {
+    const [feederId] = dependenciesOf(station);
+    const feeder = machines.find((candidate) => candidate.id === feederId);
+    if (feeder) return { station, feeder };
+  }
+  throw new Error('expected at least one station with a feeder');
+}
+
+describe('w8-03 names the station that jumped its feeder', () => {
+  test('energising a station before its feeder reports both and both ticks', () => {
+    const { station, feeder } = pickChain(machinesWithPrefix(w8_03.build(1), 'sub-'));
+    const result = runLevel(w8_03, 1, (sim, botId) => {
+      walkTo(sim, botId, station.at);
+      sim.use(botId);
+      walkTo(sim, botId, feeder.at);
+      sim.use(botId);
+    });
+    const report = must(
+      result.verdict.objectives.find((objective) => objective.id === 'precedence-held'),
+      'precedence-held',
+    );
+
+    expect(report.met).toBe(false);
+    expect(report.divergence?.where).toBe(`${station.id} · feeder ${feeder.id}`);
+    expect(report.divergence?.expected).toMatch(/^start at tick \d+ or later$/);
+    expect(report.divergence?.received).toMatch(/^started at tick \d+$/);
+  });
+
+  test('a grid nobody touched has no precedence to break', () => {
+    const result = runLevel(w8_03, 1, () => undefined);
+    const report = must(
+      result.verdict.objectives.find((objective) => objective.id === 'precedence-held'),
+      'precedence-held',
+    );
+
+    expect(report.met).toBe(true);
+    expect(report.divergence).toBeUndefined();
+  });
+});
+
+/**
+ * `w8-05`'s grid is twenty bots and a crate haul wide, and the precedence rule reads only the
+ * `use` log. Driving a whole shift to provoke one out-of-order start would test the pathfinding
+ * in the test, so the log is written directly and the level's own objective reads it.
+ */
+function traceOfUses(
+  initialWorld: ReturnType<LevelDef['build']>,
+  uses: readonly { t: number; machineId: string }[],
+): Trace {
+  return {
+    initialWorld,
+    events: uses.map((use) => ({
+      t: use.t,
+      botId: 0,
+      dt: 1,
+      kind: 'use' as const,
+      at: vec(0, 0),
+      machineId: use.machineId,
+      ok: true,
+    })),
+    keyframes: [],
+    endTick: Math.max(0, ...uses.map((use) => use.t + 1)),
+  };
+}
+
+describe('w8-05 names the station that jumped its feeder', () => {
+  const initialWorld = w8_05.build(1);
+  const { station, feeder } = pickChain(machinesWithPrefix(initialWorld, 'sub-'));
+  const objective = objectiveIn(w8_05, 'precedence');
+
+  const contextFrom = (uses: readonly { t: number; machineId: string }[]): ObjectiveContext => ({
+    world: cloneWorld(initialWorld),
+    initialWorld,
+    trace: traceOfUses(initialWorld, uses),
+  });
+
+  test('a station started before its feeder finished reports both ticks', () => {
+    const ctx = contextFrom([
+      { t: 10, machineId: station.id },
+      { t: 20, machineId: feeder.id },
+    ]);
+
+    expect(objective.evaluate(ctx)).toBe(false);
+    expect(objective.divergence?.(ctx)).toEqual({
+      where: `${station.id} · feeder ${feeder.id}`,
+      expected: 'start at tick 21 or later',
+      received: 'started at tick 10',
+    });
+  });
+
+  test('a station started with its feeder never energised at all says so', () => {
+    const ctx = contextFrom([{ t: 10, machineId: station.id }]);
+
+    expect(objective.evaluate(ctx)).toBe(false);
+    expect(objective.divergence?.(ctx)).toEqual({
+      where: `${station.id} · feeder ${feeder.id}`,
+      expected: `feeder ${feeder.id} energised first`,
+      received: 'started at tick 10',
+    });
+  });
+
+  test('the right order reports nothing', () => {
+    const ctx = contextFrom([
+      { t: 10, machineId: feeder.id },
+      { t: 20, machineId: station.id },
+    ]);
+
+    expect(objective.evaluate(ctx)).toBe(true);
+    expect(objective.divergence?.(ctx)).toBeUndefined();
+  });
+});
+
+/** An L-walk across `w8-03`'s open plain: clear of the crew rows first, then across, then down. */
+function walkTo(sim: Sim, botId: number, to: Vec): void {
+  sim.move(botId, Dir.North);
+  for (let guard = 0; guard < 64 && sim.pos(botId).x !== to.x; guard++) {
+    sim.move(botId, sim.pos(botId).x < to.x ? Dir.East : Dir.West);
+  }
+  for (let guard = 0; guard < 64 && sim.pos(botId).y !== to.y; guard++) {
+    sim.move(botId, sim.pos(botId).y < to.y ? Dir.South : Dir.North);
+  }
+}

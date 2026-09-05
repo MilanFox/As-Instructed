@@ -291,6 +291,15 @@ describe('the player-facing compiler accepts ordinary JavaScript', () => {
     expect(LEVELS.length).toBe(40);
   });
 
+  test('all 40 starters compile cleanly', { timeout: 120_000 }, async () => {
+    const rejected: string[] = [];
+    for (const level of LEVELS) {
+      const result = await compilePlayerCode(editor.monaco, playerModel(level.id, level.starter));
+      if (!result.ok) rejected.push(`${level.id}: ${result.error.message}`);
+    }
+    expect(rejected).toEqual([]);
+  });
+
   test('an untyped arrow parameter is not an error', async () => {
     const source = 'const doubled = [1, 2, 3].map((n) => n * 2);\nprint(String(doubled.length));\n';
     const result = await compilePlayerCode(editor.monaco, playerModel('w1-02', source));
