@@ -8,6 +8,10 @@ import type { Medal } from '../../game/score.ts';
 import { levelPoints, medalFor } from '../../game/score.ts';
 import { currentLevel, useGame } from '../../game/store.ts';
 import { nextLevel } from '../../levels/index.ts';
+// Deep imports on purpose: `src/meta/ui/index.ts` re-exports `LibraryPanel`, which pulls Monaco
+// into whatever chunk reaches it, and the report is rendered from the entry chunk.
+import { PUBLISH } from '../../meta/copy.ts';
+import { useLibrary } from '../../meta/store.ts';
 import { MEDAL_BEAT } from '../../audio/index.ts';
 import { audio } from '../audio.ts';
 import { BudgetBar } from '../components/BudgetBar.tsx';
@@ -70,6 +74,8 @@ function ResultsReport(): JSX.Element | null {
   const jumpToFailure = useGame((state) => state.jumpToFailure);
   const trace = useGame((state) => state.trace);
   const progress = useGame((state) => (level ? state.save.levels[level.id] : undefined));
+  const notice = useLibrary((state) => state.notice);
+  const muteNotice = useLibrary((state) => state.muteNotice);
   const primaryRef = useRef<HTMLButtonElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
 
@@ -455,6 +461,30 @@ function ResultsReport(): JSX.Element | null {
                   </div>
                 );
               })}
+            </section>
+          ) : null}
+
+          {/* The Repository's half of a closed work order. It asks for nothing, so it is a line on
+              the report rather than the fourth modal on the same transition. */}
+          {passed && notice ? (
+            <section className="report-section">
+              <div className="rail__label">{PUBLISH.noticeLabel}</div>
+              <p className="modal__line">
+                {notice.nested.length > 0
+                  ? PUBLISH.noticeNested(notice.nested)
+                  : PUBLISH.noticeNothing}
+              </p>
+              <button
+                type="button"
+                className="modal__quiet"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  muteNotice();
+                }}
+                title="Stop the Repository asking"
+              >
+                stop offering
+              </button>
             </section>
           ) : null}
 
