@@ -37,6 +37,8 @@ export interface LevelProgress {
   attempts: number;
   /** Epoch ms of the first passing run. */
   clearedAt?: number;
+  /** How many hints this order has given up. Asking for one is not a penalty and never comes back off. */
+  hintsRevealed?: number;
 }
 
 export interface Layout {
@@ -205,6 +207,7 @@ function rescueLevels(raw: unknown): Record<string, LevelProgress> {
     if (isPositive(value['bestChars'])) progress.bestChars = value['bestChars'];
     if (isPositive(value['attempts'])) progress.attempts = value['attempts'];
     if (isPositive(value['clearedAt'])) progress.clearedAt = value['clearedAt'];
+    if (isPositive(value['hintsRevealed'])) progress.hintsRevealed = value['hintsRevealed'];
     levels[id] = progress;
   }
   return levels;
@@ -388,6 +391,8 @@ export function mergeProgress(
   if (objectives.length > 0) merged.objectives = objectives;
   const code = next.code ?? current.code;
   if (code !== undefined) merged.code = code;
+  const hints = Math.max(current.hintsRevealed ?? 0, next.hintsRevealed ?? 0);
+  if (hints > 0) merged.hintsRevealed = hints;
   const ticks = minDefined(current.bestTicks, next.bestTicks);
   if (ticks !== undefined) merged.bestTicks = ticks;
   const chars = minDefined(current.bestChars, next.bestChars);

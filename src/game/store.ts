@@ -104,6 +104,7 @@ export interface GameState {
   openLevel(levelId: string): void;
   setCode(code: string): void;
   resetCode(): void;
+  revealHint(count: number): void;
   setPanel(panel: 'brief' | 'console' | 'docs'): void;
   setDocsOpen(open: boolean): void;
   setLayout(patch: Partial<SaveFile['settings']['layout']>): void;
@@ -337,6 +338,16 @@ export const useGame = create<GameState>((set, get) => {
       const id = get().currentLevelId;
       const level = id ? getLevel(id) : undefined;
       if (level) get().setCode(level.starter);
+    },
+
+    revealHint(count) {
+      const id = get().currentLevelId;
+      if (!id) return;
+      const levels = { ...get().save.levels };
+      const progress = levels[id] ?? emptyProgress();
+      if ((progress.hintsRevealed ?? 0) >= count) return;
+      levels[id] = { ...progress, hintsRevealed: count };
+      persist({ ...get().save, levels });
     },
 
     setPanel(panel) {

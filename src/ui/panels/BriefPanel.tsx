@@ -1,12 +1,8 @@
-import { useEffect, useState } from 'react';
 import type * as React from 'react';
 import { currentLevel, unlockedHardware, useGame } from '../../game/store.ts';
 import { worldMeta } from '../../levels/index.ts';
 import { Markdown } from '../components/Markdown.tsx';
 import '../styles/docs.css';
-
-/** Revealed hints survive a panel unmount and a trip to the level list, but not a reload. */
-const revealedByLevel = new Map<string, number>();
 
 function openDocs(name: string): void {
   useGame.getState().setDocsOpen(true);
@@ -30,11 +26,8 @@ function HardwareChip({ name, fresh }: { name: string; fresh: boolean }): React.
 export function BriefPanel(): React.JSX.Element {
   const level = useGame(currentLevel);
   const levelId = level?.id ?? '';
-  const [revealed, setRevealed] = useState(() => revealedByLevel.get(levelId) ?? 0);
-
-  useEffect(() => {
-    setRevealed(revealedByLevel.get(levelId) ?? 0);
-  }, [levelId]);
+  const revealed = useGame((state) => state.save.levels[levelId]?.hintsRevealed ?? 0);
+  const revealHint = useGame((state) => state.revealHint);
 
   if (!level) {
     return (
@@ -47,11 +40,6 @@ export function BriefPanel(): React.JSX.Element {
   const world = worldMeta(level.world);
   const fitted = unlockedHardware(level.id).filter((name) => !level.hardware.includes(name));
   const hints = level.hints;
-
-  function reveal(count: number): void {
-    revealedByLevel.set(levelId, count);
-    setRevealed(count);
-  }
 
   return (
     <section className="doc-pane brief">
@@ -111,7 +99,7 @@ export function BriefPanel(): React.JSX.Element {
             ))}
           </ol>
           {revealed < hints.length ? (
-            <button type="button" className="hint-ask" onClick={() => reveal(revealed + 1)}>
+            <button type="button" className="hint-ask" onClick={() => revealHint(revealed + 1)}>
               Request hint {revealed + 1} of {hints.length}
             </button>
           ) : (

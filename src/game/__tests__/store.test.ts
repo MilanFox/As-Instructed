@@ -270,6 +270,15 @@ describe('rewards', () => {
     expect(useGame.getState().freshCommendations).not.toContain('filed');
   });
 
+  it('remembers revealed hints across a reload', async () => {
+    reset();
+    useGame.getState().revealHint(2);
+    expect(useGame.getState().save.levels['w1-01']?.hintsRevealed).toBe(2);
+
+    useGame.getState().revealHint(1);
+    expect(useGame.getState().save.levels['w1-01']?.hintsRevealed).toBe(2);
+  });
+
   it('tallies a failed run without taking anything away', async () => {
     reset();
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
