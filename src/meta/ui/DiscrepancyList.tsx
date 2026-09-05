@@ -9,6 +9,12 @@ import './library.css';
  * A discrepancy never blocks anything: the work order stays closed, the medal stays recorded, and
  * "close the discrepancy" is available whether or not the player fixes it — which is the joke, and
  * also the guarantee that this can be ignored for the whole game.
+ *
+ * What the card is *for* is the layout number. Until the layout went onto the work order's run
+ * schedule (`campaign.ts`), the only thing this page could do was tell the player they were wrong
+ * about something they had no way to look at, which made `Stop raising these` the most useful
+ * button on it. The layout, the primary action and the line saying the result stands are all there
+ * to make the other button the obvious one.
  */
 export function DiscrepancyList(): React.JSX.Element {
   const save = useLibrary((state) => state.save);
@@ -39,7 +45,9 @@ export function DiscrepancyList(): React.JSX.Element {
         <article key={entry.id} className={entry.closed ? 'lib-disc lib-disc--closed' : 'lib-disc'}>
           <div className="lib-disc__ref">{entry.id}</div>
           <h3 className="lib-disc__title">{DISCREPANCY.title(entry.levelId)}</h3>
+          <div className="lib-disc__layout">{DISCREPANCY.layout(entry.seed)}</div>
           <p className="lib-disc__body">{DISCREPANCY.body(entry.levelId, entry.seed)}</p>
+          <p className="lib-disc__kept">{DISCREPANCY.kept}</p>
           <p className="lib__note">{DISCREPANCY.note}</p>
           {entry.resolved ? (
             <p className="lib__note">{DISCREPANCY.resolved(entry.levelId)}</p>
@@ -57,7 +65,7 @@ export function DiscrepancyList(): React.JSX.Element {
               className="lib__btn"
               disabled={entry.closed}
               onClick={() => close(entry.id)}
-              title={DISCREPANCY.closeNote}
+              title={DISCREPANCY.closeNote(entry.seed)}
             >
               {DISCREPANCY.close}
             </button>
