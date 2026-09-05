@@ -57,3 +57,77 @@ commendation reads a medal**, so the A7 hazard — a commendation keyed to a med
 has none — is now structurally absent rather than handled. `sector-nominal` and `sector-gold` were
 the two that had to be taught about ungraded levels; both are gone.
 
+### Save compatibility — the proof
+
+`RETIRED_ACHIEVEMENTS` in `achievements.ts` names the ten. `rescueAchievements` in `save.ts` skips
+them on read and keeps everything else, which is `rescueLevels`' medal whitelist applied to a
+second field: **one drop, on read, so no screen has to know which commendations this build stopped
+issuing.** An id that is merely unrecognised is kept — it was written by a build that is not this
+one, and a player who opens an older binary must not have their record eaten by it.
+
+Three further seams, all closed:
+
+- **The v1 → v2 migration** used to reconstruct `filed` and `within-budget` from `medal` and
+  `clearedAt`. Both are retired and none of the five follows from what a v1 save stored, so it now
+  reconstructs nothing. `reconstructStats` is untouched.
+- **`importSave`** unions `current.achievements` with `incoming.achievements`. Both sides have
+  already been through `rescueAchievements`, so a retired id cannot re-enter through an import.
+  There is a test for exactly that.
+- **`store.award(id)`** now refuses an id this build does not issue. `src/ui/library.ts` still
+  raises `no-regressions`, and that call site is not mine to delete; the guard means it writes
+  nothing rather than writing a value the next load discards.
+
+Proof is `src/game/__tests__/save.test.ts`, the new fixture block *"a save written by a build that
+had fifteen commendations"*, built on `ungraded.test.ts`'s pattern: a literal JSON save from the
+old build holding five retired ids and three surviving ones, asserting that the five go, the three
+keep their original timestamps, and the level record, stars, best ticks, attempts, campaign stats,
+signed requisitions and read review ranks all survive byte for byte. Plus one test that an
+unrecognised id (`shipped-it-twice`) is kept, and one that import does not resurrect.
+
+`achievements.test.ts` also holds a new invariant: no id may be in `ACHIEVEMENTS` *and*
+`RETIRED_ACHIEVEMENTS`, because such a commendation would be awarded on the run and gone by the
+next load.
+
+### Test accounting for this unit
+
+**1692 → 1686, exactly −6.**
+
+| file | before | after | what moved |
+|---|---:|---:|---|
+| `achievements.test.ts` | 24 | 12 | −12. The twelve that died: `filed`'s first close; gold-only-on-gold; first-run-on-attempt-one; the personal-best commendation; the half-of-par bar; zero-blocked-moves; the duplicate tenth-attempt test; four sector tests (closed-sector, all-gold, empty world, ungraded-counts-as-gold); ungraded-pays-no-gold; the bonus-star commendation. Three arrived: the information budget in isolation, an ordinary close earning nothing, and the live-vs-retired disjointness invariant. |
+| `save.test.ts` | — | +6 | The retirement fixture block. Four existing tests were re-pointed from `filed`/`no-contact` onto live ids; one was rewritten to assert the v1 migration reconstructs nothing. |
+| `store.test.ts` | — | 0 | Two rewritten in place: "files the first close" became "pays no commendation for an ordinary close"; "never re-awards" became "files a commendation once and never again", driving `w1-01` to four runs so `second-look` is the thing that fires. `award` gained an assertion that a retired id is refused. |
+| `ungraded.test.ts` | — | 0 | One retitled: the v1 gold on an ungraded level now reconstructs nothing at all rather than `filed` alone. |
+
+---
+
+## 2. Finding 12 — the binding document still ordered the streak's return. **Fixed.**
+
+This was the live hazard: §11 of `DESIGN.md` opens *"Amendments — these override §1–§10"*, there was
+no amendment retiring the streak, and §7.1 read `stats` as *"(runs, passes, fails, streak, best
+streak)"* with a bullet stating a failed run *"resets the streak."* The most likely way the streak
+came back was that somebody read §7.1 and put it back.
+
+Three changes:
+
+- **§7.1 now states the deletion in §7's absolute register**, the one it uses for character count:
+  *"There is no streak. There is no streak counter, no best streak, no field for either in
+  `CampaignStats`, and nothing anywhere that resets on a failed run."* The failure bullet no longer
+  resets anything, and gained *"no commendation taken back"* because that is now the whole penalty
+  model. A new bullet fixes the list at five and states the admission test.
+- **`docs/DESIGN.md` §11 A9** records the ruling where agents are told to look. It carries the
+  streak deletion, the cut to five, the survivors by id, the one-sentence test any sixth must pass,
+  the invariant that **no commendation reads a medal** (so A7 cannot break one), and the
+  retired-id-drop / unknown-id-keep save rule.
+- **§11 A10** records finding 6's ruling as a standing constraint rather than as a one-off
+  deletion: *a blocked move is priced once, in ticks.* Without it the next agent adds another
+  no-bump reward and the finding regrows. See §4 below.
+
+The orphaned doc comment under `CampaignStats.fails` — a description of the streak with no field
+beneath it — is deleted in `save.ts`.
+
+**Left for the orchestrator:** `src/ui/styles/screens.css:564` still defines
+`.sitemap .screen-stat__streak`. That file belongs to the art-direction agent.
+
+
+
