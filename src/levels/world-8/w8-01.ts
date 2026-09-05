@@ -1,4 +1,4 @@
-import type { ObjectiveContext, Vec, World } from '../../engine/index.ts';
+import type { Divergence, ObjectiveContext, Vec, World } from '../../engine/index.ts';
 import {
   Dir,
   ItemKind,
@@ -7,15 +7,17 @@ import {
   Terrain,
   addBot,
   addMachine,
+  clipValue,
   countItemsAt,
   createWorld,
+  inventoryCount,
   machineById,
   setTerrain,
   tileAt,
   vec,
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
-import { localRng } from './shared.ts';
+import { localRng, point } from './shared.ts';
 
 const FIELD_W = 14;
 const FIELD_H = 10;
@@ -94,17 +96,72 @@ function build(seed: number): World {
 
 const siloTile = (world: World): Vec => machineById(world, 'silo')?.at ?? vec(0, 0);
 
-const ripeAtStart = (world: World): number => {
+/** Every tile carrying a crop at full growth, in row-major order. */
+const ripeTiles = (world: World): Vec[] => {
+  const out: Vec[] = [];
+  world.tiles.forEach((tile, index) => {
+    if (tile.crop === undefined || tile.maxGrowth === undefined) return;
+    if ((tile.growth ?? 0) >= tile.maxGrowth) {
+      out.push(vec(index % world.w, Math.floor(index / world.w)));
+    }
+  });
+  return out;
+};
+
+const ripeAtStart = (world: World): number => ripeTiles(world).length;
+
+const delivered = (ctx: ObjectiveContext): number =>
+  countItemsAt(ctx.world, siloTile(ctx.initialWorld), ItemKind.Crop);
+
+const carried = (ctx: ObjectiveContext): number => {
+  const bot = ctx.world.bots[0];
+  return bot === undefined ? 0 : inventoryCount(bot, ItemKind.Crop);
+};
+
+/** Crops that reached the silo tile on or before `tick`, read off the drop log. */
+const deliveredBy = (ctx: ObjectiveContext, tick: number): number => {
+  const silo = siloTile(ctx.initialWorld);
   let total = 0;
-  for (const tile of world.tiles) {
-    if (tile.crop === undefined || tile.maxGrowth === undefined) continue;
-    if ((tile.growth ?? 0) >= tile.maxGrowth) total++;
+  for (const event of ctx.trace.events) {
+    if (event.kind !== 'drop' || !event.ok || event.item !== ItemKind.Crop) continue;
+    if (event.at.x !== silo.x || event.at.y !== silo.y) continue;
+    if (event.t + event.dt > tick) continue;
+    total += event.count;
   }
   return total;
 };
 
-const delivered = (ctx: ObjectiveContext): number =>
-  countItemsAt(ctx.world, siloTile(ctx.initialWorld), ItemKind.Crop);
+/** The first crop that was ripe when the shift opened and is still in the ground at the end. */
+const stillStanding = (ctx: ObjectiveContext): Vec | undefined =>
+  ripeTiles(ctx.initialWorld).find((at) => {
+    const tile = tileAt(ctx.world, at);
+    return tile?.crop !== undefined && (tile.growth ?? 0) >= (tile.maxGrowth ?? 1);
+  });
+
+/**
+ * Where the load fell short.
+ *
+ * A crop left in the ground and a crop left in the arms are different mistakes — one is a route
+ * that missed a tile, the other is a last trip nobody made — and the count they share cannot tell
+ * them apart. The tile is named first because it is the one the shift clock cannot explain.
+ */
+function harvestMiss(ctx: ObjectiveContext): Divergence {
+  const standing = stillStanding(ctx);
+  if (standing !== undefined) {
+    return {
+      where: point(standing),
+      expected: 'harvested and taken to the silo',
+      received: 'still standing; it was ripe at the start',
+    };
+  }
+  const held = carried(ctx);
+  const landed = String(delivered(ctx));
+  return {
+    where: `the silo at ${point(siloTile(ctx.initialWorld))}`,
+    expected: `${String(ripeAtStart(ctx.initialWorld))} crops`,
+    received: held > 0 ? `${landed} crops, ${String(held)} still in the arms` : `${landed} crops`,
+  };
+}
 
 /**
  * Ticks and readings are both gates. These four numbers are the whole level.
@@ -172,9 +229,12 @@ export const w8_01: LevelDef = {
       'ripe-to-silo',
       'Deliver every crop that was ripe at the start to the silo',
       (ctx) => delivered(ctx) >= ripeAtStart(ctx.initialWorld),
-      (ctx) => {
-        const total = ripeAtStart(ctx.initialWorld);
-        return [Math.min(delivered(ctx), total), total];
+      {
+        progress: (ctx) => {
+          const total = ripeAtStart(ctx.initialWorld);
+          return [Math.min(delivered(ctx), total), total];
+        },
+        divergence: harvestMiss,
       },
     ),
     Objectives.withinTicks(SHIFT_TICKS, {
@@ -192,7 +252,21 @@ export const w8_01: LevelDef = {
       'audit-tight',
       `Close the shift in ${String(TIGHT_TICKS)} ticks or fewer`,
       (ctx) => ctx.trace.endTick <= TIGHT_TICKS,
-      (ctx) => [Math.min(ctx.trace.endTick, TIGHT_TICKS), TIGHT_TICKS],
+      {
+        progress: (ctx) => [Math.min(ctx.trace.endTick, TIGHT_TICKS), TIGHT_TICKS],
+        /* The target tick is a place in the run, not just a number, so the report stands at it
+           and says what the field looked like from there. A load that was all in by then and a
+           load that was half in are the same overrun and two different fixes. */
+        divergence: (ctx) => ({
+          where: `tick ${String(TIGHT_TICKS)}`,
+          expected: 'every ripe crop already in the silo',
+          received: clipValue(
+            `${String(deliveredBy(ctx, TIGHT_TICKS))} of ${String(
+              ripeAtStart(ctx.initialWorld),
+            )} in; the run ended at ${String(ctx.trace.endTick)}`,
+          ),
+        }),
+      },
     ),
     Objectives.withinSenses('look', TIGHT_SURVEY, {
       label: `Survey the field on ${String(TIGHT_SURVEY)} beams — one a row`,

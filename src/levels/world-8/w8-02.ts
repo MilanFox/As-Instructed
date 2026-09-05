@@ -1,4 +1,4 @@
-import type { ItemKind, ObjectiveContext, Vec, World } from '../../engine/index.ts';
+import type { Divergence, ItemKind, ObjectiveContext, Vec, World } from '../../engine/index.ts';
 import {
   Dir,
   MachineKind,
@@ -10,6 +10,7 @@ import {
   countItemsAt,
   createWorld,
   eq,
+  inventoryCount,
   machineById,
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
@@ -18,6 +19,7 @@ import {
   dropLog,
   groundCensus,
   localRng,
+  point,
   reachableTiles,
   roomCentre,
   sightingTick,
@@ -134,6 +136,51 @@ function sorted(ctx: ObjectiveContext): [number, number] {
   return [done, total];
 }
 
+/** A crate lying on a bay that does not take its class: the run's own drop, read back. */
+function onTheWrongBay(ctx: ObjectiveContext): Divergence | undefined {
+  for (const machine of ctx.initialWorld.machines) {
+    if (!machine.id.startsWith(DEPOT_PREFIX)) continue;
+    const takes = machine.id.slice(DEPOT_PREFIX.length);
+    for (const stack of ctx.world.items) {
+      if (!eq(stack.at, machine.at) || stack.count === 0 || stack.kind === takes) continue;
+      return {
+        where: point(machine.at),
+        expected: `this bay takes ${takes}`,
+        received: `${String(stack.count)} ${stack.kind} lying on it`,
+      };
+    }
+  }
+  return undefined;
+}
+
+/** The first class the manifest is short of, and where its crates got to instead. */
+function shortClass(ctx: ObjectiveContext): Divergence | undefined {
+  for (const [kind, wanted] of manifest(ctx.initialWorld)) {
+    const bay = machineById(ctx.initialWorld, depotId(kind));
+    const landed = bay ? countItemsAt(ctx.world, bay.at, kind) : 0;
+    if (landed >= wanted) continue;
+    const held = ctx.world.bots.reduce((sum, bot) => sum + inventoryCount(bot, kind), 0);
+    const there = landed === 0 ? `no ${kind} there` : `${String(landed)} ${kind} there`;
+    return {
+      where: depotId(kind),
+      expected: `${String(wanted)} ${kind} on the bay`,
+      received: held > 0 ? `${there}, ${String(held)} still in the arms` : there,
+    };
+  }
+  return undefined;
+}
+
+/**
+ * What the sort got wrong, in the order the two mistakes are worth hearing about.
+ *
+ * A crate on the wrong bay is named first because it is the only one of the two that is invisible
+ * from the manifest: the count is right, the class is right, and the tile is one the run chose.
+ * Nothing here names a bay the run has not already stood on, or a crate it has not already moved.
+ */
+function sortingMiss(ctx: ObjectiveContext): Divergence | undefined {
+  return onTheWrongBay(ctx) ?? shortClass(ctx);
+}
+
 /** Crate tiles and bay tiles as they stood at the start: the things that had to be found. */
 function landmarks(world: World): Vec[] {
   const out: Vec[] = world.items.map((stack) => stack.at);
@@ -215,7 +262,7 @@ export const w8_02: LevelDef = {
         const [done, total] = sorted(ctx);
         return done >= total;
       },
-      sorted,
+      { progress: sorted, divergence: sortingMiss },
     ),
   ],
   bonus: [
@@ -226,9 +273,29 @@ export const w8_02: LevelDef = {
         const total = sorted(ctx)[1];
         return deliveredBeforeSurveyDone(ctx) >= Math.ceil(total / 2);
       },
-      (ctx) => {
-        const half = Math.ceil(sorted(ctx)[1] / 2);
-        return [Math.min(deliveredBeforeSurveyDone(ctx), half), half];
+      {
+        progress: (ctx) => {
+          const half = Math.ceil(sorted(ctx)[1] / 2);
+          return [Math.min(deliveredBeforeSurveyDone(ctx), half), half];
+        },
+        /* Ticks and counts only. The bonus is about *when* the run shipped, so naming a crate or
+           a bay here would answer the level's other question for free. */
+        divergence: (ctx) => {
+          const complete = sightingTick(ctx, landmarks(ctx.initialWorld));
+          if (!Number.isFinite(complete)) {
+            return {
+              where: 'the last crate or bay',
+              expected: 'in view at some point in the shift',
+              received: 'never came into view',
+            };
+          }
+          const half = Math.ceil(sorted(ctx)[1] / 2);
+          return {
+            where: `tick ${String(complete)}, the last sighting`,
+            expected: `${String(half)} crates already on their bays`,
+            received: `${String(deliveredBeforeSurveyDone(ctx))} were`,
+          };
+        },
       },
     ),
   ],

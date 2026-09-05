@@ -1,14 +1,17 @@
-import type { ObjectiveContext, Vec, World } from '../../engine/index.ts';
+import type { DieEvent, Divergence, ObjectiveContext, Vec, World } from '../../engine/index.ts';
 import {
   Dir,
   ItemKind,
   MachineKind,
+  NOTHING,
   Objectives,
   Terrain,
   addBot,
   addGroundItems,
   addMachine,
+  clipValue,
   createWorld,
+  eq,
   inventoryCount,
   opposite,
   rebuildOccupancy,
@@ -22,6 +25,7 @@ import {
   key,
   loadAntenna,
   localRng,
+  point,
   sealPacket,
   tilesEntered,
   worldDistances,
@@ -311,6 +315,63 @@ const holdsForm = (ctx: ObjectiveContext): boolean => {
 };
 
 /**
+ * The distinct tiles the plan does not describe, in the order the run first stood on them.
+ *
+ * The same set `offPlan` counts, kept ordered and dated so the objective can point at the one
+ * that spent the allowance rather than at the total.
+ */
+function strayTrail(ctx: ObjectiveContext): { at: Vec; t: number }[] {
+  const planned = plannedTiles(ctx.initialWorld.vars.seed ?? 1);
+  const seen = new Set<string>();
+  const trail: { at: Vec; t: number }[] = [];
+  const note = (at: Vec, t: number): void => {
+    const id = key(at);
+    if (planned.has(id) || seen.has(id)) return;
+    seen.add(id);
+    trail.push({ at, t });
+  };
+  for (const bot of ctx.initialWorld.bots) note(bot.at, 0);
+  for (const event of ctx.trace.events) {
+    if (event.kind === 'move' && event.ok) note(event.to, event.t + event.dt);
+  }
+  return trail;
+}
+
+/**
+ * Where KD-0001-T ended the shift, in words the run has already earned.
+ *
+ * The locker's tile is the last thing the filed plan resolves to, so a form still sitting in it
+ * is described and never located. What the report does add is whether anybody stood there: a
+ * route that arrived and did not pick up and a route that never arrived are the same `not met`
+ * and completely different bugs.
+ */
+function formStanding(ctx: ObjectiveContext): string {
+  for (const bot of ctx.world.bots) {
+    if (inventoryCount(bot, ItemKind.Chip) > 0) return `in the hold of ${bot.name}`;
+  }
+  const loose = ctx.world.items.find((stack) => stack.kind === ItemKind.Chip && stack.count > 0);
+  if (loose === undefined) return 'nowhere on the site';
+  const locker = surveyFor(ctx.initialWorld.vars.seed ?? 1).locker;
+  if (!eq(loose.at, locker)) return `on the ground at ${point(loose.at)}`;
+  return tilesEntered(ctx).has(key(locker))
+    ? 'still in the locker; the bot stood on it'
+    : 'still in the locker; nobody reached it';
+}
+
+/** The tick and tile the run ended on, and what the sim said stopped it. */
+function died(ctx: ObjectiveContext): Divergence {
+  const death = ctx.trace.events.find((event): event is DieEvent => event.kind === 'die');
+  if (death === undefined) {
+    return { where: 'end of run', expected: 'a bot on the site', received: NOTHING };
+  }
+  return {
+    where: `tick ${String(death.t)} · ${point(death.at)}`,
+    expected: 'the bot still running',
+    received: clipValue(death.reason),
+  };
+}
+
+/**
  * Par: measured from the reference, which drives the filed plan and only re-surveys where the
  * plan turns out to be wrong. That lands between 101 and 223 ticks across the five seeds and par
  * is the worst of them, because every seed has to clear it. Ignoring the plan and searching the
@@ -371,11 +432,18 @@ export const w8_04: LevelDef = {
   budget: { maxTicks: 3000 },
   build,
   objectives: [
-    Objectives.custom('form-recovered', 'Come back up holding KD-0001-T', holdsForm),
+    Objectives.custom('form-recovered', 'Come back up holding KD-0001-T', holdsForm, {
+      divergence: (ctx) => ({
+        where: 'KD-0001-T at the end of the run',
+        expected: 'in the bot',
+        received: clipValue(formStanding(ctx)),
+      }),
+    }),
     Objectives.custom(
       'bot-intact',
       'Bring the bot back in one piece',
       (ctx) => ctx.world.bots[0]?.alive === true,
+      { divergence: died },
     ),
   ],
   bonus: [
@@ -383,9 +451,25 @@ export const w8_04: LevelDef = {
       'no-resurvey',
       'Stay inside the allowance for ground the plan already described, in tiles',
       (ctx) => offPlan(ctx) <= strayAllowance(ctx),
-      /* Unclamped on purpose. The clamp is what turned an overrun into `44 / 44` and a blank
-         box, which says a budget was missed and nothing about by how much. */
-      (ctx) => [offPlan(ctx), strayAllowance(ctx)],
+      {
+        /* Unclamped on purpose. The clamp is what turned an overrun into `44 / 44` and a blank
+           box, which says a budget was missed and nothing about by how much. */
+        progress: (ctx) => [offPlan(ctx), strayAllowance(ctx)],
+        /* The tile named is one of the run's own footprints — never a leg of the plan, never a
+           stretch that has come down, never a count of either. The allowance is already the
+           denominator on the progress bar, so repeating it gives nothing else away. */
+        divergence: (ctx) => {
+          const allowance = strayAllowance(ctx);
+          const trail = strayTrail(ctx);
+          const over = trail[allowance];
+          if (over === undefined) return undefined;
+          return {
+            where: `tick ${String(over.t)} · ${point(over.at)}`,
+            expected: `inside ${String(allowance)} tiles off the plan`,
+            received: `tile ${String(allowance + 1)} of ${String(trail.length)} off it`,
+          };
+        },
+      },
     ),
   ],
   starter: [

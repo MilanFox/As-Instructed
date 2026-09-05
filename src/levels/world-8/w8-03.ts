@@ -13,7 +13,14 @@ import {
   vec,
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
-import { carveLine, criticalChain, dependenciesOf, localRng, machinesWithPrefix } from './shared.ts';
+import {
+  carveLine,
+  criticalChain,
+  dependenciesOf,
+  localRng,
+  machinesWithPrefix,
+  overranBy,
+} from './shared.ts';
 
 const WIDTH = 32;
 const HEIGHT = 24;
@@ -376,7 +383,10 @@ export const w8_03: LevelDef = {
       'within-shift',
       "Finish the whole grid inside the shift's deadline, in ticks",
       (ctx) => ctx.trace.endTick <= deadlineFor(ctx.initialWorld),
-      (ctx) => [ctx.trace.endTick, deadlineFor(ctx.initialWorld)],
+      {
+        progress: (ctx) => [ctx.trace.endTick, deadlineFor(ctx.initialWorld)],
+        divergence: (ctx) => overranBy(ctx, deadlineFor(ctx.initialWorld)),
+      },
     ),
   ],
   bonus: [
@@ -384,7 +394,10 @@ export const w8_03: LevelDef = {
       'tight-shift',
       "Beat the shift's theoretical minimum plus travel, in ticks",
       (ctx) => ctx.trace.endTick <= targetFor(ctx.initialWorld),
-      (ctx) => [ctx.trace.endTick, targetFor(ctx.initialWorld)],
+      {
+        progress: (ctx) => [ctx.trace.endTick, targetFor(ctx.initialWorld)],
+        divergence: (ctx) => overranBy(ctx, targetFor(ctx.initialWorld)),
+      },
     ),
     Objectives.withinSenses('probe', SURVEY_BUDGET, {
       label: `Plan the restart on ${String(SURVEY_BUDGET)} reads or fewer`,

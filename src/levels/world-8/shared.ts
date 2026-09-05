@@ -1,7 +1,10 @@
 import type {
+  Bot,
   Dir,
+  Divergence,
   ItemKind,
   Machine,
+  MoveEvent,
   ObjectiveContext,
   Sim,
   TileView,
@@ -37,6 +40,9 @@ import {
  */
 
 export const key = (at: Vec): string => `${at.x},${at.y}`;
+
+/** A coordinate, written the way the briefs and the facts tables write one. */
+export const point = (at: Vec): string => `(${String(at.x)}, ${String(at.y)})`;
 
 /** Build-time randomness. Never consume `world.rng`: replay depends on it staying untouched. */
 export function localRng(seed: number): Rng {
@@ -506,6 +512,35 @@ export function blockedMoves(ctx: ObjectiveContext): number {
   return ctx.trace.events.filter((event) => event.kind === 'move' && !event.ok).length;
 }
 
+/** The earliest move that went nowhere and still cost a tick. */
+export function firstBlockedMove(ctx: ObjectiveContext): MoveEvent | undefined {
+  return ctx.trace.events.find((event): event is MoveEvent => event.kind === 'move' && !event.ok);
+}
+
+/** The bot whose own clock ran longest: on a fleet level it is the one that set the end tick. */
+export function lastBotStanding(ctx: ObjectiveContext): Bot | undefined {
+  return ctx.world.bots.reduce<Bot | undefined>(
+    (slowest, bot) => (slowest === undefined || bot.clock > slowest.clock ? bot : slowest),
+    undefined,
+  );
+}
+
+/**
+ * A tick budget that was missed, pinned to the bot that was still going when it ran out.
+ *
+ * The clock stops when the last bot stops, so a fleet's end tick is one bot's number and the
+ * other bots' idle time. Naming it turns "the shift overran" into "this lane overran", which is
+ * the difference between rewriting the schedule and rewriting one route.
+ */
+export function overranBy(ctx: ObjectiveContext, limit: number): Divergence {
+  const last = lastBotStanding(ctx);
+  return {
+    where: last === undefined ? 'the whole run' : `${last.name}, the last to stop`,
+    expected: `tick ${String(limit)}`,
+    received: `tick ${String(ctx.trace.endTick)}`,
+  };
+}
+
 export interface UseRecord {
   t: number;
   /** The tick the operation *finished*, which is what precedence rules compare against. */
@@ -628,17 +663,36 @@ export function sightingTick(ctx: ObjectiveContext, targets: readonly Vec[], ran
  * Per-bot idle time as a fraction of the makespan: waiting, syncing, and the tail a bot spends
  * finished while the rest of the fleet is still out. The fleet-utilisation measure.
  */
-export function worstIdleFraction(ctx: ObjectiveContext): number {
+function idleTicks(ctx: ObjectiveContext): Map<number, number> {
   const span = ctx.trace.endTick;
-  if (span <= 0) return 0;
   const idle = new Map<number, number>();
   for (const bot of ctx.world.bots) idle.set(bot.id, span - bot.clock);
   for (const event of ctx.trace.events) {
     if (event.kind !== 'wait' && event.kind !== 'sync') continue;
     idle.set(event.botId, (idle.get(event.botId) ?? 0) + event.dt);
   }
+  return idle;
+}
+
+export function worstIdleFraction(ctx: ObjectiveContext): number {
+  const span = ctx.trace.endTick;
+  if (span <= 0) return 0;
   let worst = 0;
-  for (const value of idle.values()) worst = Math.max(worst, value / span);
+  for (const value of idleTicks(ctx).values()) worst = Math.max(worst, value / span);
+  return worst;
+}
+
+/** The idlest bot by name and the share of the shift it spent that way. */
+export function worstIdler(ctx: ObjectiveContext): { name: string; fraction: number } | undefined {
+  const span = ctx.trace.endTick;
+  if (span <= 0) return undefined;
+  let worst: { name: string; fraction: number } | undefined;
+  for (const [botId, ticks] of idleTicks(ctx)) {
+    const fraction = ticks / span;
+    if (worst !== undefined && fraction <= worst.fraction) continue;
+    const bot = ctx.world.bots.find((candidate) => candidate.id === botId);
+    worst = { name: bot?.name ?? `bot #${String(botId)}`, fraction };
+  }
   return worst;
 }
 

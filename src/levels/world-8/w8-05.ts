@@ -1,4 +1,11 @@
-import type { Machine, ObjectiveContext, Vec, World } from '../../engine/index.ts';
+import type {
+  Divergence,
+  Machine,
+  MoveEvent,
+  ObjectiveContext,
+  Vec,
+  World,
+} from '../../engine/index.ts';
 import {
   Dir,
   ItemKind,
@@ -10,6 +17,7 @@ import {
   addGroundItems,
   addMachine,
   createWorld,
+  inventoryCount,
   machineById,
   manhattan,
   rebuildOccupancy,
@@ -23,17 +31,21 @@ import {
   carveLine,
   criticalChain,
   dependenciesOf,
+  firstBlockedMove,
   groundCensus,
   itemsOnTile,
   key,
   loadAntenna,
   localRng,
   machinesWithPrefix,
+  overranBy,
+  point,
   scatterCandidates,
   sealPacket,
   useLog as machineUseLog,
   worldDistances,
   worstIdleFraction,
+  worstIdler,
 } from './shared.ts';
 
 const WIDTH = 48;
@@ -452,6 +464,49 @@ function quotaTally(ctx: ObjectiveContext): [number, number] {
 }
 
 /**
+ * The first class the shift is short of, and where its crates got to instead.
+ *
+ * Everything here is already on the band: `CRATE` lines give every crate and `DEPOT` lines give
+ * every bay, so naming the tile costs the level nothing. What the count adds is which of the two
+ * ways to be short this run was — crates never fetched, or crates fetched and still aboard.
+ */
+function quotaMiss(ctx: ObjectiveContext): Divergence | undefined {
+  const census = groundCensus(ctx.initialWorld, CLASS_KINDS);
+  for (const sink of classSinks(ctx.world)) {
+    const kind = CLASS_KINDS.find((candidate) => candidate === classOf(sink));
+    if (kind === undefined) continue;
+    const wanted = census.get(kind) ?? 0;
+    const landed = itemsOnTile(ctx.world, sink.at, kind);
+    if (landed >= wanted) continue;
+    const held = ctx.world.bots.reduce((sum, bot) => sum + inventoryCount(bot, kind), 0);
+    const there = landed === 0 ? `no ${kind} there` : `${String(landed)} ${kind} there`;
+    return {
+      where: `${sink.id} at ${point(sink.at)}`,
+      expected: `${String(wanted)} ${kind} on the tile`,
+      received: held > 0 ? `${there}, ${String(held)} still in a hold` : there,
+    };
+  }
+  return undefined;
+}
+
+/**
+ * Why the sim refused a move, in the site's own words.
+ *
+ * A move into rock, a move into a bot that had not moved yet and a move at a door nobody has
+ * paid the toll on are three different programs, and the tick count they cost is identical.
+ */
+function blockedBy(ctx: ObjectiveContext, event: MoveEvent): string {
+  if (event.reason === 'bot') return 'another bot was standing there';
+  if (event.reason === 'bounds') return 'that is the edge of the site';
+  if (event.reason === 'dead') return 'the bot was no longer running';
+  const gates = machineById(ctx.initialWorld, 'airlock')?.links ?? [];
+  if (gates.some((gate) => gate.x === event.to.x && gate.y === event.to.y)) {
+    return 'the airlock had not been opened yet';
+  }
+  return 'rock';
+}
+
+/**
  * Stations that finished `on` *and* have somebody's `use` against them in the log.
  *
  * The brief has always said the audit reads the use log, and now it does. A station is only ever
@@ -739,7 +794,7 @@ export const w8_05: LevelDef = {
         const [done, total] = quotaTally(ctx);
         return done === total;
       },
-      quotaTally,
+      { progress: quotaTally, divergence: quotaMiss },
     ),
     Objectives.custom(
       'file-form',
@@ -756,9 +811,12 @@ export const w8_05: LevelDef = {
       'deadline',
       'Finish inside the shift, in ticks',
       (ctx) => ctx.trace.endTick <= deadlineFor(ctx.initialWorld),
-      (ctx) => {
-        const limit = deadlineFor(ctx.initialWorld);
-        return [Math.min(ctx.trace.endTick, limit), limit];
+      {
+        progress: (ctx) => {
+          const limit = deadlineFor(ctx.initialWorld);
+          return [Math.min(ctx.trace.endTick, limit), limit];
+        },
+        divergence: (ctx) => overranBy(ctx, deadlineFor(ctx.initialWorld)),
       },
     ),
   ],
@@ -767,20 +825,46 @@ export const w8_05: LevelDef = {
       'under-budget',
       'Close the work order a fifth inside the shift, in ticks',
       (ctx) => ctx.trace.endTick <= Math.floor(deadlineFor(ctx.initialWorld) * 0.8),
-      (ctx) => {
-        const limit = Math.floor(deadlineFor(ctx.initialWorld) * 0.8);
-        return [Math.min(ctx.trace.endTick, limit), limit];
+      {
+        progress: (ctx) => {
+          const limit = Math.floor(deadlineFor(ctx.initialWorld) * 0.8);
+          return [Math.min(ctx.trace.endTick, limit), limit];
+        },
+        divergence: (ctx) => overranBy(ctx, Math.floor(deadlineFor(ctx.initialWorld) * 0.8)),
       },
     ),
     Objectives.custom(
       'fleet-utilisation',
       'Keep every bot working for at least two thirds of the shift',
       (ctx) => worstIdleFraction(ctx) <= 0.35,
+      {
+        divergence: (ctx) => {
+          const worst = worstIdler(ctx);
+          if (worst === undefined) return undefined;
+          return {
+            where: worst.name,
+            expected: 'idle for 35% of the shift at most',
+            received: `idle for ${String(Math.round(worst.fraction * 100))}% of it`,
+          };
+        },
+      },
     ),
     Objectives.custom(
       'no-blocked-moves',
       'Finish the shift without one blocked move',
       (ctx) => blockedMoves(ctx) === 0,
+      {
+        divergence: (ctx) => {
+          const blocked = firstBlockedMove(ctx);
+          if (blocked === undefined) return undefined;
+          const bot = ctx.world.bots.find((each) => each.id === blocked.botId);
+          return {
+            where: `tick ${String(blocked.t)} · ${bot?.name ?? `bot #${String(blocked.botId)}`}`,
+            expected: `${point(blocked.to)} open to step into`,
+            received: blockedBy(ctx, blocked),
+          };
+        },
+      },
     ),
   ],
   starter: STARTER,

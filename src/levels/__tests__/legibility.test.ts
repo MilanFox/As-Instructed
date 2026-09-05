@@ -77,20 +77,6 @@ const AWAITING_A_DIFF: readonly string[] = [
   'w7-05/sites-up',
   'w7-05/told-where-to-go',
   'w7-05/workers-busy',
-  'w8-01/ripe-to-silo',
-  'w8-01/audit-tight',
-  'w8-02/depot-sorted',
-  'w8-02/ship-while-you-look',
-  'w8-03/within-shift',
-  'w8-03/tight-shift',
-  'w8-04/form-recovered',
-  'w8-04/bot-intact',
-  'w8-04/no-resurvey',
-  'w8-05/quota',
-  'w8-05/deadline',
-  'w8-05/under-budget',
-  'w8-05/fleet-utilisation',
-  'w8-05/no-blocked-moves',
 ];
 
 /**
