@@ -839,3 +839,75 @@ The queue after that, in order: apply leftovers 1–3 above; implement **DESIGN 
 duplicated constants (**three found in one day**); work `AUDIT-INCENTIVES.md` findings 3 and
 5–12; the ranked mute verbs (`plant()`, `send()`, and `use()` returning a mute *success*);
 the UI/visual audit, now unblocked; then the loose content items.
+
+### 2026-09-05, 17:15 — divergence merged. Every objective in the campaign now says where.
+
+Green at **1624 tests / 64 files** (+184: 38 guard, 1 ladder, 140 world-level, 5 from main),
+tsc / build clean. All 86 reference solutions pass unedited; no par, threshold, budget, cost
+or objective `id` moved. The audit's top finding is closed.
+
+**The mechanism forces the issue at the type level.** `Objectives.custom` now *requires*
+`report`, and `report` requires `divergence`; there is no shorter call, and the transitional
+positional overload is deleted, so the compiler asks at every call site.
+`Objectives.checkbox` is the only legal way to report one bit. The invariant is **binary, or
+a divergence, no third option** — and a progress tuple is explicitly *not* a third option,
+because `0 of 5 — 5 short` is the readout that cost the beginner 55 minutes.
+
+**Result: 34 silent / 55 progress-only / 9 divergent → 98 divergent, 0 silent, 0 binary.**
+Not one objective in the campaign turned out to be genuinely binary; each already held a
+tick, tile, count or pair it had computed in order to answer. `BINARY_BY_DESIGN` ships empty.
+
+Deleting the overload surfaced **11 call sites the guard could not see** — it walks `LEVELS`,
+and six of those were unused exported builders in World 1/2 `shared.ts`. They got real
+divergences too, on the grounds that a dormant builder is exactly where the defect grows back.
+
+`w4-04`'s bonus, the worked example, real values on seed 1:
+`(7, 21) → (25, 3) → (13, 21)` — **want** `224 steps` — **got** `448 steps`.
+
+**Three reports were refused as answer keys rather than diffs**, which is the judgement the
+job needed: `w4-04/best-order` (the order itself), `w6-02/name-the-fault` (the right byte —
+it returns the run's wrong guess instead, ruling out one of 4–10), and `w5-02/patched`, where
+"the break lies further along" would have been a free reading per run and let a player close
+200 segments having bisected nothing. **The audit asked for the best order; half that request
+was a diff and half was an oracle.** A test asserts `w4-04`'s expected/received contain no
+coordinate.
+
+The guard is `src/levels/__tests__/legibility.test.ts`: four static invariants plus, per
+level, driving the **empty program** and asserting every miss returns a filled
+`{where, expected, received}` within 44 characters. Four of seven world suites re-run it over
+every shipped seed.
+
+**Bundled fixes all landed:** the silver band is `max(par + 1, par * 1.25)`, and
+`levels.test.ts` now *grades the ladder directly* — walking every integer tick and asserting
+all three medals are reachable — rather than inferring it. `SILVER_FACTOR` has one copy.
+Both `power()` fact rows and Dot's "the tunnels join up" line are cut; `w4-02`'s brief is
+44 → 28 words, and the player keeps the two `NOTE(4470)` starter comments plus the red ring
+the trail draws. Dot's line was the third telling of the same fact.
+
+**A correction to an earlier note:** `FIX-REWARDS.md` §3 claimed no test depended on the
+tier-5 threshold. `score.test.ts` asserted `reviewTier(93) === RETAINED`. Fixed with the
+change. The paired text half is now applied in both files — `score.ts:137` is annotated
+*"verbatim from NARRATIVE.md §7"*, and that invariant is intact.
+
+### Open, unassigned, in the order I would take them
+
+1. `src/ui/components/Icons.tsx` — dead `IconReview` export. `docs/DESIGN.md:258` and
+   `README.md:59` describe the deleted review screen. Diffs in `docs/FIX-REVIEW-CUT.md`.
+2. **Tier 1 is unreachable** — the medals-only denominator floors a graded record at 33%, so
+   `DEVELOPING` (0–24%) can never show and tier 2 needs a near-all-bronze record. A design
+   call in `score.ts`; `NARRATIVE.md` §7 records it.
+3. **DESIGN §11 A7** — `graded?: boolean`, measured set `w1-01, w1-03, w5-02, w6-01, w6-03,
+   w6-05`. Reaches `ObjectiveRail.tsx`, `store.ts`, `achievements.ts`, `meta/types.ts`,
+   `save.ts`. All owners are now free.
+4. **Duplicated-constant sweep** — three found in one day (two tick counters, two character
+   counters, `SILVER_FACTOR` beside an inline `1.25`). Look for the fourth.
+5. **`budgets.ts` infers a budget's unit by parsing its English label** — see its own section.
+6. `AUDIT-INCENTIVES.md` findings 3 and 5–12, still unassigned.
+7. The ranked mute verbs: `plant()` wants a reason field, `send()` should throw, and `use()`
+   on an empty cycle returns `true` and does nothing — a mute *success*, needing a ruling.
+8. **The UI/visual audit**, unblocked since the viewport and review work merged.
+9. Loose content: `w2-01` cut candidate, `use` requisitioned at `w3-04` where nothing operates
+   a machine, `w8-05` accumulating rather than integrating, CURRICULUM drift on
+   `w2-01`/`w2-05`, Worlds 3–8 pars unmeasured against the lazy/smart criterion.
+
+**No agents are running. Main is green and everything is merged.**
