@@ -416,3 +416,51 @@ consumer was `serve.ts` forwarding it into `source`. Removing them touches `prot
 `serve.ts`, `run-level.ts`, `src/ui/adapters.ts`, `src/meta/adapters.ts` and four test
 files, so it was correctly left as its own change rather than smuggled into a deletion.
 `LevelScore` in `score.ts` is also now an exported interface with no reference anywhere.
+
+### 2026-09-05, 16:00 — viewport merged (`d08dc45`)
+
+Green at **1378 tests** (1369 + 9), tsc / build clean.
+
+891x393 was never hard-coded and the camera was innocent — it is two independent
+constants on two axes: `DEFAULT_LAYOUT.editorFraction = 0.44` gives the 891, and
+`viewportFraction = 0.58` gives the 393. The finding that decided the design is that
+`tilePx = min(viewW/cols, viewH/rows)` and the box is 2.27:1 while nothing in the campaign
+exceeds 1.4:1 — **the viewport is always height-bound, so widening it buys zero tile
+size.** The "56% of width wasted" framing was right about the waste and wrong about the
+remedy.
+
+Also wrong in the old note: the grids are **not all square**. 8 of 34 are 1:1, 26 are
+wider, median 1.40 — but the largest (w4-05 40x40, w8-05 48x40, three 30x30) are the square
+ones, so the assumption fails in general and holds where it matters.
+
+New `useWorkspaceLayout` hook: detail panel capped at 340px, height claimed only up to what
+the grid can spend, right-column width targeting `viewportHeight x gridAspect`. **All of it
+applies only while the saved fraction is still the shipped default** — a dragged splitter is
+returned verbatim, so no player's saved layout is stomped and no migration was needed.
+
+Found while measuring: `.rail` carries `.panel`, so `.workspace__lower > .panel { flex: 1 }`
+was overriding the rail's own `width: 268px` and handing the objective rail **half the
+detail panel** (711px at 2560). One selector.
+
+Campaign-wide, driving the real `Camera` over all 34 levels: **no level's tiles get smaller
+at any size.** At 2560x1440 the site view goes 1.92:1 to 1.00:1, mean canvas fill 48% to
+69%, and w4-05/w8-05 go 18px to 24px tiles at 49% to 96% fill. Screenshots in
+`docs/shots/viewport/`.
+
+Known costs, accepted: wide-thin levels lose a few points of fill at 2560 against the
+deliberate 96px tile ceiling; the objective rail scrolls at 2560 where it did not before;
+and the editor now carries the surplus — 1576px of Monaco for a 40-line program. A
+max-width on the code column is the obvious next move and belongs to the UI audit.
+
+Measurement note for whoever drives a browser next, written up in `FIX-VIEWPORT.md` §4:
+`resize_window` does not work in this environment, and **Chrome suspends ResizeObserver
+delivery in a hidden tab** — so measure *after* forcing a frame with a screenshot. This
+cost the agent real time and looked like an app bug.
+
+### In flight
+
+- **Par recalibration** — measuring reference solutions against par across all 34 levels.
+- **`power()` silent failure** — engine/runtime.
+- **Incentive audit** — read-only, writes only `docs/AUDIT-INCENTIVES.md`.
+- **`w4-02` visited-tile trail** — started now that `src/render/**` is free. Also checking
+  whether DESIGN §11 A5's blocked-move and livelock visuals were ever implemented.
