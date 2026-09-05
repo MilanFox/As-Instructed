@@ -1,23 +1,22 @@
 import type { Vec, World } from '../../engine/index.ts';
-import {
-  Dir,
-  ItemKind,
-  Objectives,
-  Terrain,
-  addBot,
-  createWorld,
-  setTile,
-  vec,
-} from '../../engine/index.ts';
+import { Dir, ItemKind, Terrain, addBot, createWorld, setTile, vec } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
-import { hopperFullOf } from './shared.ts';
+import { hopperFullOf, withinFootprint } from './shared.ts';
 
 const WIDTH = 12;
 const HEIGHT = 6;
 const MAX_GROWTH = 8;
 /** The shift. Long enough for a disciplined pass, far too short for the whole field. */
 const SHIFT = 84;
-const BONUS_TICKS = Math.floor(SHIFT * 0.85);
+/**
+ * Distinct tiles a shift may enter.
+ *
+ * `scan(Dir.North)` and `scan(Dir.South)` mean a bot walking one row reads three, so two lanes
+ * survey the whole field from a quarter of it. Measured: that route fills the hopper on 22–27
+ * tiles and inside 51 ticks across the five seeds, while the serpentine that passes the level
+ * enters 41–49. Set above the first and well under the second.
+ */
+const FOOTPRINT = 32;
 
 /** Row-major serpentine, which is the order a bot with no long-range sensor will meet the field. */
 function sweepOrder(): Vec[] {
@@ -115,10 +114,10 @@ export const w2_05: LevelDef = {
   },
   objectives: [hopperFullOf(ItemKind.Crop, 'Fill the hopper with crop')],
   bonus: [
-    Objectives.withinTicks(BONUS_TICKS, {
-      id: 'shift-to-spare',
-      label: `Finish with a sixth of the shift unspent (${String(BONUS_TICKS)} ticks)`,
-    }),
+    withinFootprint(
+      FOOTPRINT,
+      `Fill the hopper having set foot on at most ${String(FOOTPRINT)} tiles`,
+    ),
   ],
   starter: [
     '// scan().crop names what is growing here: "crop", "ice", or null on bare soil.',

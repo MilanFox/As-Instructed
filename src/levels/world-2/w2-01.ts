@@ -1,7 +1,7 @@
 import type { World } from '../../engine/index.ts';
 import { Dir, ItemKind, Terrain, addBot, createWorld, setTile, vec } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
-import { parkedOnRipestCrop, shortestSurvey } from './shared.ts';
+import { parkedOnRipestCrop, parkedWithoutOvershoot } from './shared.ts';
 
 const ROW_Y = 1;
 const FIRST_X = 1;
@@ -42,6 +42,9 @@ export const w2_01: LevelDef = {
     'Both are free. Moving is not. A bare tile reads `crop: null` and `growth: 0`, and is',
     'not a candidate.',
     '',
+    '`growth` never reads higher than `maxGrowth`. the sensor has no number for riper than',
+    'finished, and nothing in Bay 9 is coming on any further today.',
+    '',
     '> ONBOARD: WELCOME TO AGRICULTURE, NEW HIRE! TIP TWO OF THREE: MEASURE TWICE, IT COSTS',
     '> NOTHING TO MEASURE UNLESS YOUR LICENCE HAS— `[EVALUATION LICENCE — 0 SEATS REMAINING]`',
   ].join('\n'),
@@ -67,7 +70,7 @@ export const w2_01: LevelDef = {
     return world;
   },
   objectives: [parkedOnRipestCrop()],
-  bonus: [shortestSurvey('Survey the row without a wasted move')],
+  bonus: [parkedWithoutOvershoot('Park on the ripest crop without driving one move past it')],
   starter: [
     '// scan() reads the tile under the bot. scan(Dir.East) reads the next one along.',
     '',
@@ -77,7 +80,7 @@ export const w2_01: LevelDef = {
   ].join('\n'),
   hints: [
     'Reading a tile costs nothing and driving over it costs a tick. The row is short enough to read all of it.',
-    'You cannot know which reading is the highest until you have seen the last one. What has to survive the walk?',
+    'A reading you have not taken yet could still be the highest — unless the one in front of you cannot be beaten.',
     'Two things travel with you: the best reading so far, and the position it came from.',
     'The bot ends the run wherever it stops. Getting back to the best tile is part of the job.',
   ],

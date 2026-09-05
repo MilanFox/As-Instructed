@@ -4,6 +4,7 @@ import {
   Terrain,
   botById,
   manhattan,
+  senseTotals,
   terrainProps,
   tileAt,
 } from '../../engine/index.ts';
@@ -71,6 +72,68 @@ export function inspectedEveryTile(label = 'Enter every floor tile in the bay'):
 /** Bonus: nothing was driven into. A blocked move costs a tick (DESIGN.md §4.4). */
 export function noBlockedMoves(label = 'Finish without a single blocked move'): Objective {
   return Objectives.custom('no-blocked-moves', label, (ctx) => blockedMoves(ctx) === 0);
+}
+
+/** Where the seed put the landing pad, or undefined on a level that has none. */
+export function padPosition(world: World): Vec | undefined {
+  for (let i = 0; i < world.tiles.length; i++) {
+    if (world.tiles[i]?.terrain === Terrain.Pad) {
+      return { x: i % world.w, y: Math.floor(i / world.w) };
+    }
+  }
+  return undefined;
+}
+
+/** Ticks the run spent on top of the shortest route from the start tile to the pad. */
+export function wastedTicks(ctx: ObjectiveContext): number {
+  const start = ctx.initialWorld.bots[0];
+  const pad = padPosition(ctx.initialWorld);
+  if (!start || !pad) return ctx.trace.endTick;
+  return ctx.trace.endTick - manhattan(start.at, pad);
+}
+
+/**
+ * Bonus: the corridor surveyed on a rationed instrument, without the wall collecting the difference.
+ *
+ * `reads` caps `canMove`; `waste` caps the ticks spent beyond the shortest route, which is measured
+ * from the seed's own pad rather than declared. Asking before every tile fills the log on the first
+ * eight tiles of any shift; driving blind hands the far wall every tile the corridor turned out not
+ * to have. What fits between the two is a stride — one reading, then several steps taken on it.
+ *
+ * The id is the shape `Objectives.withinSenses` mints, so the objective rail reads the run's real
+ * `canMove` total back out of the trace instead of the clamped one.
+ */
+export function rationedSurvey(reads: number, waste: number, label: string): Objective {
+  const used = (ctx: ObjectiveContext): number => senseTotals(ctx.trace)['canMove'] ?? 0;
+  return Objectives.custom(
+    `within-${String(reads)}-canMove`,
+    label,
+    (ctx) => used(ctx) <= reads && wastedTicks(ctx) <= waste,
+    (ctx) => [Math.min(used(ctx), reads), reads],
+  );
+}
+
+/** Every move the run issued, the ones that went nowhere included. */
+export function movesIssued(ctx: ObjectiveContext): number {
+  return ctx.trace.events.filter((event) => event.kind === 'move').length;
+}
+
+/**
+ * Bonus: the whole bay covered on no more than one move per floor tile.
+ *
+ * A sweep that enters every tile once spends `tiles - 1` moves, so the budget leaves exactly one
+ * move spare: enough for the single re-entry a west half with an even number of rows *and* columns
+ * cannot avoid, and nowhere near enough to drive back along a row that was already inspected. A
+ * blocked move counts, because it was still filed.
+ */
+export function oneMovePerFloorTile(label: string): Objective {
+  const budget = (ctx: ObjectiveContext): number => walkableTiles(ctx.initialWorld).length;
+  return Objectives.custom(
+    'one-move-per-tile',
+    label,
+    (ctx) => movesIssued(ctx) <= budget(ctx),
+    (ctx) => [Math.min(movesIssued(ctx), budget(ctx)), budget(ctx)],
+  );
 }
 
 /** Bonus: the run took exactly the Manhattan distance from start to pad — not one tick more. */

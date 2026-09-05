@@ -1,7 +1,7 @@
 import type { World } from '../../engine/index.ts';
 import { Dir, Rng, Terrain, addBot, createWorld, setTerrain, vec } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
-import { inspectedEveryTile, noBlockedMoves } from './shared.ts';
+import { inspectedEveryTile, oneMovePerFloorTile } from './shared.ts';
 
 const START = vec(1, 1);
 
@@ -41,8 +41,12 @@ export const w1_05: LevelDef = {
     'The bay is a rectangle split by a partition wall running North to South. The partition',
     'has exactly one doorway and it is always the tile at the **southern end** of the wall.',
     'The bay is a different size every shift and the partition stands in a different column.',
+    '',
+    'The inspection is filed by tile-entries, not by tiles. A tile entered a second time is a',
+    'second entry on the form, and Head Office has asked, in writing, why Bay 7 returns more',
+    'entries than it has floor.',
   ].join('\n'),
-  seeds: [1, 2, 6, 8],
+  seeds: [21, 1, 2, 6, 8],
   par: { ticks: 50, chars: 420 },
   build(seed: number): World {
     const { width, height, divider } = bayLayout(seed);
@@ -55,7 +59,7 @@ export const w1_05: LevelDef = {
     return world;
   },
   objectives: [inspectedEveryTile()],
-  bonus: [noBlockedMoves('Sweep the whole bay without one blocked move')],
+  bonus: [oneMovePerFloorTile('Inspect the bay in no more than one move per floor tile')],
   starter: [
     '// NOTE(4470): the sweep works. it works because the room is square',
     '// NOTE(4470): the room is not always square',
@@ -68,6 +72,7 @@ export const w1_05: LevelDef = {
     'Turning round at the end of a row is cheaper than driving back to the start of the next one.',
     'The doorway is the last tile of the partition, at the South end. A sweep that reaches the bottom row going East goes through it without being asked.',
     'Once the bot is in the east half, the same sweep works again — only the direction it climbs has changed.',
+    'A sweep that ends at the wrong wall has to drive back along a row it already inspected. Which way you snake decides which wall you end at.',
   ],
   docs: ['canMove', 'move'],
 };

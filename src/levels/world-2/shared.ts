@@ -71,23 +71,25 @@ function botTile(world: World): Vec | undefined {
   return bot?.alive ? bot.at : undefined;
 }
 
+/** Whichever crop the seed made the furthest along at tick 0. */
+export function ripestCrop(world: World): Vec | undefined {
+  let best: Vec | undefined;
+  let bestGrowth = -1;
+  for (const at of croppedAtStart(world)) {
+    const tile = tileAt(world, at);
+    const growth = tile ? maturity(tile, 0) : -1;
+    if (growth > bestGrowth) {
+      bestGrowth = growth;
+      best = at;
+    }
+  }
+  return best;
+}
+
 /** The bot finished parked on whichever crop the seed made the furthest along. */
 export function parkedOnRipestCrop(label = 'Park on the crop that is furthest along'): Objective {
-  const target = (world: World): Vec | undefined => {
-    let best: Vec | undefined;
-    let bestGrowth = -1;
-    for (const at of croppedAtStart(world)) {
-      const tile = tileAt(world, at);
-      const growth = tile ? maturity(tile, 0) : -1;
-      if (growth > bestGrowth) {
-        bestGrowth = growth;
-        best = at;
-      }
-    }
-    return best;
-  };
   return Objectives.custom('park-ripest', label, (ctx) => {
-    const goal = target(ctx.initialWorld);
+    const goal = ripestCrop(ctx.initialWorld);
     const here = botTile(ctx.world);
     return goal !== undefined && here !== undefined && key(goal) === key(here);
   });
@@ -191,16 +193,100 @@ export function harvestedNothingTwice(label = 'One harvest per ripe crop, no mis
   });
 }
 
-/** Bonus: the survey took the fewest ticks the row allows — out to the far end, then straight back. */
-export function shortestSurvey(label = 'Survey the row in the fewest possible ticks'): Objective {
-  return Objectives.custom('shortest-survey', label, (ctx) => {
+/**
+ * Bonus: the run spent nothing beyond the drive to the ripest crop.
+ *
+ * The allowance is the distance from the bot's start tile to the target, so the star is only there
+ * for a run that stopped the moment it had the answer rather than reading to the end of the row and
+ * walking back. A seed that puts the target under the bot allows nothing at all, which is right:
+ * the answer was already on the screen.
+ */
+export function parkedWithoutOvershoot(
+  label = 'Park on the ripest crop without driving one move past it',
+): Objective {
+  const allowance = (world: World): number => {
+    const bot = botById(world, 0);
+    const goal = ripestCrop(world);
+    if (!bot || !goal) return 0;
+    return Math.abs(goal.x - bot.at.x) + Math.abs(goal.y - bot.at.y);
+  };
+  return Objectives.custom(
+    'no-overshoot',
+    label,
+    (ctx) => ctx.trace.endTick <= allowance(ctx.initialWorld),
+    (ctx) => [ctx.trace.endTick, allowance(ctx.initialWorld)],
+  );
+}
+
+/** The tick of the first successful harvest at each position the run took something from. */
+export function firstHarvestTicks(ctx: ObjectiveContext): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const event of ctx.trace.events) {
+    if (event.kind !== 'harvest' || !event.ok) continue;
+    const at = key(event.at);
+    if (!out.has(at)) out.set(at, event.t);
+  }
+  return out;
+}
+
+/**
+ * Bonus: the depot's freshness ledger — one unit for every tick a crop stood mature and unpicked,
+ * summed over the crops the seed sowed. A crop never taken is charged to the end of the run.
+ *
+ * A total rather than a worst case, because the hopper starts full: nothing can be harvested until
+ * something has been planted, and that opening debt is the same whatever the player writes.
+ */
+export function withinSpoilage(limit: number, label: string): Objective {
+  const spoilage = (ctx: ObjectiveContext): number => {
+    const taken = firstHarvestTicks(ctx);
+    let total = 0;
+    for (const at of croppedAtStart(ctx.initialWorld)) {
+      const tile = tileAt(ctx.initialWorld, at);
+      if (!tile || tile.maxGrowth === undefined) continue;
+      const plantedAt = tile.meta?.['plantedAt'];
+      const ready =
+        typeof plantedAt === 'number'
+          ? Math.max(0, plantedAt + tile.maxGrowth)
+          : maturity(tile, 0) >= tile.maxGrowth
+            ? 0
+            : undefined;
+      if (ready === undefined) continue;
+      total += Math.max(0, (taken.get(key(at)) ?? ctx.trace.endTick) - ready);
+    }
+    return total;
+  };
+  const allTaken = (ctx: ObjectiveContext): boolean => {
+    const taken = firstHarvestTicks(ctx);
+    return croppedAtStart(ctx.initialWorld).every((at) => taken.has(key(at)));
+  };
+  return Objectives.custom(
+    'crop-spoilage',
+    label,
+    (ctx) => allTaken(ctx) && spoilage(ctx) <= limit,
+    (ctx) => [spoilage(ctx), limit],
+  );
+}
+
+/**
+ * Bonus: how much of the field the bot actually entered, its start tile included.
+ *
+ * A budget on the wheels rather than on the clock. The sensor reaches tiles the bot never stands
+ * on, so a run that reads more can walk less; a sweep that crosses every tile it surveys cannot.
+ */
+export function withinFootprint(limit: number, label: string): Objective {
+  const entered = (ctx: ObjectiveContext): number => {
+    const seen = new Set<string>();
     const bot = botById(ctx.initialWorld, 0);
-    if (!bot) return false;
-    const row = soilTiles(ctx.initialWorld);
-    if (row.length === 0) return false;
-    const far = Math.max(...row.map((at) => at.x));
-    const here = botTile(ctx.world);
-    if (here === undefined) return false;
-    return ctx.trace.endTick === far - bot.at.x + (far - here.x);
-  });
+    if (bot) seen.add(key(bot.at));
+    for (const event of ctx.trace.events) {
+      if (event.kind === 'move' && event.ok) seen.add(key(event.to));
+    }
+    return seen.size;
+  };
+  return Objectives.custom(
+    'tile-footprint',
+    label,
+    (ctx) => entered(ctx) <= limit,
+    (ctx) => [entered(ctx), limit],
+  );
 }

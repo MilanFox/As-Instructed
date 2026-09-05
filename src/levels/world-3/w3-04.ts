@@ -14,6 +14,7 @@ import type { LevelDef } from '../types.ts';
 import { frame, key, tilePicker, warm } from './yard.ts';
 
 const PAR_TICKS = 365;
+const SLOT_BUDGET = 18;
 
 const RACK_ROWS = [2, 3, 6, 7];
 const AISLE_ROWS = [1, 4, 5, 8];
@@ -79,10 +80,27 @@ const inOrder = (ctx: ObjectiveContext): number => {
   return i;
 };
 
-const staged = (ctx: ObjectiveContext): number => {
-  const bay = bayOf(ctx.initialWorld);
+const vacantSlots = (world: World): Set<string> => {
+  const vacant = new Set<string>();
+  for (const y of RACK_ROWS) {
+    for (let x = 1; x < world.w - 1; x++) {
+      const at = vec(x, y);
+      if (countItemsAt(world, at, 'crate') === 0) vacant.add(key(at));
+    }
+  }
+  return vacant;
+};
+
+/**
+ * Steps taken into rack slots that were empty when the shift opened. Every rack row runs alongside
+ * an aisle, so the stencils can all be read from an aisle tile and a slot only has to be entered
+ * to lift the crate standing in it — which is a different reading of the yard from the sweep that
+ * finds the same crates by walking the racks themselves.
+ */
+const slotsTrodden = (ctx: ObjectiveContext): number => {
+  const vacant = vacantSlots(ctx.initialWorld);
   return ctx.trace.events.filter(
-    (event) => event.kind === 'drop' && event.ok && (event.at.x !== bay.x || event.at.y !== bay.y),
+    (event) => event.kind === 'move' && event.ok && vacant.has(key(event.to)),
   ).length;
 };
 
@@ -118,6 +136,9 @@ export const w3_04: LevelDef = {
     'Move every crate onto the outbound bay pad. Set them down in ascending arrival order:',
     'number 1 first, then number 2, and so on to the last. The order the crates are numbered in',
     'is not the order they are laid out in. The bot carries one crate at a time.',
+    '',
+    'Yard rules: an empty rack slot is not a walkway, and every step into one is logged. A slot',
+    'that started the shift with a crate in it is not counted, and neither is an aisle.',
   ].join('\n'),
   seeds: [1, 2, 3, 4],
   par: { ticks: PAR_TICKS, chars: 1240 },
@@ -172,10 +193,10 @@ export const w3_04: LevelDef = {
   ],
   bonus: [
     Objectives.custom(
-      'no-staging',
-      'Never set a crate down anywhere but the bay',
-      (ctx) => staged(ctx) === 0,
-      (ctx) => [staged(ctx) === 0 ? 1 : 0, 1],
+      'aisle-discipline',
+      `Tread no more than ${String(SLOT_BUDGET)} slots that started the shift empty`,
+      (ctx) => slotsTrodden(ctx) <= SLOT_BUDGET,
+      (ctx) => [slotsTrodden(ctx), SLOT_BUDGET],
     ),
   ],
   budget: { maxTicks: 5000 },
@@ -192,6 +213,7 @@ export const w3_04: LevelDef = {
     'The nearest crate and the next crate are hardly ever the same crate.',
     'Nothing stops you learning the whole yard before you lift anything.',
     'You will find the crates in one order and you have to ship them in another. Both orders are yours to hold.',
+    'A bot in an aisle can read the rack row above it and the rack row below it without leaving the aisle.',
   ],
   docs: ['scan', 'pickup', 'drop'],
 };
