@@ -197,4 +197,38 @@ describe('failureCauses ranks what went wrong', () => {
     );
     expect(causes[0]?.detail).toBe('not met');
   });
+
+  test('a divergence rides along with the cause, so the report can show the diff', () => {
+    const divergence = { where: 'line 3', expected: 'stone 5', received: 'ice 1' };
+    const causes = failureCauses(
+      [
+        {
+          id: 'manifest-printed',
+          label: 'Report one line per class present',
+          met: false,
+          progress: [0, 5],
+          divergence,
+        },
+        { id: 'manifest-filed', label: 'Leave the terminal reading filed', met: false },
+      ],
+      { trace: traceOf([], 80) },
+    );
+    expect(causes[0]?.divergence).toEqual(divergence);
+    expect(causes[1]?.divergence).toBeNull();
+  });
+
+  test('a met objective is not a cause, diff or no diff', () => {
+    const causes = failureCauses(
+      [
+        {
+          id: 'manifest-printed',
+          label: 'Report one line per class present',
+          met: true,
+          divergence: { where: 'line 3', expected: 'a', received: 'b' },
+        },
+      ],
+      { trace: traceOf([], 80) },
+    );
+    expect(causes).toEqual([]);
+  });
 });

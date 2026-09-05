@@ -126,8 +126,22 @@ export {
   maturity,
 } from './sim.ts';
 
-export type { Objective, ObjectiveContext, ObjectiveOptions, Comparison } from './objectives.ts';
-export { compare, evaluateObjectives, hasTerrain } from './objectives.ts';
+export type {
+  Comparison,
+  Divergence,
+  Objective,
+  ObjectiveContext,
+  ObjectiveOptions,
+  ObjectiveReport,
+} from './objectives.ts';
+export {
+  DIVERGENCE_VALUE_CHARS,
+  NOTHING,
+  clipValue,
+  compare,
+  evaluateObjectives,
+  hasTerrain,
+} from './objectives.ts';
 /**
  * Objective builders live behind a namespace on purpose: `Objectives.botAt(pad)` is the objective,
  * `botAt(world, pos)` is the world query, and having both flat would be a trap.

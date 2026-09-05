@@ -135,6 +135,7 @@ export const w3_03: LevelDef = {
       'Report one line per class present, in the declared order',
       (ctx) => filed(ctx).evaluate(ctx),
       (ctx) => filed(ctx).progress?.(ctx) ?? [0, 0],
+      (ctx) => filed(ctx).divergence?.(ctx),
     ),
     Objectives.machineState('terminal', 'filed', {
       id: 'manifest-filed',

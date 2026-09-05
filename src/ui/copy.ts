@@ -183,11 +183,11 @@ const HARDWARE: Record<string, HardwareNote> = {
     opens: 'What was taken can be put back, which Legal prefers we mention.',
   },
   inventory: {
-    spec: 'Returns carried items and their counts. Sensing is free.',
+    spec: 'Returns how many items the bot is carrying, of one kind or in total. Sensing is free.',
     opens: 'The bot can check its own pockets.',
   },
   mine: {
-    spec: "Breaks the deposit on the bot's tile into inventory. Costs 2 ticks.",
+    spec: 'Breaks the deposit on a neighbouring tile into inventory. Costs 2 ticks.',
     opens: 'Rock becomes stock. The paperwork treats these as the same thing.',
   },
   pickup: {
@@ -207,31 +207,31 @@ const HARDWARE: Record<string, HardwareNote> = {
     opens: 'The yard has machines. The machines have never had anyone to press them.',
   },
   look: {
-    spec: 'Returns the tiles within line of sight. Sensing is free.',
+    spec: 'Returns the tiles the bot can see along one direction. Sensing is free.',
     opens: 'The dark stops being uniformly dark.',
   },
   mark: {
-    spec: "Writes a number onto the bot's current tile. Persists for the run. Costs 1 tick.",
+    spec: "Writes a line of text onto the bot's current tile. Persists for the run. Costs 1 tick.",
     opens: 'The tunnels can be made to remember you were there.',
   },
   readMark: {
-    spec: 'Returns the number written on a tile, or undefined. Sensing is free.',
+    spec: "Returns the text written on the bot's tile, or null when it carries none. Sensing is free.",
     opens: 'A corridor you have already walked can say so.',
   },
   power: {
-    spec: 'Returns the current draw and capacity of a grid node. Sensing is free.',
-    opens: 'The grid can be read instead of guessed at.',
+    spec: 'Sets a machine to a given state directly, by id. Costs 2 ticks.',
+    opens: 'The grid can be set rather than only read.',
   },
   probe: {
     spec: 'Tests one node and reports its state. Sensing is free, but levels may budget it.',
     opens: 'You can ask the grid a question. The grid counts how often you ask.',
   },
   link: {
-    spec: 'Runs cable between two adjacent nodes. Costs 2 ticks and spends cable.',
+    spec: 'Runs cable between two nodes the level allows. Costs 2 ticks and spends cable.',
     opens: 'The map stops being fixed. You are now the one drawing it.',
   },
   receive: {
-    spec: 'Returns the next frame on the listening band, or undefined. Sensing is free.',
+    spec: 'Returns the next frame on the listening band, or null when the band is quiet. Sensing is free.',
     opens: 'Something on a dead band has been transmitting for some time.',
   },
   transmit: {
@@ -239,7 +239,7 @@ const HARDWARE: Record<string, HardwareNote> = {
     opens: 'The listening post can, for the first time, answer.',
   },
   decode: {
-    spec: 'Returns the decoded payload of a frame, or undefined on a checksum failure.',
+    spec: "Returns the decoded payload of a frame under the level's key. Free: it is arithmetic, not an action.",
     opens: 'Noise becomes a message, assuming it was ever noise.',
   },
   refuel: {
@@ -247,7 +247,7 @@ const HARDWARE: Record<string, HardwareNote> = {
     opens: 'A bot that stops can be a bot that starts again.',
   },
   fuel: {
-    spec: 'Returns remaining charge and capacity. Sensing is free.',
+    spec: 'Returns the charge the bot has left. Sensing is free.',
     opens: 'You find out how far it can go before it finds out.',
   },
   bot: {
@@ -255,7 +255,7 @@ const HARDWARE: Record<string, HardwareNote> = {
     opens: 'There is more than one bot now. They do not wait for each other.',
   },
   bots: {
-    spec: 'Returns handles to every live bot. Sensing is free.',
+    spec: 'Returns the id of every live bot. Sensing is free.',
     opens: 'The fleet can be addressed as a fleet.',
   },
   clock: {
@@ -263,7 +263,7 @@ const HARDWARE: Record<string, HardwareNote> = {
     opens: 'Each bot keeps its own time. This is the whole difficulty and the whole opportunity.',
   },
   spawn: {
-    spec: 'Brings a new bot online at a bay tile. Costs ticks on the spawning bot.',
+    spec: 'Brings a new bot online on a neighbouring tile. Costs 5 ticks on the spawning bot.',
     opens: 'Robots are cheap. This is the level at which the company means it.',
   },
   sync: {
@@ -275,7 +275,7 @@ const HARDWARE: Record<string, HardwareNote> = {
     opens: 'Bots can tell each other things, which is how they stop queueing.',
   },
   recv: {
-    spec: "Returns the next message in the bot's queue, or undefined. Sensing is free.",
+    spec: "Returns the next message in the bot's queue, or null when it is empty. Sensing is free.",
     opens: 'Being told something becomes a thing a bot can do.',
   },
 };

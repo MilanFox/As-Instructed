@@ -24,7 +24,7 @@
  *
  * A level added later gets all three for free, provided it says what it is measuring in its label.
  */
-import type { Trace, TraceEvent, Verdict } from '../engine/index.ts';
+import type { Divergence, Trace, TraceEvent, Verdict } from '../engine/index.ts';
 
 /** What a budget is denominated in, and where the run's spend against it is counted. */
 export type Meter =
@@ -52,6 +52,8 @@ export interface ObjectiveReading {
   label: string;
   met: boolean;
   progress?: [number, number] | undefined;
+  /** The one point this objective and the run parted on, when it reported one. */
+  divergence?: Divergence | undefined;
 }
 
 export interface BudgetSource {
@@ -338,6 +340,12 @@ export interface FailureCause {
   /** "over by 5 beams", "9 of 12 — 3 short", "not met". */
   detail: string;
   budget: Budget | null;
+  /**
+   * Where it went wrong, when the objective could name a point. A budget answers "by how much"
+   * on its own; this is the answer for everything that cannot be counted, and for the failures
+   * whose count says `0 of 5` no matter what the run actually did.
+   */
+  divergence: Divergence | null;
   /** Fraction of the target missed, for ranking. 1 means nothing was achieved. */
   severity: number;
 }
@@ -358,6 +366,7 @@ export function failureCauses(
   const causes: FailureCause[] = [];
   for (const objective of objectives) {
     if (objective.met) continue;
+    const divergence = objective.divergence ?? null;
     const budget = budgetFor(objective, sourceFor ? sourceFor(objective.id) : source);
     if (budget && budget.over > 0) {
       causes.push({
@@ -365,6 +374,7 @@ export function failureCauses(
         label: objective.label,
         detail: overBudgetLine(budget),
         budget,
+        divergence,
         severity: budget.over / budget.limit,
       });
       continue;
@@ -378,6 +388,7 @@ export function failureCauses(
         label: objective.label,
         detail: `${String(done)} of ${String(total)} — ${String(short)} short`,
         budget: null,
+        divergence,
         severity: short / total,
       });
       continue;
@@ -387,6 +398,7 @@ export function failureCauses(
       label: objective.label,
       detail: budget ? budgetReadout(budget) : 'not met',
       budget,
+      divergence,
       severity: 1,
     });
   }

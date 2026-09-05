@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { LEVELS } from '../../levels/index.ts';
 import { PLAYER_API, apiForWorld, apiFunction, apiUnlockedAt, apiUnlockedBy } from '../api-spec.ts';
+import { hardwareNote } from '../../ui/copy.ts';
 
 /**
  * The API spec is the contract three agents depend on. These tests guard the properties they will
@@ -99,6 +100,44 @@ describe('agreement with the level registry', () => {
       if (!known.has(fn.unlockedBy)) continue;
       const level = LEVELS.find((l) => l.id === fn.unlockedBy);
       expect(level?.hardware, fn.name).toContain(fn.name);
+    }
+  });
+});
+
+/**
+ * The requisition card is the last thing a player reads before writing the line, and it is written
+ * by hand in `src/ui/copy.ts` rather than generated, so it can drift from the signature it
+ * describes. It once promised a `number` from `mark`, which the compiler refused. These tests do
+ * not police the wording: they only refuse a card that names a type the signature does not have,
+ * or a price the spec does not charge.
+ */
+describe('the requisition card agrees with the spec', () => {
+  const TYPE_WORDS = ['string', 'number', 'boolean', 'undefined', 'null'];
+
+  test('every unlockable command has a card of its own', () => {
+    const fallback = hardwareNote('no-such-hardware').spec;
+    for (const fn of PLAYER_API.functions) {
+      expect(hardwareNote(fn.name).spec, fn.name).not.toBe(fallback);
+    }
+  });
+
+  test('no card names a type the signature does not have', () => {
+    for (const fn of PLAYER_API.functions) {
+      const spec = hardwareNote(fn.name).spec.toLowerCase();
+      const signature = [fn.returns, ...fn.params.map((p) => p.type)].join(' ').toLowerCase();
+      for (const word of TYPE_WORDS) {
+        if (!new RegExp(`\\b${word}\\b`).test(spec)) continue;
+        expect(signature.includes(word), `${fn.name} card says "${word}"`).toBe(true);
+      }
+    }
+  });
+
+  test('every price a card quotes is the price the spec charges', () => {
+    for (const fn of PLAYER_API.functions) {
+      const spec = hardwareNote(fn.name).spec;
+      const quoted = /costs (\d+) tick/i.exec(spec);
+      if (quoted) expect(Number(quoted[1]), fn.name).toBe(fn.cost);
+      if (/\bfree\b/i.test(spec)) expect(fn.cost, fn.name).toBe(0);
     }
   });
 });

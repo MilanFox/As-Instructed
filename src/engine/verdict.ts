@@ -1,5 +1,5 @@
 import { FailureCode } from './errors.ts';
-import type { Objective, ObjectiveContext } from './objectives.ts';
+import type { Objective, ObjectiveContext, ObjectiveReport } from './objectives.ts';
 import { evaluateObjectives } from './objectives.ts';
 import { senseTotals } from './trace.ts';
 import type { Vec } from './types.ts';
@@ -7,7 +7,7 @@ import type { Vec } from './types.ts';
 /** DESIGN.md §4.6. */
 export interface Verdict {
   passed: boolean;
-  objectives: { id: string; label: string; met: boolean; progress?: [number, number] }[];
+  objectives: ObjectiveReport[];
   failure?: { code: FailureCode; message: string; at?: Vec; line?: number };
   stats: {
     /** `max(bot.clock)` — the makespan. The primary score. */

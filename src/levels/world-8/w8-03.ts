@@ -150,7 +150,14 @@ function allEnergised(ctx: ObjectiveContext): number {
  * energising of it was still running. A start at exactly the feeder's finish is legal, which is
  * what makes ties unambiguous rather than a matter of taste.
  */
-function precedenceBreaches(ctx: ObjectiveContext): number {
+interface Breach {
+  station: string;
+  feeder: string;
+  started: number;
+  fedAt: number;
+}
+
+function breachesIn(ctx: ObjectiveContext): Breach[] {
   const starts = new Map<string, number>();
   const finishes = new Map<string, number>();
   for (const event of ctx.trace.events) {
@@ -163,16 +170,27 @@ function precedenceBreaches(ctx: ObjectiveContext): number {
     if (finish === undefined || done > finish) finishes.set(id, done);
   }
 
-  let breaches = 0;
+  const breaches: Breach[] = [];
   for (const machine of stationsOf(ctx.initialWorld)) {
     const start = starts.get(machine.id);
     if (start === undefined) continue;
     for (const feeder of dependenciesOf(machine)) {
       const finish = finishes.get(feeder);
-      if (finish !== undefined && start < finish) breaches++;
+      if (finish !== undefined && start < finish) {
+        breaches.push({ station: machine.id, feeder, started: start, fedAt: finish });
+      }
     }
   }
   return breaches;
+}
+
+/** The earliest one, because a restart that went out of order went out of order once first. */
+function firstBreach(ctx: ObjectiveContext): Breach | undefined {
+  return breachesIn(ctx).reduce<Breach | undefined>(
+    (earliest, breach) =>
+      earliest === undefined || breach.started < earliest.started ? breach : earliest,
+    undefined,
+  );
 }
 
 /**
@@ -314,7 +332,17 @@ export const w8_03: LevelDef = {
     Objectives.custom(
       'precedence-held',
       'Start no station before every feeder it hangs off has finished',
-      (ctx) => precedenceBreaches(ctx) === 0,
+      (ctx) => breachesIn(ctx).length === 0,
+      undefined,
+      (ctx) => {
+        const breach = firstBreach(ctx);
+        if (!breach) return undefined;
+        return {
+          where: `${breach.station} · feeder ${breach.feeder}`,
+          expected: `start at tick ${String(breach.fedAt)} or later`,
+          received: `started at tick ${String(breach.started)}`,
+        };
+      },
     ),
     Objectives.custom(
       'within-shift',
