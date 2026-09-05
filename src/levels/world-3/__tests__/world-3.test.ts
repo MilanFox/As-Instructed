@@ -1,10 +1,17 @@
 import { describe, expect, test } from 'vitest';
 import type { ItemKind, Objective, ObjectiveContext, Sim, Vec } from '../../../engine/index.ts';
-import { Dir, evaluateObjectives, medalFor, scoreChars } from '../../../engine/index.ts';
+import {
+  Dir,
+  countItemsAt,
+  evaluateObjectives,
+  medalFor,
+  scoreChars,
+} from '../../../engine/index.ts';
+import type { LevelRunResult } from '../../harness.ts';
 import { runLevel, runReference } from '../../harness.ts';
 import type { LevelDef, ReferenceSolution } from '../../types.ts';
 import { WORLD_3_LEVELS, w3_01, w3_02, w3_03, w3_04, w3_05 } from '../index.ts';
-import { goTo, key, nearestIndex, surveyYard } from '../__solutions__/driver.ts';
+import { distance, goTo, key, nearestIndex, surveyYard } from '../__solutions__/driver.ts';
 import { solution as w3_01Solution } from '../__solutions__/w3-01.ts';
 import { solution as w3_02Solution } from '../__solutions__/w3-02.ts';
 import { solution as w3_03Solution } from '../__solutions__/w3-03.ts';
@@ -54,6 +61,203 @@ function survey(sim: Sim, botId: number): Survey {
   });
   return found;
 }
+
+const RACK_ROWS = [2, 3, 6, 7];
+const YARD_EAST = 16;
+const YARD_SOUTH = 8;
+const SLOT_BUDGET = 18;
+
+/** Everything a w3-04 round can learn without leaving the aisles. */
+interface Yard {
+  bay: Vec | null;
+  arrivals: Map<number, Vec>;
+  stocked: Set<string>;
+}
+
+function readAround(sim: Sim, botId: number, found: Yard): void {
+  const tiles = [
+    sim.scan(botId),
+    sim.scan(botId, Dir.North),
+    sim.scan(botId, Dir.East),
+    sim.scan(botId, Dir.South),
+    sim.scan(botId, Dir.West),
+  ];
+  for (const tile of tiles) {
+    if (!tile.inBounds) continue;
+    if (tile.terrain === 'pad') found.bay = tile.at;
+    const index = tile.mark === null ? Number.NaN : Number(tile.mark);
+    if (Number.isInteger(index) && tile.items.some((stack) => stack.kind === 'crate')) {
+      found.arrivals.set(index, tile.at);
+      found.stocked.add(key(tile.at));
+    }
+  }
+}
+
+const treadCost = (found: Yard, at: Vec): number =>
+  RACK_ROWS.includes(at.y) && !found.stocked.has(key(at)) ? 1 : 0;
+
+/** Cheapest route from `from` to `to` in empty slots trodden first, moves second. */
+function routeThroughAisles(found: Yard, from: Vec, to: Vec): Vec[] {
+  const index = (at: Vec): number => at.y * (YARD_EAST + 2) + at.x;
+  const cost = new Map<number, number>([[index(from), 0]]);
+  const prev = new Map<number, Vec>();
+  const open: Vec[] = [from];
+  while (open.length > 0) {
+    let pick = 0;
+    for (let i = 1; i < open.length; i++) {
+      const rival = cost.get(index(open[i] as Vec)) ?? 0;
+      if (rival < (cost.get(index(open[pick] as Vec)) ?? 0)) pick = i;
+    }
+    const at = open.splice(pick, 1)[0] as Vec;
+    const base = cost.get(index(at)) ?? 0;
+    const steps = [
+      { x: at.x, y: at.y - 1 },
+      { x: at.x + 1, y: at.y },
+      { x: at.x, y: at.y + 1 },
+      { x: at.x - 1, y: at.y },
+    ];
+    for (const step of steps) {
+      if (step.x < 1 || step.x > YARD_EAST || step.y < 1 || step.y > YARD_SOUTH) continue;
+      const candidate = base + treadCost(found, step) * 1000 + 1;
+      if (candidate < (cost.get(index(step)) ?? Number.POSITIVE_INFINITY)) {
+        cost.set(index(step), candidate);
+        prev.set(index(step), at);
+        open.push(step);
+      }
+    }
+  }
+  const path: Vec[] = [];
+  let at: Vec | undefined = to;
+  while (at && !(at.x === from.x && at.y === from.y)) {
+    path.push(at);
+    at = prev.get(index(at));
+  }
+  return path.reverse();
+}
+
+function driveTo(sim: Sim, botId: number, found: Yard, to: Vec): void {
+  for (const step of routeThroughAisles(found, sim.pos(botId), to)) {
+    const at = sim.pos(botId);
+    const dir =
+      step.y < at.y ? Dir.North : step.x > at.x ? Dir.East : step.y > at.y ? Dir.South : Dir.West;
+    sim.move(botId, dir);
+    readAround(sim, botId, found);
+  }
+}
+
+function walkAisle(sim: Sim, botId: number, found: Yard, y: number): void {
+  const from = sim.pos(botId);
+  driveTo(sim, botId, found, { x: from.x <= YARD_EAST / 2 ? 1 : YARD_EAST, y });
+  const along = sim.pos(botId).x === 1 ? Dir.East : Dir.West;
+  while (sim.canMove(botId, along)) {
+    sim.move(botId, along);
+    readAround(sim, botId, found);
+  }
+}
+
+function shipInOrder(sim: Sim, botId: number, found: Yard): void {
+  const bay = found.bay;
+  if (!bay) return;
+  for (const index of [...found.arrivals.keys()].sort((a, b) => a - b)) {
+    const slot = found.arrivals.get(index);
+    if (!slot) continue;
+    driveTo(sim, botId, found, slot);
+    sim.pickup(botId, 'crate', 1);
+    driveTo(sim, botId, found, bay);
+    sim.drop(botId, 'crate', 1);
+  }
+}
+
+/**
+ * The round the w3-04 star is pitched at: every stencil read from the aisle beside it, and a rack
+ * row entered only where a crate is standing in it.
+ */
+const aisleRound = (sim: Sim, botId: number): void => {
+  const found: Yard = { bay: null, arrivals: new Map(), stocked: new Set() };
+  readAround(sim, botId, found);
+  const start = sim.pos(botId).y;
+  const order = start === 1 ? [1, 4, 5, 8] : start === YARD_SOUTH ? [8, 5, 4, 1] : [4, 5, 8, 1];
+  for (const y of order) walkAisle(sim, botId, found, y);
+  shipInOrder(sim, botId, found);
+};
+
+/** The degenerate answer: the two middle aisles cost nothing and see none of the outer racks. */
+const middleAislesOnly = (sim: Sim, botId: number): void => {
+  const found: Yard = { bay: null, arrivals: new Map(), stocked: new Set() };
+  readAround(sim, botId, found);
+  for (const y of [4, 5]) walkAisle(sim, botId, found, y);
+  shipInOrder(sim, botId, found);
+};
+
+const slotsTrodden = (result: LevelRunResult): number =>
+  result.trace.events.filter(
+    (event) =>
+      event.kind === 'move' &&
+      event.ok &&
+      RACK_ROWS.includes(event.to.y) &&
+      countItemsAt(result.initialWorld, event.to, 'crate') === 0,
+  ).length;
+
+/** The w3-02 route plan the star asks for: one class collected and delivered before the next. */
+const oneClassAtATime = (sim: Sim, botId: number): void => {
+  const found = survey(sim, botId);
+  const remaining = [...new Set(found.crates.map((crate) => crate.kind))];
+  while (remaining.length > 0) {
+    const here = sim.pos(botId);
+    const next = nearestIndex(
+      here,
+      remaining.map((kind) => found.depots.get(kind) ?? here),
+    );
+    const kind = remaining.splice(next < 0 ? 0 : next, 1)[0];
+    const depot = kind === undefined ? undefined : found.depots.get(kind);
+    if (kind === undefined || !depot) continue;
+    const mine = found.crates.filter((crate) => crate.kind === kind).map((crate) => crate.at);
+    while (mine.length > 0) {
+      const at = mine.splice(nearestIndex(sim.pos(botId), mine), 1)[0];
+      if (!at) break;
+      goTo(sim, botId, at);
+      sim.pickup(botId, kind, 1);
+      goTo(sim, botId, depot);
+      sim.drop(botId, kind, 1);
+    }
+  }
+};
+
+/** The obvious w3-02 round: fetch whichever crate is nearest and take it where its stencil says. */
+const nearestCrateFirst = (sim: Sim, botId: number): void => {
+  const found = survey(sim, botId);
+  const left = found.crates.slice();
+  while (left.length > 0) {
+    const pick = nearestIndex(
+      sim.pos(botId),
+      left.map((crate) => crate.at),
+    );
+    const crate = left.splice(pick, 1)[0];
+    if (!crate) break;
+    const depot = found.depots.get(crate.kind);
+    if (!depot) continue;
+    goTo(sim, botId, crate.at);
+    sim.pickup(botId, crate.kind, 1);
+    goTo(sim, botId, depot);
+    sim.drop(botId, crate.kind, 1);
+  }
+};
+
+/** A w3-01 round with no memory: it re-surveys the shed before every single trip. */
+const resurveyEveryTrip = (sim: Sim, botId: number): void => {
+  for (;;) {
+    const found = survey(sim, botId);
+    const onPad = new Set(found.pads.map(key));
+    const crate = found.crates.find((candidate) => !onPad.has(key(candidate.at)));
+    const loaded = new Set(found.crates.map((candidate) => key(candidate.at)));
+    const pad = found.pads.find((at) => !loaded.has(key(at)));
+    if (!crate || !pad) return;
+    goTo(sim, botId, crate.at);
+    sim.pickup(botId, 'crate', 1);
+    goTo(sim, botId, pad);
+    sim.drop(botId, 'crate', 1);
+  }
+};
 
 describe('World 3 — structure', () => {
   test('the world exports five levels in play order', () => {
@@ -117,26 +321,64 @@ describe('World 3 — the reference solutions clear par on every seed', () => {
 });
 
 describe('World 3 — bonus objectives are reachable', () => {
-  test('w3-01 pays its bonus on every seed', () => {
-    for (const seed of w3_01.seeds) {
-      const result = runReference(w3_01, seed, w3_01Solution);
-      expect(bonusMet(w3_01, result)).toBe(true);
+  // The two tick bonuses are pitched under par on purpose: the reference earns them on the
+  // teaching seed and has to be improved on to earn them on the crowded ones.
+  test('w3-03 and w3-05 pay their tick bonus on seed 1', () => {
+    expect(bonusMet(w3_03, runReference(w3_03, 1, w3_03Solution))).toBe(true);
+    expect(bonusMet(w3_05, runReference(w3_05, 1, w3_05Solution))).toBe(true);
+  });
+});
+
+describe('w3-02 — one depot at a time', () => {
+  test('working the yard one class at a time earns the star on every seed', () => {
+    for (const seed of w3_02.seeds) {
+      const result = runLevel(w3_02, seed, oneClassAtATime);
+      expect(result.verdict.passed).toBe(true);
+      expect(bonusMet(w3_02, result)).toBe(true);
+      expect(result.ticks).toBeLessThanOrEqual(w3_02.par.ticks);
     }
   });
 
-  test('w3-04 ships without staging on every seed', () => {
+  test('taking the nearest crate every time is correct and misses the star on every seed', () => {
+    for (const seed of w3_02.seeds) {
+      const result = runLevel(w3_02, seed, nearestCrateFirst);
+      expect(result.verdict.passed).toBe(true);
+      expect(bonusMet(w3_02, result)).toBe(false);
+    }
+  });
+
+  test('the reference delivers in the order it found the crates and misses the star', () => {
+    for (const seed of w3_02.seeds) {
+      expect(bonusMet(w3_02, runReference(w3_02, seed, w3_02Solution))).toBe(false);
+    }
+  });
+});
+
+describe('w3-04 — read the racks from the aisle', () => {
+  test('an aisle round ships the yard inside the slot budget on every seed', () => {
     for (const seed of w3_04.seeds) {
-      const result = runReference(w3_04, seed, w3_04Solution);
+      const result = runLevel(w3_04, seed, aisleRound);
+      expect(result.verdict.passed).toBe(true);
+      expect(slotsTrodden(result)).toBeLessThanOrEqual(SLOT_BUDGET);
       expect(bonusMet(w3_04, result)).toBe(true);
     }
   });
 
-  // The three tick bonuses are pitched under par on purpose: the reference earns them on the
-  // teaching seed and has to be improved on to earn them on the crowded ones.
-  test('w3-02, w3-03 and w3-05 pay their tick bonus on seed 1', () => {
-    expect(bonusMet(w3_02, runReference(w3_02, 1, w3_02Solution))).toBe(true);
-    expect(bonusMet(w3_03, runReference(w3_03, 1, w3_03Solution))).toBe(true);
-    expect(bonusMet(w3_05, runReference(w3_05, 1, w3_05Solution))).toBe(true);
+  test('the rack-walking survey ships the yard and blows the slot budget on every seed', () => {
+    for (const seed of w3_04.seeds) {
+      const result = runReference(w3_04, seed, w3_04Solution);
+      expect(result.verdict.passed).toBe(true);
+      expect(slotsTrodden(result)).toBeGreaterThan(SLOT_BUDGET);
+      expect(bonusMet(w3_04, result)).toBe(false);
+    }
+  });
+
+  test('never reaching the outer aisles is cheap in slots and cannot ship the yard', () => {
+    for (const seed of [1, 2, 3]) {
+      const result = runLevel(w3_04, seed, middleAislesOnly);
+      expect(slotsTrodden(result)).toBeLessThan(SLOT_BUDGET);
+      expect(result.verdict.passed).toBe(false);
+    }
   });
 });
 
@@ -188,6 +430,103 @@ describe('w3-01 — one clamp', () => {
       });
       expect(result.verdict.passed).toBe(false);
       expect(result.trace.events.some((e) => e.kind === 'pickup' && !e.ok)).toBe(true);
+    }
+  });
+
+  test('the reference finishes inside par with nothing grabbed twice', () => {
+    for (const seed of w3_01.seeds) {
+      expect(bonusMet(w3_01, runReference(w3_01, seed, w3_01Solution))).toBe(true);
+    }
+  });
+
+  /*
+   * PLAYTEST-BEGINNER.md §10 item 3: the old label said "pickup", which is a trace event kind, so
+   * the readout counted every pickup in the run against a limit taken from a 0-or-1 flag and
+   * rendered `6 / 1 pickups`. The limit this star actually spends against is the tick par, and the
+   * label and the progress now both say so.
+   */
+  test('the star is metered in ticks, not in pickups', () => {
+    const star = (w3_01.bonus ?? [])[0] as Objective;
+    expect(star.label).toContain('ticks');
+    expect(star.label).not.toContain('pickup');
+    for (const seed of w3_01.seeds) {
+      const result = runReference(w3_01, seed, w3_01Solution);
+      expect(star.progress?.(result)).toEqual([
+        Math.min(result.ticks, w3_01.par.ticks),
+        w3_01.par.ticks,
+      ]);
+    }
+  });
+
+  test('a round that re-surveys before every trip is correct and misses the star', () => {
+    for (const seed of w3_01.seeds) {
+      const result = runLevel(w3_01, seed, resurveyEveryTrip);
+      expect(result.verdict.passed).toBe(true);
+      expect(result.trace.events.some((e) => e.kind === 'pickup' && !e.ok)).toBe(false);
+      expect(result.ticks).toBeGreaterThan(w3_01.par.ticks);
+      expect(bonusMet(w3_01, result)).toBe(false);
+    }
+  });
+
+  /*
+   * Why this level carries a tick star and not a resource one. The only freedom the shed offers is
+   * which crate is paired with which pad and in what order, and it is small enough to solve
+   * exactly: nearest-crate-then-nearest-pad is already the best pairing on seed 2 and seed 3, and
+   * is two ticks off it on seed 1. There is no budget that separates a better idea from a worse
+   * one, so there is no honest resource bonus to write here.
+   */
+  test('greedy pairing is within two ticks of the best pairing on every declared seed', () => {
+    const permutations = (items: Vec[]): Vec[][] => {
+      if (items.length <= 1) return [items];
+      const out: Vec[][] = [];
+      for (let i = 0; i < items.length; i++) {
+        const rest = items.slice(0, i).concat(items.slice(i + 1));
+        for (const tail of permutations(rest)) out.push([items[i] as Vec, ...tail]);
+      }
+      return out;
+    };
+    const roundCost = (start: Vec, order: Vec[], pads: Vec[]): number => {
+      let at = start;
+      let total = 0;
+      for (let i = 0; i < order.length; i++) {
+        const crate = order[i] as Vec;
+        const pad = pads[i] as Vec;
+        total += distance(at, crate) + 1 + distance(crate, pad) + 1;
+        at = pad;
+      }
+      return total;
+    };
+
+    for (const seed of w3_01.seeds) {
+      const world = w3_01.build(seed);
+      const crates = world.items.map((stack) => stack.at);
+      const pads: Vec[] = [];
+      for (let y = 0; y < world.h; y++) {
+        for (let x = 0; x < world.w; x++) {
+          if (world.tiles[y * world.w + x]?.terrain === 'pad') pads.push({ x, y });
+        }
+      }
+      const start = (world.bots[0] as { at: Vec }).at;
+
+      let best = Number.POSITIVE_INFINITY;
+      for (const order of permutations(crates)) {
+        for (const assignment of permutations(pads)) {
+          best = Math.min(best, roundCost(start, order, assignment));
+        }
+      }
+
+      const leftCrates = crates.slice();
+      const leftPads = pads.slice();
+      let at = start;
+      let greedy = 0;
+      while (leftCrates.length > 0) {
+        const crate = leftCrates.splice(nearestIndex(at, leftCrates), 1)[0] as Vec;
+        const pad = leftPads.splice(nearestIndex(crate, leftPads), 1)[0] as Vec;
+        greedy += distance(at, crate) + 1 + distance(crate, pad) + 1;
+        at = pad;
+      }
+
+      expect(greedy - best).toBeLessThanOrEqual(2);
     }
   });
 });

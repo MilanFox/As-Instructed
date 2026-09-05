@@ -99,9 +99,9 @@ export const w3_01: LevelDef = {
   bonus: [
     Objectives.custom(
       'clean-run',
-      'Finish within par with no failed pickup',
+      `Finish inside ${String(PAR_TICKS)} ticks with no grab that comes up empty`,
       (ctx) => ctx.trace.endTick <= PAR_TICKS && failedPickups(ctx) === 0,
-      (ctx) => [failedPickups(ctx) === 0 ? 1 : 0, 1],
+      (ctx) => [Math.min(ctx.trace.endTick, PAR_TICKS), PAR_TICKS],
     ),
   ],
   budget: { maxTicks: 2500 },

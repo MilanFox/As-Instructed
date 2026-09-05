@@ -1,7 +1,7 @@
 import type { Vec, World } from '../../engine/index.ts';
 import { Dir, ItemKind, Terrain, addBot, createWorld, setTile, vec } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
-import { croppedAtStart, everyTilePlanted, harvestedEvery, noFailedHarvests } from './shared.ts';
+import { croppedAtStart, everyTilePlanted, harvestedEvery, withinSpoilage } from './shared.ts';
 
 const PLOT_W = 3;
 const PLOT_H = 2;
@@ -15,6 +15,15 @@ const MAX_GROWTH = 8;
  * negative: maturity clamps at zero, so a tile with `plantedAt: -8` is simply ripe on arrival.
  */
 const RIPEN_LADDER: readonly number[] = [0, 9, 18, 28, 38];
+
+/**
+ * Ticks of standing ripe crop the depot will absorb across the whole plot.
+ *
+ * Measured: a run that reads the plot and stands on each tile as it comes ready owes 4–15 over the
+ * four seeds; the resume-sweep that passes the level owes 14–30 and 24 on the seed the report
+ * shows. Set above the first and under the second.
+ */
+const SPOILAGE_ALLOWANCE = 18;
 
 function plotTiles(): Vec[] {
   const tiles: Vec[] = [];
@@ -65,6 +74,9 @@ export const w2_04: LevelDef = {
     '',
     'The crops ripen at different times. Growth climbs by one every tick, driving or not, so',
     'a tile reading 5 of 8 is ready in three ticks.',
+    '',
+    'The depot docks the sheet for spoilage: one against the shift for every tick a crop stands',
+    'ripe in the ground with nobody on it. Growth stops at `maxGrowth`. The docking does not.',
   ].join('\n'),
   seeds: [1, 2, 3, 4],
   par: { ticks: 52, chars: 1050 },
@@ -85,7 +97,12 @@ export const w2_04: LevelDef = {
     harvestedEvery(croppedAtStart, 'Harvest every crop in the plot', 'harvested-crops'),
     everyTilePlanted(),
   ],
-  bonus: [noFailedHarvests('Never swing at a hopper with no room in it')],
+  bonus: [
+    withinSpoilage(
+      SPOILAGE_ALLOWANCE,
+      `Come back with no more than ${String(SPOILAGE_ALLOWANCE)} spoilage on the sheet`,
+    ),
+  ],
   starter: [
     '// NOTE(4470): the hopper comes out full. that is the schedule, not a fault',
     '// NOTE(4470): you cannot pick anything up until you have put something down',

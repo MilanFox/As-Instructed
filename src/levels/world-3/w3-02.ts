@@ -15,6 +15,7 @@ import {
   frame,
   groundTotal,
   interior,
+  key,
   stencilledDepots,
   tilePicker,
   warm,
@@ -35,6 +36,30 @@ const sorted = (ctx: ObjectiveContext): number =>
       ),
     0,
   );
+
+const depotsWorked = (world: World): number => {
+  const stocked = new Set(world.items.map((stack) => stack.kind));
+  return stencilledDepots(world).filter((depot) => stocked.has(depot.kind)).length;
+};
+
+/**
+ * Times the round left one depot for another. A round that reads the table as a route plan — one
+ * class collected and delivered, then the next — leaves each depot once and never returns; a round
+ * that takes whichever crate is nearest walks back to a pad it has already used again and again.
+ */
+const depotSwitches = (ctx: ObjectiveContext): number => {
+  const pads = new Set(stencilledDepots(ctx.initialWorld).map((depot) => key(depot.at)));
+  let switches = 0;
+  let last = '';
+  for (const event of ctx.trace.events) {
+    if (event.kind !== 'drop' || !event.ok) continue;
+    const at = key(event.at);
+    if (!pads.has(at)) continue;
+    if (last !== '' && at !== last) switches++;
+    last = at;
+  }
+  return switches;
+};
 
 /**
  * The randomized axis is the mapping, not the geometry. Depot positions are drawn first and the
@@ -64,6 +89,10 @@ export const w3_02: LevelDef = {
     '',
     'The stencils are repainted between shifts. Which pad takes which class changes, and so',
     'does the number of classes in the yard. The bot carries one item at a time.',
+    '',
+    'Vance will sign the shift off as tidy if every depot was finished in one go: the last crate',
+    'of a class delivered before the first crate of the next. A pad you come back to after',
+    'delivering somewhere else has been started twice.',
   ].join('\n'),
   seeds: [1, 2, 3, 4],
   par: { ticks: PAR_TICKS, chars: 1230 },
@@ -95,10 +124,12 @@ export const w3_02: LevelDef = {
     ),
   ],
   bonus: [
-    Objectives.withinTicks(Math.floor(PAR_TICKS * 0.9), {
-      id: 'tight-round',
-      label: 'Beat par by ten percent',
-    }),
+    Objectives.custom(
+      'one-depot-at-a-time',
+      'Finish each depot before you start the next',
+      (ctx) => depotSwitches(ctx) <= depotsWorked(ctx.initialWorld) - 1,
+      (ctx) => [depotSwitches(ctx), Math.max(0, depotsWorked(ctx.initialWorld) - 1)],
+    ),
   ],
   budget: { maxTicks: 4000 },
   starter: [
@@ -115,6 +146,7 @@ export const w3_02: LevelDef = {
     'You will walk past a crate long before you have found the depot that takes it.',
     'A chain of if-statements has a fixed number of branches. The yard does not have a fixed number of classes.',
     'Two things vary independently here: where each depot is, and which class it takes.',
+    'The table that says where a class belongs will also say what order to work the yard in.',
   ],
   docs: ['scan', 'carrying'],
 };
