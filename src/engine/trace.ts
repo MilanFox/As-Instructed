@@ -74,7 +74,14 @@ export type MineEvent = ItemTransfer & { kind: 'mine' };
 /** `harvest` and `mine` credit the bot's inventory. The tile edit rides on a separate tileChange. */
 export type GatherEvent = HarvestEvent | MineEvent;
 
-export type PlantEvent = BotAction & { kind: 'plant'; at: Vec; item: ItemKind; ok: boolean };
+export type PlantEvent = BotAction & {
+  kind: 'plant';
+  at: Vec;
+  item: ItemKind;
+  ok: boolean;
+  /** Why a failed plant failed: 'terrain' | 'occupied' | 'seed'. */
+  reason?: string;
+};
 
 export type PickupEvent = ItemTransfer & { kind: 'pickup' };
 export type DropEvent = ItemTransfer & { kind: 'drop' };

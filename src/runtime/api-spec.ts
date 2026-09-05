@@ -295,10 +295,12 @@ if (picked === null) {
       },
     ],
     returns: 'boolean',
-    doc: 'Plants one item of `kind` from the inventory into plantable ground under the bot. Returns false when the ground is not soil, when something is already growing there, or when the bot carries none of that kind, and costs the full price either way.',
-    example: `if (scan().terrain === 'soil') {
-  plant();
-}`,
+    doc: 'Plants one item of `kind` from the inventory into plantable ground under the bot. It refuses for exactly three reasons, and each one has a free check that tells it from the other two: the ground is not soil (`scan().terrain`), something is already growing there (`scan().crop`), or the bot carries none of that kind (`inventory(kind)`). A refusal costs the full price, so it is worth asking first.',
+    example: `const here = scan();
+if (here.terrain !== 'soil') print('not soil');
+else if (here.crop !== null) print('already growing');
+else if (inventory('seed') === 0) print('out of seed');
+else plant();`,
     cost: 2,
     unlockedBy: 'w2-02',
     world: 2,

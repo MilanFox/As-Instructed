@@ -389,6 +389,57 @@ describe('plant', () => {
     expect(sim.inventory(0, ItemKind.Seed)).toBe(1);
   });
 
+  test('each of the three refusals names itself on the event', () => {
+    const seeded = { kind: ItemKind.Seed, count: 2 };
+
+    const wrongGround = new Sim(asciiWorld(['..S'], { bots: [vec(0, 0)], inventory: [seeded] }));
+    expect(wrongGround.plant(0)).toBe(false);
+    expect(must(eventsOfKind(wrongGround.finish().events, 'plant')[0]).reason).toBe('terrain');
+
+    const alreadyGrowing = new Sim(asciiWorld(['S..'], { bots: [vec(0, 0)], inventory: [seeded] }));
+    alreadyGrowing.plant(0);
+    expect(alreadyGrowing.plant(0)).toBe(false);
+    expect(must(eventsOfKind(alreadyGrowing.finish().events, 'plant')[1]).reason).toBe('occupied');
+
+    const empty = new Sim(asciiWorld(['S..'], { bots: [vec(0, 0)] }));
+    expect(empty.plant(0)).toBe(false);
+    expect(must(eventsOfKind(empty.finish().events, 'plant')[0]).reason).toBe('seed');
+  });
+
+  /*
+   * The player never sees the trace. What they get back is one bit, so the thing that has to be
+   * true is that free calls — the only non-fatal channel there is — separate the three causes the
+   * bit collapses. This walks the three worlds a player would actually be standing in.
+   */
+  test('free calls tell the three refusals apart without spending a tick', () => {
+    function diagnose(sim: Sim): string {
+      const here = sim.scan(0);
+      if (here.terrain !== Terrain.Soil) return 'terrain';
+      if (here.crop !== null) return 'occupied';
+      if (sim.inventory(0, ItemKind.Seed) === 0) return 'seed';
+      return 'would plant';
+    }
+
+    const seeded = { kind: ItemKind.Seed, count: 2 };
+    const cases: [Sim, string][] = [
+      [new Sim(asciiWorld(['..S'], { bots: [vec(0, 0)], inventory: [seeded] })), 'terrain'],
+      [new Sim(asciiWorld(['S..'], { bots: [vec(0, 0)], inventory: [seeded] })), 'occupied'],
+      [new Sim(asciiWorld(['S..'], { bots: [vec(0, 0)] })), 'seed'],
+    ];
+    cases[1]?.[0].plant(0);
+
+    for (const [sim, expected] of cases) {
+      const before = sim.ticks;
+      expect(sim.plant(0)).toBe(false);
+      const diagnosis = diagnose(sim);
+      expect(diagnosis).toBe(expected);
+      expect(sim.ticks).toBe(before + DEFAULT_COSTS.plant);
+
+      const events = eventsOfKind(sim.finish().events, 'plant');
+      expect(must(events[events.length - 1]).reason).toBe(diagnosis);
+    }
+  });
+
   test('a custom grow time is honoured', () => {
     const world = asciiWorld(['S..'], {
       bots: [vec(0, 0)],

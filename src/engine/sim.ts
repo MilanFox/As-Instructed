@@ -434,7 +434,16 @@ export class Sim {
     return item;
   }
 
-  /** Plants one `kind` from the inventory into plantable ground under the bot. */
+  /**
+   * Plants one `kind` from the inventory into plantable ground under the bot.
+   *
+   * A refusal returns false, charges the full price, and records *which* of the three causes it
+   * was as `reason` on the event, the way a blocked `move` already does. There is deliberately no
+   * `canPlant()` to go with it: `move` needs `canMove` because its block reason includes tile
+   * reservations the player cannot see, whereas every input to this decision is already free and
+   * exact — `scan().terrain`, `scan().crop` and `inventory(kind)` — so the three checks that tell
+   * the causes apart are three the player can already make, before the call or after it.
+   */
   plant(botId: number, kind: ItemKind = 'seed', growTime = DEFAULT_GROW_TIME): boolean {
     const bot = this.requireActiveBot(botId);
     const t = bot.clock;
@@ -442,13 +451,11 @@ export class Sim {
     this.requireFuel(bot, dt, 'plant');
     const at = { x: bot.at.x, y: bot.at.y };
     const tile = tileAt(this.world, at);
+    const reason = plantBlockReason(tile, inventoryCount(bot, kind));
 
-    const plantable =
-      tile !== undefined && terrainProps(tile.terrain).plantable && tile.crop === undefined;
-    const hasSeed = inventoryCount(bot, kind) > 0;
-
-    if (!plantable || !hasSeed || !tile) {
-      this.builder.push({ t, botId, dt, kind: 'plant', at, item: kind, ok: false });
+    if (reason !== null || !tile) {
+      const why = reason ?? 'terrain';
+      this.builder.push({ t, botId, dt, kind: 'plant', at, item: kind, ok: false, reason: why });
       this.charge(bot, dt);
       return false;
     }
@@ -1148,6 +1155,19 @@ export class Sim {
     }
     return bot;
   }
+}
+
+/**
+ * Which of `plant`'s three refusals applies, or null when the seed would go in.
+ *
+ * Ordered ground, then crop, then inventory — the same order the player checks them in, and the
+ * order that keeps the answer stable when two causes hold at once.
+ */
+function plantBlockReason(tile: Tile | undefined, seeds: number): string | null {
+  if (!tile || !terrainProps(tile.terrain).plantable) return 'terrain';
+  if (tile.crop !== undefined) return 'occupied';
+  if (seeds <= 0) return 'seed';
+  return null;
 }
 
 /** Human-readable rendering of a move failure, for hint text and failure messages. */
