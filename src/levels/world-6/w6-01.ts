@@ -47,7 +47,6 @@ export const w6_01: LevelDef = {
   hardware: ['receive'],
   brief: [
     '**FROM:** Field Engineer D. Halloran',
-    '**TO:** Contractor #4471',
     '',
     'the post has been listening on this band for thirteen years. nobody has read the queue.',
     'it is not a long queue. some shifts there is nothing on it at all, and nothing is still',
@@ -56,8 +55,7 @@ export const w6_01: LevelDef = {
     'Print every packet queued on the band, in order, exactly as it arrived.',
     '',
     '`receive()` returns the next packet as a string, or `null` once the queue is empty. It is',
-    'free. The number of packets changes between shifts. On some shifts there are none, and a',
-    'program that prints nothing is the correct program for that shift.',
+    'free. The number of packets changes between shifts.',
   ].join('\n'),
   seeds: [1, 2, 3],
   par: { ticks: 1, chars: 100 },
@@ -86,7 +84,6 @@ export const w6_01: LevelDef = {
   ],
   starter: [
     '// The bot is parked on the antenna. Nothing on this level needs to move.',
-    '// receive() returns the next packet, or null when the queue is empty.',
     '',
     '// NOTE(4470): the queue is short and some shifts it is empty',
     '// NOTE(4470): there is a ping on this band every shift. it is not ours',

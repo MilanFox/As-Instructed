@@ -62,10 +62,8 @@ export const w3_01: LevelDef = {
   hardware: ['pickup', 'drop'],
   brief: [
     '**FROM:** Field Engineer D. Halloran',
-    '**TO:** Contractor #4471',
     '',
-    'the arm on RIG-04 has one clamp. it holds one crate, and while it is holding one crate',
-    'it will pick up nothing else. the log still shows you tried.',
+    'the arm on RIG-04 has one clamp. the log still shows you tried for a second.',
     '',
     'Every pad on the east side of the shed must end the shift holding at least one crate.',
     'There are exactly as many pads as there are crates, and both move between shifts.',
@@ -109,7 +107,6 @@ export const w3_01: LevelDef = {
   budget: { maxTicks: 2500 },
   starter: [
     '// The crates are on the west siding. The pads are on the east side.',
-    '// The bot holds one crate at a time.',
     '',
     'while (canMove(Dir.West)) move(Dir.West);',
     '',

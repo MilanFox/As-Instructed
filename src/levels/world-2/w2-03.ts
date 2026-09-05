@@ -51,9 +51,8 @@ export const w2_03: LevelDef = {
   brief: [
     '**FROM:** Field Eng. D. Halloran',
     '',
-    'you will have seen the rotation memo. it is real and they do check. whatever you take',
-    'out, put something back before you drive off. the silo was moved again over the winter,',
-    'so the mule drops you at a different corner than last time.',
+    'you will have seen the rotation memo. it is real and they do check. the silo was moved',
+    'again over the winter, so the mule drops you at a different corner than last time.',
     '',
     'Work every tile of the field. On a tile whose crop is ready: **harvest it, then plant',
     'the same tile again before moving on.** On a tile that is bare: plant it. **No soil',
@@ -84,8 +83,7 @@ export const w2_03: LevelDef = {
   ],
   bonus: [noWastedFieldwork('Waste no swing and no seed')],
   starter: [
-    '// The mule parks at a different corner each quarter, so which way the field runs is',
-    '// something to find out rather than something to know. canMove() is free.',
+    '// The mule parks at a different corner each quarter. canMove() is free.',
     '',
     'const here = scan();',
     'if (here.crop === null) {',

@@ -61,9 +61,10 @@ export const w4_03: LevelDef = {
   title: 'Left Hand on the Wall',
   hardware: [],
   brief: [
-    'The survey grid was cut by machine and never revisited. One way in, one way out, no loops,',
-    'and every wall in it joins the outside wall somewhere. Facilities list it as the only fully',
-    'documented structure on site, which is true, because a machine did the documenting.',
+    'The survey grid was cut by machine and never revisited. Facilities list it as the only',
+    'fully documented structure on site. A machine did the documenting.',
+    '',
+    'One way in, one way out, no loops, and every wall in it joins the outside wall somewhere.',
     '',
     'Drive the bot from the entrance to the exit pad. Both are openings in the outside wall, and',
     'the exit is on a different side of the grid every shift.',
@@ -88,7 +89,6 @@ export const w4_03: LevelDef = {
   ],
   starter: [
     '// One entrance, one exit, both in the outside wall.',
-    '// Nothing in this grid loops, and no wall inside it stands on its own.',
     '',
     'print(pos());',
     '',
