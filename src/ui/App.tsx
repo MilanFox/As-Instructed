@@ -1,17 +1,28 @@
-import { useEffect, useRef } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { currentLevel, useGame } from '../game/store.ts';
 import { CanvasRenderer, RuntimeRunner } from './adapters.ts';
 import { countChars } from '../game/score.ts';
 import { exportSave } from '../game/save.ts';
 import { worldMeta } from '../levels/index.ts';
-import { IconBook, IconMap, IconReview } from './components/Icons.tsx';
+// Deep import on purpose: `src/meta/ui/index.ts` also re-exports `LibraryPanel`, which pulls
+// Monaco back into the entry chunk and undoes the split below.
+import { PublishDialog } from '../meta/ui/PublishDialog.tsx';
+import { mountAudio } from './audio.ts';
+import { mountLibrary } from './library.ts';
+import { IconBook, IconMap, IconReview, IconSound } from './components/Icons.tsx';
 import { useKeyboard } from './hooks/useKeyboard.ts';
+import { AudioSettings } from './screens/AudioSettings.tsx';
 import { LevelSelect } from './screens/LevelSelect.tsx';
 import { PerformanceReview } from './screens/PerformanceReview.tsx';
 import { Results } from './screens/Results.tsx';
-import { Workspace } from './Workspace.tsx';
 import './styles/fonts.css';
 import './styles/app.css';
+
+/**
+ * The workspace is the only screen that needs Monaco, and Monaco is most of the build. Splitting
+ * it out is what keeps the site map — the screen the game opens on — a small download.
+ */
+const Workspace = lazy(async () => ({ default: (await import('./Workspace.tsx')).Workspace }));
 
 export function App(): React.JSX.Element {
   useKeyboard();
@@ -19,16 +30,27 @@ export function App(): React.JSX.Element {
 
   useEffect(() => {
     const state = useGame.getState();
-    state.attachRunner(new RuntimeRunner());
+    const runner = new RuntimeRunner();
+    state.attachRunner(runner);
     state.attachRenderer(new CanvasRenderer());
+    const detachAudio = mountAudio();
+    const detachLibrary = mountLibrary(runner);
     const level = state.currentLevelId;
-    if (level) state.runner().prepare(level);
+    if (level) runner.prepare(level);
+    return () => {
+      detachLibrary();
+      detachAudio();
+    };
   }, []);
 
   return (
     <div className="app">
       <TopBar />
-      {screen === 'workspace' ? <Workspace /> : null}
+      {screen === 'workspace' ? (
+        <Suspense fallback={<div className="screen screen--loading">opening the terminal…</div>}>
+          <Workspace />
+        </Suspense>
+      ) : null}
       {screen === 'levels' ? (
         <div className="screen">
           <LevelSelect />
@@ -40,6 +62,7 @@ export function App(): React.JSX.Element {
         </div>
       ) : null}
       <Results />
+      <PublishDialog />
     </div>
   );
 }
@@ -57,6 +80,7 @@ function TopBar(): React.JSX.Element {
   const save = useGame((state) => state.save);
   const importSaveFile = useGame((state) => state.importSaveFile);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const [sound, setSound] = useState(false);
 
   const running = runState === 'running';
   const chars = countChars(code);
@@ -158,6 +182,16 @@ function TopBar(): React.JSX.Element {
           </button>
         ) : null}
 
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={() => setSound(true)}
+          title="Sound settings"
+          aria-label="Sound settings"
+        >
+          <IconSound />
+        </button>
+
         <button type="button" className="btn btn--ghost" onClick={onExport} title="Export progress">
           export
         </button>
@@ -202,6 +236,8 @@ function TopBar(): React.JSX.Element {
           </button>
         ) : null}
       </div>
+
+      {sound ? <AudioSettings onClose={() => setSound(false)} /> : null}
     </header>
   );
 }

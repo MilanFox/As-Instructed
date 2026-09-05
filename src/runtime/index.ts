@@ -32,7 +32,16 @@ export type {
 } from './protocol.ts';
 export { WORKER_TIMEOUT_MS } from './protocol.ts';
 
-export { PLAYER_API, apiForWorld, apiFunction, apiUnlockedAt, apiUnlockedBy } from './api-spec.ts';
+export {
+  PLAYER_API,
+  apiForWorld,
+  apiFunction,
+  apiUnlockedAt,
+  apiUnlockedBy,
+  botHandleDeclaration,
+  perBotApi,
+  renderParams,
+} from './api-spec.ts';
 
 export {
   apiFunctionsFor,

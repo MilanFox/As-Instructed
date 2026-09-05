@@ -106,7 +106,7 @@ export const w7_02: LevelDef = {
     '',
     'Plumbing, stated once so it is not a puzzle:',
     '',
-    '- `probe(0, "depot")` returns the depot machine. `vars.requisition` is how many bots the',
+    '- `probe("depot")` returns the depot machine. `vars.requisition` is how many bots the',
     '  fleet is allowed to contain, counting the one you already have. `vars.crops` is how many',
     '  crop tiles there are, and `vars.c0` … `vars.c{n-1}` are their positions, each packed as',
     '  `y * 24 + x`. Probing is free and works from anywhere on the map.',
@@ -179,7 +179,7 @@ export const w7_02: LevelDef = {
   starter: [
     '// import { pathTo } from "lib";',
     '',
-    'const depot = probe(0, "depot");',
+    'const depot = probe("depot");',
     'const fleet = depot.vars.requisition;',
     'const total = depot.vars.crops;',
     '// Positions come back packed: x = p % 24, y = Math.floor(p / 24).',

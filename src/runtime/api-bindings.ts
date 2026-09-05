@@ -7,7 +7,8 @@ import {
   manhattan,
   tileAt,
 } from '../engine/index.ts';
-import { PLAYER_API } from './api-spec.ts';
+import type { ApiFunctionSpec } from './protocol.ts';
+import { PLAYER_API, perBotApi } from './api-spec.ts';
 import { apiFunctionsFor, requiredTypesFor } from './ambient.ts';
 
 /**
@@ -19,12 +20,48 @@ import { apiFunctionsFor, requiredTypesFor } from './ambient.ts';
  * implementation is a loud crash on boot, never a `undefined is not a function` in a player's face
  * halfway through World 5.
  *
- * The bot id is bound away here; the player never passes one (DESIGN.md §3).
+ * The bot id is bound away here; the player never passes one (DESIGN.md §3). From World 7 on,
+ * `bot(id)` hands it back: the handle it returns carries the same implementations re-bound to a
+ * different bot, taken from this very table, so a fleet call and a bare call can never disagree.
  */
 
 export type PlayerFunction = (...args: unknown[]) => unknown;
 
-type Binder = (sim: Sim, botId: number) => PlayerFunction;
+/**
+ * `unlocked` is only read by `bot`, which needs it to give the handle exactly the methods this
+ * level has installed and no more. Every other binder ignores it.
+ */
+type Binder = (
+  sim: Sim,
+  botId: number,
+  unlocked: readonly ApiFunctionSpec[],
+) => PlayerFunction;
+
+/**
+ * The `Bot` handle for one id: every per-bot entry of `unlocked`, bound to `id` instead of to the
+ * bot the bare functions command. Handles are memoized because World 7 solutions call `bot(id)`
+ * inside their hot loops, and a fresh object per call would be pure garbage.
+ */
+function botHandles(
+  sim: Sim,
+  unlocked: readonly ApiFunctionSpec[],
+): (id: number) => Record<string, PlayerFunction> {
+  const members = perBotApi(unlocked);
+  const cache = new Map<number, Record<string, PlayerFunction>>();
+
+  return (id: number) => {
+    const existing = cache.get(id);
+    if (existing) return existing;
+
+    const handle: Record<string, PlayerFunction> = {};
+    for (const fn of members) {
+      const binder = BINDERS[fn.name];
+      if (binder) handle[fn.name] = binder(sim, id, unlocked);
+    }
+    cache.set(id, handle);
+    return handle;
+  };
+}
 
 /**
  * `link`, `receive`, `transmit` and `decode` have no `Sim` method: DESIGN.md leaves World 5 and 6
@@ -243,6 +280,11 @@ const BINDERS: Record<string, Binder> = {
       return decodeText(stringify(text), Number(key));
     },
   bots: (sim) => (): number[] => sim.botIds(),
+  clock: (sim, botId) => (): number => sim.clock(botId),
+  bot: (sim, _botId, unlocked) => {
+    const handleFor = botHandles(sim, unlocked);
+    return (id): unknown => handleFor(Number(id));
+  },
   sync: (sim) => (): number => sim.sync(),
   send:
     (sim, botId) =>
@@ -326,7 +368,7 @@ export function buildPlayerScope(
           'api-spec.ts and api-bindings.ts have drifted apart.',
       );
     }
-    api[fn.name] = binder(sim, botId);
+    api[fn.name] = binder(sim, botId, functions);
   }
 
   const values: Record<string, unknown> = {};

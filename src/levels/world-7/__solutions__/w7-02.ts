@@ -92,7 +92,7 @@ export const solution: ReferenceSolution = {
     }
   },
   source: [
-    'const depot = probe(0, "depot");',
+    'const depot = probe("depot");',
     'const crops = [];',
     'for (let i = 0; i < depot.vars.crops; i++) {',
     '  const p = depot.vars["c" + i];',

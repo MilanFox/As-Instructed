@@ -1,5 +1,11 @@
 import type { ApiFunctionSpec, ApiTypeSpec } from './protocol.ts';
-import { PLAYER_API, apiUnlockedBy } from './api-spec.ts';
+import {
+  PLAYER_API,
+  apiUnlockedBy,
+  botHandleDeclaration,
+  perBotApi,
+  renderParams,
+} from './api-spec.ts';
 
 /**
  * Generates the ambient `.d.ts` Monaco injects into the player's editor.
@@ -63,10 +69,7 @@ export function requiredTypesFor(functions: readonly ApiFunctionSpec[]): ApiType
 
 /** `declare function look(dir: Dir, range?: number): TileView[];` */
 export function renderSignature(fn: ApiFunctionSpec): string {
-  const params = fn.params
-    .map((param) => `${param.name}${param.optional ? '?' : ''}: ${param.type}`)
-    .join(', ');
-  return `declare function ${fn.name}(${params}): ${fn.returns};`;
+  return `declare function ${fn.name}(${renderParams(fn)}): ${fn.returns};`;
 }
 
 function costLine(cost: number | string): string {
@@ -105,6 +108,16 @@ function jsDocForType(type: ApiTypeSpec): string {
 }
 
 /**
+ * `Bot` is the one declaration that depends on the level: the handle may only offer the hardware
+ * this bot has installed, or `bot(id).spawn(...)` would type-check a world before the fabricator
+ * exists. Everything else is a fixed string in the spec.
+ */
+function declarationFor(type: ApiTypeSpec, unlocked: readonly ApiFunctionSpec[]): string {
+  if (type.name !== 'Bot') return type.declaration;
+  return botHandleDeclaration(perBotApi(unlocked), jsDoc);
+}
+
+/**
  * The complete ambient declaration file for a bot with exactly `unlockedHardware` installed.
  *
  * The result is a *script*, not a module: it declares globals, so it must never contain a
@@ -117,7 +130,7 @@ export function buildAmbientDts(unlockedHardware: string[]): string {
   const blocks: string[] = [DTS_HEADER];
 
   for (const type of types) {
-    blocks.push(`${jsDocForType(type)}\n${type.declaration}`);
+    blocks.push(`${jsDocForType(type)}\n${declarationFor(type, functions)}`);
   }
 
   for (const fn of functions) {

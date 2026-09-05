@@ -33,13 +33,39 @@ function forbidSolutionsInBundle(): Plugin {
   };
 }
 
+/**
+ * Monaco is roughly nine tenths of the build. `src/ui/adapters.ts` reaches it through a dynamic
+ * `import()` and the workspace is lazy, so it already lands in its own chunk — naming it here
+ * keeps it out of anything else's, and gives it a cache lifetime of its own: the editor does not
+ * change when a level does.
+ *
+ * `worker: { format: 'es' }` (DESIGN.md §3) is deliberately untouched. The sim worker and Monaco's
+ * own workers are separate builds and manual chunking does not apply to them.
+ */
+function manualChunks(id: string): string | undefined {
+  // Vite's dynamic-import preload helper is shared by every chunk. Left unplaced it lands in
+  // whichever chunk Rollup picks first — which was Monaco, giving the entry a static import of it.
+  if (id.includes('vite/preload-helper')) return 'vendor';
+  if (id.includes('/node_modules/monaco-editor/') || id.includes('/node_modules/@monaco-editor/')) {
+    return 'monaco';
+  }
+  if (/\/node_modules\/(react|react-dom|scheduler|zustand|use-sync-external-store)\//.test(id)) {
+    return 'vendor';
+  }
+  if (id.includes('/src/levels/')) return 'levels';
+  if (id.includes('/src/engine/')) return 'engine';
+  return undefined;
+}
+
 export default defineConfig({
   plugins: [react(), forbidSolutionsInBundle()],
   worker: { format: 'es' },
   build: {
     target: 'es2022',
     sourcemap: true,
+    chunkSizeWarningLimit: 900,
     rollupOptions: {
+      output: { manualChunks },
       onwarn(warning, defaultHandler) {
         if (warning.id && SOLUTION_PATTERN.test(warning.id)) {
           throw new Error(`Reference solution referenced during build: ${warning.id}`);

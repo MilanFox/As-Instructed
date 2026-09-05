@@ -3,13 +3,25 @@
  *
  * This is the only file in the shell that knows `Runner`, `Renderer` or Monaco exist. Everything
  * upstream of it talks to the ports, which is what let the UI be built before either landed.
+ *
+ * Monaco is reached through a dynamic `import()`. It is by a wide margin the largest thing in the
+ * build, the game opens on the site map, and nothing on that screen can type — so the editor is
+ * fetched alongside the first paint instead of before it.
  */
-import type { RunResponse } from '../runtime/index.ts';
-import { PLAYER_FILE_PATH, Runner, compilePlayerCode, configurePlayerLanguage } from '../runtime/index.ts';
+import type { MonacoApi, RunRequest, RunResponse, RuntimeFailure } from '../runtime/index.ts';
+import {
+  PLAYER_FILE_PATH,
+  Runner,
+  compilePlayerCode,
+  configurePlayerLanguage,
+  importsLibrary,
+} from '../runtime/index.ts';
 import { Renderer } from '../render/index.ts';
 import type { Trace } from '../engine/index.ts';
+import { LIBRARY_FAILURE, prepareLibrary, useLibrary } from '../meta/index.ts';
 import type { RendererPort, RunSubmission, RunnerPort } from '../game/ports.ts';
-import { monaco, setupMonaco } from './monaco-setup.ts';
+
+type LibraryRequest = NonNullable<RunRequest['library']>;
 
 /**
  * Compile on the main thread, simulate in the worker.
@@ -19,15 +31,38 @@ import { monaco, setupMonaco } from './monaco-setup.ts';
  */
 export class RuntimeRunner implements RunnerPort {
   private readonly runner = new Runner();
+  private loading: Promise<MonacoApi> | null = null;
+  private levelId: string | null = null;
+  private configuredFor: string | null = null;
+
+  /** The unwrapped runner, for the metagame's regression suite (docs/LIBRARY.md §6). */
+  get simulation(): Runner {
+    return this.runner;
+  }
 
   prepare(levelId: string): void {
-    setupMonaco();
-    configurePlayerLanguage(monaco, { levelId });
+    this.levelId = levelId;
+    void this.ready();
+  }
+
+  /** Monaco, loaded and configured for the current work order. */
+  async ready(): Promise<MonacoApi> {
+    this.loading ??= import('./monaco-setup.ts').then((module) => module.setupMonaco());
+    const monaco = await this.loading;
+    if (this.levelId && this.configuredFor !== this.levelId) {
+      configurePlayerLanguage(monaco, { levelId: this.levelId });
+      this.configuredFor = this.levelId;
+    }
+    return monaco;
   }
 
   async run(submission: RunSubmission): Promise<RunResponse> {
-    setupMonaco();
-    const model = this.model(submission.code);
+    const monaco = await this.ready();
+
+    const library = await this.library(monaco, submission.code);
+    if (library.error) return { ok: false, error: library.error };
+
+    const model = this.model(monaco, submission.code);
     const compiled = await compilePlayerCode(monaco, model);
     if (!compiled.ok) return { ok: false, error: compiled.error };
 
@@ -37,6 +72,7 @@ export class RuntimeRunner implements RunnerPort {
       lineMap: compiled.lineMap,
       levelId: submission.levelId,
       seeds: submission.seeds,
+      ...(library.request ? { library: library.request } : {}),
     });
   }
 
@@ -48,8 +84,36 @@ export class RuntimeRunner implements RunnerPort {
     this.runner.dispose();
   }
 
+  /**
+   * The Repository, compiled and ready to link (docs/LIBRARY.md §6, step 2).
+   *
+   * Before the unlock there is no `lib.ts` to build, so this costs nothing at all for the first
+   * three worlds. Afterwards it runs on every Run — that is also what installs `declare module
+   * 'lib'`, so the player's own `import` type-checks in the editor.
+   */
+  private async library(
+    monaco: MonacoApi,
+    code: string,
+  ): Promise<{ request?: LibraryRequest; error?: RuntimeFailure }> {
+    const state = useLibrary.getState();
+    if (!state.save.unlocked) return {};
+
+    const prepared = await prepareLibrary(monaco, state.source);
+    if (prepared.request) return { request: prepared.request };
+    if (!importsLibrary(code)) return {};
+    return {
+      error: {
+        kind: 'compile',
+        file: 'lib',
+        message: LIBRARY_FAILURE.notCompiled,
+        line: prepared.problems[0]?.line ?? 1,
+        column: 1,
+      },
+    };
+  }
+
   /** The editor owns this model in practice; the fallback keeps Run working headlessly. */
-  private model(code: string): monaco.editor.ITextModel {
+  private model(monaco: MonacoApi, code: string): ReturnType<MonacoApi['editor']['createModel']> {
     const uri = monaco.Uri.parse(PLAYER_FILE_PATH);
     const existing = monaco.editor.getModel(uri);
     if (existing) {

@@ -116,3 +116,40 @@ describe('locked hardware is a type error', () => {
     );
   });
 });
+
+/**
+ * The `Bot` handle is the one declaration generated per level rather than copied out of the spec,
+ * so it needs the compiler pointed at it directly: a member that is bound at runtime and missing
+ * here would cost the player autocomplete on every World 7 line they write.
+ */
+describe('the bot handle type-checks', () => {
+  test('a World 7 program written against handles compiles', () => {
+    const source = [
+      'const crew: number[] = bots();',
+      'for (const id of crew) {',
+      '  while (bot(id).canMove(Dir.East)) bot(id).move(Dir.East);',
+      '  bot(id).send(crew[0]!, id);',
+      '}',
+      'sync();',
+      'for (const id of crew) {',
+      '  const msg: Message | null = bot(id).recv();',
+      '  if (msg !== null) print(`${msg.from} at ${msg.t}`);',
+      '}',
+    ].join('\n');
+    expect(messages(check('w7-01', source))).toEqual([]);
+  });
+
+  test('the handle obeys the hardware gate the free functions obey', () => {
+    const program = 'const helper = bot(bots()[0]!).spawn(Dir.East);';
+    const early = check('w7-01', program);
+    expect(early.map((d) => d.code)).toContain(2339);
+    expect(messages(early)[0]).toContain('spawn');
+    expect(messages(check('w7-02', program))).toEqual([]);
+  });
+
+  test('the handle is typed, not an escape hatch', () => {
+    expect(messages(check('w7-01', 'bot(0).move("north");'))[0]).toContain('not assignable');
+    expect(messages(check('w7-01', 'bot("lead").pos();'))[0]).toContain('not assignable');
+    expect(messages(check('w7-01', 'bot(0).clock().toFixed(0);'))).toEqual([]);
+  });
+});

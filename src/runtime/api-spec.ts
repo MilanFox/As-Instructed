@@ -10,8 +10,9 @@ import type { ApiFunctionSpec, ApiTypeSpec, PlayerApiSpec } from './protocol.ts'
  *
  * Bindings: the spec describes the SINGLE-BOT binding, where the acting bot id is already bound
  * away by the runtime. Player code never passes a bot id. World 7 additionally exposes the same
- * functions on per-bot handle objects; constructing those handles is RUNTIME's concern and does
- * not change any signature described here.
+ * functions on the per-bot handle `bot(id)` returns; `FLEET_WIDE` below is the only thing that
+ * decides which entries appear there, and the `Bot` interface the editor sees is generated from
+ * that same list, so the handle cannot drift from the free functions.
  *
  * Specified, not yet implemented in `Sim`: `link`, `receive`, `transmit`, `decode`. World 5 and 6
  * semantics are deliberately open in DESIGN.md, so these four are contracts for the RUNTIME and
@@ -575,6 +576,40 @@ if (raw !== null) {
     category: 'signal',
   },
   {
+    name: 'bot',
+    params: [
+      {
+        name: 'id',
+        type: 'number',
+        doc: 'Which bot to command, as reported by `bots()` or returned by `spawn()`.',
+      },
+    ],
+    returns: 'Bot',
+    doc: "Returns a handle to one bot in the fleet. Every command a bot can run is a method on the handle, and it acts on that bot alone against that bot's own clock, so `bot(0).move(...)` followed by `bot(1).move(...)` moves both of them in the same tick. The bare, unprefixed calls have not changed: they still command the first bot on site.",
+    example: `for (const id of bots()) {
+  bot(id).move(Dir.East);
+}`,
+    cost: 0,
+    unlockedBy: 'w7-01',
+    world: 7,
+    category: 'swarm',
+    requiresTypes: ['Bot', 'Dir'],
+  },
+  {
+    name: 'clock',
+    params: [],
+    returns: 'number',
+    doc: "Returns the tick this bot has reached. Every bot keeps its own clock and the level is scored on the highest one at the end, so comparing clocks is how you find the bot that is furthest behind and hand it the next job.",
+    example: `let idle = bots()[0] as number;
+for (const id of bots()) {
+  if (bot(id).clock() < bot(idle).clock()) idle = id;
+}`,
+    cost: 0,
+    unlockedBy: 'w7-01',
+    world: 7,
+    category: 'sensing',
+  },
+  {
     name: 'bots',
     params: [],
     returns: 'number[]',
@@ -658,9 +693,59 @@ if (helper >= 0) {
   },
 ];
 
+/**
+ * Calls that address the whole fleet rather than one bot, and so are *not* methods on `Bot`.
+ * Everything else is: a bot can do it, therefore `bot(id)` can be asked to do it.
+ */
+const FLEET_WIDE = new Set<string>(['bot', 'bots', 'sync']);
+
+/** The entries `bot(id)` exposes as methods, in unlock order. */
+export function perBotApi(
+  functions: readonly ApiFunctionSpec[] = FUNCTIONS,
+): ApiFunctionSpec[] {
+  return functions.filter((fn) => !FLEET_WIDE.has(fn.name));
+}
+
+/** `dir: Dir, range?: number` — shared by the free-function and the `Bot` member renderers. */
+export function renderParams(fn: ApiFunctionSpec): string {
+  return fn.params
+    .map((param) => `${param.name}${param.optional ? '?' : ''}: ${param.type}`)
+    .join(', ');
+}
+
+/**
+ * The `Bot` interface, generated from the specs that also bind the implementations.
+ *
+ * `members` is the unlocked subset, which is what makes the handle obey the same hardware gate as
+ * the free functions: `bot(id).spawn(...)` must not type-check before the level that installs the
+ * fabricator. `docFor` renders the JSDoc block above each member when the caller wants one.
+ */
+export function botHandleDeclaration(
+  members: readonly ApiFunctionSpec[],
+  docFor?: (fn: ApiFunctionSpec) => string,
+): string {
+  const lines = members.map((fn) => {
+    const signature = `  ${fn.name}(${renderParams(fn)}): ${fn.returns};`;
+    const doc = docFor?.(fn);
+    if (doc === undefined) return signature;
+    const indented = doc
+      .split('\n')
+      .map((line) => `  ${line}`)
+      .join('\n');
+    return `${indented}\n${signature}`;
+  });
+  return `interface Bot {\n${lines.join('\n')}\n}`;
+}
+
+const BOT_TYPE: ApiTypeSpec = {
+  name: 'Bot',
+  declaration: botHandleDeclaration(perBotApi()),
+  doc: "A handle to one bot in the fleet, as returned by `bot(id)`. Every method commands that bot alone and is charged to that bot's own clock.",
+};
+
 export const PLAYER_API: PlayerApiSpec = {
   version: 1,
-  types: TYPES,
+  types: [...TYPES, BOT_TYPE],
   functions: FUNCTIONS,
 };
 

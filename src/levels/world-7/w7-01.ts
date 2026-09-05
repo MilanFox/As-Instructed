@@ -57,7 +57,7 @@ export const w7_01: LevelDef = {
   world: 7,
   index: 1,
   title: 'Two Bots',
-  hardware: ['bots', 'sync', 'send', 'recv'],
+  hardware: ['bot', 'bots', 'clock', 'sync', 'send', 'recv'],
   brief: [
     '**FROM:** Field Eng. D. Halloran',
     '**TO:** Contractor #4471',
@@ -138,5 +138,5 @@ export const w7_01: LevelDef = {
     'Nothing you write makes one bot wait for another. Only sync() does that. So the question is not how to run them in parallel; it is where you are accidentally stopping them.',
     'A bot that is behind in virtual time has not heard anything yet. Ask yourself how far along the shorter walk the fleet is when you call sync(), and what the other bot still has left to do at that moment.',
   ],
-  docs: ['bots', 'sync', 'send', 'recv'],
+  docs: ['bot', 'bots', 'sync', 'send', 'recv'],
 };

@@ -115,10 +115,10 @@ export const solution: ReferenceSolution = {
     }
   },
   source: [
-    'const board = probe(0, "board");',
+    'const board = probe("board");',
     'const jobs = [];',
     'for (let i = 0; i < board.vars.jobs; i++) {',
-    '  const job = probe(0, `job-${i}`);',
+    '  const job = probe(`job-${i}`);',
     '  jobs.push({ id: job.id, at: job.at, cost: job.vars.cost });',
     '}',
     'jobs.sort((a, b) => b.cost - a.cost);',

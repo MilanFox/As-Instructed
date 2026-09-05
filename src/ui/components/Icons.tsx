@@ -109,3 +109,13 @@ export function IconTarget(): React.JSX.Element {
     </svg>
   );
 }
+
+export function IconSound(): React.JSX.Element {
+  return (
+    <svg {...BASE}>
+      <path d="M3 6h2.2L8.6 3.2v9.6L5.2 10H3Z" />
+      <path d="M10.8 6.1a2.6 2.6 0 0 1 0 3.8" />
+      <path d="M12.6 4.3a5.1 5.1 0 0 1 0 7.4" />
+    </svg>
+  );
+}

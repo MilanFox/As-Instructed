@@ -288,7 +288,7 @@ export const w7_05: LevelDef = {
     '// NOTE(4470): the sites are not on the plan. that was the point of them',
     '// NOTE(4470): whoever finds one has to say so. nothing else finds it for them',
     '',
-    'const muster = probe(0, "muster");',
+    'const muster = probe("muster");',
     'const scouts = bots().slice(0, muster.vars.scouts);',
     'const hands = bots().slice(muster.vars.scouts);',
     'print(`${scouts.length} scouts, ${hands.length} hands, ${muster.vars.sites} sites`);',

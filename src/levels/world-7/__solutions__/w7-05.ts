@@ -189,7 +189,7 @@ export const solution: ReferenceSolution = {
     }
   },
   source: [
-    'const muster = probe(0, "muster");',
+    'const muster = probe("muster");',
     'const ids = bots();',
     'const scouts = ids.slice(0, muster.vars.scouts);',
     'const hands = ids.slice(muster.vars.scouts);',
