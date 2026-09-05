@@ -56,6 +56,22 @@ export function alpha(hex: string, a: number): string {
   return table[step] as string;
 }
 
+/**
+ * Linear blend between two palette entries, `t` in 0..1.
+ *
+ * Exists so a ramp between two *existing* hues counts as derived colour rather than a new accent
+ * — the visited-tile trail runs `inkDim` to `danger` and would otherwise need literals for every
+ * step. Call it while building a lookup table, never per draw.
+ */
+export function mix(from: string, to: string, t: number): string {
+  const k = t <= 0 ? 0 : t >= 1 ? 1 : t;
+  const a = Number.parseInt(from.slice(1), 16);
+  const b = Number.parseInt(to.slice(1), 16);
+  const lerp = (shift: number): number =>
+    Math.round(((a >> shift) & 255) + (((b >> shift) & 255) - ((a >> shift) & 255)) * k);
+  return `#${((1 << 24) | (lerp(16) << 16) | (lerp(8) << 8) | lerp(0)).toString(16).slice(1)}`;
+}
+
 export function shade(hex: string, factor: number): string {
   const n = Number.parseInt(hex.slice(1), 16);
   const clamp = (v: number): number => Math.max(0, Math.min(255, Math.round(v)));

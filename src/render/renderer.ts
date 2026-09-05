@@ -66,6 +66,7 @@ import {
 } from './tiles.ts';
 import type { Biome } from './tiles.ts';
 import { TraceTimeline, createPose } from './timeline.ts';
+import { VisitTrail } from './trail.ts';
 import type { BotPose } from './timeline.ts';
 
 /** Playback speed is expressed in engine ticks per wall-clock second. */
@@ -185,6 +186,7 @@ export class Renderer {
 
   private trace: Trace | null = null;
   private timeline: TraceTimeline | null = null;
+  private trail: VisitTrail | null = null;
 
   private currentTick = 0;
   private playing = false;
@@ -364,6 +366,7 @@ export class Renderer {
   setTrace(trace: Trace | null): void {
     this.trace = trace ? reviveTrace(trace) : null;
     this.timeline = trace ? new TraceTimeline(trace) : null;
+    this.trail = this.timeline ? new VisitTrail(this.timeline) : null;
     this.snapshot = null;
     this.snapshotTick = -1;
     this.workingIndex = 0;
@@ -1052,6 +1055,13 @@ export class Renderer {
       world.w * tilePx,
       world.h * tilePx,
     );
+
+    // The visited-tile trail sits between the floor and the grid: the grid lines stay legible on
+    // top of it, and every feature, mark, item and bot below draws over it (DESIGN.md §11 A5).
+    if (this.trail) {
+      this.trail.sync(tick);
+      this.trail.draw(ctx, tilePx, this.range);
+    }
 
     drawGrid(ctx, tilePx, this.range, 5, dpr);
     drawOutOfBounds(ctx, world.w, world.h, tilePx, dpr);

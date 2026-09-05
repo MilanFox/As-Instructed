@@ -107,4 +107,6 @@ export type { BotPose, BotSegment, TickIndex } from './timeline.ts';
 export { TerrainLayer, cacheTilePxFor, keysEqual } from './terrain.ts';
 export type { TerrainKey } from './terrain.ts';
 
-export { BOT_ACCENTS, botAccent, palette, alpha, shade } from './theme.ts';
+export { VisitTrail, TRAIL_MIN_VISITS, TRAIL_MAX_VISITS, trailFill } from './trail.ts';
+
+export { BOT_ACCENTS, botAccent, palette, alpha, mix, shade } from './theme.ts';
