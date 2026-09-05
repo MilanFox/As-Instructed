@@ -222,8 +222,10 @@ level where you install the sensor. Each world's finale is a bigger multi-object
 
 ## 7. Scoring
 
-**Medals are ticks-only.** `max(bot.clock)` against `par.ticks`: `<= par` gold, `<= par * 1.25`
-silver, a pass is bronze. Nothing else moves a medal.
+**Medals are ticks-only.** `max(bot.clock)` against `par.ticks`: `<= par` gold,
+`<= max(par + 1, par * 1.25)` silver, a pass is bronze. Nothing else moves a medal. The
+`par + 1` floor exists because ticks are integers, so a par under four otherwise has an empty
+silver band — `floor(3 * 1.25)` is 3. One rung is always reachable. See `docs/FIX-PAR.md` §7.
 
 - **Ticks** (the medal axis): `max(bot.clock)`.
 - **The information budget**: `Objectives.withinSenses(name, n)`. Sensing stays free in ticks;
