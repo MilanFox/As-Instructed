@@ -147,10 +147,15 @@ export function mountLibrary(runner: RuntimeRunner): () => void {
    * against the *level's* hardware declarations: run this before `configurePlayerLanguage` has
    * caught up and a library that calls `look()` fails to build against World 1's firmware, the
    * declaration is dropped, and every import in the editor turns red until the next Run.
+   *
+   * Which is why `levelId` is passed rather than read: the store's own subscribers run before the
+   * workspace's effects do, so at this point the runner has not been told what the player just
+   * opened and `ready()` on its own would answer for the previous work order.
    */
-  const installTypes = async (): Promise<void> => {
+  const installTypes = async (levelId?: string | null): Promise<void> => {
     const state = useLibrary.getState();
     if (!state.save.unlocked || !activeRunner) return;
+    if (levelId) activeRunner.prepare(levelId);
     await prepareLibrary(await activeRunner.ready(), state.save.source);
   };
 
@@ -194,7 +199,7 @@ export function mountLibrary(runner: RuntimeRunner): () => void {
   let pending: { levelId: string; code: string } | null = null;
 
   const unsubscribe = useGame.subscribe((state, previous) => {
-    if (state.currentLevelId !== previous.currentLevelId) void installTypes();
+    if (state.currentLevelId !== previous.currentLevelId) void installTypes(state.currentLevelId);
 
     if (state.showResults && !previous.showResults && state.verdict?.passed) {
       const levelId = state.currentLevelId;

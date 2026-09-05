@@ -1,4 +1,5 @@
 import { findModuleStatements, importedLibraryNames } from '../runtime/index.ts';
+import { PUBLISH } from './copy.ts';
 
 /**
  * Lifting a declaration out of a closed work order and into `lib.ts`.
@@ -33,6 +34,8 @@ export interface Declaration {
   uses: string[];
   /** Bot API names it calls. Used to warn that earlier work orders have no such hardware. */
   hardware: string[];
+  /** True when it binds something a later work order could call. Data and scratch do not. */
+  callable: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -254,22 +257,15 @@ function lineAt(offsets: readonly number[], offset: number): number {
 const DECLARATION_START =
   /^(?:export\s+)?(?:(?:async\s+)?function\s*\*?\s*([A-Za-z_$][\w$]*)|(?:abstract\s+)?class\s+([A-Za-z_$][\w$]*)|(const|let|var)\s+([A-Za-z_$][\w$]*))/;
 
-/**
- * The end of a top-level declaration that starts at `from`.
- *
- * A `function` or `class` ends at the `}` that closes its body — braces only, because the
- * parameter list's own `)` is not the end of anything. A `const` ends at the semicolon or line
- * break that closes it, with every bracket balanced first so a ten-line object literal comes
- * along whole.
- */
-function declarationEnd(source: string, from: number, braced: boolean): number {
-  let braces = 0;
-  let brackets = 0;
-  let opened = false;
+/** Offset of the next character that is neither whitespace nor a comment. */
+function nextSignificant(source: string, from: number): number {
   let i = from;
-
   while (i < source.length) {
     const ch = source[i] as string;
+    if (/\s/.test(ch)) {
+      i += 1;
+      continue;
+    }
     if (ch === '/' && source[i + 1] === '/') {
       while (i < source.length && source[i] !== '\n') i++;
       continue;
@@ -280,37 +276,208 @@ function declarationEnd(source: string, from: number, braced: boolean): number {
       i += 2;
       continue;
     }
+    break;
+  }
+  return Math.min(i, source.length);
+}
+
+/** Offset just past the `}` closing a template substitution that opened before `from`. */
+function skipSubstitution(source: string, from: number): number {
+  let depth = 1;
+  let i = from;
+  while (i < source.length) {
+    const ch = source[i] as string;
     if (ch === '"' || ch === "'" || ch === '`') {
-      const quote = ch;
-      i += 1;
-      while (i < source.length) {
-        if (source[i] === '\\') {
-          i += 2;
-          continue;
-        }
-        if (source[i] === quote) {
-          i += 1;
-          break;
-        }
-        i += 1;
-      }
+      const next = skipLiteral(source, i);
+      if (next === -1) return -1;
+      i = next;
       continue;
     }
-
-    if (ch === '{') {
-      braces++;
-      opened = true;
-    } else if (ch === '}') {
-      braces--;
-      if (braced && opened && braces === 0) return i + 1;
-    } else if (ch === '(' || ch === '[') brackets++;
-    else if (ch === ')' || ch === ']') brackets--;
-    else if (!braced && braces === 0 && brackets === 0 && (ch === ';' || ch === '\n')) {
-      return ch === ';' ? i + 1 : i;
+    if (ch === '/' && source[i + 1] === '/') {
+      while (i < source.length && source[i] !== '\n') i++;
+      continue;
+    }
+    if (ch === '/' && source[i + 1] === '*') {
+      i += 2;
+      while (i < source.length && !(source[i] === '*' && source[i + 1] === '/')) i++;
+      i += 2;
+      continue;
+    }
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) return i + 1;
     }
     i += 1;
   }
+  return -1;
+}
+
+/**
+ * Offset just past the string or template starting at `from`, or `-1` when it never closes.
+ *
+ * Templates are walked rather than skipped to their next backtick, because a substitution can hold
+ * another template — and a scan that stopped at the first backtick it saw would go on to count the
+ * braces of a string as structure.
+ */
+function skipLiteral(source: string, from: number): number {
+  const quote = source[from] as string;
+  let i = from + 1;
+  while (i < source.length) {
+    const ch = source[i] as string;
+    if (ch === '\\') {
+      i += 2;
+      continue;
+    }
+    if (ch === quote) return i + 1;
+    if (quote !== '`' && ch === '\n') return -1;
+    if (quote === '`' && ch === '$' && source[i + 1] === '{') {
+      const close = skipSubstitution(source, i + 2);
+      if (close === -1) return -1;
+      i = close;
+      continue;
+    }
+    i += 1;
+  }
+  return -1;
+}
+
+/** Offset just past a regular expression starting at `from`, or `-1` when it never closes. */
+function skipRegex(source: string, from: number): number {
+  let i = from + 1;
+  let inClass = false;
+  while (i < source.length) {
+    const ch = source[i] as string;
+    if (ch === '\\') {
+      i += 2;
+      continue;
+    }
+    if (ch === '\n') return -1;
+    if (ch === '[') inClass = true;
+    else if (ch === ']') inClass = false;
+    else if (ch === '/' && !inClass) return i + 1;
+    i += 1;
+  }
+  return -1;
+}
+
+const REGEX_MAY_START = /[=(,:[!&|?{};+\-*%~^<>]$/;
+
+/**
+ * The last token before a line break that says the expression is not finished, and the first token
+ * after one that says the same thing. Together they are automatic semicolon insertion, which is
+ * the only rule that decides where an unterminated `const` actually ends.
+ */
+const CONTINUES_AFTER =
+  /(?:=>|[=+\-*/%,?:&|^~!<>.])$|\b(?:new|typeof|instanceof|in|of|as|satisfies|extends|implements|keyof|await|void|delete|yield|return|else|do)$/;
+const CONTINUES_BEFORE =
+  /^(?:=>|\?\.|\.{3}|&&|\|\||\?\?|[.?:,+\-*/%&|^<>=])|^(?:instanceof|in|of|as|satisfies|extends|implements)\b/;
+
+const TAIL_LENGTH = 24;
+
+/**
+ * The end of a top-level declaration that starts at `from`.
+ *
+ * Both shapes are decided by structure, never by lines. A `function` or `class` ends at the `}`
+ * that returns every delimiter to depth zero and is not immediately followed by another `{` — the
+ * second `{` being the body of `function f(): { a: number } { … }` and the first its return type.
+ * A `const` ends at a `;`, or at the line break where JavaScript would insert one: a line ending
+ * in `=>`, or one followed by `.`, is not a line break that ends anything.
+ *
+ * Nothing here counts lines. A declaration spanning twelve of them is one declaration, and the
+ * only reason the old scan disagreed was that it stopped at the first newline it could reach.
+ */
+function declarationEnd(source: string, from: number, braced: boolean): number {
+  const open: string[] = [];
+  let tail = '';
+  let i = from;
+
+  const push = (text: string): void => {
+    tail = (tail + text).slice(-TAIL_LENGTH);
+  };
+  const space = (): void => {
+    if (!tail.endsWith(' ')) tail += ' ';
+  };
+
+  while (i < source.length) {
+    const ch = source[i] as string;
+
+    if (ch === '/' && source[i + 1] === '/') {
+      while (i < source.length && source[i] !== '\n') i++;
+      space();
+      continue;
+    }
+    if (ch === '/' && source[i + 1] === '*') {
+      i += 2;
+      while (i < source.length && !(source[i] === '*' && source[i + 1] === '/')) i++;
+      i += 2;
+      space();
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === '`') {
+      const next = skipLiteral(source, i);
+      if (next === -1) return source.length;
+      i = next;
+      push(')');
+      continue;
+    }
+    if (ch === '/' && REGEX_MAY_START.test(tail.trimEnd())) {
+      const next = skipRegex(source, i);
+      if (next === -1) return source.length;
+      i = next;
+      push(')');
+      continue;
+    }
+
+    if (ch === '\n') {
+      if (
+        !braced &&
+        open.length === 0 &&
+        tail.trim() !== '' &&
+        !CONTINUES_AFTER.test(tail.trimEnd()) &&
+        !CONTINUES_BEFORE.test(source.slice(nextSignificant(source, i + 1)).slice(0, TAIL_LENGTH))
+      ) {
+        return i;
+      }
+      space();
+      i += 1;
+      continue;
+    }
+    if (/\s/.test(ch)) {
+      space();
+      i += 1;
+      continue;
+    }
+
+    if (ch === '(' || ch === '[' || ch === '{') {
+      open.push(ch);
+      push(ch);
+      i += 1;
+      continue;
+    }
+    if (ch === ')' || ch === ']' || ch === '}') {
+      open.pop();
+      push(ch);
+      i += 1;
+      if (braced && ch === '}' && open.length === 0) {
+        const rest = source.slice(nextSignificant(source, i)).slice(0, TAIL_LENGTH);
+        if (rest.startsWith('{') || CONTINUES_BEFORE.test(rest)) continue;
+        return source[i] === ';' ? i + 1 : i;
+      }
+      continue;
+    }
+    if (ch === ';' && !braced && open.length === 0) return i + 1;
+
+    push(ch);
+    i += 1;
+  }
   return source.length;
+}
+
+/** A `//` run sharing the declaration's last line belongs to it, the way a doc comment does. */
+function trailingComment(source: string, end: number): number {
+  const match = /^[ \t]*\/\/[^\n]*/.exec(source.slice(end));
+  return match ? end + match[0].length : end;
 }
 
 /** Doc comment or `//` run directly above `line`, so it travels with the declaration. */
@@ -332,26 +499,7 @@ function commentAbove(lines: readonly string[], line: number): number {
  * as an unpublishable file.
  */
 function declarationHead(text: string): number {
-  let i = 0;
-  while (i < text.length) {
-    const ch = text[i] as string;
-    if (/\s/.test(ch)) {
-      i += 1;
-      continue;
-    }
-    if (ch === '/' && text[i + 1] === '/') {
-      while (i < text.length && text[i] !== '\n') i++;
-      continue;
-    }
-    if (ch === '/' && text[i + 1] === '*') {
-      i += 2;
-      while (i < text.length && !(text[i] === '*' && text[i + 1] === '/')) i++;
-      i += 2;
-      continue;
-    }
-    break;
-  }
-  return Math.min(i, text.length);
+  return nextSignificant(text, 0);
 }
 
 const FUNCTION_HEAD =
@@ -404,6 +552,106 @@ function parameterNames(text: string): Set<string> {
   return names;
 }
 
+/** Offset of the delimiter closing the one at `open`, or `-1` when nothing closes it. */
+function matchingBracket(text: string, open: number): number {
+  let depth = 0;
+  let i = open;
+  while (i < text.length) {
+    const ch = text[i] as string;
+    if (ch === '"' || ch === "'" || ch === '`') {
+      const next = skipLiteral(text, i);
+      if (next === -1) return -1;
+      i = next;
+      continue;
+    }
+    if (ch === '(' || ch === '[' || ch === '{') depth++;
+    else if (ch === ')' || ch === ']' || ch === '}') {
+      depth--;
+      if (depth === 0) return i;
+    }
+    i += 1;
+  }
+  return -1;
+}
+
+/** Offset of the `=` that introduces a binding's value, past any type annotation. */
+function initialiserAt(body: string): number {
+  let i = 0;
+  while (i < body.length) {
+    const ch = body[i] as string;
+    if (ch === '"' || ch === "'" || ch === '`') {
+      const next = skipLiteral(body, i);
+      if (next === -1) return -1;
+      i = next;
+      continue;
+    }
+    if (ch === '(' || ch === '[' || ch === '{') {
+      const close = matchingBracket(body, i);
+      if (close === -1) return -1;
+      i = close + 1;
+      continue;
+    }
+    if (
+      ch === '=' &&
+      body[i + 1] !== '>' &&
+      body[i + 1] !== '=' &&
+      !/[=<>!]/.test(body[i - 1] ?? '')
+    )
+      return i;
+    if (ch === ';' || ch === '\n') return -1;
+    i += 1;
+  }
+  return -1;
+}
+
+/**
+ * True when the declaration binds something a later work order could *call*.
+ *
+ * The Repository is for subroutines. A tile map, a loop counter or a best-so-far accumulator is
+ * real code the player wrote, and it is still not a thing another work order imports and uses — it
+ * travels as part of a routine's closure or it does not travel at all. See docs/FIX-LIBRARY.md.
+ */
+function isCallable(kind: Declaration['kind'], text: string): boolean {
+  if (kind === 'function' || kind === 'class') return true;
+  const body = text.slice(declarationHead(text));
+  const equals = initialiserAt(body);
+  if (equals === -1) return false;
+
+  let value = body.slice(equals + 1).trimStart();
+  if (/^async\b/.test(value)) value = value.slice(5).trimStart();
+  if (/^function\b/.test(value)) return true;
+  if (/^[A-Za-z_$][\w$]*\s*=>/.test(value)) return true;
+  if (/^<[^<>]*>\s*\(/.test(value)) value = value.slice(value.indexOf('(') as number);
+  if (!value.startsWith('(')) return false;
+
+  const close = matchingBracket(value, 0);
+  if (close === -1) return false;
+  return /^\s*(?:=>|:)/.test(value.slice(close + 1));
+}
+
+/**
+ * A routine plus everything it needs: the transitive `uses` closure, in source order.
+ *
+ * A subroutine is a function, the helpers it calls and the state it closes over. Asking the player
+ * to assemble that by ticking one box per part is asking them to do the dependency analysis the
+ * scan has already done.
+ */
+export function closureOf(
+  declarations: readonly Declaration[],
+  names: readonly string[],
+): string[] {
+  const byName = new Map(declarations.map((each) => [each.name, each]));
+  const reached = new Set<string>();
+  const pending = [...names];
+  while (pending.length > 0) {
+    const name = pending.pop() as string;
+    if (reached.has(name) || !byName.has(name)) continue;
+    reached.add(name);
+    pending.push(...(byName.get(name) as Declaration).uses);
+  }
+  return declarations.filter((each) => reached.has(each.name)).map((each) => each.name);
+}
+
 /**
  * Top-level declarations in the player's source, in order.
  *
@@ -421,10 +669,11 @@ export function publishableDeclarations(
   const found: Declaration[] = [];
   const hardwareSet = new Set(hardware);
 
-  const moduleSpans = findModuleStatements(source).map((statement) => ({
-    start: statement.start,
-    end: statement.end,
-  }));
+  /* `export function f() {}` is a declaration that happens to be exported, which is exactly what
+     `lib.ts` is made of; only an import or a bare `export { … }` clause is off limits. */
+  const moduleSpans = findModuleStatements(source)
+    .filter((statement) => !DECLARATION_START.test(statement.text))
+    .map((statement) => ({ start: statement.start, end: statement.end }));
 
   for (let index = 0; index < lines.length; index++) {
     const raw = lines[index] as string;
@@ -445,7 +694,7 @@ export function publishableDeclarations(
         : ((match[3] ?? 'const') as 'const' | 'let' | 'var');
 
     const braced = kind === 'function' || kind === 'class';
-    const end = declarationEnd(source, start, braced);
+    const end = trailingComment(source, declarationEnd(source, start, braced));
     const startLine = commentAbove(lines, index + 1);
     const textStart = offsets[startLine - 1] as number;
 
@@ -465,6 +714,7 @@ export function publishableDeclarations(
       text: source.slice(textStart, end),
       uses: [],
       hardware: [...referenced].filter((each) => hardwareSet.has(each)).sort(),
+      callable: isCallable(kind, source.slice(start, end)),
     });
   }
 
@@ -536,6 +786,126 @@ export interface PublishPlan {
   missing: string[];
   /** Bot API the published code calls. */
   hardware: string[];
+  /**
+   * Why the plan was not applied. When this is non-empty both sources are the originals: the
+   * publish did not happen, and neither did any part of it.
+   */
+  refusals: PublishRefusal[];
+}
+
+/** Something that would make the composed file unusable. A publish with any of these is refused. */
+export interface PublishRefusal {
+  /** The declaration the trouble sits inside, when it sits inside one. */
+  name?: string;
+  message: string;
+}
+
+interface Balance {
+  /** Offset of a delimiter, string or comment that never closes. */
+  unclosed: number | null;
+  /** Offset of a closing delimiter that closes nothing. */
+  stray: number | null;
+}
+
+/**
+ * Whether a file's delimiters, strings, templates and comments all close.
+ *
+ * Not a parser, and it does not pretend to be one: it is the check that catches every way a text
+ * rewrite can leave a file that cannot be read back — half a declaration, a swallowed neighbour, a
+ * comment that ate the code after it. Anything it passes still has to satisfy the round trip.
+ */
+function balanceOf(source: string): Balance {
+  const open: { ch: string; at: number }[] = [];
+  let tail = '';
+  let i = 0;
+
+  while (i < source.length) {
+    const ch = source[i] as string;
+    if (ch === '/' && source[i + 1] === '/') {
+      while (i < source.length && source[i] !== '\n') i++;
+      tail = ' ';
+      continue;
+    }
+    if (ch === '/' && source[i + 1] === '*') {
+      const at = i;
+      i += 2;
+      while (i < source.length && !(source[i] === '*' && source[i + 1] === '/')) i++;
+      if (i >= source.length) return { unclosed: at, stray: null };
+      i += 2;
+      tail = ' ';
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === '`') {
+      const next = skipLiteral(source, i);
+      if (next === -1) return { unclosed: i, stray: null };
+      i = next;
+      tail = ')';
+      continue;
+    }
+    if (ch === '/' && REGEX_MAY_START.test(tail.trimEnd())) {
+      const next = skipRegex(source, i);
+      if (next === -1) return { unclosed: i, stray: null };
+      i = next;
+      tail = ')';
+      continue;
+    }
+    if (ch === '(' || ch === '[' || ch === '{') open.push({ ch, at: i });
+    else if (ch === ')' || ch === ']' || ch === '}') {
+      const last = open.pop();
+      const wanted = ch === ')' ? '(' : ch === ']' ? '[' : '{';
+      if (!last) return { unclosed: null, stray: i };
+      if (last.ch !== wanted) return { unclosed: last.at, stray: i };
+    }
+    if (!/\s/.test(ch)) tail = (tail + ch).slice(-TAIL_LENGTH);
+    else if (!tail.endsWith(' ')) tail += ' ';
+    i += 1;
+  }
+  return { unclosed: open[0]?.at ?? null, stray: null };
+}
+
+/** 1-based line holding `offset`. */
+function lineOf(source: string, offset: number): number {
+  let line = 1;
+  for (let i = 0; i < offset && i < source.length; i++) if (source[i] === '\n') line += 1;
+  return line;
+}
+
+/**
+ * Whether the composed `lib.ts` can be read back as the file that was meant to be written.
+ *
+ * Two questions, and the second is the one that matters. *Does it close?* — every delimiter,
+ * string and comment balances. *Does it round-trip?* — scanning the composed file finds each
+ * published declaration again, byte for byte as it was appended. A publish that fails either
+ * question is refused and nothing is written, because a refused publish is recoverable and a
+ * corrupted Repository is not.
+ */
+export function libraryRefusals(options: {
+  source: string;
+  additions: readonly { name: string; text: string }[];
+}): PublishRefusal[] {
+  const refusals: PublishRefusal[] = [];
+
+  for (const addition of options.additions) {
+    const balance = balanceOf(addition.text);
+    if (balance.unclosed !== null || balance.stray !== null) {
+      refusals.push({ name: addition.name, message: PUBLISH.refusedDeclaration(addition.name) });
+    }
+  }
+  if (refusals.length > 0) return refusals;
+
+  const balance = balanceOf(options.source);
+  if (balance.unclosed !== null || balance.stray !== null) {
+    const at = (balance.unclosed ?? balance.stray) as number;
+    return [{ message: PUBLISH.refusedLibrary(lineOf(options.source, at)) }];
+  }
+
+  const readBack = publishableDeclarations(options.source);
+  for (const addition of options.additions) {
+    if (!readBack.some((each) => each.name === addition.name && each.text === addition.text)) {
+      refusals.push({ name: addition.name, message: PUBLISH.refusedDeclaration(addition.name) });
+    }
+  }
+  return refusals;
 }
 
 /** Names `lib.ts` already publishes, read from the source rather than from save data. */
@@ -617,6 +987,14 @@ export function planPublication(options: {
       ? options.librarySource
       : `${trimmedLibrary}\n\n${additions.join('\n\n')}\n`;
 
+  const refusals = libraryRefusals({
+    source: librarySource,
+    additions: chosen.map((each, index) => ({
+      name: each.publishAs,
+      text: additions[index] as string,
+    })),
+  });
+
   /* Then the work order: cut from the bottom so the offsets above stay true. */
   const ordered = [...chosen].sort((a, b) => b.declaration.start - a.declaration.start);
   let levelSource = options.levelSource;
@@ -632,14 +1010,24 @@ export function planPublication(options: {
       : `${each.publishAs} as ${each.declaration.name}`,
   );
   if (wanted.length > 0) levelSource = withLibraryImport(levelSource, wanted);
+  levelSource = levelSource.replace(/\n{3,}/g, '\n\n');
 
+  if (refusals.length === 0) {
+    const levelBalance = balanceOf(levelSource);
+    if (levelBalance.unclosed !== null || levelBalance.stray !== null) {
+      refusals.push({ message: PUBLISH.refusedRemoval });
+    }
+  }
+
+  const applied = refusals.length === 0;
   return {
-    librarySource,
-    levelSource: levelSource.replace(/\n{3,}/g, '\n\n'),
+    librarySource: applied ? librarySource : options.librarySource,
+    levelSource: applied ? levelSource : options.levelSource,
     published: chosen.map((each) => each.publishAs),
     conflicts,
     missing,
     hardware,
+    refusals,
   };
 }
 
