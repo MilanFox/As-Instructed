@@ -72,7 +72,7 @@ describe('reviewTier', () => {
     expect(reviewTier(74).grade).toBe('ABOVE BASELINE');
     expect(reviewTier(75).grade).toBe('EXCEPTIONAL (NON-BINDING)');
     expect(reviewTier(92).grade).toBe('EXCEPTIONAL (NON-BINDING)');
-    expect(reviewTier(93).grade).toBe('RETAINED');
+    expect(reviewTier(99.9).grade).toBe('EXCEPTIONAL (NON-BINDING)');
     expect(reviewTier(100).grade).toBe('RETAINED');
   });
 

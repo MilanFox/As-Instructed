@@ -132,7 +132,7 @@ export const REVIEW_TIERS: readonly ReviewTier[] = [
   {
     rank: 5,
     grade: 'RETAINED',
-    min: 93,
+    min: 100,
     body:
       'Every work order on this site is closed at or under par. There is no grade above this one. ' +
       'There has never needed to be.\n\n' +
