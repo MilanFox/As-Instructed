@@ -119,6 +119,7 @@ export class TerrainLayer {
     }
 
     this.tintSolids(world, ctx, tilePx);
+    this.renderPits(world, ctx, tilePx);
     this.renderWallShadows(world, ctx, tilePx);
 
     const dim = biomeArt(biome).dim;
@@ -151,6 +152,40 @@ export class TerrainLayer {
         const isWall = !tile || tile.terrain === Terrain.Wall || tile.terrain === Terrain.Void;
         ctx.fillStyle = isWall ? wall : obstacle;
         ctx.fillRect(x * tilePx, y * tilePx, tilePx, tilePx);
+      }
+    }
+    ctx.restore();
+  }
+
+  /**
+   * Turns pit tiles into holes.
+   *
+   * A pit is `walkable: true, lethal: true` — the one terrain that kills a bot for driving onto
+   * it — and `feature.pit` is a thin dark ring on a floor that is already dark, so at 13 px it is
+   * indistinguishable from a rubble smudge. That is the worst legibility failure in the set,
+   * because the consequence is fatal and the player is expected to route around it.
+   *
+   * The fix stays inside the art direction rather than adding a warning colour: a hole is drawn
+   * as a hole. Near-void fill, and a single lit arc on the far rim, which is the one cue that
+   * separates "depression" from "dark patch" at any size. Baked into the cache, so it is free.
+   */
+  private renderPits(world: World, ctx: CanvasRenderingContext2D, tilePx: number): void {
+    const r = tilePx * 0.36;
+    ctx.save();
+    ctx.lineWidth = Math.max(1, tilePx * 0.05);
+    for (let y = 0; y < world.h; y++) {
+      for (let x = 0; x < world.w; x++) {
+        if (tileAt(world, { x, y })?.terrain !== Terrain.Pit) continue;
+        const cx = (x + 0.5) * tilePx;
+        const cy = (y + 0.52) * tilePx;
+        ctx.fillStyle = alpha(palette.bgVoid, 0.88);
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, r, r * 0.88, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = alpha(palette.inkDim, 0.55);
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, r, r * 0.88, 0, Math.PI * 1.08, Math.PI * 1.92);
+        ctx.stroke();
       }
     }
     ctx.restore();

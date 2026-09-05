@@ -109,6 +109,25 @@ interface CelebrationState {
 const MEDAL_BEAT = 0.14;
 
 /**
+ * The playback lean.
+ *
+ * `setHighlights` is called with the cells the objective in progress still has to reach, and it
+ * is called again every time the run reaches one of them. So the camera is told where the work is
+ * going several times a second during a busy stretch, and each telling refreshes a short focus —
+ * which adds up to a view that sits slightly towards whatever the run is currently doing and
+ * drifts back to centre when it stops doing anything.
+ *
+ * `LEAN_SECONDS` is the tail: long enough that consecutive refreshes overlap into one continuous
+ * lean rather than a series of twitches, short enough that a run which stalls lets go on its own.
+ * `LEAN_PULL` is deliberately below the celebration's 0.55 — a medal landing is an event and may
+ * take the camera, an objective in progress is only the subject and may lean towards it. On a
+ * grid that fits the viewport, which is most of them, `MAX_FOCUS_PX` caps the whole gesture at
+ * fourteen pixels of drift.
+ */
+const LEAN_SECONDS = 2.4;
+const LEAN_PULL = 0.32;
+
+/**
  * `peak` is the opacity of the screen wash at the very edge of the viewport, measured rather than
  * guessed: at 0.3 a gold corner reads RGB 79 against a void of RGB 6, which is a glow, and glow is
  * exactly what DESIGN.md §8 forbids. At 0.2 it is unmistakably gold and still furniture.
@@ -219,10 +238,22 @@ export class Renderer {
     showLabel: false,
     rush: 0,
     reduced: false,
+    dpr: 1,
   };
 
   private highlights: readonly Vec[] = [];
   private highlightsMet = false;
+  /**
+   * True once the player has panned or zoomed by hand.
+   *
+   * The lean is the camera taking an interest, and a camera that takes an interest in something
+   * the player has just deliberately looked away from is a camera fighting them. So the first
+   * manual pan or zoom hands the view over for the rest of this replay; `fit` and the next
+   * `setTrace` give it back, and neither is far away.
+   */
+  private cameraHeld = false;
+  /** A lean is in flight, as opposed to a celebration's focus. Only leans yield to the transport. */
+  private leaning = false;
   private hoverCell: Vec | null = null;
   private activeBot: number | null = null;
 
@@ -344,6 +375,8 @@ export class Renderer {
     this.poses.clear();
     this.drawOrder.length = 0;
     this.skipCelebration();
+    this.leaning = false;
+    this.cameraHeld = false;
     this.completion = 0;
     this.finalObjective = lastObjectiveIndex(this.trace);
 
@@ -380,6 +413,7 @@ export class Renderer {
     // for pixels as for sound: nothing left ringing, nothing left on screen.
     if (next !== this.currentTick) {
       this.skipCelebration();
+      this.releaseLean();
       this.completion = 0;
     }
     if (next < this.currentTick) {
@@ -408,10 +442,13 @@ export class Renderer {
     this.skipCelebration();
     if (this.currentTick >= this.endTick) this.seek(0);
     this.playing = true;
+    this.lean();
   }
 
   pause(): void {
     this.playing = false;
+    // A camera still drifting after the player has stopped the run reads as lag, not as intent.
+    this.releaseLean();
   }
 
   setSpeed(ticksPerSecond: number): void {
@@ -433,10 +470,37 @@ export class Renderer {
     this.terrain.invalidate();
   }
 
-  /** Cells the current objective is about. Drawn as pulsing brackets under the bots. */
+  /**
+   * Cells the current objective is about. Drawn as pulsing brackets under the bots, and — while
+   * the run is playing — leaned towards. See `LEAN_SECONDS`.
+   */
   setHighlights(cells: readonly Vec[], met = false): void {
     this.highlights = cells;
     this.highlightsMet = met;
+    this.lean();
+  }
+
+  /**
+   * Points the camera a little way towards the work in progress.
+   *
+   * Every condition here is a reason the camera is already somebody else's: the player's hands,
+   * a follow target, a celebration, a stopped playhead, or reduced motion — under which this is
+   * the whole feature, and it is simply off.
+   */
+  private lean(): void {
+    const at = this.highlights[0];
+    if (!at) return;
+    if (!this.playing || this.cameraHeld || this.reducedMotion) return;
+    if (this.camera.following || this.celebration) return;
+    this.camera.focus(at.x, at.y, LEAN_SECONDS, LEAN_PULL);
+    this.leaning = true;
+  }
+
+  /** Drops a lean, leaving a celebration's focus alone. */
+  private releaseLean(): void {
+    if (!this.leaning) return;
+    this.leaning = false;
+    this.camera.releaseFocus();
   }
 
   setActiveBot(botId: number | null): void {
@@ -454,6 +518,8 @@ export class Renderer {
   }
 
   fit(): void {
+    this.cameraHeld = false;
+    this.leaning = false;
     this.camera.fit(true);
   }
 
@@ -505,6 +571,8 @@ export class Renderer {
       duration: options.seconds ?? (tier.strength > 0 ? 1.5 : 1),
     };
 
+    // The finale outranks the lean; from here the focus belongs to the celebration arc.
+    this.leaning = false;
     const at = options.at ?? this.celebrationCell();
     if (tier.strength > 0) {
       this.burst('medal', at.x + 0.5, at.y + 0.5, tier.color, kind.length * 7919, 0, 0, tier.strength, MEDAL_BEAT);
@@ -985,9 +1053,9 @@ export class Renderer {
       world.h * tilePx,
     );
 
-    drawGrid(ctx, tilePx, this.range, 5);
-    drawOutOfBounds(ctx, world.w, world.h, tilePx);
-    drawGoals(ctx, this.highlights, tilePx, this.elapsed, this.highlightsMet, this.completion);
+    drawGrid(ctx, tilePx, this.range, 5, dpr);
+    drawOutOfBounds(ctx, world.w, world.h, tilePx, dpr);
+    drawGoals(ctx, this.highlights, tilePx, this.elapsed, this.highlightsMet, this.completion, dpr);
 
     // --- features ----------------------------------------------------------
     ctx.imageSmoothingEnabled = tilePx < cacheTile;
@@ -1010,6 +1078,7 @@ export class Renderer {
         stack.count,
         tilePx,
         this.elapsed,
+        this.camera.dpr,
       );
     }
 
@@ -1023,7 +1092,7 @@ export class Renderer {
     this.particles.draw(ctx, FX_LAYER_OVER, tilePx);
 
     // --- top overlays ------------------------------------------------------
-    if (this.hoverCell) drawHover(ctx, this.hoverCell, tilePx);
+    if (this.hoverCell) drawHover(ctx, this.hoverCell, tilePx, dpr);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     drawVignette(ctx, deviceW, deviceH);
 
@@ -1078,7 +1147,7 @@ export class Renderer {
       const max = tile.maxGrowth ?? 0;
       const growth = maturity(tile, t);
       tiles.draw(ctx, plantStageName(growth, max), x * tilePx, y * tilePx, tilePx);
-      drawPlantGauge(ctx, x, y, tilePx, growth, max, this.elapsed);
+      drawPlantGauge(ctx, x, y, tilePx, growth, max, this.elapsed, this.camera.dpr);
     }
   }
 
@@ -1098,6 +1167,7 @@ export class Renderer {
         tilePx,
         powered,
         this.elapsed,
+        this.camera.dpr,
       );
     }
   }
@@ -1110,7 +1180,7 @@ export class Renderer {
       if (!this.inRange(x, y)) continue;
       const tile = world.tiles[index];
       if (!tile?.mark) continue;
-      drawMark(ctx, tile.mark, x, y, tilePx);
+      drawMark(ctx, tile.mark, x, y, tilePx, this.camera.dpr);
     }
   }
 
@@ -1142,19 +1212,21 @@ export class Renderer {
     // Painter's order: further up the screen draws first, so overlapping bots stack correctly.
     order.sort(this.byScreenDepth);
 
-    if (tilePx >= BOT_DETAIL_TILE_PX) {
+    const dpr = this.camera.dpr;
+    if (tilePx >= BOT_DETAIL_TILE_PX * dpr) {
       for (let i = 0; i < order.length; i++) {
         const id = order[i] as number;
         const bot = timeline.timelineFor(id);
         if (bot) drawTreads(ctx, bot, tick, tilePx, botAccent(id));
       }
       for (let i = 0; i < order.length; i++) {
-        drawHeadlight(ctx, this.poses.get(order[i] as number) as BotPose, tilePx);
+        drawHeadlight(ctx, this.poses.get(order[i] as number) as BotPose, tilePx, dpr);
       }
     }
     const opts = this.botOptions;
     opts.rush = this.rush;
     opts.reduced = this.reducedMotion;
+    opts.dpr = dpr;
     for (let i = 0; i < order.length; i++) {
       const id = order[i] as number;
       const pose = this.poses.get(id) as BotPose;
@@ -1231,6 +1303,8 @@ export class Renderer {
       this.camera.panBy(event.clientX - this.dragX, event.clientY - this.dragY);
       this.dragX = event.clientX;
       this.dragY = event.clientY;
+      this.cameraHeld = true;
+      this.leaning = false;
     }
     const rect = canvas.getBoundingClientRect();
     const cell = this.camera.tileAtScreen(event.clientX - rect.left, event.clientY - rect.top);
@@ -1261,6 +1335,8 @@ export class Renderer {
     if (!canvas) return;
     event.preventDefault();
     const rect = canvas.getBoundingClientRect();
+    this.cameraHeld = true;
+    this.leaning = false;
     this.camera.zoomBy(event.deltaY < 0 ? 1 : -1, event.clientX - rect.left, event.clientY - rect.top);
   };
 

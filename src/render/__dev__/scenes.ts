@@ -269,10 +269,93 @@ export function sceneBiome(world: number, label: string): Scene {
   return { id: `biome-${world}`, label, world, trace, highlights: [] };
 }
 
+/**
+ * The legibility case: a 21x21 maze, which in the real viewport panel lands around 13 CSS px per
+ * tile. Everything the renderer has to stay readable at that size is on this grid — a pit, ore,
+ * a machine, crops, ground items — and the highlights are scattered rather than adjacent, which
+ * is what `highlightsAt` actually feeds the renderer during a run.
+ */
+export function sceneMaze(): Scene {
+  const size = 21;
+  const world = createWorld({ w: size, h: size, seed: 11, fill: Terrain.Regolith });
+  for (let i = 0; i < size; i++) {
+    setTile(world, vec(i, 0), { terrain: Terrain.Wall });
+    setTile(world, vec(i, size - 1), { terrain: Terrain.Wall });
+    setTile(world, vec(0, i), { terrain: Terrain.Wall });
+    setTile(world, vec(size - 1, i), { terrain: Terrain.Wall });
+  }
+  // A pillared maze: walls on every other cell, with a deterministic stub hanging off each one.
+  for (let y = 2; y < size - 1; y += 2) {
+    for (let x = 2; x < size - 1; x += 2) {
+      setTile(world, vec(x, y), { terrain: Terrain.Wall });
+      const dir = (x * 7 + y * 13) % 4;
+      const nx = x + (dir === 1 ? 1 : dir === 3 ? -1 : 0);
+      const ny = y + (dir === 2 ? 1 : dir === 0 ? -1 : 0);
+      if (nx > 0 && ny > 0 && nx < size - 1 && ny < size - 1) {
+        setTile(world, vec(nx, ny), { terrain: Terrain.Wall });
+      }
+    }
+  }
+  const hazards: [number, number, Terrain][] = [
+    [3, 1, Terrain.Pit],
+    [9, 5, Terrain.Pit],
+    [15, 11, Terrain.Pit],
+    [5, 17, Terrain.Pit],
+    [17, 3, Terrain.Ore],
+    [11, 15, Terrain.Ore],
+    [7, 9, Terrain.Rock],
+    [13, 7, Terrain.Ice],
+    [1, 11, Terrain.Pad],
+  ];
+  for (const [x, y, terrain] of hazards) setTile(world, vec(x, y), { terrain });
+  for (let i = 0; i < 4; i++) {
+    setTile(world, vec(3 + i * 2, 13), {
+      terrain: Terrain.Soil,
+      growth: 0,
+      maxGrowth: 8,
+      crop: 'crop',
+      meta: { plantedAt: i * 6 },
+    });
+  }
+  addGroundItems(world, vec(1, 1), 'crate', 2);
+  addGroundItems(world, vec(19, 19), 'ore', 3);
+  addMachine(world, {
+    id: 'relay',
+    kind: 'antenna',
+    at: vec(19, 1),
+    state: 'on',
+    inventory: [],
+    vars: {},
+  });
+  addBot(world, { at: vec(1, 19), facing: Dir.North, name: 'MAZE-01' });
+  addBot(world, { at: vec(19, 17), facing: Dir.West, name: 'MAZE-02' });
+  rebuildOccupancy(world);
+
+  const trace = finish(world, (sim) => {
+    const [a, b] = sim.world.bots;
+    if (!a || !b) return;
+    for (let round = 0; round < 30; round++) {
+      sim.move(a.id, round % 4 === 3 ? Dir.East : Dir.North);
+      sim.move(b.id, round % 3 === 2 ? Dir.North : Dir.West);
+      if (round % 6 === 5) sim.mine(a.id);
+    }
+  });
+
+  return {
+    id: 'maze21',
+    label: 'maze21 · 21x21, the small-tile case',
+    world: 4,
+    trace,
+    // Scattered the way an objective's remaining work is scattered, not a neat block.
+    highlights: [vec(1, 11), vec(11, 15), vec(17, 3), vec(9, 5), vec(5, 17)],
+  };
+}
+
 export function allScenes(): Scene[] {
   return [
     sceneW101(),
     sceneShowcase(),
+    sceneMaze(),
     sceneStress(),
     sceneBiome(1, 'biome · Boot Sector'),
     sceneBiome(4, 'biome · Cave Systems'),

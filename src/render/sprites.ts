@@ -112,6 +112,8 @@ export interface BotDrawOptions {
   rush: number;
   /** Honour `prefers-reduced-motion`: no smear, no sway, no shimmy. Every tell stays. */
   reduced: boolean;
+  /** Device pixel ratio. Every "is there room for this" threshold below is in *screen* pixels. */
+  dpr: number;
 }
 
 /**
@@ -207,8 +209,9 @@ export function drawHeadlight(
   ctx: CanvasRenderingContext2D,
   pose: BotPose,
   tilePx: number,
+  dpr = 1,
 ): void {
-  if (!pose.alive || tilePx < BOT_DETAIL_TILE_PX) return;
+  if (!pose.alive || tilePx < BOT_DETAIL_TILE_PX * dpr) return;
   const s = tilePx / REF;
   const cx = (pose.x + 0.5) * tilePx;
   const cy = (pose.y + 0.5) * tilePx;
@@ -231,9 +234,13 @@ export function drawHeadlight(
  * travel" is just a non-uniform scale on the local X axis.
  */
 /**
- * Below this many device pixels per tile the detailed chassis collapses into mush — 1.8 px strokes
- * become 0.6 px and the whole bot reads as a grey smudge. World 7 spends most of its time here, so
- * there is a dedicated low-zoom form instead.
+ * Below this many *screen* pixels per tile the detailed chassis collapses into mush — 1.8 px
+ * strokes become 0.6 px and the whole bot reads as a grey smudge. World 7 spends most of its time
+ * here, so there is a dedicated low-zoom form instead.
+ *
+ * Screen, not device: on a retina display a 22-device-pixel tile is 11 px of actual screen, and
+ * comparing against the device number keeps the detailed chassis switched on for the entire range
+ * where it is unreadable — which is most of where the game is played.
  */
 export const BOT_DETAIL_TILE_PX = 22;
 
@@ -313,7 +320,7 @@ export function drawBot(
   options: BotDrawOptions,
 ): void {
   gradients.invalidate(tilePx);
-  if (tilePx < BOT_DETAIL_TILE_PX) {
+  if (tilePx < BOT_DETAIL_TILE_PX * options.dpr) {
     drawBotChip(ctx, pose, tilePx, options);
     return;
   }
@@ -521,7 +528,7 @@ export function drawBot(
     drawFuelRing(ctx, cx, cy, tilePx, options.fuel);
   }
 
-  if (options.showLabel && tilePx >= 28) {
+  if (options.showLabel && tilePx >= 28 * options.dpr) {
     ctx.save();
     ctx.font = `600 ${Math.round(tilePx * 0.21)}px 'JetBrains Mono', ui-monospace, monospace`;
     ctx.textAlign = 'center';
@@ -676,6 +683,7 @@ export function drawGroundStack(
   count: number,
   tilePx: number,
   time: number,
+  dpr = 1,
 ): void {
   const px = x * tilePx;
   const py = y * tilePx;
@@ -692,7 +700,7 @@ export function drawGroundStack(
   tiles.draw(ctx, name, px, py, tilePx);
   ctx.restore();
 
-  if (count > 1 && tilePx >= 24) {
+  if (count > 1 && tilePx >= 24 * dpr) {
     const r = tilePx * 0.17;
     const bx = px + tilePx * 0.76;
     const by = py + tilePx * 0.76;
@@ -702,7 +710,7 @@ export function drawGroundStack(
     ctx.arc(bx, by, r, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = alpha(palette.accent2, 0.85);
-    ctx.lineWidth = 1;
+    ctx.lineWidth = dpr;
     ctx.stroke();
     ctx.fillStyle = palette.accent2;
     ctx.font = `600 ${Math.round(tilePx * 0.24)}px 'JetBrains Mono', ui-monospace, monospace`;
@@ -711,6 +719,44 @@ export function drawGroundStack(
     ctx.fillText(numberLabel(Math.min(99, count)), bx, by + tilePx * 0.01);
     ctx.restore();
   }
+}
+
+/**
+ * The far-zoom machine, mirroring `drawBotChip`.
+ *
+ * At this size the sprite is a smudge of the same value as the floor, the soft ground shadow only
+ * muddies it further, and the powered glow is a blob wider than the tile. So: a dark plate to lift
+ * the machine off the ground plane, the sprite on top of it, and — if it is running — one hard
+ * amber pip with a floor in screen pixels. Landmark, state, no bloom.
+ */
+function drawMachineChip(
+  ctx: CanvasRenderingContext2D,
+  tiles: TileSet,
+  name: string,
+  px: number,
+  py: number,
+  tilePx: number,
+  powered: boolean,
+  time: number,
+  dpr: number,
+): void {
+  const inset = tilePx * 0.08;
+  ctx.save();
+  ctx.fillStyle = alpha(palette.bgVoid, 0.5);
+  roundRect(ctx, px + inset, py + inset, tilePx - inset * 2, tilePx - inset * 2, tilePx * 0.18);
+  ctx.fill();
+  ctx.strokeStyle = alpha(palette.inkDim, 0.45);
+  ctx.lineWidth = Math.max(dpr, tilePx * 0.03);
+  ctx.stroke();
+  tiles.draw(ctx, name, px, py, tilePx);
+  if (powered) {
+    const pulse = 0.5 + 0.5 * Math.sin(time * 2.6 + px + py);
+    ctx.fillStyle = alpha(palette.accent2, 0.55 + pulse * 0.45);
+    ctx.beginPath();
+    ctx.arc(px + tilePx * 0.78, py + tilePx * 0.22, Math.max(1.5 * dpr, tilePx * 0.1), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
 }
 
 /**
@@ -726,9 +772,14 @@ export function drawMachine(
   tilePx: number,
   powered: boolean,
   time: number,
+  dpr = 1,
 ): void {
   const px = x * tilePx;
   const py = y * tilePx;
+  if (tilePx < BOT_DETAIL_TILE_PX * dpr) {
+    drawMachineChip(ctx, tiles, name, px, py, tilePx, powered, time, dpr);
+    return;
+  }
   ctx.save();
   ctx.globalAlpha = 0.4;
   ctx.fillStyle = botTheme.shadow;

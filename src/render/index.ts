@@ -60,6 +60,9 @@ export { ParticleSystem, FX_LAYER_OVER, FX_LAYER_UNDER } from './fx.ts';
 export type { FxName, FxOptions } from './fx.ts';
 
 export {
+  BRACKET_CLOSED_PX,
+  BRACKET_TIGHTEN_PX,
+  bracketCloseness,
   describeTile,
   drawBrackets,
   drawCelebration,

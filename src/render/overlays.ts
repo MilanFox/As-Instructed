@@ -16,15 +16,27 @@ import { alpha, overlay, palette } from './theme.ts';
 import type { ViewRange } from './camera.ts';
 import { roundRect } from './sprites.ts';
 
+/**
+ * Every threshold and every minimum stroke in this file is quoted in *screen* pixels and scaled
+ * by `dpr` at the call site, because `tilePx` here is in device pixels.
+ *
+ * That distinction is the whole legibility story at small tile sizes. A `Math.max(1.5, …)` floor
+ * on a device-pixel canvas is 0.75 css px on a retina display — a stroke the eye cannot resolve —
+ * and a `tilePx < 18` cutoff hides a gauge at 18 css px while showing it at 9. Both read as "the
+ * overlay is broken on my machine", and both are the same missing division.
+ */
+const MIN_STROKE_PX = 1.5;
+
 /** One `stroke()` for the whole viewport. ASSETS.md §4.6: never a per-tile blit. */
 export function drawGrid(
   ctx: CanvasRenderingContext2D,
   tilePx: number,
   range: ViewRange,
   major = 5,
+  dpr = 1,
 ): void {
   const tile = tilePx;
-  if (tile < 10) return;
+  if (tile < 10 * dpr) return;
   const x0 = range.x0;
   const y0 = range.y0;
   const x1 = range.x1 + 1;
@@ -66,6 +78,28 @@ export function drawGrid(
   ctx.restore();
 }
 
+/**
+ * Screen pixels per tile at which the corner brackets start closing up, and at which they have
+ * closed completely.
+ *
+ * A bracket is four ticks of line near four corners. At 48 px that is a restrained way to say
+ * "this cell" — the eye reads the implied box and the tile itself stays visible. At 13 px the
+ * ticks are three pixels long with a two-pixel gap between them, and there is no implied box left
+ * to read: it is four specks. So the arms grow as the tile shrinks until they meet, and the
+ * treatment becomes a closed outline. Same language, same colour, same weight — the marker simply
+ * stops relying on the viewer being able to interpolate a shape that is smaller than a full stop.
+ */
+export const BRACKET_TIGHTEN_PX = 30;
+export const BRACKET_CLOSED_PX = 15;
+
+/** 0 at comfortable tile sizes, 1 once the brackets have closed into a box. */
+export function bracketCloseness(tilePx: number, dpr = 1): number {
+  const css = tilePx / dpr;
+  if (css >= BRACKET_TIGHTEN_PX) return 0;
+  if (css <= BRACKET_CLOSED_PX) return 1;
+  return (BRACKET_TIGHTEN_PX - css) / (BRACKET_TIGHTEN_PX - BRACKET_CLOSED_PX);
+}
+
 /** Corner brackets. Used for goals (amber, pulsing) and hover (cyan, steady). */
 export function drawBrackets(
   ctx: CanvasRenderingContext2D,
@@ -75,14 +109,22 @@ export function drawBrackets(
   color: string,
   strength: number,
   inset = 0.1,
+  dpr = 1,
 ): void {
+  const close = bracketCloseness(tilePx, dpr);
   const px = x * tilePx;
   const py = y * tilePx;
-  const i = tilePx * inset;
-  const len = tilePx * 0.26;
+  // Tighter to the cell edge as it closes, so a 13 px tile spends its pixels on the marker rather
+  // than on the gap around it.
+  const i = tilePx * (inset - inset * 0.45 * close);
+  const reach = tilePx * 0.5 - i;
+  const len = tilePx * 0.26 + (reach - tilePx * 0.26) * close;
   ctx.save();
   ctx.strokeStyle = alpha(color, strength);
-  ctx.lineWidth = Math.max(1.5, tilePx * 0.045);
+  // The weight has a floor in *screen* pixels and gains a little as the brackets close, which is
+  // what keeps the outline a line rather than a hairline once the tile is smaller than the stroke
+  // would like to be.
+  ctx.lineWidth = Math.max(MIN_STROKE_PX * dpr * (1 + close * 0.4), tilePx * 0.045);
   ctx.lineCap = 'square';
   ctx.beginPath();
   ctx.moveTo(px + i, py + i + len);
@@ -110,17 +152,32 @@ export function drawGoals(
   met: boolean,
   /** 0..1 decaying just after the run finishes. The brackets take a breath and let go. */
   completion = 0,
+  dpr = 1,
 ): void {
   if (cells.length === 0) return;
   const pulse = 0.55 + 0.45 * Math.sin((time * (Math.PI * 2)) / 0.8);
   const color = met ? palette.ok : overlay.goal;
   const lift = completion * completion;
+  // The wash inside the cell carries progressively more of the signal as the outline runs out of
+  // room. At 48 px it is a hint under the brackets; at 13 px, where the outline is most of the
+  // tile, it is what makes the marked cell a *colour* the eye can find without reading a shape.
+  const close = bracketCloseness(tilePx, dpr);
+  const wash = 0.08 + pulse * 0.06 + lift * 0.1 + close * 0.13;
   for (const cell of cells) {
     ctx.save();
-    ctx.fillStyle = alpha(color, 0.08 + pulse * 0.06 + lift * 0.1);
+    ctx.fillStyle = alpha(color, wash);
     ctx.fillRect(cell.x * tilePx, cell.y * tilePx, tilePx, tilePx);
     ctx.restore();
-    drawBrackets(ctx, cell.x, cell.y, tilePx, color, Math.min(1, 0.5 + pulse * 0.5 + lift * 0.4));
+    drawBrackets(
+      ctx,
+      cell.x,
+      cell.y,
+      tilePx,
+      color,
+      Math.min(1, 0.5 + pulse * 0.5 + lift * 0.4),
+      0.1,
+      dpr,
+    );
   }
 }
 
@@ -128,12 +185,13 @@ export function drawHover(
   ctx: CanvasRenderingContext2D,
   cell: Vec,
   tilePx: number,
+  dpr = 1,
 ): void {
   ctx.save();
   ctx.fillStyle = alpha(overlay.hover, 0.07);
   ctx.fillRect(cell.x * tilePx, cell.y * tilePx, tilePx, tilePx);
   ctx.restore();
-  drawBrackets(ctx, cell.x, cell.y, tilePx, overlay.hover, 0.85, 0.06);
+  drawBrackets(ctx, cell.x, cell.y, tilePx, overlay.hover, 0.85, 0.06, dpr);
 }
 
 /**
@@ -148,13 +206,14 @@ export function drawPlantGauge(
   growth: number,
   max: number,
   time: number,
+  dpr = 1,
 ): void {
-  if (max <= 0 || tilePx < 18) return;
+  if (max <= 0 || tilePx < 18 * dpr) return;
   const ratio = Math.max(0, Math.min(1, growth / max));
   const cx = (x + 0.5) * tilePx;
   const cy = (y + 0.86) * tilePx;
   const w = tilePx * 0.56;
-  const h = Math.max(2, tilePx * 0.075);
+  const h = Math.max(2 * dpr, tilePx * 0.075);
 
   ctx.save();
   ctx.fillStyle = alpha(palette.bgVoid, 0.72);
@@ -167,7 +226,7 @@ export function drawPlantGauge(
   if (ratio >= 1) {
     const pulse = 0.5 + 0.5 * Math.sin(time * 4);
     ctx.strokeStyle = alpha(palette.ok, 0.3 + pulse * 0.35);
-    ctx.lineWidth = Math.max(1.5, tilePx * 0.035);
+    ctx.lineWidth = Math.max(MIN_STROKE_PX * dpr, tilePx * 0.035);
     ctx.beginPath();
     ctx.arc((x + 0.5) * tilePx, (y + 0.46) * tilePx, tilePx * (0.3 + pulse * 0.05), 0, Math.PI * 2);
     ctx.stroke();
@@ -182,8 +241,9 @@ export function drawMark(
   x: number,
   y: number,
   tilePx: number,
+  dpr = 1,
 ): void {
-  if (tilePx < 20) return;
+  if (tilePx < 20 * dpr) return;
   const cx = (x + 0.5) * tilePx;
   const cy = (y + 0.28) * tilePx;
   const label = text.length > 4 ? `${text.slice(0, 3)}…` : text;
@@ -196,7 +256,7 @@ export function drawMark(
   roundRect(ctx, cx - w / 2, cy - tilePx * 0.13, w, tilePx * 0.26, tilePx * 0.06);
   ctx.fill();
   ctx.strokeStyle = alpha(palette.accent, 0.5);
-  ctx.lineWidth = 1;
+  ctx.lineWidth = dpr;
   ctx.stroke();
   ctx.fillStyle = palette.accent;
   ctx.fillText(label, cx, cy);
@@ -209,12 +269,13 @@ export function drawOutOfBounds(
   cols: number,
   rows: number,
   tilePx: number,
+  dpr = 1,
 ): void {
   const w = cols * tilePx;
   const h = rows * tilePx;
   ctx.save();
   ctx.strokeStyle = alpha(palette.inkDim, 0.35);
-  ctx.lineWidth = Math.max(1, tilePx * 0.03);
+  ctx.lineWidth = Math.max(dpr, tilePx * 0.03);
   ctx.strokeRect(-0.5, -0.5, w + 1, h + 1);
   ctx.restore();
 }
