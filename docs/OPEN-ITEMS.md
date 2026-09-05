@@ -943,3 +943,47 @@ agent report; it belongs in the binding document.
   caught each of the three known ones, since a guard that closes the class beats a fix.
 
 Next wake-up armed for 23:42.
+
+### 2026-09-05, 19:55 — duplicated-constant audit (`docs/AUDIT-CONSTANTS.md`, 612 lines)
+
+Read-only, no source touched. It found a live player-visible bug the sweep was not
+looking for.
+
+**1. The silver rule existed four times and three copies were already wrong — fixed
+(`db3d4c1`).** `FIX-PAR.md` §7 widened the band to `max(par + 1, par * 1.25)` so a par under
+four has a reachable rung. That landed in `verdict.ts` **and nowhere else**. Still stating the
+old rule: the function's own docstring, **`DESIGN.md` §7 — the binding contract** — and
+`DocsPanel.tsx`, *what the player reads in game*. Two levels ship with par below four, so the
+game documented a medal it hands out. **Deduplicating the constant did not deduplicate the
+rule**, which is the sharpest statement of this bug class yet. DESIGN and the docs panel are
+fixed; the docstring is routed to the agent that owns `verdict.ts`.
+
+**2. The fourth instance: `BONUS_STAR_WEIGHT`.** Exported from `verdict.ts`, re-exported from
+`index.ts`, named authoritative by `ENGINE.md` — **read by nothing.** The live value is
+`BONUS_STAR_POINTS` in `score.ts:13`, two lines above the `SILVER_FACTOR` that was
+deduplicated this morning; that fix did not look up. And `score.test.ts:60` is a **tautology**
+— `toBe(3 + 2 * BONUS_STAR_POINTS)` passes for any value. Both halves routed to their owners.
+
+**3. `CostTable.link` and `.transmit` are unreachable.** The sim reads 15 of 17 cost keys; the
+live cost for those two is in `api-spec.ts` via `costOf()`. A level author writing
+`costs: { transmit: 3 }` gets a **silent no-op with no type error** — the same disease across
+a data boundary that `FIX-POWER.md` found in the docs panel.
+
+**4. `REVIEW_TIERS` versus `NARRATIVE.md` §7 has already failed once** — `7b7acd5`, four hours
+earlier, was a hand fix to tier 5. All five agree today; nothing enforces it.
+
+**5–9.** `api-spec` costs versus `DEFAULT_COSTS` (16 agree, unguarded); **`CURRICULUM.md` §3
+specifies a 9-tick timed door on `w1-05` that does not exist** in an 81-line static-doorway
+level; `MEDAL_BEAT` and `BASE_TICKS_PER_SECOND` each twice, *both admitting it in a comment*;
+palette three times plus a dead `--tile: 48px` with zero `var(--tile)` uses.
+
+### The guard, and it is the real result
+
+`grep -rniE 'verbatim|mirrors|authoritative' src/` **returns 24 hits, and every one is an
+unenforced hand-maintained invariant.** This codebase has the good habit of confessing its
+duplicates in prose and nobody has ever read that index. One guard built on it covers five of
+the nine findings. Unused-export linting is cheaper and would have caught `SILVER_FACTOR` and
+finding 2 outright, but it is **blind to every case where both copies are live** — findings 1,
+3, 5, 7, 8 — so it is worth shipping first and worth not mistaking for closing the class.
+
+Neither guard is built yet. Both are queued.
