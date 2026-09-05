@@ -132,40 +132,14 @@ testers would have quit in. Gold on nine of the first ten levels, first honest r
   2 graded in full. Table in `docs/FIX-PAR.md` §6.
 - Housekeeping: 2 pre-existing eslint false positives; delete branch `wip/wave1-interrupted`.
 
-### Backlog — i18n, German toggle
+### Scratched — i18n and the German toggle
 
-Requested 2026-09-05. Not started, and deliberately not started small: this is a
-structural change, not a string sweep.
+**Cut 2026-09-05 by the user, before any work started.** Nothing was built: no locale
+lookup, no extracted strings, no toggle. The only trace was the backlog entry that used to
+sit here (`4a554ef`) and this note. **Do not re-propose it** — it was considered in detail,
+specced, and dropped deliberately.
 
-**Scope.** Player-facing prose lives in four places and none of it is extracted:
-briefs and hints inline in the 34 level files (~2200 quoted lines), `src/ui/copy.ts`
-(316), `src/meta/copy.ts` (263), and the docs entries in `src/runtime/api-spec.ts`
-(793, mixed prose and signatures). Plus commendation titles/notes/requirements in
-`src/game/achievements.ts`, verdict and failure copy, and the objective labels that
-`budgets.ts` now parses for their unit.
-
-**Three things make this harder than a normal i18n job:**
-
-1. **The API must stay English.** `move`, `harvest`, `scan().crop`, `Dir.North` are real
-   TypeScript the player writes. Identifiers, the generated `.d.ts`, starter code and
-   every code sample stay as they are. So `api-spec.ts` splits: signatures fixed,
-   surrounding prose translated. Same for briefs, which quote the API inline.
-2. **`budgets.ts` parses English labels.** A label ending `, in <plural noun>` is how a
-   budget declares its unit, and label words are matched against event kinds. That
-   coupling has to be replaced with explicit structured fields *before* any label is
-   translated, or German labels silently stop being budgets.
-3. **The tone is the product.** The dry corporate register — work orders, requisitions,
-   Scheduling, "the last recorded instance was in 2204 and is disputed" — is most of the
-   game's character. Machine-translated German would read as flat instructions and lose
-   it. The German copy has to be *written*, by someone who can be funny in German, against
-   the English as a reference rather than a source.
-
-**Order of work:** decouple `budgets.ts` from label prose → extract strings behind a
-lookup keyed by id, English as the fallback locale → verify nothing regressed with the
-English still in place → then write the German. Steps 1–3 are the engineering and are
-worth doing on their own; step 4 is a writing job.
-
-A language toggle belongs in Settings next to the layout controls, persisted in the save.
+One thing it was carrying survives on its own merits, below.
 
 ### Done since that list was written
 
@@ -302,11 +276,10 @@ convicted:
 - `tolerance` (5) — check what it modifies; if it names a threshold the player must hit,
   it is load-bearing.
 
-**Non-native readers make this worse**, and this game has a German toggle on the backlog:
-uncommon English abstractions are exactly what fails first for a reader working in a
-second language, and they are also the hardest words to translate without losing the joke.
-Do this pass **before** any string extraction for i18n, so the German is written against
-copy that is already clear.
+**Non-native readers make this worse**: uncommon English abstractions are exactly what fails
+first for a reader working in a second language. That was doubly true when a German toggle
+was on the backlog; the toggle is scratched and this reason stands on its own, since the
+game is played in English by people who do not think in it.
 
 **Deliverable.** Every player-facing term classified flavour / load-bearing / borderline,
 with the load-bearing ones rewritten and shown in context. A report that reclassifies
@@ -789,3 +762,24 @@ Tier 5 goes `min: 93 → 100` in `score.ts` (divergence agent) and its text "Eve
 medals-only denominator 100% means every closed order is gold, which is what the tier's own
 text claims; at 93% a player carries seven silvers and is told otherwise. **No test depends
 on the value**, which is exactly why it needed routing rather than leaving to be noticed.
+
+### Open — `budgets.ts` infers a budget's unit by parsing its English label
+
+This was written down as an i18n prerequisite. **i18n is scratched; this item is not**, and
+it should never have needed a translation project to justify it.
+
+`src/game/budgets.ts` decides what a budget measures by reading the words of its own label:
+`TICK_WORDS`/`OP_WORDS` regexes against the lowercased label, sense and resource names
+matched word-by-word, and `declaredUnit()` parsing a label that ends `…, in ticks` or
+`…, in tiles`. A label is player-facing prose. **Reword the prose and the budget silently
+stops being a budget** — no error, no failing test, just a number that quietly stops scoring.
+
+The risk is not hypothetical here: every brief and objective label in the campaign was
+rewritten today, and `makespan`, `precedence` and `audit` were removed from player-facing
+text in the same pass. That pass happened to leave the load-bearing words intact. The next
+one has no reason to.
+
+The fix is a structured field on the objective declaring its unit, with the label free to
+say whatever reads best. The parsing can stay as a fallback for levels that have not
+declared, but a level that declares should never be guessed at. Worth a test that fails when
+a label changes in a way that changes the inferred unit.
