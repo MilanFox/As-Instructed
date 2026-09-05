@@ -423,7 +423,7 @@ describe('information budget objectives', () => {
     const verdict = buildVerdict({
       objectives: [
         Objectives.withinSenses('probe', 10),
-        Objectives.custom('found', 'Name the broken node', () => low === 41),
+        Objectives.checkbox('found', 'Name the broken node', () => low === 41),
       ],
       world: sim.world,
       trace: sim.finish(),

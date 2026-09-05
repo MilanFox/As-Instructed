@@ -758,33 +758,37 @@ export const w8_05: LevelDef = {
         const [done, total] = gridTally(ctx);
         return total > 0 && done === total;
       },
-      gridTally,
-      (ctx) => {
-        const dark = darkStation(ctx);
-        if (!dark) return undefined;
-        return {
-          where: `${dark.id} at (${String(dark.at.x)}, ${String(dark.at.y)})`,
-          expected: 'on, switched by a use() at the tile',
-          received: dark.reason,
-        };
+      {
+        progress: gridTally,
+        divergence: (ctx) => {
+          const dark = darkStation(ctx);
+          if (!dark) return undefined;
+          return {
+            where: `${dark.id} at (${String(dark.at.x)}, ${String(dark.at.y)})`,
+            expected: 'on, switched by a use() at the tile',
+            received: dark.reason,
+          };
+        },
       },
     ),
     Objectives.custom(
       'precedence',
       'Energise each station only after its feeders',
       precedenceHolds,
-      precedenceTally,
-      (ctx) => {
-        const breach = firstBreach(ctx);
-        if (!breach) return undefined;
-        return {
-          where: `${breach.station} · feeder ${breach.feeder}`,
-          expected:
-            breach.fedAt === null
-              ? `feeder ${breach.feeder} energised first`
-              : `start at tick ${String(breach.fedAt)} or later`,
-          received: `started at tick ${String(breach.started)}`,
-        };
+      {
+        progress: precedenceTally,
+        divergence: (ctx) => {
+          const breach = firstBreach(ctx);
+          if (!breach) return undefined;
+          return {
+            where: `${breach.station} · feeder ${breach.feeder}`,
+            expected:
+              breach.fedAt === null
+                ? `feeder ${breach.feeder} energised first`
+                : `start at tick ${String(breach.fedAt)} or later`,
+            received: `started at tick ${String(breach.started)}`,
+          };
+        },
       },
     ),
     Objectives.custom(
@@ -800,12 +804,13 @@ export const w8_05: LevelDef = {
       'file-form',
       'File KD-0001-T in the Charter registry or the renewals tray',
       (ctx) => filedIn(ctx.world) !== null,
-      undefined,
-      (ctx) => ({
-        where: 'KD-0001-T',
-        expected: 'on slot-charter or slot-renewals',
-        received: whereIsTheForm(ctx),
-      }),
+      {
+        divergence: (ctx) => ({
+          where: 'KD-0001-T',
+          expected: 'on slot-charter or slot-renewals',
+          received: whereIsTheForm(ctx),
+        }),
+      },
     ),
     Objectives.custom(
       'deadline',

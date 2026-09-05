@@ -411,36 +411,18 @@ export interface CustomReport {
 /**
  * Escape hatch. Prefer a named builder when one fits — the UI reads `label`, not the code.
  *
- * The positional overload is the pre-`CustomReport` form and is retired as its call sites
- * convert. `docs/FIX-DIVERGENCE.md` tracks which are left; when the list empties, delete it and
- * the type system asks the question at every remaining call site on its own.
+ * `report` is required, and so is its `divergence`. There is no shorter call: an objective that
+ * has nothing to diverge on is a `checkbox`, and saying so is a sentence the author has to write.
  */
 export function custom(
   id: string,
   label: string,
   fn: (ctx: ObjectiveContext) => boolean,
   report: CustomReport,
-): Objective;
-export function custom(
-  id: string,
-  label: string,
-  fn: (ctx: ObjectiveContext) => boolean,
-  progress?: (ctx: ObjectiveContext) => [number, number],
-  divergence?: (ctx: ObjectiveContext) => Divergence | undefined,
-): Objective;
-export function custom(
-  id: string,
-  label: string,
-  fn: (ctx: ObjectiveContext) => boolean,
-  fourth?: CustomReport | ((ctx: ObjectiveContext) => [number, number]),
-  fifth?: (ctx: ObjectiveContext) => Divergence | undefined,
 ): Objective {
-  if (typeof fourth === 'object') {
-    return define(id, label, { id, label }, fn, fourth.progress?.bind(fourth), (ctx) =>
-      fourth.divergence(ctx),
-    );
-  }
-  return define(id, label, { id, label }, fn, fourth, fifth);
+  return define(id, label, { id, label }, fn, report.progress?.bind(report), (ctx) =>
+    report.divergence(ctx),
+  );
 }
 
 /**

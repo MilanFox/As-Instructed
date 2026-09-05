@@ -117,26 +117,22 @@ describe('machineState reports the state the machine was left in', () => {
 describe('the verdict carries the divergence, and only where there is one', () => {
   test('a met objective is never asked for one', () => {
     let asked = 0;
-    const objective = Objectives.custom(
-      'always',
-      'Always true',
-      () => true,
-      undefined,
-      () => {
+    const objective = Objectives.custom('always', 'Always true', () => true, {
+      divergence: () => {
         asked++;
         return { where: 'nowhere', expected: 'a', received: 'b' };
       },
-    );
+    });
     const [report] = evaluateObjectives([objective], afterPrinting([]));
 
     expect(asked).toBe(0);
     expect(report?.divergence).toBeUndefined();
   });
 
-  test('an objective that reports nothing stays exactly as it was', () => {
+  test('a checkbox reports the bit and nothing else', () => {
     const ctx = afterPrinting([]);
     const [report] = evaluateObjectives(
-      [Objectives.custom('silent', 'Says nothing', () => false)],
+      [Objectives.checkbox('silent', 'Says nothing', () => false)],
       ctx,
     );
 

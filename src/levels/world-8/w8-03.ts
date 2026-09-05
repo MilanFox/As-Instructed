@@ -346,37 +346,41 @@ export const w8_03: LevelDef = {
       'grid-live',
       'Leave every substation energised',
       (ctx) => allEnergised(ctx) === stationsOf(ctx.world).length,
-      (ctx) => [allEnergised(ctx), stationsOf(ctx.world).length],
-      (ctx) => {
-        const dark = darkStation(ctx);
-        if (!dark) return undefined;
-        return {
-          where: `${dark.id} at (${String(dark.at.x)}, ${String(dark.at.y)})`,
-          expected: 'on, switched by a use() at the tile',
-          received: dark.reason,
-        };
+      {
+        progress: (ctx) => [allEnergised(ctx), stationsOf(ctx.world).length],
+        divergence: (ctx) => {
+          const dark = darkStation(ctx);
+          if (!dark) return undefined;
+          return {
+            where: `${dark.id} at (${String(dark.at.x)}, ${String(dark.at.y)})`,
+            expected: 'on, switched by a use() at the tile',
+            received: dark.reason,
+          };
+        },
       },
     ),
     Objectives.custom(
       'precedence-held',
       'Start no station before every feeder it hangs off has finished',
       (ctx) => breachesIn(ctx).length === 0,
-      /* Divergence says which feeder was jumped; this says how much of the grid came up in
-         order anyway, so a schedule that is one edge wrong does not read like one that is
-         entirely wrong. */
-      (ctx) => {
-        const total = stationsOf(ctx.initialWorld).length;
-        const early = new Set(breachesIn(ctx).map((breach) => breach.station));
-        return [Math.max(0, total - early.size), total];
-      },
-      (ctx) => {
-        const breach = firstBreach(ctx);
-        if (!breach) return undefined;
-        return {
-          where: `${breach.station} · feeder ${breach.feeder}`,
-          expected: `start at tick ${String(breach.fedAt)} or later`,
-          received: `started at tick ${String(breach.started)}`,
-        };
+      {
+        /* Divergence says which feeder was jumped; this says how much of the grid came up in
+           order anyway, so a schedule that is one edge wrong does not read like one that is
+           entirely wrong. */
+        progress: (ctx) => {
+          const total = stationsOf(ctx.initialWorld).length;
+          const early = new Set(breachesIn(ctx).map((breach) => breach.station));
+          return [Math.max(0, total - early.size), total];
+        },
+        divergence: (ctx) => {
+          const breach = firstBreach(ctx);
+          if (!breach) return undefined;
+          return {
+            where: `${breach.station} · feeder ${breach.feeder}`,
+            expected: `start at tick ${String(breach.fedAt)} or later`,
+            received: `started at tick ${String(breach.started)}`,
+          };
+        },
       },
     ),
     Objectives.custom(

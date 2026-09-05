@@ -10,6 +10,11 @@
  * The rule is one line: **an objective either reports a divergence or declares itself binary.**
  * A progress tuple is not a third option — `0 of 5 — 5 short` is the exact readout the beginner
  * playtest lost fifty-five minutes to (`docs/PLAYTEST-BEGINNER.md` §3).
+ *
+ * The type system now asks the same question at every call site: `Objectives.custom` takes a
+ * `CustomReport` whose `divergence` is required. This file is what catches the two things a type
+ * cannot — a `divergence` that exists and returns `undefined` on the commonest failure there is,
+ * and a `checkbox` reached for because it was easier than thinking.
  */
 import { describe, expect, test } from 'vitest';
 import type { Objective, ObjectiveContext } from '../../engine/index.ts';
@@ -27,44 +32,15 @@ function nameOf(level: LevelDef, objective: Objective): string {
 }
 
 /**
- * Objectives that still report a bare bit, listed so that the ones left are countable.
+ * Every objective the campaign ships that declares itself binary rather than reporting a diff.
  *
- * The assertion below is a **subset** check, not an equality one: an id may leave this list the
- * moment its level is converted, and nothing new may ever join it. `docs/FIX-DIVERGENCE.md`
- * records which worlds are done. When the list empties, delete it and the positional overload of
- * `Objectives.custom` with it.
+ * It is empty, and that is the finding rather than an accident: all 98 objectives across the 34
+ * work orders turned out to hold a tick, a tile, a count or a pair of values they had already
+ * computed and were throwing away. `Objectives.checkbox` stays because the rule needs a legal way
+ * to say "there is genuinely nothing here", and because a rule with no exit is one people route
+ * around. Adding one means adding a line here, which is the point.
  */
-const AWAITING_A_DIFF: readonly string[] = [
-  'w3-01/pads-loaded',
-  'w3-01/clean-run',
-  'w3-02/crates-sorted',
-  'w3-02/one-depot-at-a-time',
-  'w3-04/bay-cleared',
-  'w3-04/bay-in-order',
-  'w3-04/aisle-discipline',
-  'w5-01/energised',
-  'w5-01/in-order',
-  'w5-01/one-pass',
-  'w5-02/patched',
-  'w5-03/cabled',
-  'w5-03/energised',
-  'w5-03/in-order',
-  'w5-03/tight-order',
-  'w5-04/assigned',
-  'w5-04/within-capacity',
-  'w5-04/largest-idle',
-  'w5-05/connected',
-  'w5-05/budget',
-  'w5-05/energised',
-  'w5-05/tight',
-];
-
-/**
- * `Objectives.checkbox` is the deliberate way to say an objective has nothing to diverge on, and
- * it is only worth having if it stays rare enough that a reviewer can read the whole list. The cap
- * is the guard against it becoming the new default; the list itself is printed on failure.
- */
-const MAX_BINARY = 12;
+const BINARY_BY_DESIGN: readonly string[] = [];
 
 describe('every objective can name where the run went wrong', () => {
   test('an objective either reports a divergence or declares itself binary', () => {
@@ -76,7 +52,7 @@ describe('every objective can name where the run went wrong', () => {
         silent.push(nameOf(level, objective));
       }
     }
-    expect(silent.filter((id) => !AWAITING_A_DIFF.includes(id))).toEqual([]);
+    expect(silent).toEqual([]);
   });
 
   test('no objective is both binary and divergent', () => {
@@ -103,13 +79,13 @@ describe('every objective can name where the run went wrong', () => {
     expect(counted).toEqual([]);
   });
 
-  test('checkbox stays rare enough to read in one sitting', () => {
+  test('the binary objectives are exactly the ones on record', () => {
     const binary = LEVELS.flatMap((level) =>
       objectivesOf(level)
         .filter((objective) => objective.binary === true)
         .map((objective) => nameOf(level, objective)),
     );
-    expect(binary.length, binary.join(', ')).toBeLessThanOrEqual(MAX_BINARY);
+    expect(binary.sort()).toEqual([...BINARY_BY_DESIGN].sort());
   });
 });
 
@@ -136,7 +112,6 @@ describe('an empty program is told where it fell short', () => {
       for (const [index, report] of reports.entries()) {
         const objective = objectivesOf(level)[index] as Objective;
         if (report.met || objective.binary === true) continue;
-        if (AWAITING_A_DIFF.includes(nameOf(level, objective))) continue;
         if (report.divergence === undefined) {
           mute.push(nameOf(level, objective));
           continue;

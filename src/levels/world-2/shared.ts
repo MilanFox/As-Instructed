@@ -95,6 +95,19 @@ export function harvestCalls(ctx: ObjectiveContext): { ok: number; failed: numbe
   return { ok, failed };
 }
 
+/** The tick and tile of the first swing that came back with nothing. */
+function firstEmptySwing(ctx: ObjectiveContext): Divergence | undefined {
+  const swing = ctx.trace.events.find(
+    (event): event is HarvestEvent => event.kind === 'harvest' && !event.ok,
+  );
+  if (swing === undefined) return undefined;
+  return {
+    where: `tick ${String(swing.t)} · ${at(swing.at)}`,
+    expected: 'a swing that finds something',
+    received: 'the arm came back empty',
+  };
+}
+
 export function failedFieldwork(ctx: ObjectiveContext): number {
   return ctx.trace.events.filter(
     (event) => (event.kind === 'harvest' || event.kind === 'plant') && !event.ok,
@@ -169,7 +182,16 @@ export function clearedEveryRipeTile(label = 'Harvest every ripe crop'): Objecti
     'cleared-ripe',
     label,
     (ctx) => done(ctx) === ripeAtStart(ctx.initialWorld).length,
-    (ctx) => [done(ctx), ripeAtStart(ctx.initialWorld).length],
+    {
+      progress: (ctx) => [done(ctx), ripeAtStart(ctx.initialWorld).length],
+      divergence: (ctx) => {
+        const standing = ripeAtStart(ctx.initialWorld).find(
+          (spot) => tileAt(ctx.world, spot)?.crop !== undefined,
+        );
+        if (standing === undefined) return undefined;
+        return { where: at(standing), expected: 'harvested', received: 'still standing' };
+      },
+    },
   );
 }
 
@@ -185,7 +207,16 @@ export function leftUnripeStanding(label = 'Leave every unripe crop where it is'
     'unripe-untouched',
     label,
     (ctx) => done(ctx) === unripe(ctx.initialWorld).length,
-    (ctx) => [done(ctx), unripe(ctx.initialWorld).length],
+    {
+      progress: (ctx) => [done(ctx), unripe(ctx.initialWorld).length],
+      divergence: (ctx) => {
+        const taken = unripe(ctx.initialWorld).find(
+          (spot) => tileAt(ctx.world, spot)?.crop === undefined,
+        );
+        if (taken === undefined) return undefined;
+        return { where: at(taken), expected: 'left standing', received: 'taken, and it was unripe' };
+      },
+    },
   );
 }
 
@@ -322,15 +353,33 @@ export function noWastedFieldwork(label = 'Waste no harvest and no planting'): O
 export function noFailedHarvests(
   label = 'Never swing at a hopper that is already full',
 ): Objective {
-  return Objectives.custom('no-failed-harvests', label, (ctx) => harvestCalls(ctx).failed === 0);
+  return Objectives.custom('no-failed-harvests', label, (ctx) => harvestCalls(ctx).failed === 0, {
+    divergence: firstEmptySwing,
+  });
 }
 
 /** Bonus: exactly one successful harvest per ripe tile, and not one failed attempt. */
 export function harvestedNothingTwice(label = 'One harvest per ripe crop, no misses'): Objective {
-  return Objectives.custom('exact-harvests', label, (ctx) => {
-    const { ok, failed } = harvestCalls(ctx);
-    return failed === 0 && ok === ripeAtStart(ctx.initialWorld).length;
-  });
+  return Objectives.custom(
+    'exact-harvests',
+    label,
+    (ctx) => {
+      const { ok, failed } = harvestCalls(ctx);
+      return failed === 0 && ok === ripeAtStart(ctx.initialWorld).length;
+    },
+    {
+      divergence: (ctx) => {
+        const empty = firstEmptySwing(ctx);
+        if (empty) return empty;
+        const { ok } = harvestCalls(ctx);
+        return {
+          where: 'the arm',
+          expected: `${String(ripeAtStart(ctx.initialWorld).length)} swings`,
+          received: `${String(ok)} swings`,
+        };
+      },
+    },
+  );
 }
 
 /**

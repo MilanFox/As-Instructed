@@ -115,9 +115,29 @@ export function inspectedEveryTile(label = 'Enter every floor tile in the bay'):
   );
 }
 
+/** What the engine's own `reason` on a refused move means, in the words the briefs use. */
+const BLOCKED_BY: Readonly<Record<string, string>> = Object.freeze({
+  bot: 'another bot was already there',
+  terrain: 'a wall',
+  bounds: 'the edge of the site',
+  dead: 'a bot that had stopped running',
+});
+
 /** Bonus: nothing was driven into. A blocked move costs a tick (DESIGN.md §4.4). */
 export function noBlockedMoves(label = 'Finish without a single blocked move'): Objective {
-  return Objectives.custom('no-blocked-moves', label, (ctx) => blockedMoves(ctx) === 0);
+  return Objectives.custom('no-blocked-moves', label, (ctx) => blockedMoves(ctx) === 0, {
+    divergence: (ctx) => {
+      const bump = ctx.trace.events.find(
+        (event): event is MoveEvent => event.kind === 'move' && !event.ok,
+      );
+      if (bump === undefined) return undefined;
+      return {
+        where: `tick ${String(bump.t)} · ${at(bump.to)}`,
+        expected: 'a tile the bot could drive into',
+        received: BLOCKED_BY[bump.reason ?? ''] ?? 'a tile it could not enter',
+      };
+    },
+  });
 }
 
 /** Where the seed put the landing pad, or undefined on a level that has none. */
@@ -228,11 +248,31 @@ export function oneMovePerFloorTile(label: string): Objective {
 
 /** Bonus: the run took exactly the Manhattan distance from start to pad — not one tick more. */
 export function shortestRoute(label = 'Arrive in the fewest possible ticks'): Objective {
-  return Objectives.custom('shortest-route', label, (ctx) => {
+  const shortest = (ctx: ObjectiveContext): number | undefined => {
     const start = ctx.initialWorld.bots[0];
-    const bot = botById(ctx.world, 0);
-    if (!start || !bot?.alive) return false;
-    if (tileAt(ctx.world, bot.at)?.terrain !== Terrain.Pad) return false;
-    return ctx.trace.endTick === manhattan(start.at, bot.at);
-  });
+    const pad = padPosition(ctx.initialWorld);
+    return start && pad ? manhattan(start.at, pad) : undefined;
+  };
+  return Objectives.custom(
+    'shortest-route',
+    label,
+    (ctx) => {
+      const start = ctx.initialWorld.bots[0];
+      const bot = botById(ctx.world, 0);
+      if (!start || !bot?.alive) return false;
+      if (tileAt(ctx.world, bot.at)?.terrain !== Terrain.Pad) return false;
+      return ctx.trace.endTick === manhattan(start.at, bot.at);
+    },
+    {
+      divergence: (ctx) => {
+        const floor = shortest(ctx);
+        if (floor === undefined) return undefined;
+        return {
+          where: 'the drive',
+          expected: `${String(floor)} ticks`,
+          received: `${String(ctx.trace.endTick)} ticks`,
+        };
+      },
+    },
+  );
 }

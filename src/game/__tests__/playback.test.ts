@@ -45,7 +45,7 @@ function corridor(): { level: LevelDef; trace: Trace } {
     hardware: [],
     build: () => world,
     objectives: [
-      Objectives.custom(
+      Objectives.checkbox(
         'halfway',
         'Get past the middle',
         (ctx) => (botById(ctx.world, 0)?.at.x ?? 0) >= 3,
