@@ -787,7 +787,7 @@ Theme: the finale. Unlocks nothing (DESIGN.md §6). Four large levels plus one m
 - `assumes` All thirty-nine previous levels.
 - `hardware` —
 - `heritage` Every heritage in this document, once: MST, topological sort, list scheduling, recursive-descent parsing, online exploration, capacitated routing.
-- `world` 48×40. 6–12 bots. An unknown subsurface region. An infrastructure DAG to energise. A quota of material to route to depots by class. An inbound enciphered, partly-corrupt signal stream revealing part of the map and part of the graph. A hard deadline, a fuel budget and a character budget.
+- `world` 48×40. 6–12 bots. An unknown subsurface region. An infrastructure DAG to energise. A quota of material to route to depots by class. An inbound enciphered, partly-corrupt signal stream revealing part of the map and part of the graph. A hard deadline and a fuel budget.
 - `varies` Every axis above, independently drawn.
 - `anti-hardcode` Seven seeds across six independent axes. The brief states the reason in-fiction: *"the Yards run this every night."*
 - `naive-fails` Any solution that solves one subproblem well and the rest naively misses the deadline. The only shape that reaches gold is a fleet with **roles** — scouts, haulers, electricians — coordinated over `send`/`recv`.
@@ -797,7 +797,7 @@ Theme: the finale. Unlocks nothing (DESIGN.md §6). Four large levels plus one m
   The ~250 this document carried until now was a planning figure from before the level existed;
   it was never true of anything that passes seven seeds. A player who has published the §18
   ladder writes considerably less of it here, which is the whole argument for the Repository.
-- `bonus` **Three separate stars:** (a) beat the deadline by 20%; (b) come in a third under the character budget; (c) zero blocked moves across a 12-bot fleet.
+- `bonus` **Three separate stars:** (a) `under-budget` — close a fifth inside the shift; (b) `fleet-utilisation` — keep every bot working for at least two thirds of it; (c) `no-blocked-moves` — finish without one blocked move. (b) was a character budget until character count was withdrawn from scoring (DESIGN.md §7); the star that replaced it asks for the same thing the character budget was standing in for, which is a fleet that is not idling.
 - `note` **This level must be beatable at bronze by a patient player with a slow, ugly solution.** Bronze's deadline is generous; gold is where it bites. Gating the ending behind gold ends the game for most players one level before the payoff, and the payoff (NARRATIVE.md §3.3) is the reason the other 39 levels exist.
 
 ---
