@@ -385,7 +385,7 @@ function label(value: unknown): string {
 /**
  * The single conversion point from "something was thrown" to a player-facing `RuntimeFailure`.
  *
- * Engine budget errors carry their own player-facing text and are passed through verbatim; only
+ * Engine budget errors carry their own player-facing text and are passed through unchanged; only
  * the `kind` changes so the UI can pick the right treatment. Nothing else is allowed to escape as
  * a raw stack trace.
  */
