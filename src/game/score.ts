@@ -134,7 +134,7 @@ export const REVIEW_TIERS: readonly ReviewTier[] = [
     grade: 'RETAINED',
     min: 100,
     body:
-      'Every work order on this site is closed at or under par. There is no grade above this one. ' +
+      'Every work order issued to you is closed at or under par. There is no grade above this one. ' +
       'There has never needed to be.\n\n' +
       'Your engagement has been marked for retention. Retention is not a promotion, a bonus, or a ' +
       'term of employment. It is a flag on a record that prevents the record from being closed.\n\n' +
