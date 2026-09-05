@@ -5,23 +5,15 @@
  * the live readouts, the medal wall and the Performance Review, and it must agree with the engine
  * on every number it also produces.
  */
-import { MEDAL_WEIGHT, Medal, medalFor } from '../engine/index.ts';
+import { MEDAL_WEIGHT, Medal, SILVER_FACTOR, medalFor } from '../engine/index.ts';
 
 export { Medal, medalFor, MEDAL_WEIGHT };
 
 /** DESIGN.md §11 A4. */
 export const BONUS_STAR_POINTS = 1;
 
-/**
- * Silver is everything up to this multiple of par. DESIGN.md §7.
- *
- * A second copy: `medalFor` in `src/engine/verdict.ts` has the authoritative 1.25 written inline,
- * and nothing reads this one at runtime. Keeping it because the arithmetic it describes has a
- * consequence worth being able to assert — ticks are integers, so the silver band `(par, par*1.25]`
- * contains no integer below a par of four, and `docs/FIX-PAR.md` §6 names the two levels that are
- * there. If the engine's copy ever moves, this one is not what will move it.
- */
-export const SILVER_FACTOR = 1.25;
+/** Re-exported, not redeclared: `src/engine/verdict.ts` holds the only copy. */
+export { SILVER_FACTOR };
 
 /**
  * Stars actually earned on a level, counting only bonus objectives the level still offers.

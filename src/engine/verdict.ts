@@ -105,10 +105,15 @@ export const Medal = {
 } as const;
 export type Medal = (typeof Medal)[keyof typeof Medal];
 
-/** DESIGN.md §7: `<= par` gold, `<= par * 1.25` silver, a pass is bronze. */
+/** Silver is everything up to this multiple of par. DESIGN.md §7. The one authoritative copy. */
+export const SILVER_FACTOR = 1.25;
+
+/** DESIGN.md §7: `<= par` gold, `<= par * SILVER_FACTOR` silver, a pass is bronze. */
 export function medalFor(passed: boolean, ticks: number, parTicks: number): Medal {
   if (!passed) return Medal.None;
   if (ticks <= parTicks) return Medal.Gold;
-  if (ticks <= parTicks * 1.25) return Medal.Silver;
+  // Ticks are integers, so a par under four has an empty silver band: floor(3 * 1.25) is 3.
+  // One rung is always reachable. docs/FIX-PAR.md §7.
+  if (ticks <= Math.max(parTicks + 1, parTicks * SILVER_FACTOR)) return Medal.Silver;
   return Medal.Bronze;
 }

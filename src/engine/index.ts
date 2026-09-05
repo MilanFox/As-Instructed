@@ -150,7 +150,14 @@ export {
 export * as Objectives from './objectives.ts';
 
 export type { Verdict, VerdictInput } from './verdict.ts';
-export { BONUS_STAR_WEIGHT, MEDAL_WEIGHT, Medal, buildVerdict, medalFor } from './verdict.ts';
+export {
+  BONUS_STAR_WEIGHT,
+  MEDAL_WEIGHT,
+  Medal,
+  SILVER_FACTOR,
+  buildVerdict,
+  medalFor,
+} from './verdict.ts';
 
 export {
   FailureCode,

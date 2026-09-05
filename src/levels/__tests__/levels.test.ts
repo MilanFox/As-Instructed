@@ -293,24 +293,32 @@ describe('par calibration', () => {
   });
 
   /**
-   * Ticks are integers and silver is `(par, par * 1.25]`, so the band holds no integer at all
-   * below a par of four: `floor(3 * 1.25)` is 3. On those levels the shell draws a three-tier
-   * ladder with two reachable rungs — gold, or a bronze cliff one tick wide.
+   * Ticks are integers and `par * 1.25` alone holds no integer at all below a par of four:
+   * `floor(3 * 1.25)` is 3. Two levels are there — `w6-01`, whose own comment says its par is 1
+   * only because the registry test requires a positive one, and `w5-02`, whose par is the single
+   * `power` call the level is about. Neither is a design figure, so the band was widened to
+   * `max(par + 1, par * 1.25)` rather than the pars moved: `docs/FIX-PAR.md` §7.
    *
-   * Two levels are there, and neither par is a design figure. `w6-01`'s own comment says it is 1
-   * "because the registry test requires a positive par" (the reference costs 0), and `w5-02`'s is
-   * the cost of the single `power` call the level is about. They are placeholders standing where a
-   * medal axis is displayed, which is `docs/AUDIT-INCENTIVES.md` §8 and is not fixable by moving a
-   * number — see `docs/FIX-PAR.md` §6. Listed rather than left implicit so a third cannot appear
-   * without this test saying so.
+   * The list stays because the arithmetic that made the widening necessary is still worth naming,
+   * and a third level arriving in it is worth knowing about. What it no longer implies is an
+   * unreachable rung — the test below that one is the one that grades the ladder.
    */
-  const SILVER_IS_UNREACHABLE = ['w5-02', 'w6-01'];
+  const SILVER_NEEDS_THE_WIDENING = ['w5-02', 'w6-01'];
 
-  test('the silver band holds an integer everywhere except the two known placeholders', () => {
+  test('two pars are small enough that the raw 1.25 band holds no integer', () => {
     const degenerate = LEVELS.filter(
       (level) => Math.floor(level.par.ticks * SILVER_FACTOR) <= level.par.ticks,
     );
-    expect(degenerate.map((level) => level.id).sort()).toEqual(SILVER_IS_UNREACHABLE);
+    expect(degenerate.map((level) => level.id).sort()).toEqual(SILVER_NEEDS_THE_WIDENING);
+  });
+
+  test('every rung of the ladder is reachable on every level', () => {
+    for (const level of LEVELS) {
+      const par = level.par.ticks;
+      const awarded = new Set<string>();
+      for (let ticks = 0; ticks <= par * 2 + 4; ticks++) awarded.add(medalFor(true, ticks, par));
+      expect([...awarded].sort(), level.id).toEqual(['bronze', 'gold', 'silver']);
+    }
   });
 
   /**
