@@ -1113,3 +1113,71 @@ charge the tick, so throwing today would turn `transmit()`-with-no-antenna into 
 W5/W6. **My reading, for whoever takes it: the tick-charge path and the change path should be
 separated first, then a player-supplied unknown id throws.** Verify that against the code before
 acting — it reopens `power()`'s shipped unknown-id ruling and lands in level-owned files.
+
+### 2026-09-05, 22:35 — UI and visual audit (`docs/AUDIT-UI.md`, 1318 lines, 23 findings)
+
+Read-only, 21 screenshots in `docs/shots/audit-ui/`. **It found a crash nobody was looking
+for**, which is the argument for the instrument: two playtests and an incentive audit had
+each been past this screen.
+
+**1. The publish offer takes the whole app to a black screen.** `PublishDialog` memoises
+`selection` on `offer`; its effect calls `setSelection`, which does
+`set({ offer: { ...offer, selection } })` — new identity every call, so it never settles.
+React throws, and with **no error boundary above the modal layer** the entire tree unmounts to
+`--bg-void`. I confirmed the mechanism by reading both files. **There is no screenshot of the
+publish dialog in the audit because the dialog cannot be reached.** Assigned, with the
+archaeology as the first task: both testers *did* reach this dialog, so either it regressed
+today or the reproduction needs a state they never hit — and that has to be settled, because a
+right patch on a wrong diagnosis still leaves the trap.
+
+**2. The site view is empty until you press Run.** Every level opens on a black rectangle
+reading `NO TRACE ON FILE`. The player is asked to write a program against a map they cannot
+see.
+
+**3–10.** The divergence is thrown away on dismiss — after being stated four times · 68–81% of
+the brief is below the fold, **including the hint button**, with no scroll cue · the reference
+is 11,444px of manual through a 390×290 slot · the report's last paragraph is drawn *under* its
+own footer, unscrollable · the grid cannot be counted and is not drawn at all at 13" ·
+`--ink-dim` fails AA on all three surfaces across 111 uses, and ghost buttons read as disabled ·
+the medal is ring hue alone, no glyph, no legend, and **`MedalBadge` exists but is unused** ·
+the 340px detail cap starves the brief while the editor takes 198ch it cannot use.
+
+**11–23** include: awards outrank the medal on the report; the commendation shelf is
+unreachable; 8 shortcuts and 3 announced; 576px of dead rail beside 15-character truncation;
+`skip the ceremony` is a permanent setting; **three disagreeing tick counters**; two unhandled
+rejections.
+
+### The verdict on "does it look good" — worth quoting
+
+**"Not yet — it looks like a very good design system that nobody has laid out."** The tokens,
+the spacing scale, the mono/prose split, the motion and five individual screens are at the bar.
+The composition is not. Against the genre: Opus Magnum opens on the bench and closes with
+histograms; this opens on a black rectangle and closes with the word `gold` in a box the same
+size as `SEEDS 1`. TIS-100's board is a countable lattice and its manual is a printed document;
+here the lattice is 18% alpha over a floor of the same value and the manual is 12,000 characters
+through a 290px slot. Baba Is You never spends a hue it does not mean; `src/levels/index.ts`
+adds **eight world accents on top of a six-colour semantic palette**, three of them outside
+`tokens.css`, and **World 7 *is* `--danger`, World 8 *is* `--gold`**.
+
+Its six changes, in order: draw the level on entry; give the medal and a comparison the top of
+the report and cut the restatements; make the grid countable and draw the divergence on it; fix
+the contrast token; rebalance the columns; spend the world accents down.
+
+**It also answered the question the viewport work deferred to it: yes, cap the code column.**
+At 2560 Monaco is 1572px with a 7.79px character — **198 characters of measure against a longest
+campaign line of 43**. And the 340px detail cap was set against the wrong number: trebling window
+height leaves the brief at 307px holding 1108px of content.
+
+**Discipline worth noting:** it deliberately did not report the six ungraded levels or any
+failure-message wording, both being concurrent agents' territory, and kept its run-report
+findings to counts of blocks and repetitions rather than sentences.
+
+### Assigned now
+
+- **The crash** — own agent, `src/meta/**`, archaeology first, regression test as the deliverable.
+- **The error boundary over the modal layer** — routed to the screens agent that owns `App.tsx`;
+  `PanelBoundary.tsx` already exists and should be reused rather than duplicated.
+- Findings 6, 9 and 12 routed to the same agent as small adjacent work, with the note that any
+  medal legend needs an honest `CLOSED` state now that six levels have no medal.
+
+Everything else in the audit is unassigned and is the largest block of open work in this file.
