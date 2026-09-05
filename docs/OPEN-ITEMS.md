@@ -229,3 +229,50 @@ square grids at 891x393; the Library's unlock has no ceremony.
 **Deliverable.** Ranked, with screenshots inline as evidence, each finding naming the
 screen and the specific change. "It looks fine" is a failed report. Where a fix is a CSS
 or layout change small enough to prove, make it and show the before/after.
+
+### Backlog — accessible language pass
+
+Requested 2026-09-05. The game role-plays corporate jargon; the player has not studied
+economics or operations research. The tone stays — this is not a de-flavouring pass.
+
+**The test, and it is the whole item:** is the word *flavour* or is it *load-bearing*?
+
+- **Flavour** — a name for the thing we are doing, where nothing is lost if the player
+  never unpacks it. "TPS report" is fine: it is obviously a joke name for a task. Keep
+  every one of these. They are most of the game's character.
+- **Load-bearing** — the player must understand the word to solve the puzzle, read a
+  verdict, or operate the UI. Here jargon stops being a joke and becomes a gate. Use the
+  broadly-known word instead (preferred), or introduce the term once, in place, the first
+  time it appears.
+
+Prefer swapping the word over adding a gloss: explaining a term costs the reader more
+than choosing a common one, and the standing directive is to cut text.
+
+**Candidates to audit, by frequency in player-facing code** — flagged for review, not
+convicted:
+
+- `makespan` (14) — near-certain offender. It is an operations-research term and it is the
+  actual scoring metric for multi-bot levels, so it is load-bearing *and* obscure. "The
+  clock stops when the last bot stops" says it without the word.
+- `precedence` (19) — a real DAG/scheduling concept the finale requires the player to
+  reason about, and the name of two objectives. Load-bearing. "What has to happen first"
+  is the same idea in words everyone has.
+- `requisition` (97) — means "the level hands you a new tool". Load-bearing: it gates
+  what the player can write. Probably keep the word as a stamp, but the *first* one must
+  make its function unmistakable without relying on the noun.
+- `feeder` (160), `manifest` (20), `dispatch` (17), `audit` (13) — mixed. Some are domain
+  nouns for objects on the map, which is fine; some describe what an objective checks,
+  which is not.
+- `work order` (230), `commendation` (62) — almost certainly pure flavour. Keep.
+- `tolerance` (5) — check what it modifies; if it names a threshold the player must hit,
+  it is load-bearing.
+
+**Non-native readers make this worse**, and this game has a German toggle on the backlog:
+uncommon English abstractions are exactly what fails first for a reader working in a
+second language, and they are also the hardest words to translate without losing the joke.
+Do this pass **before** any string extraction for i18n, so the German is written against
+copy that is already clear.
+
+**Deliverable.** Every player-facing term classified flavour / load-bearing / borderline,
+with the load-bearing ones rewritten and shown in context. A report that reclassifies
+everything as flavour is a failed report.
