@@ -64,10 +64,23 @@ export interface Objective {
   /** `[done, total]` for a "7/12" readout. Omit when the objective is binary. */
   progress?(ctx: ObjectiveContext): [number, number];
   /**
-   * Opt-in. Asked only after `evaluate` returned false, and free to return `undefined` when this
+   * Asked only after `evaluate` returned false, and free to return `undefined` when this
    * particular failure has no single point to name.
+   *
+   * Every objective in the campaign either implements this or declares itself `binary`. That is
+   * an invariant, held by `src/levels/__tests__/legibility.test.ts`, not a convention.
    */
   divergence?(ctx: ObjectiveContext): Divergence | undefined;
+  /**
+   * A positive statement that there is nothing here to diverge on: the objective asks a question
+   * whose only two answers are yes and no, and its label already says which one the run gave.
+   *
+   * Only `checkbox` sets it. It exists so that "this objective reports one bit" has to be written
+   * down by the author and can be counted by a reviewer, rather than being what happens when
+   * nobody supplied a `divergence`. `docs/AUDIT-INCENTIVES.md` finding 1 is what silence by
+   * default cost: 31 of 34 work orders could only ever say `not met`.
+   */
+  binary?: true;
 }
 
 export interface ObjectiveOptions {
@@ -162,12 +175,28 @@ export function allTilesAre(
     }
     return done;
   };
+  const firstMiss = (world: World): Vec | undefined => {
+    for (let i = 0; i < world.tiles.length; i++) {
+      const at = { x: i % world.w, y: Math.floor(i / world.w) };
+      if (!pred(world.tiles[i] as Tile, at)) return at;
+    }
+    return undefined;
+  };
   return define(
     'all-tiles-are',
     'Bring every tile to spec',
     options,
     (ctx) => count(ctx.world) === ctx.world.tiles.length,
     (ctx) => [count(ctx.world), ctx.world.tiles.length],
+    (ctx) => {
+      const miss = firstMiss(ctx.world);
+      if (miss === undefined) return undefined;
+      return {
+        where: `(${String(miss.x)}, ${String(miss.y)})`,
+        expected: 'to spec',
+        received: tileAt(ctx.world, miss)?.terrain ?? NOTHING,
+      };
+    },
   );
 }
 
@@ -192,6 +221,11 @@ export function tileCount(
     options,
     (ctx) => compare(count(ctx.world), op, n),
     (ctx) => [Math.min(count(ctx.world), n), n],
+    (ctx) => ({
+      where: 'across the site',
+      expected: `${op} ${String(n)} tiles`,
+      received: `${String(count(ctx.world))} tiles`,
+    }),
   );
 }
 
@@ -212,6 +246,11 @@ export function inventoryAtLeast(
     options,
     (ctx) => held(ctx.world) >= n,
     (ctx) => [Math.min(held(ctx.world), n), n],
+    (ctx) => ({
+      where: `bot #${String(botId)} at the end of the run`,
+      expected: `${String(n)} ${kind}`,
+      received: `${String(held(ctx.world))} ${kind}`,
+    }),
   );
 }
 
@@ -247,6 +286,11 @@ export function itemsDelivered(
     options,
     (ctx) => delivered(ctx.world) >= n,
     (ctx) => [Math.min(delivered(ctx.world), n), n],
+    (ctx) => ({
+      where: `(${String(where.x)}, ${String(where.y)})`,
+      expected: `${String(n)} ${kind}`,
+      received: `${String(delivered(ctx.world))} ${kind}`,
+    }),
   );
 }
 
@@ -302,6 +346,11 @@ export function withinTicks(n: number, options?: ObjectiveOptions): Objective {
     options,
     (ctx) => ctx.trace.endTick <= n,
     (ctx) => [Math.min(ctx.trace.endTick, n), n],
+    (ctx) => ({
+      where: 'the whole run',
+      expected: `${String(n)} ticks`,
+      received: `${String(ctx.trace.endTick)} ticks`,
+    }),
   );
 }
 
@@ -321,6 +370,11 @@ export function withinSenses(name: string, n: number, options?: ObjectiveOptions
     options,
     (ctx) => used(ctx) <= n,
     (ctx) => [Math.min(used(ctx), n), n],
+    (ctx) => ({
+      where: `${name}()`,
+      expected: `${String(n)} calls`,
+      received: `${String(used(ctx))} calls`,
+    }),
   );
 }
 
@@ -333,18 +387,78 @@ export function withinOps(n: number, options?: ObjectiveOptions): Objective {
     options,
     (ctx) => used(ctx) <= n,
     (ctx) => [Math.min(used(ctx), n), n],
+    (ctx) => ({
+      where: 'the whole run',
+      expected: `${String(n)} operations`,
+      received: `${String(used(ctx))} operations`,
+    }),
   );
 }
 
-/** Escape hatch. Prefer a named builder when one fits — the UI reads `label`, not the code. */
+/**
+ * What a `custom` objective says when it is missed. `divergence` is required, `progress` is not.
+ *
+ * The asymmetry is the point. A count answers "how far off"; only a divergence answers "off
+ * where", and a level that computed the comparison already holds the answer to the second.
+ * `divergence` may still return `undefined` at runtime for a failure with no single point —
+ * what it may not do is not exist.
+ */
+export interface CustomReport {
+  progress?(ctx: ObjectiveContext): [number, number];
+  divergence(ctx: ObjectiveContext): Divergence | undefined;
+}
+
+/**
+ * Escape hatch. Prefer a named builder when one fits — the UI reads `label`, not the code.
+ *
+ * The positional overload is the pre-`CustomReport` form and is retired as its call sites
+ * convert. `docs/FIX-DIVERGENCE.md` tracks which are left; when the list empties, delete it and
+ * the type system asks the question at every remaining call site on its own.
+ */
+export function custom(
+  id: string,
+  label: string,
+  fn: (ctx: ObjectiveContext) => boolean,
+  report: CustomReport,
+): Objective;
 export function custom(
   id: string,
   label: string,
   fn: (ctx: ObjectiveContext) => boolean,
   progress?: (ctx: ObjectiveContext) => [number, number],
   divergence?: (ctx: ObjectiveContext) => Divergence | undefined,
+): Objective;
+export function custom(
+  id: string,
+  label: string,
+  fn: (ctx: ObjectiveContext) => boolean,
+  fourth?: CustomReport | ((ctx: ObjectiveContext) => [number, number]),
+  fifth?: (ctx: ObjectiveContext) => Divergence | undefined,
 ): Objective {
-  return define(id, label, { id, label }, fn, progress, divergence);
+  if (typeof fourth === 'object') {
+    return define(id, label, { id, label }, fn, fourth.progress?.bind(fourth), (ctx) =>
+      fourth.divergence(ctx),
+    );
+  }
+  return define(id, label, { id, label }, fn, fourth, fifth);
+}
+
+/**
+ * An objective with nothing to diverge on: the label states a condition, the run either met it or
+ * did not, and there is no coordinate, count or expected value that would tell the player anything
+ * their own program does not already say.
+ *
+ * Rare on purpose. Reach for it only after asking what the level knows that the player does not —
+ * on most misses the answer is "quite a lot", and then the objective wants `custom` with a
+ * `divergence`. `src/levels/__tests__/legibility.test.ts` holds the whole campaign's list of these
+ * in one place so that it stays short enough to read.
+ */
+export function checkbox(
+  id: string,
+  label: string,
+  fn: (ctx: ObjectiveContext) => boolean,
+): Objective {
+  return { id, label, evaluate: fn, binary: true };
 }
 
 /** Convenience for `allTilesAre` / `tileCount` predicates. */
@@ -355,12 +469,19 @@ export function hasTerrain(terrain: Tile['terrain']): (tile: Tile) => boolean {
 export function machinesAllIn(state: string, options?: ObjectiveOptions): Objective {
   const done = (world: World): number =>
     world.machines.filter((m: Machine) => m.state === state).length;
+  const straggler = (world: World): Machine | undefined =>
+    world.machines.find((m: Machine) => m.state !== state);
   return define(
     `machines-all-${state}`,
     `Leave every machine ${state}`,
     options,
     (ctx) => ctx.world.machines.length > 0 && done(ctx.world) === ctx.world.machines.length,
     (ctx) => [done(ctx.world), ctx.world.machines.length],
+    (ctx) => {
+      const left = straggler(ctx.world);
+      if (left === undefined) return undefined;
+      return { where: left.id, expected: state, received: left.state };
+    },
   );
 }
 

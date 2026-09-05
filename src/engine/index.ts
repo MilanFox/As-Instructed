@@ -128,6 +128,7 @@ export {
 
 export type {
   Comparison,
+  CustomReport,
   Divergence,
   Objective,
   ObjectiveContext,
