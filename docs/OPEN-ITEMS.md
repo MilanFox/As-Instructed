@@ -1495,3 +1495,61 @@ every meta run and throws them away.
 **Finding 11** (`src/runtime/**`, the bonus star graded on one seed) goes to the invariants agent
 when it lands; the exact three-file patch is in §E. Done tonight: the stale fifteen-commendation
 comment in `src/audio/__tests__/sounds.test.ts`.
+
+---
+
+## 2026-09-06 — invariants merged; the guard found a live bug before the report was written
+
+**Merged (`worktree-agent-ae39fc29957bc928a`, clean, no conflicts).** Main green at
+**1723 tests / 74 files**, tsc and build clean.
+
+Two guards, and the honest scorecard for them is the part worth keeping. `confessed-invariants`
+turns the `verbatim|mirrors|authoritative` index into a registry exact **in both directions** — a
+new confession fails until registered, a deleted one fails until removed — with seven guards
+hanging off it. `unused-exports` is an exact-set ratchet over 39 dead exports with **no new
+dependency**, and its load-bearing rule is *a re-export is not a read*, which is exactly what made
+`BONUS_STAR_WEIGHT` look alive.
+
+**Neither catches two live implementations under different names**, and the agent said so plainly
+rather than papering over it: G2 gets the dead-copy cases and is blind wherever both copies are
+live; G1 gets the hardest case (three of four copies are not code) and misses the rest. A guard
+that admits its blind spot is worth more than one that implies it has none.
+
+**The index was 24 hits and did not hold 23 invariants.** Nine real duplicated values, **eleven uses
+of the word in ordinary English** ("safe to render verbatim" means *render it as-is*), and three
+real invariants with no literal to compare. The eleven false positives are the reason nobody read
+that index twice.
+
+**The guard found a fifth instance of the bug class within minutes of existing.**
+`src/meta/profile.ts:23` declares a **second `SILVER_FACTOR`**, its comment states the pre-`FIX-PAR`
+rule, and `medalThresholds` beside it drops the `par + 1` floor — so on `w6-01` (par 1) and `w5-02`
+(par 2) the Refactor screen projects a silver rung the engine does not use. **Two of the five known
+instances reproduced in one 223-line file, in a file the audit had explicitly cleared.** Encoded as
+`KNOWN_OPEN` and asserted *exactly*, so fixing it fails the test until the entry goes. Routed to the
+discrepancy agent, which owns `src/meta/**`.
+
+**Tier ruling, arithmetic first:** the floor is exactly 33.3%, so tier 1 was unreachable — but
+**tier 2 is reachable**, since all-bronze lands at 33.3%, inside its band. Four tiers is the honest
+ladder, not three. Ranks stay numbered **2–5** because they are persisted, and renumbering would
+withhold a memo from a player who had never read it. No threshold moved.
+
+**Budgets:** `Objective.meter` and `unit` now live in the engine, so a budget declares its unit
+instead of having it parsed back out of its own prose. `budgets.ts` had its own copy of the union —
+the bug class, inside the file being fixed for it. Parsing stays as a fallback and **only six
+campaign objectives still infer from their label**, pinned exactly. Routed to the levels agent.
+
+### Spawned: bonus stars graded on one seed
+
+Finding 11, and it matters more than its size suggests. The medal reads the **worst** seed; the
+bonus star is re-evaluated against the single returned trace, which is `runs[0]`. So `w3-02` shows
+`TICKS 402 · par 332` with *"Bonus met — beat par by ten percent"* underneath — 402 is the worst
+seed, 281 is seed one. The screen contradicts itself, and worse: **the bonus star is the one reward
+in the game a hardcoded route can still win**, on the exact axis the multi-seed conjunction exists
+to defend. Ruled: a bonus is a level objective and is graded on the same conjunction as every other
+objective. It will make some stars harder, and that is the correction rather than a side effect.
+
+Told to treat §E's patch as a proposal rather than gospel — the agent that wrote it could not run
+it — and that the deliverable is **the list of which bonuses across all forty levels change status**,
+because that list measures how much of the layer was being won on seed one alone.
+
+**Four agents live:** art direction, bonuses-and-par, discrepancy, bonus-seed-grading.
