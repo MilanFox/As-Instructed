@@ -1354,3 +1354,41 @@ control), and the medal legend.
    also unreachable in practice.
 
 Next wake-up armed for 04:42.
+
+### 2026-09-05, 23:55 — the art brief, third and final sharpening
+
+User: *"Don't be afraid to throw away everything and style it new. Nothing is set in stone. The
+current Website is a UI — I want an ART DIRECTION. Be bold. Try out things. See what sticks.
+Change entire things, throw away assets and try others. I want it to be a GAME, not a WEBSITE."*
+
+**My ownership split was the binding constraint, not the brief.** I had given the art spike
+`src/render/**` and `src/ui/styles/**` and told it to *describe* structural changes rather than
+make them. That caps the work at repainting: a transformation that cannot touch component
+structure cannot stop something looking like a dashboard. Worth recording as the general
+lesson — **twice now the art work was limited by how I scoped it rather than by the idea.**
+First to CSS variables, then to no-markup.
+
+**Now:** the art spike owns **all of `src/ui/`** — screens, components, panels, `Workspace.tsx`,
+`App.tsx`, styles — plus `src/render/**`, `src/assets/**`, `public/**` and `index.html`. The
+incentives agent was pulled off every UI file and confined to `src/game/**`, `src/levels/**`
+and docs; it now hands over diffs, and was told to **lead with the intent rather than the diff**,
+because intent survives a rebuilt component and a diff against a deleted one does not.
+
+**Licence granted explicitly:** restructure the layout, delete components, replace the panel
+system if the panel system is what reads as a dashboard. The existing tokens, spacing scale,
+palette and type are **not a baseline to preserve** — they are what was judged, and the verdict
+was boring. Told to be bolder than feels sensible, and that one of three directions being too
+much is a success condition, not a failure: *"see what sticks" is licence to fail on one.*
+
+**What still holds, and deliberately only this:**
+
+- **Readability beats beauty** — with the honest version spelled out: a direction may cost real
+  legibility if it says so and argues the trade.
+- No gameplay, par, medal, budget, objective, level or difficulty change. Character count stays
+  deleted.
+- Motion respects `prefers-reduced-motion` and `settings.celebrations`; per-frame cost stated.
+- No new runtime dependencies; assets authored in-repo with provenance and weight.
+- Green at the end. **Tests asserting current markup may legitimately need rewriting** — rewrite
+  to assert behaviour. A renderer test failing because the palette changed on purpose is a
+  signal to update the test; one failing because the grid stopped being countable is a signal
+  to stop.
