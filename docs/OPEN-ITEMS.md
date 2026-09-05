@@ -683,3 +683,109 @@ found earlier today. **That is three duplicated-constant bugs in one day; worth 
   pre-compression versions. Deliberately not folded into the par change.
 - Worlds 3–8 pars unmeasured against the lazy/smart criterion; World 3 already silvers a
   beginner three times.
+
+### 2026-09-05, 16:30 — `w4-02`'s failure is visible (merged)
+
+Green at **1410 tests** (1389 + 21: 16 trail, 5 docs-cost), tsc / build clean.
+Defect 2 in the list above is closed, and `FIX-POWER.md` §2 can be struck.
+
+**Heat, not a flag** — and the agent measured before writing renderer code, which decided
+the design. `w4-02` solved correctly touches its worst tile **3** times; failed, **25 to
+113**. A binary "was this tile visited" trail would have painted the two runs identically:
+the defect restated in colour. Only revisits draw; one visit is invisible.
+
+**Always on, no level flag, no toggle**, because the measurement showed three
+non-overlapping regimes: solutions that never double back peak at heat 1 and draw nothing,
+honest working solutions sit at 2–6, and the designed failure at 25+. An absolute ramp
+separates them without configuration.
+
+The naive tunnel-follower now paints the closed circuit as a **solid red ring against bare
+grey rock** by the time it halts, with the branches it never entered untouched. Controls
+both check out: the same level solved with breadcrumbs shows a faint darkening and no red;
+`w4-01` with the same program shows nothing at all.
+
+**The calibration no test could have caught.** The first ramp ran `inkDim` → `danger` and
+drew *nothing* below ~8 visits, because `inkDim` (`#6a7a8c`) is within a few points of the
+World 4 cave floor's own grey. The cold end is now `bgVoid` — a darkening, luminance first —
+with hue and alpha on separate curves. There is now a test that fails if the cold end stops
+being a darkening.
+
+Cost is bounded by the **grid, not the tick budget**: worst case `w8-05` at 351 cells,
+`w4-02` at most 77, zero on levels that never double back. No per-frame allocation.
+
+**DESIGN §11 A5 gained a fourth bullet.**
+
+**The sibling requirement was already implemented, and well.** Blocked moves get a different
+segment *shape*, a red rim, an impact chevron, a hopping `!`, sparks and a ring; `w7-03`'s
+livelock trips after 8 all-blocked rounds, so it is seen for eight rounds before it lands.
+Nothing to do. The trail also lights `w7-03` up, orthogonally to its `blockedMoves === 0`
+bonus, since a blocked move produces no arrival.
+
+**`DocsPanel` per-level `costs` — fixed** in the same pass. `w7-02`, `w7-04` and `w8-05`
+were showing a price the player does not pay. The `typeof` guard matters: `wait`'s cost is
+the string `'n'`.
+
+### Handed to the divergence agent
+
+Dot's *"the tunnels join up"* line in `w4-02`'s brief can now go — the condition that
+justified keeping it is gone. Sent as a decision to make deliberately, not a rubber stamp,
+since the trail only speaks *after* a run while the line speaks before it.
+
+### Browser gotchas, now three — `FIX-VIEWPORT.md` §4
+
+`resize_window` does not work in this environment; Chrome suspends ResizeObserver delivery
+in a hidden tab; and **Vite HMR of a `src/render/**` module does not reliably reach a hidden
+tab's mounted renderer**, so a stale module looks exactly like a bug. Hard reload.
+
+### 2026-09-05, 16:38 — publish gate and review scoping merged (`299622d`)
+
+Green at **1440 tests** (1384 + 14 review scoping + 16 publish notice), tsc / build clean.
+
+**The publish refusal is a line on the result, not a dialog.** When the scan finds nothing
+callable, the report grows one section under the commendations saying there was nothing
+shaped like a subroutine to file, what a subroutine is, and how a later work order would
+call it — with a *stop offering* control. If the player factored a helper but left it
+indented, that sentence is replaced by one naming it, which turns the audit's second-order
+note (`publishableDeclarations` only sees column zero) into the one sentence worth saying.
+
+No new modal and no new stylesheet — `report-section`, `rail__label`, `modal__line` and
+`modal__quiet` already existed. Rejected on the way: deleting the early return (a modal that
+interrupts, asks, then refuses an answer, and the *fourth* on that transition); the dialog in
+an explanatory state; a floating toast; and a line in the Repository panel, which the player
+who needs it never opens. New guard `published.length === 0` stops it becoming wallpaper.
+
+**The review's denominator was 139, not the audit's 134** — 34 levels and 37 stars. The
+defects reproduced anyway.
+
+| Player | Before | After |
+|---|---|---|
+| Nothing closed | 0% `DEVELOPING` | `NOT ASSESSED` |
+| 17/17 gold, all stars | 49% `CONSISTENT WITH EXPECTATION` | 100% `RETAINED` |
+| 34/34 gold, no stars | 73% `EXCEPTIONAL` | 100% `RETAINED` |
+| 32 gold + 2 silver | 72%, tier 3, prints "34 of 34" | 98%, tier 4, "32 gold results" |
+
+Three rules: the wall lists **reached** work orders, the grade counts only **closed** ones,
+and the denominator is **medals only**. It declined the audit's version of the second rule —
+keeping the level you are standing on in the denominator as a zero caps a flawless player
+below 100% forever, which is the same disease in miniature. Correct call.
+
+### Ruling: cut the Performance Review down. Assigned.
+
+Its own agent recommended it and I agree. Neither tester opened the screen; the medal wall
+restates the site map, which already shows points, closed count, medal counts, per-world
+totals and an `ALL AT PAR` badge; it is the second place a completion fraction renders
+(audit finding 13); and cutting beats fixing. **The memo stays** — best writing in the game,
+changes at four thresholds — but it gets *delivered* on tier change through the existing
+`Requisition`/`RepositoryIssue` ceremony rather than hosted behind a top-bar icon. World tabs
+go. Roughly 200 of 330 lines, plus a screen and a route.
+
+The one risk flagged to that agent: the veteran already complained about three stacked modals
+on one transition, so a delivered memo must not become a fourth.
+
+### Paired change, deliberately split across two agents
+
+Tier 5 goes `min: 93 → 100` in `score.ts` (divergence agent) and its text "Every work order
+**on this site**" → "**issued to you**" in `NARRATIVE.md` §7 (review-cut agent). Under a
+medals-only denominator 100% means every closed order is gold, which is what the tier's own
+text claims; at 93% a player carries seven silvers and is told otherwise. **No test depends
+on the value**, which is exactly why it needed routing rather than leaving to be noticed.
