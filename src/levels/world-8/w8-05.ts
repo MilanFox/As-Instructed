@@ -603,69 +603,69 @@ const BRIEF = [
   'airlock past the Yards has cycled on a nine-tick clock since before I got here.',
   'nobody wrote it down because nobody had to. now you know.',
   '',
-  'Everything below has to be true when your program stops.',
+  'Bring the grid up, clear the crates, and file KD-0001-T.',
   '',
-  '**The grid.** `probe("desk")` publishes `stations` and `classes`. The stations are',
-  '`sub-0` up to `sub-N`, and every one of them must finish `on`. Each station',
-  'publishes its feeders: `vars.deps` is how many it has, and `vars.dep0`,',
-  '`vars.dep1` are their indices. The audit reads the use log. A station may not',
-  'start energising before every one of its feeders has finished. A station cycles',
-  '`off`, `on`, and the cycle wraps — using one twice turns it back off.',
-  '',
-  '**Hands on.** Every station publishes `vars.manual: 1`, and so does the airlock. The',
-  'Yards took the remote bus down with the last contractor, so `power()` returns false',
-  'on anything carrying that flag and charges you for the attempt. `use()`, standing on',
-  'the tile, is the only thing that moves them. Twelve stations across a 48-by-40',
-  'workings is a routing problem before it is a sequencing one.',
-  '',
-  '**The quota.** Crates are lying on the ground in three or four classes. Each class',
-  'has one sink, `depot-<class>`, where `<class>` is the item kind: `ore`, `ice`,',
-  '`scrap`, `part` or `cell`. A crate is delivered when it is dropped on its own',
-  "class depot tile. Every crate on the site has to end up on one, so a crate left in",
-  'a bot at the end of the shift is a crate that is not delivered.',
-  '',
-  '**The manifest.** `antenna` is live and `receive()` returns the next line of the',
-  "night's manifest, or `null`. A line is `KD4470|<field>|...|<checksum>`, in clear —",
-  'the band out of the Yards is not enciphered and nothing on it is corrupt tonight.',
-  'Split on `|`, drop the header and the checksum, and read `CRATE|x|y|kind`,',
-  '`DEPOT|x|y|kind` and `FORM|x|y`. This is a list, not a puzzle; the puzzle is what',
-  'you do with it.',
-  '',
-  '**Fuel.** Every bot has a finite cell. Acting burns fuel equal to the ticks the',
-  'action costs; waiting, sensing and refuelling burn none. `refuel()` fills the cell',
-  'and only works while the bot is standing on a depot tile. There are several depot',
-  'tiles. There is no gauge for a full cell; every bot starts the shift full, so',
-  '`fuel()` before anybody moves is the number.',
-  '',
-  '**The airlock.** `airlock` starts sealed, and it is manual too. One `use()` advances',
-  'it one stage and costs one tick, and `probe("airlock")` publishes `vars.stages`,',
-  'which is exactly how many uses it takes to open. It stays open once it is open, and',
-  'until somebody has stood there and paid the toll it is a wall to your planner.',
-  '',
-  '**The deadline.** The shift is finite and the objectives panel shows the number.',
-  '',
-  '**The Repository.** Nothing here is new. This work order assumes `lib.ts` holds:',
-  '',
-  '- `reach(x, y, b?)` — routes a bot to a tile, surveying first when the record does not',
-  "  know it yet. `import { reach } from 'lib';`",
-  '- `dispatch(deps, costs, fleet)` — groups the grid into waves and deals each wave out',
-  "  across the fleet. `import { dispatch } from 'lib';`",
-  '',
-  'If any of them is not in there, write it in this file. It will be a longer evening.',
-  '',
-  'Every tick those routines spend is charged here, the whole way down. The Cost tab',
-  'will tell you which of them the Kessler contract is paying for.',
-  '',
-  '**The form.** KD-0001-T is a chip lying on the ground in the workings. Its tile is',
-  'marked and its position is in the signal. One bot has to pick it up and carry it.',
-  'The two slots are `slot-charter` and `slot-renewals`, and `probe` gives you both',
-  'positions.',
-  '',
-  'KD-0001-T is filed when it is left in one of two places. The Charter registry',
-  'countersigns it and the engagement concludes. The renewals tray processes it and',
-  'the Contract runs on, with you as signatory. Both slots are past the airlock, the',
-  'same distance from it. Either one closes the work order.',
+  'The form is filed when it is left in one of two slots past the airlock. The Charter',
+  'registry countersigns it and the engagement concludes. The renewals tray processes it',
+  'and the Contract runs on, with you as signatory. Either one closes the work order.',
 ].join('\n');
+
+const FACTS = [
+  {
+    label: 'The desk',
+    value:
+      '`probe("desk")` publishes `stations` and `classes`. The stations are `sub-0` up to `sub-N`.',
+  },
+  {
+    label: 'Feeders',
+    value:
+      '`vars.deps` is how many stations feed this one. `vars.dep0`, `vars.dep1` hold their numbers.',
+  },
+  {
+    label: 'The order rule',
+    value:
+      'A station may not **start** until every feeder has **finished**. Read off the use log, not the final state.',
+  },
+  {
+    label: 'Energising',
+    value: 'The cycle is `off`, `on` and it wraps. Using a station twice turns it back off.',
+  },
+  {
+    label: 'Hands on',
+    value:
+      'Stations and the airlock publish `vars.manual: 1`. `power()` returns false on them and still charges you. Only a `use()` at the tile moves them.',
+  },
+  {
+    label: 'The quota',
+    value:
+      'Each class has one sink, `depot-<class>` — `ore`, `ice`, `scrap`, `part` or `cell`. A crate still in a bot is not delivered.',
+  },
+  {
+    label: 'The band',
+    value:
+      '`antenna` is live. `receive()` returns the next line or `null`. Nothing on it tonight is enciphered or corrupt.',
+  },
+  {
+    label: 'A line',
+    value:
+      '`KD4470|<field>|…|<checksum>`. Split on `|`, drop the header and the checksum, and read `CRATE|x|y|kind`, `DEPOT|x|y|kind`, `FORM|x|y`.',
+  },
+  {
+    label: 'Fuel',
+    value:
+      'Every bot starts full and a full cell has no gauge, so `fuel()` before anybody moves is the number. `refuel()` works on any depot tile, and there are several.',
+  },
+  {
+    label: 'The airlock',
+    value:
+      'Starts sealed. One `use()` advances one stage for one tick, and `probe("airlock")` publishes `vars.stages` — the uses it takes to open. It stays open after that.',
+  },
+  {
+    label: 'The form',
+    value:
+      'KD-0001-T is a chip on a marked tile in the workings. `probe` gives the positions of `slot-charter` and `slot-renewals`.',
+  },
+];
 
 const STARTER = [
   "// import { reach, dispatch } from 'lib';",
@@ -689,6 +689,7 @@ export const w8_05: LevelDef = {
   title: 'The Kessler Contract',
   hardware: [],
   brief: BRIEF,
+  facts: FACTS,
   seeds: [1, 4, 7],
   /* Both halves of the reference — the `Sim` driver and the player-facing source — come in
      between 560 and 977 ticks across the three seeds. Par is left where it was when there were
@@ -795,10 +796,11 @@ export const w8_05: LevelDef = {
       'what before you work out what order it all has to happen in.',
     'A bot that is not allowed to switch its station on yet is not a bot that is stuck. ' +
       'It is a bot that has something else it could be doing first.',
-    'The toll at the airlock is the same size whoever pays it and whenever it is paid. ' +
-      'The only question is who was going that way anyway.',
     'Fuel is not a chore until the second errand. Then it decides which bot should have ' +
       'taken it.',
+    'Until somebody has stood at the airlock and paid every stage of it, your route ' +
+      'planner sees a wall. The toll is the same size whoever pays it, so let the bot ' +
+      'that was going that way anyway pay it early.',
   ],
-  docs: ['fuel', 'machines', 'messaging'],
+  docs: ['fuel', 'refuel', 'power', 'use', 'receive', 'probe'],
 };

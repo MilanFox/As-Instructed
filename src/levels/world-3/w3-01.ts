@@ -65,12 +65,19 @@ export const w3_01: LevelDef = {
     '',
     'the arm on RIG-04 has one clamp. the log still shows you tried for a second.',
     '',
-    'Every pad on the east side of the shed must end the shift holding at least one crate.',
-    'There are exactly as many pads as there are crates, and both move between shifts.',
-    '`pickup()` takes what is lying on the tile the bot is standing on. `drop()` puts it back',
-    'down on the tile the bot is standing on. A `pickup()` on a full bot takes nothing and',
-    'still costs a tick.',
+    'Every pad on the east side of the shed must end the shift holding a crate.',
   ].join('\n'),
+  facts: [
+    { label: 'The crates', value: 'On the west siding. As many crates as there are pads.' },
+    {
+      label: 'Between shifts',
+      value: 'Which rows the crates sit in, and which rows the pads sit in, both change.',
+    },
+    { label: '`pickup()`', value: 'Takes what is lying on the tile the bot is standing on.' },
+    { label: '`drop()`', value: 'Puts it back down on the tile the bot is standing on.' },
+    { label: 'A full bot', value: '`pickup()` takes nothing and still costs a tick.' },
+    { label: 'The clamp', value: 'One crate at a time.' },
+  ],
   seeds: [1, 2, 3],
   par: { ticks: PAR_TICKS, chars: 1100 },
   build(seed: number): World {
@@ -112,10 +119,10 @@ export const w3_01: LevelDef = {
     '',
   ].join('\n'),
   hints: [
-    'The bot has one clamp. Work out what it is holding before you ask it to hold something else.',
-    'A pickup that takes nothing still costs a tick, and it shows up in the trace as a failure.',
-    'How many crates can one trip across the shed actually move?',
+    'The clamp holds one crate. Set it down before you reach for another.',
     'The crate rows and the pad rows are not the same rows, and they change between shifts.',
+    'A pickup that takes nothing still costs a tick, and the log shows it as a failure.',
+    'One trip across the shed moves one crate. Fetch, carry, set down, go back for the next.',
   ],
   docs: ['pickup', 'drop'],
 };

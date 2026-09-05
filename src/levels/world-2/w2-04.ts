@@ -65,19 +65,30 @@ export const w2_04: LevelDef = {
     'The hopper leaves the depot full of seed. It does not open at the other end; Legal have',
     'confirmed this is a feature and have declined to say of what.',
     '',
-    'The north plot is six tiles. **Every crop in it must be harvested once, and every tile',
-    'must be left planted.**',
-    '',
-    'The hopper starts the shift full. A hopper with no room in it takes nothing and the arm',
-    'swings anyway. `inventory()` reports what the bot is carrying right now, and it is the',
-    'only instrument that reports the hopper at all.',
-    '',
-    'The crops ripen at different times. Growth climbs by one every tick, driving or not, so',
-    'a tile reading 5 of 8 is ready in three ticks.',
-    '',
-    'The depot docks the sheet for spoilage: one against the shift for every tick a crop stands',
-    'ripe in the ground with nobody on it. Growth stops at `maxGrowth`. The docking does not.',
+    'Clear the north plot and leave every tile of it planted.',
   ].join('\n'),
+  facts: [
+    { label: 'The plot', value: 'Six tiles. Three across, two deep.' },
+    {
+      label: 'The hopper',
+      value: 'Starts the shift full. A full hopper takes nothing and the arm swings anyway.',
+    },
+    {
+      label: '`inventory()`',
+      value: 'What the bot is carrying right now. The only reading of the hopper there is.',
+    },
+    {
+      label: 'Ripening',
+      value:
+        'Growth climbs by one every tick, driving or not. A tile at 5 of 8 is ready in three ticks.',
+    },
+    {
+      label: 'Spoilage',
+      value:
+        'One against the sheet for every tick a ripe crop stands in the ground with nobody on it.',
+    },
+    { label: 'At `maxGrowth`', value: 'Growth stops. The docking does not.' },
+  ],
   seeds: [1, 2, 3, 4],
   par: { ticks: 52, chars: 1050 },
   build(seed: number): World {
@@ -112,10 +123,11 @@ export const w2_04: LevelDef = {
     '',
   ].join('\n'),
   hints: [
-    'The hopper starts full. That first reading says something about the hopper that no later reading will.',
-    'A swing at a full hopper costs the same two ticks as a swing that works. The bot can know which it is about to do.',
-    'One pass cannot finish the plot. Something has to be remembered between passes, and an ordinary variable remembers it.',
-    'Growth climbs by one per tick, so a tile states exactly how long it needs. The clock runs whether the bot drives or stands still.',
+    'The hopper starts full, so the first inventory reading is also its size.',
+    'A swing at a full hopper costs the same two ticks as one that works.',
+    'One pass cannot finish the plot. The crops do not all come ready at the same time.',
+    'Growth climbs by one per tick, so a tile says exactly how long it needs. The clock runs whether the bot drives or stands still.',
+    'Waiting on a tile until it comes ready costs no spoilage. Driving laps costs the same ticks and arrives late.',
   ],
   docs: ['inventory', 'harvest', 'plant', 'wait'],
 };

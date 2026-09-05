@@ -54,7 +54,8 @@ const CONSTRUCTED: Readonly<Record<number, YardPlan>> = Object.freeze({
 
 export function yardPlan(seed: number): YardPlan {
   const constructed = CONSTRUCTED[seed];
-  if (constructed) return { capacities: [...constructed.capacities], draws: [...constructed.draws] };
+  if (constructed)
+    return { capacities: [...constructed.capacities], draws: [...constructed.draws] };
 
   const rng = new Rng(seed * 3121 + 449);
   const consumers = rng.int(12, 20);
@@ -143,18 +144,25 @@ export const w5_04: LevelDef = {
     'Every feeder in Yard 4 has a ceiling. The ceilings are defined in Appendix C. The index',
     'entry for Appendix C is a reference to Appendix C. I have requested a copy of that.',
     '',
-    'Put every consumer on a feeder without taking any feeder over its ceiling.',
-    '',
-    '- Feeders are `feeder-1` upward and report `vars.capacity`. Consumers are `consumer-1`',
-    '  upward and report `vars.draw`. `probe(id)` is free and returns `null` past the last one.',
-    '- `link(feederId, consumerId)` puts that consumer on that feeder. It costs 2 ticks.',
-    '- **A cable cannot be removed once it is laid.** A consumer cabled to two feeders draws on',
-    '  both. **Every consumer must end on exactly one feeder.**',
-    '- A feeder is over its ceiling when the draws of the consumers cabled to it add up to more',
-    '  than its capacity.',
-    '',
-    'For the bonus: leave the single highest-capacity feeder with nothing on it at all.',
+    'Put every consumer on a feeder. Take no feeder over its ceiling.',
   ].join('\n'),
+  facts: [
+    {
+      label: 'What reports what',
+      value:
+        'Feeders are `feeder-1` upward and report `vars.capacity`. Consumers are `consumer-1` upward and report `vars.draw`. `probe(id)` is free and returns `null` past the last one.',
+    },
+    { label: '`link(feederId, consumerId)`', value: 'Puts that consumer on that feeder. 2 ticks.' },
+    {
+      label: 'Cable is permanent',
+      value:
+        '**It cannot be removed once laid.** A consumer cabled to two feeders draws on both, and every consumer must end on exactly one.',
+    },
+    {
+      label: 'Over its ceiling',
+      value: 'A feeder whose cabled consumers add up to more `draw` than its `capacity`.',
+    },
+  ],
   seeds: [1, 2, 3, 4, 5],
   par: { ticks: 40, chars: 620 },
   build(seed: number): World {

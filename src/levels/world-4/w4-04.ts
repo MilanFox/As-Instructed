@@ -1,7 +1,15 @@
 import type { ObjectiveContext, Rng, Vec, World } from '../../engine/index.ts';
 import { Objectives, Terrain, addBot, createWorld, setTerrain } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
-import { addCycles, carvePerfectMaze, cellTile, deadEndCells, distancesFrom, keyOf, paintCave } from './caves.ts';
+import {
+  addCycles,
+  carvePerfectMaze,
+  cellTile,
+  deadEndCells,
+  distancesFrom,
+  keyOf,
+  paintCave,
+} from './caves.ts';
 import { botEndsOn, firstVisitOrder, standingKeys, tilesWithTerrain } from './objectives.ts';
 
 const CELLS = 14;
@@ -135,7 +143,8 @@ function tookBestOrder(ctx: ObjectiveContext): boolean {
 
 function visitedCount(ctx: ObjectiveContext): number {
   const stood = standingKeys(ctx);
-  return tilesWithTerrain(ctx.initialWorld, Terrain.Pad).filter((at) => stood.has(keyOf(at))).length;
+  return tilesWithTerrain(ctx.initialWorld, Terrain.Pad).filter((at) => stood.has(keyOf(at)))
+    .length;
 }
 
 /**
@@ -160,26 +169,34 @@ export const w4_04: LevelDef = {
     'FROM: Dep. Coordinator M. Vance',
     'RE:   Unlogged unit',
     '',
-    'Telemetry has identified a bot at depth running a program with no',
+    'Telemetry has found a bot at depth running a program with no',
     'deployment record. It has been running for eleven months. It is',
-    'not malfunctioning. It appears to be maintaining something.',
+    'not malfunctioning.',
     '',
     'Facilities have classified it as "existing infrastructure" so that',
     'it does not require a decision.',
     '```',
     '',
-    'Three collection points, marked with pads. One lift, on a depot tile. Stand on all three',
-    'collection points, then end the run standing on the lift.',
-    '',
-    'Each of the four sits at the end of a short side passage off the main tunnels.',
-    '',
-    'Surveying, planning and walking are cheaper apart than together. The tick budget pays for',
-    'one look around and one good circuit. It does not pay for three separate trips.',
-    '',
-    '**The Repository.** Nothing here needs it. But when this work order closes you will be',
-    'offered the chance to keep the two halves you are about to write. Later briefs call them',
-    '`survey` and `pathTo`.',
+    'Stand on all three collection points, then end the run on the lift.',
   ].join('\n'),
+  facts: [
+    { label: 'Collection points', value: 'Three pad tiles.' },
+    { label: 'The lift', value: 'One depot tile.' },
+    {
+      label: 'Where they sit',
+      value: 'Each of the four is at the end of a short side passage off the main tunnels.',
+    },
+    {
+      label: 'The clock',
+      value:
+        'It pays for one look around and one good circuit. It does not pay for three separate trips.',
+    },
+    {
+      label: 'The Repository',
+      value:
+        'Nothing here needs it. But the two halves you write get names later: `survey` and `pathTo`.',
+    },
+  ],
   seeds: [1, 2, 3, 4],
   par: { ticks: 970, chars: 2500 },
   budget: { maxTicks: 1350 },
@@ -196,10 +213,8 @@ export const w4_04: LevelDef = {
     ),
   ],
   bonus: [
-    Objectives.custom(
-      'best-order',
-      'Take the collection points in the best order',
-      (ctx) => tookBestOrder(ctx),
+    Objectives.custom('best-order', 'Take the collection points in the best order', (ctx) =>
+      tookBestOrder(ctx),
     ),
   ],
   starter: [
@@ -221,5 +236,5 @@ export const w4_04: LevelDef = {
     'Once the cave is written down, the bot no longer has to be anywhere for you to work out how far apart two tiles are.',
     'There are six ways to order three stops. Six is a small enough number to simply try all of them.',
   ],
-  docs: ['look', 'coordinates'],
+  docs: ['look', 'coordinates', 'memory'],
 };

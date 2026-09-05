@@ -247,28 +247,38 @@ export const w5_03: LevelDef = {
     'site metrics framework, which I am measured on.',
     '',
     'Cable the district, then bring every substation up.',
-    '',
-    '- Substations are `sub-1` upward. `probe(id)` is free and returns `null` past the last one.',
-    '- Each station lists its upstream machines as `vars` keys of the form `prereq:<id>`. An',
-    '  upstream may be the reactor or another station. Some list none.',
-    '- For **every** listed prerequisite, run `link(prereqId, stationId)`. That is the cable.',
-    '- Then run `power(stationId, "on")`. A station only latches once all its prerequisites are',
-    '  `on`; one that lists none may come up at any time.',
-    '- `link` and `power` cost 2 ticks each, and a futile `power` costs the same as a useful one.',
-    '',
-    'For the bonus: the crew walks between stations in the order you energise them. The reactor',
-    'reports the allowance in `vars.travelBudget` — the sum of the grid distances between',
-    'consecutive stations, starting at the reactor.',
-    '',
-    'For the second bonus: bring the district up on at most 20 reads. A `probe` still costs no',
-    'ticks. It is only counted, and the district does not rewire itself while you work — a',
-    'station you read twice told you the same thing twice.',
-    '',
-    '**The Repository.** Nothing here needs it. But whatever turns that prerequisite list into a',
-    'workable order is worth keeping; three later briefs ask the same question. Later briefs call',
-    'it `waves`. What it should hand back is the groups: everything that can start now, then',
-    'everything after those.',
   ].join('\n'),
+  facts: [
+    {
+      label: '`probe(id)`',
+      value:
+        'Free, and only counted. Substations are `sub-1` upward; past the last one it returns `null`. Nothing rewires itself while you work.',
+    },
+    {
+      label: 'Upstream',
+      value:
+        'Each station lists what it waits on as `vars` keys of the form `prereq:<id>`. That may be the reactor or another station. Some list none.',
+    },
+    {
+      label: 'The cable',
+      value: 'For **every** listed prerequisite, run `link(prereqId, stationId)`. 2 ticks each.',
+    },
+    {
+      label: 'Bringing one up',
+      value:
+        '`power(stationId, "on")`, 2 ticks. It only latches once every prerequisite is `on`, and a futile call costs the same as a useful one.',
+    },
+    {
+      label: 'The crew walk',
+      value:
+        'The crew walks between stations in the order you energise them. The reactor reports the allowance in `vars.travelBudget`.',
+    },
+    {
+      label: 'The Repository',
+      value:
+        'Nothing here needs it. But keep whatever turns that list into a workable order — later briefs call it `waves`, and expect the groups back.',
+    },
+  ],
   seeds: [1, 2, 3, 4],
   par: { ticks: 76, chars: 1250 },
   build(seed: number): World {

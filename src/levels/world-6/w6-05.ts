@@ -223,21 +223,6 @@ function repairs(world: World): string[] {
     .map((packet) => `fix ${packet.plain.slice(0, packet.plain.lastIndexOf('*'))}`);
 }
 
-const GRAMMAR = [
-  'A block is `name|body*S,W`.',
-  '',
-  '- `name` is `main`, `g1`, `g2` or `g3`.',
-  '- `body` is one or more entries separated by commas.',
-  '- An entry is a **move group** — a decimal count then one of `N`, `E`, `S`, `W`, like `12S`',
-  '  — or a **call** — a block name, `*`, and a repeat count, like `g2*3`. A call runs that',
-  '  whole block, that many times.',
-  '- Blocks nest up to four deep. No block is called before it is defined and none calls itself.',
-  '- `S` and `W` are the check values over the characters of `name|body`, as in the standing',
-  '  signal-discipline order: `S` is `(salt + c0 + ... + cn) mod 256` and `W` is',
-  '  `(salt + 1*c0 + ... + (n+1)*cn) mod 256`, `ci` being the character code and `salt` the',
-  '  number the antenna carries.',
-].join('\n');
-
 /**
  * Par: the route is exactly 60 moves on every seed and nothing else costs a tick — parsing,
  * checking, key search and the repair report are all free. There is nothing to shave.
@@ -257,36 +242,45 @@ export const w6_05: LevelDef = {
     'The band is designated dead. Traffic on a dead band is, by designation, not traffic. The',
     'station still sending on it uses the old nested format.',
     '',
-    'The band carries a route from the tile you are standing on to the landing pad, in blocks.',
-    'Read them all, assemble the route, and drive it. Everything off the route is a pit.',
-    '',
-    GRAMMAR,
-    '',
-    'Three things about this traffic:',
-    '',
-    '1. `probe(\'mast\').vars.salt` gives the salt for nothing, and it changes between shifts.',
-    '2. Some blocks arrive corrupt — one character altered, checks unchanged. A corrupt block is',
-    '   a lie about a block that also arrived intact. Do not act on one.',
-    '3. **One block arrives shifted.** It went through the old repeater, which shifts printable',
-    '   characters by a whole number from 0 to 94. `decode(text, key)` undoes a shift for',
-    '   nothing. Its check values are over the plain text, not the shifted one.',
-    '',
-    'Blocks arrive in no particular order. Start from `main`.',
-    '',
-    '**Extra objective.** Repair the corrupt blocks instead of discarding them. For each one, in',
-    'arrival order, print `fix ` followed by the `name|body` it was sent as before the',
-    'character was altered.',
-    '',
-    '**The Repository.** The nesting is new. Everything inside it is not. This work order',
-    'assumes `lib.ts` holds:',
-    '',
-    '- `findKey(packets)` — returns the shift the traffic was sent with.',
-    "  `import { findKey } from 'lib';`",
-    '- `unpack(route)` — turns move groups like `4E12S1W` into the moves they stand for. A block',
-    "  body is those same groups with commas in it. `import { unpack } from 'lib';`",
-    '',
-    'If either is not in there, write it in this file.',
+    'The blocks on the band spell out a route from the tile you are standing on to the landing',
+    'pad. Read them all, start from `main`, and drive the route.',
   ].join('\n'),
+  facts: [
+    {
+      label: 'A block',
+      value:
+        '`name|body*S,W`. `name` is `main`, `g1`, `g2` or `g3`. `body` is entries, comma separated.',
+    },
+    { label: 'Move group', value: 'A count then `N`, `E`, `S` or `W`, like `12S`.' },
+    {
+      label: 'Call',
+      value:
+        'A block name, `*`, a repeat count, like `g2*3` — run that whole block three times. Blocks nest up to four deep.',
+    },
+    {
+      label: 'The checks',
+      value:
+        'Over the characters of `name|body`: `S` is `(salt + c0 + ... + cn) mod 256`, `W` is `(salt + 1*c0 + ... + (n+1)*cn) mod 256`.',
+    },
+    { label: 'The salt', value: "`probe('mast').vars.salt`. Free, and a new number every shift." },
+    {
+      label: 'Corrupt blocks',
+      value:
+        'One character altered, checks unchanged. Each one lies about a block that also arrived intact.',
+    },
+    {
+      label: 'One shifted block',
+      value:
+        'It came through the old repeater, shifted by a whole number from 0 to 94. Its checks are over the plain text.',
+    },
+    { label: 'Arrival order', value: 'None. Blocks arrive in any order.' },
+    { label: 'Off the route', value: 'Pit. Every tile that is not on the route is a pit.' },
+    {
+      label: 'Repair report',
+      value:
+        'For each corrupt block, in arrival order, print `fix ` and the `name|body` it was sent as.',
+    },
+  ],
   seeds: [1, 2, 3, 4, 5],
   par: { ticks: ROUTE_MOVES, chars: 2400 },
   build(seed: number): World {
@@ -310,14 +304,10 @@ export const w6_05: LevelDef = {
     return world;
   },
   objectives: [
-    Objectives.custom(
-      'reach-pad',
-      'Park the bot on the landing pad',
-      (ctx) => {
-        const bot = botById(ctx.world, 0);
-        return bot !== undefined && tileAt(ctx.world, bot.at)?.terrain === Terrain.Pad;
-      },
-    ),
+    Objectives.custom('reach-pad', 'Park the bot on the landing pad', (ctx) => {
+      const bot = botById(ctx.world, 0);
+      return bot !== undefined && tileAt(ctx.world, bot.at)?.terrain === Terrain.Pad;
+    }),
     stayOnRoute(),
   ],
   bonus: [
@@ -354,11 +344,11 @@ export const w6_05: LevelDef = {
     '',
   ].join('\n'),
   hints: [
-    'Sort the traffic before you read any of it. Every block on the band is exactly one of three things, and the checks tell you which without your having to understand the contents.',
+    'Sort the traffic before you read any of it. Every block is one of three things, and the checks tell you which.',
     'A block that fails its checks might still be a block. Something happened to it on the way, and you have already been taught how to undo that.',
-    'A move group produces moves. A call produces whatever the block it names produces, that many times over. The second sentence is the same shape as the first, which is a hint about the shape of the reader.',
-    'A reader that handles one level of nesting has to keep the position it was up to somewhere before it goes down a level, and get it back afterwards. There are two well-known places to keep it.',
-    'For the repair: two checks differ by two numbers. One of them is the size of the change and one of them is the size of the change multiplied by where it happened.',
+    'A move group produces moves. A call produces whatever the block it names produces, that many times over. The second sentence has the same shape as the first. So does the reader.',
+    'Going down a level means putting your place somewhere and picking it back up after. There are two well-known places to put it.',
+    'For the repair: the two checks are each out by a number. One is the size of the change. The other is that size times where it happened.',
   ],
   docs: ['decode', 'probe', 'receive'],
 };

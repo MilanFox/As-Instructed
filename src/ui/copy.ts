@@ -288,7 +288,7 @@ export function hardwareNote(name: string): HardwareNote {
   );
 }
 
-export const REQUISITION_TITLE = 'HARDWARE REQUISITION — DELIVERED';
+export const REQUISITION_TITLE = 'HARDWARE REQUISITION — NEW TOOLS DELIVERED';
 export const REQUISITION_FROM = 'Procurement, via Dep. Coordinator M. Vance';
 
 /** One dry line under the header. Rotated by the number of items in the delivery. */

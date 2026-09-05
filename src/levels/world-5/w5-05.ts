@@ -205,30 +205,36 @@ export const w5_05: LevelDef = {
     '**RE:** District 9, reconnection',
     '',
     'District 9 lost its cabling on Tuesday. Stores have issued a drum against the works',
-    'order. The drum is the amount of cable the works order says the job takes, which is',
-    'the amount of cable the job took the last time anybody measured it.',
+    'order. The drum holds what the works order says the job takes, which is what it took',
+    'the last time anybody measured it.',
     '',
-    'Re-cable District 9 so that every substation reaches the reactor, then bring them all up.',
-    '',
-    '- Substations are `sub-1` upward. `probe(id)` is free and returns `null` past the last one.',
-    '- `link(a, b)` lays a cable between two machines. It costs 2 ticks and spends cable equal to',
-    '  the grid distance between them: the difference in `x` plus the difference in `y`.',
-    '- A cable carries both ways, and laying the same cable twice spends the drum twice.',
-    '- **The drum is finite.** The reactor reports the total cable you have in `vars.cableBudget`.',
-    '  Going over it fails the job.',
-    '- `power(id, "on")` brings a substation up, for 2 ticks. **A substation only comes up if a',
-    '  cable already joins it to the reactor through machines that are already on.**',
-    '',
-    'For the bonus: finish inside 102% of the shortest possible run of cable.',
-    '',
-    '**The Repository.** The tree you lay *is* the dependency list for the bringing-up. This',
-    'work order assumes `lib.ts` holds:',
-    '',
-    "- `waves(deps)` — groups a dependency list so nothing in a group waits on anything else in",
-    "  it. `import { waves } from 'lib';`",
-    '',
-    'If it is not in there, write it in this file.',
+    'Re-cable District 9, then bring every substation up.',
   ].join('\n'),
+  facts: [
+    {
+      label: '`probe(id)`',
+      value: 'Free. Substations are `sub-1` upward; past the last one it returns `null`.',
+    },
+    {
+      label: '`link(a, b)`',
+      value:
+        'Lays a cable between two machines. 2 ticks, and spends cable equal to the grid distance: the difference in `x` plus the difference in `y`.',
+    },
+    {
+      label: 'A cable',
+      value: 'Carries both ways. Laying the same one twice spends the drum twice.',
+    },
+    {
+      label: 'The drum',
+      value:
+        'Finite. The reactor reports the whole of it in `vars.cableBudget`. Going over fails the job.',
+    },
+    {
+      label: '`power(id, "on")`',
+      value:
+        '2 ticks. A substation only comes up if a cable already joins it to the reactor through machines that are already on.',
+    },
+  ],
   seeds: [1, 2, 3, 4, 5],
   par: { ticks: 56, chars: 900 },
   build(seed: number): World {
@@ -313,6 +319,7 @@ export const w5_05: LevelDef = {
     'Every position you need is readable before you spend anything. The whole problem is arithmetic on those positions, and arithmetic is free.',
     "Every cable you lay either connects something new, or it doesn't.",
     'Grow one network outward from the reactor. At each step there is a cheapest cable that reaches something not yet on the network, and it is not always the one that starts where you finished.',
+    'The tree you laid is also the order to switch things on. A station can only come up once whatever joins it to the reactor is already on.',
   ],
   docs: ['probe', 'link', 'power'],
 };

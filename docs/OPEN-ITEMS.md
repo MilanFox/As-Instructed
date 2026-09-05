@@ -233,9 +233,14 @@ square grids at 891x393; the Library's unlock has no ceremony.
 screen and the specific change. "It looks fine" is a failed report. Where a fix is a CSS
 or layout change small enough to prove, make it and show the before/after.
 
-### Backlog — accessible language pass
+### Backlog — accessible language pass — **DONE, see `docs/FIX-PROSE.md`**
 
-Requested 2026-09-05. The game role-plays corporate jargon; the player has not studied
+Requested 2026-09-05, delivered the same day, together with the brief-length target from
+PLAYTEST-BEGINNER §13, in one sweep over the same files. Mean brief 220 → 58 words; every
+term classified; `makespan`, `precedence` and `audit` replaced in player-facing text. The
+item is left below as written, because the report is scored against it.
+
+The game role-plays corporate jargon; the player has not studied
 economics or operations research. The tone stays — this is not a de-flavouring pass.
 
 **The test, and it is the whole item:** is the word *flavour* or is it *load-bearing*?
