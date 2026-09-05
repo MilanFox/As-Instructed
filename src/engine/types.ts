@@ -123,6 +123,15 @@ export const MachineKind = {
 } as const;
 export type MachineKind = (typeof MachineKind)[keyof typeof MachineKind];
 
+/**
+ * Reserved `Machine.vars` key. `1` means the machine is hand-operated: `power()` refuses it and
+ * `use()` at its tile is the only thing that moves it.
+ *
+ * It lives in `vars` rather than in a field of its own because `vars` is the one channel `probe`
+ * publishes, and a rule the player cannot read before they break it is not a rule, it is a trap.
+ */
+export const MANUAL_ONLY = 'manual';
+
 export interface Machine {
   id: string;
   kind: MachineKind;

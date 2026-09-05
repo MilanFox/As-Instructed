@@ -19,7 +19,7 @@ export type {
   GroundStack,
   TerrainProps,
 } from './types.ts';
-export { Dir, Terrain, ItemKind, MachineKind, ALL_DIRS, usesFuel } from './types.ts';
+export { Dir, Terrain, ItemKind, MachineKind, MANUAL_ONLY, ALL_DIRS, usesFuel } from './types.ts';
 
 export type { RngState } from './rng.ts';
 export { Rng } from './rng.ts';

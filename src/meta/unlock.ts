@@ -46,7 +46,7 @@ export interface LibraryRequirement {
  * | `pathTo` | w4-04 | w4-05, w7-02, w7-05, w8-01, w8-02, w8-03 |
  * | `waves` | w5-03 | w5-05, w8-03 |
  * | `unpack` | w6-03 | w6-05, w8-04 |
- * | `findKey` | w6-04 | w6-05, w8-04, w8-05 |
+ * | `findKey` | w6-04 | w6-05, w8-04 |
  * | `deal` | w7-04 | w7-05, w8-03 |
  * | `reach` = `survey` + `pathTo` | w8-02 | w8-04, w8-05 |
  * | `dispatch` = `waves` + `deal` | w8-03 | w8-05 |
@@ -178,11 +178,6 @@ export const LIBRARY_REQUIREMENTS: Readonly<Record<string, readonly LibraryRequi
       },
     ],
     'w8-05': [
-      {
-        name: 'findKey',
-        signature: 'findKey(packets: string[]): number',
-        assumes: 'Takes the traffic on the band and returns the shift it was sent with.',
-      },
       {
         name: 'reach',
         signature: 'reach(x: number, y: number, b?: Bot): boolean',

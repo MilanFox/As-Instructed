@@ -530,7 +530,7 @@ if (node !== null && node.state === 'off') {
       { name: 'state', type: 'string', doc: "The state to force, typically 'on' or 'off'." },
     ],
     returns: 'boolean',
-    doc: "Sets a machine's state directly instead of stepping through its cycle the way `use` does. Returns false for an unknown machine id, and costs the full price either way.",
+    doc: "Sets a machine's state directly instead of stepping through its cycle the way `use` does, from anywhere on the map. Returns false for an unknown machine id, and for a machine that publishes `vars.manual: 1` — those are hand-operated, and only a `use()` at the tile moves them. It costs the full price either way.",
     example: `power('node-1', 'on');
 power('node-2', 'off');`,
     cost: 2,

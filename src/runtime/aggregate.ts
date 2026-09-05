@@ -12,6 +12,13 @@ import type { SeedRun } from './run-level.ts';
  *    they only solved for one world layout.
  *  - The trace handed back is the **failing** seed's. Returning seed 1's trace after seed 3 failed
  *    shows the player a successful run and leaves them with nothing to debug.
+ *
+ * The same rule runs per objective rather than per run, which is what makes partial credit
+ * honest. Five objectives across three seeds is fifteen results, and collapsing them onto one
+ * seed's column reports objectives as met that another seed missed. Each objective is therefore
+ * reported from the worst seed *for that objective* — the first that missed it, with that seed's
+ * own progress — so a run that closes four of five everywhere can say so, and the one that is
+ * still open says which layout it is still open on.
  */
 
 function maxOf(values: readonly number[]): number {
@@ -38,6 +45,22 @@ function mergeSenses(runs: readonly SeedRun[]): Record<string, number> {
   return worst;
 }
 
+/**
+ * One row per objective, taken from the first seed that failed it and from the reported seed when
+ * every seed met it. Objective order follows the level's, which is the reported run's order.
+ */
+function worstPerObjective(runs: readonly SeedRun[], reported: SeedRun): Verdict['objectives'] {
+  return reported.verdict.objectives.map((objective) => {
+    for (const run of runs) {
+      const missed = run.verdict.objectives.find(
+        (candidate) => candidate.id === objective.id && !candidate.met,
+      );
+      if (missed) return missed;
+    }
+    return objective;
+  });
+}
+
 function seedPrefix(seed: number, index: number, total: number): string {
   return total > 1 ? `Seed ${index + 1} of ${total} (seed ${seed}) failed. ` : '';
 }
@@ -60,7 +83,7 @@ export function aggregate(runs: SeedRun[]): RunResponse {
 
   const verdict: Verdict = {
     passed: failedIndex === -1,
-    objectives: reported.verdict.objectives,
+    objectives: worstPerObjective(runs, reported),
     stats: {
       ticks: maxOf(runs.map((run) => run.verdict.stats.ticks)),
       ops: maxOf(runs.map((run) => run.verdict.stats.ops)),

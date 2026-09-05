@@ -1,6 +1,7 @@
 import type { Machine, ObjectiveContext, Vec, World } from '../../engine/index.ts';
 import {
   Dir,
+  MANUAL_ONLY,
   MachineKind,
   Objectives,
   Terrain,
@@ -139,8 +140,32 @@ function targetFor(world: World): number {
   return criticalChain(world) * USE_COST + (lanes(world) + 2) * meanHop(world);
 }
 
+/** The first station the audit will not sign off, and why. */
+function darkStation(ctx: ObjectiveContext): { id: string; at: Vec; reason: string } | undefined {
+  const switched = usedMachines(ctx);
+  for (const machine of stationsOf(ctx.world)) {
+    if (machine.state === 'on' && switched.has(machine.id)) continue;
+    const reason = switched.has(machine.id)
+      ? `${machine.state} — used an even number of times`
+      : 'never used; no bot stood on it';
+    return { id: machine.id, at: machine.at, reason };
+  }
+  return undefined;
+}
+
+function usedMachines(ctx: ObjectiveContext): Set<string> {
+  const switched = new Set<string>();
+  for (const event of ctx.trace.events) {
+    if (event.kind === 'use' && event.ok && event.machineId !== null) switched.add(event.machineId);
+  }
+  return switched;
+}
+
 function allEnergised(ctx: ObjectiveContext): number {
-  return stationsOf(ctx.world).filter((machine) => machine.state === 'on').length;
+  const switched = usedMachines(ctx);
+  return stationsOf(ctx.world).filter(
+    (machine) => machine.state === 'on' && switched.has(machine.id),
+  ).length;
 }
 
 /**
@@ -225,7 +250,9 @@ export const w8_03: LevelDef = {
     'index numbers of those feeders — `dep0: 3` means `sub-3` feeds it.',
     '',
     '**Energising.** Stand on the station tile and call `use()`, for two ticks. The cycle is',
-    '`off, on` and it wraps, so using a station twice turns it back off.',
+    '`off, on` and it wraps, so using a station twice turns it back off. Every station',
+    'publishes `vars.manual: 1`: the remote bus is out, so `power()` returns false on them and',
+    'charges you for asking. Somebody has to be standing there.',
     '',
     '**The rule the audit enforces.** A station may not *begin* energising until every feeder it',
     'hangs off has *finished*. A `use` that starts at tick 40 finishes at tick 42, so anything',
@@ -285,7 +312,7 @@ export const w8_03: LevelDef = {
           feeders.length === 0
             ? []
             : rng.shuffle(feeders).slice(0, Math.min(feeders.length, rng.int(1, 2)));
-        const vars: Record<string, number> = { deps: chosen.length };
+        const vars: Record<string, number> = { deps: chosen.length, [MANUAL_ONLY]: 1 };
         chosen.forEach((feeder, i) => {
           vars[`dep${i}`] = feeder;
           const from = sites[feeder] as Vec;
@@ -328,12 +355,28 @@ export const w8_03: LevelDef = {
       'Leave every substation energised',
       (ctx) => allEnergised(ctx) === stationsOf(ctx.world).length,
       (ctx) => [allEnergised(ctx), stationsOf(ctx.world).length],
+      (ctx) => {
+        const dark = darkStation(ctx);
+        if (!dark) return undefined;
+        return {
+          where: `${dark.id} at (${String(dark.at.x)}, ${String(dark.at.y)})`,
+          expected: 'on, switched by a use() at the tile',
+          received: dark.reason,
+        };
+      },
     ),
     Objectives.custom(
       'precedence-held',
       'Start no station before every feeder it hangs off has finished',
       (ctx) => breachesIn(ctx).length === 0,
-      undefined,
+      /* Divergence says which feeder was jumped; this says how much of the grid came up in
+         order anyway, so a schedule that is one edge wrong does not read like one that is
+         entirely wrong. */
+      (ctx) => {
+        const total = stationsOf(ctx.initialWorld).length;
+        const early = new Set(breachesIn(ctx).map((breach) => breach.station));
+        return [Math.max(0, total - early.size), total];
+      },
       (ctx) => {
         const breach = firstBreach(ctx);
         if (!breach) return undefined;
@@ -346,7 +389,7 @@ export const w8_03: LevelDef = {
     ),
     Objectives.custom(
       'within-shift',
-      'Finish the whole grid before the shift deadline',
+      "Finish the whole grid inside the shift's deadline, in ticks",
       (ctx) => ctx.trace.endTick <= deadlineFor(ctx.initialWorld),
       (ctx) => [ctx.trace.endTick, deadlineFor(ctx.initialWorld)],
     ),
@@ -354,7 +397,7 @@ export const w8_03: LevelDef = {
   bonus: [
     Objectives.custom(
       'tight-shift',
-      "Finish within the shift's theoretical minimum plus travel",
+      "Beat the shift's theoretical minimum plus travel, in ticks",
       (ctx) => ctx.trace.endTick <= targetFor(ctx.initialWorld),
       (ctx) => [ctx.trace.endTick, targetFor(ctx.initialWorld)],
     ),

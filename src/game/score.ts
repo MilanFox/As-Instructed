@@ -141,6 +141,24 @@ export function starsFor(
   return stars.filter((id) => ids.has(id)).length;
 }
 
+/**
+ * Required objective ids that held on every seed of this run.
+ *
+ * The credit unit for a multi-objective level. An objective that passed on two layouts out of
+ * three is not closed — a level's seeds are a conjunction (DESIGN.md §5) — but an objective that
+ * held on all of them is, whether or not the run as a whole passed. That distinction is the
+ * difference between "still open" and "four of five, and here is the fifth".
+ */
+export function objectivesOnEverySeed(
+  seeds: readonly { objectives: readonly { id: string; met: boolean }[] }[],
+  required: readonly string[],
+): string[] {
+  if (seeds.length === 0) return [];
+  return required.filter((id) =>
+    seeds.every((seed) => seed.objectives.some((entry) => entry.id === id && entry.met)),
+  );
+}
+
 export interface LevelScore {
   medal: Medal;
   /** Bonus objective ids met on this run. */

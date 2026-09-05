@@ -2,6 +2,7 @@ import type { Machine, ObjectiveContext, Vec, World } from '../../engine/index.t
 import {
   Dir,
   ItemKind,
+  MANUAL_ONLY,
   MachineKind,
   Objectives,
   Terrain,
@@ -20,10 +21,8 @@ import {
   blockedMoves,
   carveCaves,
   carveLine,
-  checksum,
   criticalChain,
   dependenciesOf,
-  encodeCaesar,
   groundCensus,
   itemsOnTile,
   key,
@@ -32,7 +31,7 @@ import {
   machinesWithPrefix,
   scatterCandidates,
   sealPacket,
-  useLog,
+  useLog as machineUseLog,
   worldDistances,
   worstIdleFraction,
 } from './shared.ts';
@@ -70,35 +69,33 @@ const DEPOT_PREFIX = 'depot-';
 const STATION_PREFIX = 'sub-';
 
 /**
- * One instance per seed. Every axis is drawn independently of the others; the table exists so the
- * seven seeds each test a different *decision* (CURRICULUM.md §15.5) rather than different
- * numbers, and so the degenerate cases §15.3 asks for are actually present.
+ * One instance per seed. Every axis is drawn independently of the others.
  *
- * Seed 1 is the teaching instance: no cipher, no corrupt traffic, the smallest fleet.
- * Seed 4 is a pure chain — the grid cannot be parallelised and the fleet has to notice.
- * Seed 6 is a flat graph — almost nothing has to wait for anything.
- * Seed 7 is the squeeze: the smallest fleet against the largest quota.
+ * Three seeds, and each of them asks a different question. Seed 1 is the general case and the
+ * teaching instance: a branching grid, the smallest fleet, the smallest quota, and the shape a
+ * player should be able to close first. Seed 4 is a pure chain — the grid cannot be parallelised
+ * at all, so a fleet that waits on it wastes the whole shift and the answer is to spend the fleet
+ * on the crates instead. Seed 7 is the squeeze: the same six bots against twelve stations and
+ * twenty crates, where fuel and not scheduling is what runs out.
+ *
+ * The four seeds this table used to carry moved the same numbers without moving a decision, and
+ * seven randomisations of a 48x40 map is seven times the failure surface for no extra idea.
+ * docs/FIX-FINALE.md records which went and why.
  */
 interface Instance {
   bots: number;
   stations: number;
   crates: number;
   classes: number;
-  cipherKey: number;
-  decoys: number;
-  shape: 'wide' | 'chain' | 'flat';
+  shape: 'wide' | 'chain';
   fuel: number;
   depots: number;
 }
 
 const INSTANCES: readonly (readonly [number, Instance])[] = [
-  [1, { bots: 6, stations: 8, crates: 12, classes: 3, cipherKey: 0, decoys: 0, shape: 'wide', fuel: 110, depots: 4 }],
-  [2, { bots: 8, stations: 9, crates: 14, classes: 3, cipherKey: 47, decoys: 4, shape: 'wide', fuel: 110, depots: 5 }],
-  [3, { bots: 10, stations: 10, crates: 16, classes: 4, cipherKey: 12, decoys: 5, shape: 'wide', fuel: 100, depots: 5 }],
-  [4, { bots: 7, stations: 10, crates: 15, classes: 4, cipherKey: 94, decoys: 5, shape: 'chain', fuel: 110, depots: 4 }],
-  [5, { bots: 12, stations: 11, crates: 20, classes: 4, cipherKey: 33, decoys: 7, shape: 'wide', fuel: 100, depots: 6 }],
-  [6, { bots: 9, stations: 8, crates: 18, classes: 3, cipherKey: 61, decoys: 5, shape: 'flat', fuel: 110, depots: 5 }],
-  [7, { bots: 6, stations: 12, crates: 20, classes: 4, cipherKey: 5, decoys: 6, shape: 'wide', fuel: 120, depots: 5 }],
+  [1, { bots: 6, stations: 8, crates: 12, classes: 3, shape: 'wide', fuel: 110, depots: 4 }],
+  [4, { bots: 7, stations: 10, crates: 15, classes: 4, shape: 'chain', fuel: 110, depots: 4 }],
+  [7, { bots: 6, stations: 12, crates: 20, classes: 4, shape: 'wide', fuel: 120, depots: 5 }],
 ];
 
 function instanceFor(seed: number): Instance {
@@ -176,16 +173,6 @@ function sealStrandedGround(world: World, from: Vec): void {
       setTerrain(world, at, Terrain.Rock);
     }
   }
-}
-
-// ---------------------------------------------------------------------------
-// The signal
-// ---------------------------------------------------------------------------
-
-/** A packet whose body is plausible and whose checksum is one out. Discard it or waste a walk. */
-function decoyPacket(fields: readonly (string | number)[]): string {
-  const body = ['KD4470', ...fields].join('|');
-  return `${body}|${String((checksum(body) + 1) % 1000)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -301,10 +288,6 @@ function build(seed: number): World {
       deps.push([i - 1]);
       continue;
     }
-    if (spec.shape === 'flat') {
-      deps.push(rng.chance(0.5) ? [0] : []);
-      continue;
-    }
     if (rng.chance(0.25)) {
       deps.push([]);
       continue;
@@ -320,7 +303,7 @@ function build(seed: number): World {
   }
 
   for (let i = 0; i < spec.stations; i++) {
-    const vars: Record<string, number> = { deps: (deps[i] ?? []).length };
+    const vars: Record<string, number> = { deps: (deps[i] ?? []).length, [MANUAL_ONLY]: 1 };
     (deps[i] ?? []).forEach((d, n) => {
       vars[`dep${n}`] = d;
     });
@@ -378,7 +361,7 @@ function build(seed: number): World {
     at: gateStand,
     state: AIRLOCK_CYCLE[0] as string,
     inventory: [],
-    vars: { stages: AIRLOCK_STAGES },
+    vars: { stages: AIRLOCK_STAGES, [MANUAL_ONLY]: 1 },
     cycle: [...AIRLOCK_CYCLE],
     links: gates,
   });
@@ -436,20 +419,7 @@ function build(seed: number): World {
     plain.push(sealPacket(['DEPOT', at.x, at.y, kind]));
   });
   plain.push(sealPacket(['FORM', formAt.x, formAt.y]));
-  for (let i = 0; i < spec.decoys; i++) {
-    const kind = classes[rng.int(0, classes.length - 1)] ?? ItemKind.Ore;
-    const at = { x: rng.int(CARVE_MARGIN, GATE_X - 2), y: rng.int(2, HEIGHT - 3) };
-    plain.push(
-      rng.chance(0.3)
-        ? decoyPacket(['FORM', at.x, at.y])
-        : decoyPacket(['CRATE', at.x, at.y, kind]),
-    );
-  }
-  loadAntenna(
-    world,
-    antennaAt,
-    rng.shuffle(plain).map((line) => encodeCaesar(line, spec.cipherKey)),
-  );
+  loadAntenna(world, antennaAt, rng.shuffle(plain));
 
   rebuildOccupancy(world);
   return world;
@@ -481,9 +451,20 @@ function quotaTally(ctx: ObjectiveContext): [number, number] {
   return [done, total];
 }
 
+/**
+ * Stations that finished `on` *and* have somebody's `use` against them in the log.
+ *
+ * The brief has always said the audit reads the use log, and now it does. A station is only ever
+ * `manual`, so the two readings agree today; they are both here so that the promise in the brief
+ * stays true whatever a later edit does to the machine flags.
+ */
 function gridTally(ctx: ObjectiveContext): [number, number] {
+  const switched = new Set(machineUseLog(ctx).map((record) => record.machineId));
   const stations = machinesWithPrefix(ctx.world, STATION_PREFIX);
-  return [stations.filter((station) => station.state === 'on').length, stations.length];
+  const done = stations.filter(
+    (station) => station.state === 'on' && switched.has(station.id),
+  ).length;
+  return [done, stations.length];
 }
 
 /**
@@ -493,7 +474,45 @@ function gridTally(ctx: ObjectiveContext): [number, number] {
  * difference between a grid that came up in order and one that came up all at once.
  */
 function precedenceHolds(ctx: ObjectiveContext): boolean {
-  return firstBreach(ctx) === undefined;
+  return breachesIn(ctx).length === 0;
+}
+
+/**
+ * The first station the audit will not sign off, and why.
+ *
+ * `power()` cannot reach a station on this site, so the only two ways to be short are a station
+ * nobody walked to and a station somebody used twice.
+ */
+function darkStation(ctx: ObjectiveContext): { id: string; at: Vec; reason: string } | undefined {
+  const switched = new Set(machineUseLog(ctx).map((record) => record.machineId));
+  for (const station of machinesWithPrefix(ctx.world, STATION_PREFIX)) {
+    if (station.state === 'on' && switched.has(station.id)) continue;
+    const reason = switched.has(station.id)
+      ? `${station.state} — used an even number of times`
+      : 'never used; no bot stood on it';
+    return { id: station.id, at: station.at, reason };
+  }
+  return undefined;
+}
+
+/** Where KD-0001-T actually ended the shift, in the words the player can act on. */
+function whereIsTheForm(ctx: ObjectiveContext): string {
+  for (const bot of ctx.world.bots) {
+    if (bot.inventory.some((stack) => stack.kind === ItemKind.Chip && stack.count > 0)) {
+      return `still in the hold of ${bot.name}`;
+    }
+  }
+  const loose = ctx.world.items.find((stack) => stack.kind === ItemKind.Chip && stack.count > 0);
+  return loose
+    ? `on the ground at (${String(loose.at.x)}, ${String(loose.at.y)})`
+    : 'nowhere on the site';
+}
+
+/** Stations that came up in order, out of every station on the site. */
+function precedenceTally(ctx: ObjectiveContext): [number, number] {
+  const stations = machinesWithPrefix(ctx.initialWorld, STATION_PREFIX);
+  const early = new Set(breachesIn(ctx).map((breach) => breach.station));
+  return [Math.max(0, stations.length - early.size), stations.length];
 }
 
 interface Breach {
@@ -504,6 +523,28 @@ interface Breach {
   fedAt: number | null;
 }
 
+function breachesIn(ctx: ObjectiveContext): Breach[] {
+  const firstUse = new Map<string, number>();
+  const lastDone = new Map<string, number>();
+  for (const record of machineUseLog(ctx)) {
+    const start = firstUse.get(record.machineId);
+    if (start === undefined || record.t < start) firstUse.set(record.machineId, record.t);
+    const done = lastDone.get(record.machineId);
+    if (done === undefined || record.done > done) lastDone.set(record.machineId, record.done);
+  }
+  const breaches: Breach[] = [];
+  for (const station of machinesWithPrefix(ctx.initialWorld, STATION_PREFIX)) {
+    const start = firstUse.get(station.id);
+    if (start === undefined) continue;
+    for (const feeder of dependenciesOf(station)) {
+      const finished = lastDone.get(feeder);
+      if (finished !== undefined && start >= finished) continue;
+      breaches.push({ station: station.id, feeder, started: start, fedAt: finished ?? null });
+    }
+  }
+  return breaches;
+}
+
 /**
  * The earliest station started too early, and the feeder it jumped.
  *
@@ -511,31 +552,11 @@ interface Breach {
  * worth naming: everything downstream of it is a consequence, not a second mistake.
  */
 function firstBreach(ctx: ObjectiveContext): Breach | undefined {
-  const firstUse = new Map<string, number>();
-  const lastDone = new Map<string, number>();
-  for (const record of useLog(ctx)) {
-    const start = firstUse.get(record.machineId);
-    if (start === undefined || record.t < start) firstUse.set(record.machineId, record.t);
-    const done = lastDone.get(record.machineId);
-    if (done === undefined || record.done > done) lastDone.set(record.machineId, record.done);
-  }
-  let earliest: Breach | undefined;
-  for (const station of machinesWithPrefix(ctx.initialWorld, STATION_PREFIX)) {
-    const start = firstUse.get(station.id);
-    if (start === undefined) continue;
-    for (const feeder of dependenciesOf(station)) {
-      const finished = lastDone.get(feeder);
-      if (finished !== undefined && start >= finished) continue;
-      const breach: Breach = {
-        station: station.id,
-        feeder,
-        started: start,
-        fedAt: finished ?? null,
-      };
-      if (earliest === undefined || breach.started < earliest.started) earliest = breach;
-    }
-  }
-  return earliest;
+  return breachesIn(ctx).reduce<Breach | undefined>(
+    (earliest, breach) =>
+      earliest === undefined || breach.started < earliest.started ? breach : earliest,
+    undefined,
+  );
 }
 
 /**
@@ -547,8 +568,8 @@ function firstBreach(ctx: ObjectiveContext): Breach | undefined {
  *
  * The floor is measured, not guessed. A reference that surveys with the whole fleet, walks the
  * grid on one clock and hauls one crate at a time — the slow, ugly shape the level block asks
- * to stay viable — costs a little over 2200 ticks on the twelve-bot instance. Below the floor
- * the formula was quietly making that shape fail, which would have gated the ending on gold.
+ * to stay viable — costs a little over 2200 ticks on the widest instance. Below the floor the
+ * formula was quietly making that shape fail, which would have gated the ending on gold.
  */
 const SHIFT_FLOOR = 3000;
 
@@ -591,20 +612,24 @@ const BRIEF = [
   'start energising before every one of its feeders has finished. A station cycles',
   '`off`, `on`, and the cycle wraps — using one twice turns it back off.',
   '',
+  '**Hands on.** Every station publishes `vars.manual: 1`, and so does the airlock. The',
+  'Yards took the remote bus down with the last contractor, so `power()` returns false',
+  'on anything carrying that flag and charges you for the attempt. `use()`, standing on',
+  'the tile, is the only thing that moves them. Twelve stations across a 48-by-40',
+  'workings is a routing problem before it is a sequencing one.',
+  '',
   '**The quota.** Crates are lying on the ground in three or four classes. Each class',
   'has one sink, `depot-<class>`, where `<class>` is the item kind: `ore`, `ice`,',
   '`scrap`, `part` or `cell`. A crate is delivered when it is dropped on its own',
   "class depot tile. Every crate on the site has to end up on one, so a crate left in",
   'a bot at the end of the shift is a crate that is not delivered.',
   '',
-  '**The signal.** `antenna` is live and `receive()` returns the next packet or',
-  '`null`. A packet is `KD4470|<field>|...|<checksum>`. The header is the fixed magic',
-  '`KD4470`. The checksum is the sum of the character codes of everything before the',
-  'final `|`, taken modulo 1000. The whole packet is then Caesar-shifted over',
-  'printable ASCII, and the shift is one of ninety-five; `decode(text, key)` undoes',
-  'it. Roughly a fifth of the traffic fails its checksum: those coordinates are wrong.',
-  'Packets that hold carry `CRATE|x|y|kind`, `DEPOT|x|y|kind` and `FORM|x|y`. None of',
-  'this is required. The same facts can be found by walking, which costs more.',
+  '**The manifest.** `antenna` is live and `receive()` returns the next line of the',
+  "night's manifest, or `null`. A line is `KD4470|<field>|...|<checksum>`, in clear —",
+  'the band out of the Yards is not enciphered and nothing on it is corrupt tonight.',
+  'Split on `|`, drop the header and the checksum, and read `CRATE|x|y|kind`,',
+  '`DEPOT|x|y|kind` and `FORM|x|y`. This is a list, not a puzzle; the puzzle is what',
+  'you do with it.',
   '',
   '**Fuel.** Every bot has a finite cell. Acting burns fuel equal to the ticks the',
   'action costs; waiting, sensing and refuelling burn none. `refuel()` fills the cell',
@@ -612,16 +637,15 @@ const BRIEF = [
   'tiles. There is no gauge for a full cell; every bot starts the shift full, so',
   '`fuel()` before anybody moves is the number.',
   '',
-  '**The airlock.** `airlock` starts sealed. One `use()` advances it one stage and',
-  'costs one tick, and `probe("airlock")` publishes `vars.stages`, which is exactly',
-  'how many uses it takes to open. It stays open once it is open.',
+  '**The airlock.** `airlock` starts sealed, and it is manual too. One `use()` advances',
+  'it one stage and costs one tick, and `probe("airlock")` publishes `vars.stages`,',
+  'which is exactly how many uses it takes to open. It stays open once it is open, and',
+  'until somebody has stood there and paid the toll it is a wall to your planner.',
   '',
   '**The deadline.** The shift is finite and the objectives panel shows the number.',
   '',
   '**The Repository.** Nothing here is new. This work order assumes `lib.ts` holds:',
   '',
-  '- `findKey(packets)` — returns the shift the traffic was sent with.',
-  "  `import { findKey } from 'lib';`",
   '- `reach(x, y, b?)` — routes a bot to a tile, surveying first when the record does not',
   "  know it yet. `import { reach } from 'lib';`",
   '- `dispatch(deps, costs, fleet)` — groups the grid into waves and deals each wave out',
@@ -644,7 +668,7 @@ const BRIEF = [
 ].join('\n');
 
 const STARTER = [
-  "// import { findKey, reach, dispatch } from 'lib';",
+  "// import { reach, dispatch } from 'lib';",
   '',
   '// NOTE(4470): the whole site runs on your code now. mine is all switched off',
   '// NOTE(4470): the airlock still runs on its own clock. it does not care',
@@ -665,10 +689,12 @@ export const w8_05: LevelDef = {
   title: 'The Kessler Contract',
   hardware: [],
   brief: BRIEF,
-  seeds: [1, 2, 3, 4, 5, 6, 7],
+  seeds: [1, 4, 7],
   /* Both halves of the reference — the `Sim` driver and the player-facing source — come in
-     between 560 and 1130 ticks across the seven seeds, so par sits just above the slower of the
-     two. The old 2300 was measured against a walker that could not finish the level at all. */
+     between 560 and 977 ticks across the three seeds. Par is left where it was when there were
+     seven: the two most expensive instances went with the seed cull, and moving the gold line
+     down to meet the new worst case would be tightening the medal on a level nobody has closed
+     yet. docs/FIX-FINALE.md flags it as a decision for the orchestrator, not a silent one. */
   par: { ticks: 1300, chars: 13000 },
   costs: { use: 1 },
   budget: { maxTicks: 16000, maxOps: 8_000_000 },
@@ -682,12 +708,21 @@ export const w8_05: LevelDef = {
         return total > 0 && done === total;
       },
       gridTally,
+      (ctx) => {
+        const dark = darkStation(ctx);
+        if (!dark) return undefined;
+        return {
+          where: `${dark.id} at (${String(dark.at.x)}, ${String(dark.at.y)})`,
+          expected: 'on, switched by a use() at the tile',
+          received: dark.reason,
+        };
+      },
     ),
     Objectives.custom(
       'precedence',
       'Energise each station only after its feeders',
       precedenceHolds,
-      undefined,
+      precedenceTally,
       (ctx) => {
         const breach = firstBreach(ctx);
         if (!breach) return undefined;
@@ -714,10 +749,16 @@ export const w8_05: LevelDef = {
       'file-form',
       'File KD-0001-T in the Charter registry or the renewals tray',
       (ctx) => filedIn(ctx.world) !== null,
+      undefined,
+      (ctx) => ({
+        where: 'KD-0001-T',
+        expected: 'on slot-charter or slot-renewals',
+        received: whereIsTheForm(ctx),
+      }),
     ),
     Objectives.custom(
       'deadline',
-      'Finish inside the shift',
+      'Finish inside the shift, in ticks',
       (ctx) => ctx.trace.endTick <= deadlineFor(ctx.initialWorld),
       (ctx) => {
         const limit = deadlineFor(ctx.initialWorld);
@@ -728,8 +769,12 @@ export const w8_05: LevelDef = {
   bonus: [
     Objectives.custom(
       'under-budget',
-      'Close the work order a fifth inside the shift',
+      'Close the work order a fifth inside the shift, in ticks',
       (ctx) => ctx.trace.endTick <= Math.floor(deadlineFor(ctx.initialWorld) * 0.8),
+      (ctx) => {
+        const limit = Math.floor(deadlineFor(ctx.initialWorld) * 0.8);
+        return [Math.min(ctx.trace.endTick, limit), limit];
+      },
     ),
     Objectives.custom(
       'fleet-utilisation',
@@ -746,8 +791,8 @@ export const w8_05: LevelDef = {
   hints: [
     'Ask the desk and the stations where everything is before anybody walks anywhere. ' +
       'Machine positions are free. The ground between them is not.',
-    'The signal is worth one experiment. There are ninety-five shifts and only one of ' +
-      'them makes the header appear; after that, the packets that do not add up are lying.',
+    'Nothing on this site answers to an id from a distance. Work out who is nearest to ' +
+      'what before you work out what order it all has to happen in.',
     'A bot that is not allowed to switch its station on yet is not a bot that is stuck. ' +
       'It is a bot that has something else it could be doing first.',
     'The toll at the airlock is the same size whoever pays it and whenever it is paid. ' +

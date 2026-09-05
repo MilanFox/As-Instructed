@@ -20,7 +20,7 @@ import type { RunFacts } from './achievements.ts';
 import { earnedBy, isSenseBudget } from './achievements.ts';
 import type { LevelProgress, SaveFile } from './save.ts';
 import { emptyProgress, importSave, loadSave, mergeProgress, writeSave } from './save.ts';
-import { countChars, medalFor } from './score.ts';
+import { countChars, medalFor, objectivesOnEverySeed } from './score.ts';
 
 export type Screen = 'levels' | 'workspace' | 'review';
 export type RunState = 'idle' | 'running';
@@ -480,7 +480,7 @@ export const useGame = create<GameState>((set, get) => {
           resultId: get().resultId + 1,
           ...(verdict.passed ? {} : { failureCursor: get().failureCursor + 1 }),
         });
-        recordResult(levelDef, verdict, medal, chars, trace);
+        recordResult(levelDef, verdict, medal, chars, trace, results);
       }
 
       /**
@@ -496,6 +496,7 @@ export const useGame = create<GameState>((set, get) => {
         medal: Medal,
         chars: number,
         trace: Trace,
+        results: PerSeedResult[],
       ): void {
         const state = get();
         const levels = { ...state.save.levels };
@@ -506,12 +507,20 @@ export const useGame = create<GameState>((set, get) => {
           .map((objective) => objective.id);
         const attempt = previous.attempts + 1;
 
+        /* Banked whether the run passed or not. A failed run costs nothing (DESIGN.md §7.1), and
+           an objective that held on every layout is closed work even when its neighbour is not. */
+        const closed = objectivesOnEverySeed(
+          results,
+          levelDef.objectives.map((objective) => objective.id),
+        );
+
         const next: LevelProgress = mergeProgress(previous, {
           ...previous,
           attempts: attempt,
           completed: previous.completed || verdict.passed,
           medal: verdict.passed ? medal : previous.medal,
           stars: verdict.passed ? [...previous.stars, ...earned] : previous.stars,
+          objectives: [...(previous.objectives ?? []), ...closed],
           ...(verdict.passed ? { bestTicks: verdict.stats.ticks, bestChars: chars } : {}),
           ...(verdict.passed && !previous.clearedAt ? { clearedAt: Date.now() } : {}),
           code: get().code,

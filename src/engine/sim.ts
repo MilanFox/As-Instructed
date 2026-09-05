@@ -10,7 +10,7 @@ import {
 import type { SenseEvent, Trace } from './trace.ts';
 import { KEYFRAME_INTERVAL, MAX_SENSE_EVENTS, TraceBuilder } from './trace.ts';
 import type { Bot, Dir, ItemKind, ItemStack, Machine, Message, Tile, Vec, World } from './types.ts';
-import { Terrain } from './types.ts';
+import { MANUAL_ONLY, Terrain } from './types.ts';
 import {
   addGroundItems,
   addToInventory,
@@ -610,13 +610,22 @@ export class Sim {
     return true;
   }
 
-  /** Directly sets a machine's state (World 5's `power`). Returns false for unknown machines. */
+  /**
+   * Directly sets a machine's state (World 5's `power`). Returns false for unknown machines, and
+   * for machines whose `vars.manual` is `1` — those are hand-operated and only `use()` moves them.
+   *
+   * The manual flag exists because `power` reaches any id anywhere on the map for a flat cost, so
+   * a level whose whole subject is *getting a fleet to the machines* is defeated by a loop over
+   * ids. Levels that want the travel back mark the machines rather than the command, so World 5,
+   * where operating the grid from the desk is the point, is untouched.
+   */
   power(botId: number, machineId: string, state: string): boolean {
     const bot = this.requireActiveBot(botId);
     const t = bot.clock;
     const dt = this.costs.power;
     this.requireFuel(bot, dt, 'power');
-    const machine = machineById(this.world, machineId);
+    const found = machineById(this.world, machineId);
+    const machine = found?.vars[MANUAL_ONLY] === 1 ? undefined : found;
     if (!machine) {
       this.builder.push({ t, botId, dt, kind: 'act', name: 'power', ok: false, detail: machineId });
       this.charge(bot, dt);

@@ -189,11 +189,30 @@ function corroborate(
   return matches.length === 1 ? (matches[0] as Meter) : null;
 }
 
+/**
+ * A level whose limit is drawn per seed cannot put the number in its own label, so it declares
+ * the unit instead: a label ending `…, in ticks` or `…, in tiles` is denominating itself. That is
+ * the difference between "Finish inside the shift" — which names neither a number nor a unit and
+ * is therefore unreadable — and a budget a player can act on.
+ *
+ * The plural is load-bearing. "Report 3 lines, in order" ends in the same shape and is not a
+ * budget, and a unit that counts something is always plural.
+ */
+const DECLARED_UNIT = /,\s+in\s+([A-Za-z]+)\s*$/;
+
+export function declaredUnit(label: string): string | null {
+  const word = DECLARED_UNIT.exec(label)?.[1]?.toLowerCase();
+  if (!word || !word.endsWith('s') || GENERIC_UNITS.has(word)) return null;
+  return word;
+}
+
 /** The unit the level itself used for this number, or the meter's name as a fallback. */
 export function unitFor(label: string, limit: number, meter: Meter | null): string {
   const stated = new RegExp(`\\b${String(limit)}\\b\\s+([A-Za-z]+)`).exec(label);
   const word = stated?.[1]?.toLowerCase();
   if (word && !GENERIC_UNITS.has(word)) return word;
+  const declared = declaredUnit(label);
+  if (declared) return declared;
   if (!meter) return '';
   if (meter.kind === 'ticks') return 'ticks';
   if (meter.kind === 'ops') return 'ops';
@@ -297,17 +316,19 @@ export function budgetFor(objective: ObjectiveReading, source: BudgetSource): Bu
   if (limit <= 0) return null;
 
   const minted = WITHIN_ID.test(objective.id);
+  const declared = declaredUnit(objective.label) !== null;
   const underspent = objective.met && done < limit;
   const overrun = !objective.met && done >= limit;
-  if (!underspent && !overrun && !minted) return null;
+  if (!underspent && !overrun && !minted && !declared) return null;
 
   const meter = meterFor(objective, source);
   /*
    * An overrun with no meter behind it is not evidence of a budget. `printedSequence` reports a
    * full prefix and stays unmet when the run printed extra lines, which is the same shape, and
-   * drawing it as a filled gauge would say the opposite of what happened.
+   * drawing it as a filled gauge would say the opposite of what happened. A label that names its
+   * own unit has already said what it is, so it is taken at its word.
    */
-  if (overrun && !underspent && !meter && !minted) return null;
+  if (overrun && !underspent && !meter && !minted && !declared) return null;
 
   const used = meter ? spentOn(meter, source) : done;
   return {
