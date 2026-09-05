@@ -353,9 +353,13 @@ the unlock**, so the Repository was provisioned at level 10 and sat empty for th
 orders — meaning moving it earlier *on its own* would have made that window longer. Unlock
 now closes `w2-05` (level 7) with a `RepositoryIssue` ceremony reusing the Requisition
 modal, and both of its "why" lines are computed from `LIBRARY_REQUIREMENTS` rather than
-written, so they cannot drift. `offerPublish` also bailed unless the player already had a
-callable top-level declaration — the entry point was gated on the habit the system exists
-to teach, which is why the beginner never saw it and rated it 1/5.
+written, so they cannot drift. `offerPublish` also bails unless the player already has a
+callable top-level declaration — the entry point is gated on the habit the system exists
+to teach, which is why the beginner never saw it and rated it 1/5. **Correction, 16:20:
+that was recorded here as fixed and it is not.** The Library work added the `briefed` gate
+and the ceremony; `src/meta/store.ts`'s `if (!declarations.some(each => each.callable))
+return;` is untouched. Verified by reading the line. The error was mine, over-reading the
+agent's report, not the agent's.
 
 No level became gated; the campaign is still finishable by a player who never opens it.
 
@@ -527,3 +531,65 @@ that still promise the old silent `false`. **Ruling: delete them rather than cor
 The prose pass kept those rows *because* the failure was mute; that condition is gone, and a
 row explaining what an error message now says out loud is the "told me" half of
 PLAYTEST-BEGINNER §9. Apply once par merges.
+
+### 2026-09-05, 16:20 — incentive audit landed (`docs/AUDIT-INCENTIVES.md`, 920 lines)
+
+Read-only instrument, no source touched. It did what it was built to do: the top finding is
+structural and neither playtest saw it.
+
+**1. 31 of 34 levels cannot report *where* a run failed.** 71 of 82 `Objectives.*` calls in
+the level files are `Objectives.custom`; only 25 pass a progress tuple, and only **three
+levels** (`w6-01`, `w6-03`, `w6-05`) can produce an actual `Divergence`. Everything else
+falls through `failureCauses` to `'not met'`. `w4-04`'s bonus knows the order you took and
+the best order and reports neither. **The "read" step of run → fail → read → revise is
+empty**, so the loop degrades to guessing — and `RAISED, AND RAISED AGAIN` then pays out for
+ten runs of guessing. Proposed fix: make `divergence` non-optional in `custom`, add a
+`checkbox` variant for genuinely binary objectives, and guard it with a campaign-wide test.
+Blocked on the par agent holding `src/levels/**`.
+
+**2. The publish gate is not fixed.** See the correction above. Now assigned.
+
+**3. Strictly linear unlock** — 33 single points of failure, hint ladder the only escape and
+it ends. The gate is already leaky: `openLevel` does not check it, and the Performance
+Review's medal wall opens any row.
+
+**4. The Performance Review is a completion percentage wearing a rank.** Scoped to all 34
+levels regardless of progress, so a player at 17/17 with flawless golds reads **38%** and is
+told they are average. All-gold-no-stars is **76.1%**, below the 93% `RETAINED` tier whose
+own text is *"Every work order closed at or under par"* — which that player has done.
+**Neither tester opened this screen once.** Now assigned.
+
+Findings 5–12 cover `AS PER THE BRIEF` versus the 4th/10th-run commendations; four bonuses
+plus `NO CONTACT REPORTED` plus the tick cost all paying for not bumping, which jointly
+rewards hardcoding; the bonus layer being 27 tightenings out of 37; a Discrepancy reporting
+a failure on a layout **there is no seed picker to run**; a bonus star graded on one seed
+while the medal beside it is graded on all of them; and **DESIGN.md §7.1 still binding
+agents to implement the streak** that was deleted this morning.
+
+### The audit's par ruling — forwarded to the par agent
+
+**Par is not the axis, and raising it is the wrong fix.** Par is two measurements sharing
+one badge: on traversal levels (`w3-02` 332, `w4-04` 970, `w8-05` 1050) it prices route
+quality honestly; on reasoning levels the route is forced — eight level files' own comments
+say par *is* the correct solution's cost — so it measures nothing. Raising par there turns
+"gold for correct" into "silver for correct", replacing a truthful signal with a lie about
+headroom that does not exist. Proposal: `graded: false` on reasoning levels, keeping tuned
+par only where the route is a genuine choice.
+
+**Verified independently:** `SILVER_FACTOR = 1.25`, `w6-01` is `par: { ticks: 1 }` and
+`w5-02` is `par: { ticks: 2 }`, so the silver band contains no integer and **silver is
+arithmetically unreachable on those levels.** A ladder bug independent of tuning.
+
+### Where the audit corrected itself against the playtests
+
+Marked inline, which is the discipline working. Its behavioural claim in finding 5 is
+**refuted** — both testers ran freely (42 runs across 17 levels, 11 on one) and neither
+hesitated, so only the incoherence survives. Finding 9's prediction is **refuted at the top
+of the skill range** — the veteran used the Repository unprompted, for intrinsic reasons.
+And it withdrew a claim that `personalBestLine` was tick-golf pressure: both testers name it
+the best reward in the game, correctly, because it is a diff against your own past work with
+no threshold. **Do not touch it.**
+
+Three problems the playtests found and the audit missed are in its §18. The largest: both
+testers say the commendation layer changed their behaviour **exactly zero times**, which
+makes deletions cheap and raises whether fifteen commendations should be five.
