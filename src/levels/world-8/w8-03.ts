@@ -260,11 +260,6 @@ export const w8_03: LevelDef = {
         'Stand on the station tile and call `use()`. Two ticks. The cycle is `off, on` and it wraps, so a second use turns it back off.',
     },
     {
-      label: 'No remote',
-      value:
-        'Every station publishes `vars.manual: 1`. `power()` returns false on them and still charges you. Somebody has to stand there.',
-    },
-    {
       label: 'The order rule',
       value:
         'A station may not **start** until every feeder has **finished**. A `use` at tick 40 finishes at 42, so 42 is legal and 41 is not. Read off the log, not the final state.',

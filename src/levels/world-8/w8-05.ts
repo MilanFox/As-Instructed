@@ -631,11 +631,6 @@ const FACTS = [
     value: 'The cycle is `off`, `on` and it wraps. Using a station twice turns it back off.',
   },
   {
-    label: 'Hands on',
-    value:
-      'Stations and the airlock publish `vars.manual: 1`. `power()` returns false on them and still charges you. Only a `use()` at the tile moves them.',
-  },
-  {
     label: 'The quota',
     value:
       'Each class has one sink, `depot-<class>` — `ore`, `ice`, `scrap`, `part` or `cell`. A crate still in a bot is not delivered.',

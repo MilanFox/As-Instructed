@@ -64,8 +64,8 @@ export const w4_02: LevelDef = {
   title: 'Breadcrumbs',
   hardware: ['mark', 'readMark'],
   brief: [
-    '> dot: survey have a map of this one. it is a photograph of a whiteboard, and the',
-    '> whiteboard has since been cleaned. what i can tell you is that the tunnels join up.',
+    '> dot: survey have a map of this one. it is a photograph of a whiteboard, and',
+    '> the whiteboard has since been cleaned.',
     '',
     'Reach the ore vein.',
   ].join('\n'),
