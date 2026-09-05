@@ -180,9 +180,13 @@ describe('trail ramp', () => {
   });
 
   it('runs between two existing palette hues and introduces no new accent', () => {
-    expect(mix(palette.inkDim, palette.danger, 0)).toBe(palette.inkDim);
-    expect(mix(palette.inkDim, palette.danger, 1)).toBe(palette.danger);
-    expect(mix(palette.inkDim, palette.danger, 0.5)).toBe('#b56c75');
+    expect(mix(palette.bgVoid, palette.danger, 0)).toBe(palette.bgVoid);
+    expect(mix(palette.bgVoid, palette.danger, 1)).toBe(palette.danger);
+    expect(mix(palette.bgVoid, palette.danger, 0.5)).toBe('#853639');
+  });
+
+  it('is a darkening at the cold end, not a grey tint the cave floor swallows', () => {
+    expect(trailFill(TRAIL_MIN_VISITS).startsWith('rgba(10, 14, 20')).toBe(true);
   });
 });
 

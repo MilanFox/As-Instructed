@@ -8,6 +8,7 @@ import {
   useState,
 } from 'react';
 import type * as React from 'react';
+import type { CostOverrides } from '../../engine/index.ts';
 import type { ApiFunctionSpec, ApiTypeSpec } from '../../runtime/protocol.ts';
 import { ApiCategory } from '../../runtime/protocol.ts';
 import { PLAYER_API, apiForWorld } from '../../runtime/api-spec.ts';
@@ -146,6 +147,20 @@ console.log('same channel, same tick');`,
   },
 ];
 
+/**
+ * What this function costs *on the level the player is looking at*.
+ *
+ * `api-spec` carries the campaign-wide price, but a level may override any entry in the
+ * `CostTable` and three do — `w7-02` halves `spawn`, `w7-04` and `w8-05` halve `use`. Showing the
+ * flat number there told the finale's player that working a manual station costs twice what it
+ * does, which is enough to make its deadline look unreachable. `wait` is left alone: its cost is
+ * the string `'n'`, a multiplier rather than a price.
+ */
+export function levelCost(fn: ApiFunctionSpec, costs: CostOverrides | undefined): number | string {
+  if (typeof fn.cost !== 'number') return fn.cost;
+  return costs?.[fn.name as keyof CostOverrides] ?? fn.cost;
+}
+
 function costLabel(cost: number | string): string {
   if (cost === 0) return 'free';
   if (typeof cost === 'number') return `${cost} tick${cost === 1 ? '' : 's'}`;
@@ -216,10 +231,12 @@ function GuideCard({
 
 function FunctionCard({
   fn,
+  costs,
   focused,
   register,
-}: CardProps & { fn: ApiFunctionSpec }): React.JSX.Element {
-  const free = fn.cost === 0;
+}: CardProps & { fn: ApiFunctionSpec; costs: CostOverrides | undefined }): React.JSX.Element {
+  const cost = levelCost(fn, costs);
+  const free = cost === 0;
   return (
     <article
       className={`docs-card docs-entry${focused === fn.name ? ' is-focused' : ''}`}
@@ -227,7 +244,7 @@ function FunctionCard({
     >
       <div className="docs-card-head">
         <Signature fn={fn} />
-        <span className={free ? 'cost cost--free' : 'cost'}>{costLabel(fn.cost)}</span>
+        <span className={free ? 'cost cost--free' : 'cost'}>{costLabel(cost)}</span>
       </div>
       <Markdown source={fn.doc} className="docs-prose" />
       {fn.params.length > 0 ? (
@@ -410,7 +427,13 @@ export function DocsPanel(): React.JSX.Element {
             <section className="docs-group" key={id}>
               <h3 className="docs-group-title">{label}</h3>
               {group.map((fn) => (
-                <FunctionCard key={fn.name} fn={fn} focused={focusedName} register={register} />
+                <FunctionCard
+                  key={fn.name}
+                  fn={fn}
+                  costs={level?.costs}
+                  focused={focusedName}
+                  register={register}
+                />
               ))}
             </section>
           );

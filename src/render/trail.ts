@@ -36,22 +36,37 @@ export const TRAIL_MIN_VISITS = 2;
  */
 export const TRAIL_MAX_VISITS = 10;
 
+/** Visits by which the wash has finished turning red. Alpha keeps climbing past it. */
+const TRAIL_HOT_VISITS = 6;
+
 /**
  * Cold-to-hot fill for each visit count.
  *
- * `inkDim` to `danger` — both already in the palette, and `danger` is what the renderer already
- * means by "this did not work" (`drawBlockedTell`). The ramp deliberately does not pass through
- * `accent2`, which would read as a smoother heat gradient but is also `overlay.goal`; a mid-heat
- * floor the colour of the objective brackets is the one confusion `w4-02` cannot afford.
+ * `bgVoid` to `danger`, both already in the palette. The cold end is a *darkening* rather than a
+ * tint, which is what makes the first step legible: the first draft ran the ramp from `inkDim`,
+ * and `#6a7a8c` turned out to be within a few points of the cave floor's own grey, so two visits
+ * rendered as nothing at all on the one level this exists for. Luminance first, hue second, works
+ * on every biome. `danger` is what the renderer already means by "this did not work"
+ * (`drawBlockedTell`), so the hot end needed no new accent.
+ *
+ * The ramp deliberately does not pass through `accent2`, which would read as a smoother heat
+ * gradient but is also `overlay.goal`; a mid-heat floor the colour of the objective brackets is
+ * the one confusion `w4-02` cannot afford.
+ *
+ * Hue and alpha are on separate curves on purpose. Red arrives by `TRAIL_HOT_VISITS`, so the
+ * second lap of a loop reads as trouble while the player is still watching; alpha goes on
+ * deepening to `TRAIL_MAX_VISITS`, so a run that is well past trouble keeps saying so.
  *
  * Built once. `alpha()` memoises per hue, so this is nine small tables and no per-frame strings.
  */
 const RAMP: readonly string[] = (() => {
   const table = new Array<string>(TRAIL_MAX_VISITS + 1).fill('');
   const span = TRAIL_MAX_VISITS - TRAIL_MIN_VISITS;
+  const hotSpan = TRAIL_HOT_VISITS - TRAIL_MIN_VISITS;
   for (let v = TRAIL_MIN_VISITS; v <= TRAIL_MAX_VISITS; v++) {
-    const u = (v - TRAIL_MIN_VISITS) / span;
-    table[v] = alpha(mix(palette.inkDim, palette.danger, u), 0.1 + u * 0.24);
+    const hue = Math.min(1, (v - TRAIL_MIN_VISITS) / hotSpan);
+    const depth = (v - TRAIL_MIN_VISITS) / span;
+    table[v] = alpha(mix(palette.bgVoid, palette.danger, hue), 0.16 + depth * 0.2);
   }
   return table;
 })();

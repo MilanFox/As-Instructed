@@ -323,11 +323,14 @@ believes this.
 **A4 — Medal weights are fixed:** gold 3, silver 2, bronze 1, bonus star +1. The Performance
 Review tiers in `docs/NARRATIVE.md` §7 assume exactly this.
 
-**A5 — Three cross-cutting requirements, owned as stated:**
+**A5 — Four cross-cutting requirements, owned as stated:**
 - RENDER must draw plant growth stages as distinct overlays (needed by w2-02's `defuse`;
   originally written for the withdrawn w2-03, which w2-02 absorbed in the compression cut).
 - RENDER must draw all bots simultaneously with per-bot clocks in the trace viewer, and must draw
   a *blocked* move visibly differently from a successful one (needed by w7-01 and w7-03).
+- RENDER must show *how often* each tile has been stood on, not merely that it has. `w4-02`'s
+  designed failure is a naive walker riding a loop until the shift ends, and a trail that
+  saturates on the first visit draws the failing run and the passing one identically.
 - ENGINE/RUNTIME must report resource spend (e.g. cable used) in `Verdict.stats` as a generic
   `spend: Record<string, number>` (needed by w5-05).
 
