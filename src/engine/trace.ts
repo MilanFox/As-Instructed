@@ -143,7 +143,11 @@ export type SpendEvent = AtTick & {
  */
 export type SpawnEvent = BotAction & { kind: 'spawn'; bot: Bot };
 export type DieEvent = BotAction & { kind: 'die'; at: Vec; reason: string };
-/** `ok` is false when `to` names no bot, or a dead one. The message is then never delivered. */
+/**
+ * `ok` is false when `to` names no bot, or a dead one: the message is never delivered and the
+ * send throws immediately after this event is written. The event exists so that replay still
+ * charges the tick the live run charged.
+ */
 export type SendEvent = BotAction & {
   kind: 'send';
   to: number;

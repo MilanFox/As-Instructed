@@ -743,7 +743,17 @@ export class Sim {
     this.builder.push(line === undefined ? event : { ...event, line });
   }
 
-  /** Queues a message in another bot's inbox. World 7. */
+  /**
+   * Queues a message in another bot's inbox. World 7.
+   *
+   * Throws `IllegalActionError` when `to` names no bot, or a dead one. Both are permanent — no
+   * call in the API brings bot #99 into being, and nothing revives a bot once `kill` has run — so
+   * a `false` the player could branch on would be a branch that can never flip (docs/ENGINE.md
+   * §2). It is the same state every other verb already refuses through `requireActiveBot`, which
+   * is what made the old `false` an inconsistency rather than a choice: `move(99, …)` threw while
+   * `send(0, 99, "x")` shrugged. The refused send is logged and charged first, so the trace and
+   * the live world stay in step.
+   */
   send(botId: number, to: number, body: string | number): boolean {
     const bot = this.requireActiveBot(botId);
     const t = bot.clock;
@@ -753,7 +763,18 @@ export class Sim {
     if (!target || !target.alive) {
       this.builder.push({ t, botId, dt, kind: 'send', to, body, ok: false });
       this.charge(bot, dt);
-      return false;
+      if (!target) {
+        throw new IllegalActionError(
+          `send(${to}): there is no bot #${to} on this contract, so the message has nowhere ` +
+            'to go. bots() returns every id that exists.',
+          { botId },
+        );
+      }
+      throw new IllegalActionError(
+        `send(${to}): bot #${to} ("${target.name}") was lost at (${target.at.x}, ${target.at.y}) ` +
+          'and cannot receive messages. bots() lists only the bots still running.',
+        { botId, at: target.at },
+      );
     }
     enqueueMessage(target, { from: botId, body, t });
     this.builder.push({ t, botId, dt, kind: 'send', to, body, ok: true });

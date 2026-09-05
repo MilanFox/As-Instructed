@@ -665,7 +665,7 @@ print(\`swarm aligned at tick \${t}\`);`,
       { name: 'body', type: 'string | number', doc: 'The payload to deliver.' },
     ],
     returns: 'boolean',
-    doc: "Queues a message in another bot's inbox, stamped with the sender's clock. Returns false when `to` is not a living bot. Delivery is causal: a bot only sees a message once its own clock has reached the moment the message was sent, so the working idiom is `send`, then `sync()`, then `recv()` on the receiving side. Skipping the `sync` leaves a receiver that is behind in virtual time with an empty inbox.",
+    doc: "Queues a message in another bot's inbox, stamped with the sender's clock. The run stops and names the bot when `to` is an id that does not exist or one that has been lost — neither can start receiving later, so there is nothing to branch on. Delivery is causal: a bot only sees a message once its own clock has reached the moment the message was sent, so the working idiom is `send`, then `sync()`, then `recv()` on the receiving side. Skipping the `sync` leaves a receiver that is behind in virtual time with an empty inbox.",
     example: `for (const id of bots()) {
   if (id !== 0) {
     send(id, 'go');

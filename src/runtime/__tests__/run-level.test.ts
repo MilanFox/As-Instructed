@@ -237,6 +237,30 @@ describe('power() on a hand-operated machine', () => {
     });
   }
 
+  test('a bot id that names nothing stops the run and says so in the console line', () => {
+    const level = getLevel('w7-01') as LevelDef;
+    const seed = level.seeds[0] as number;
+    const source = ['print("dispatching");', 'send(99, "go");'].join('\n');
+    const { js, lineMap } = transpile(source);
+    const { result, verdict } = runSeed({
+      level,
+      seed,
+      js,
+      lineMap,
+      source,
+      unlockedHardware: unlockedApiNames('w7-01'),
+    });
+
+    expect(result.passed).toBe(false);
+    expect(verdict.failure?.code).toBe('illegal-action');
+
+    const message = verdict.failure?.message ?? '';
+    expect(message).toContain('send(99)');
+    expect(message).toContain('no bot #99');
+    expect(message).toContain('bots()');
+    expect(verdict.failure?.line).toBe(2);
+  });
+
   test('an unknown machine id is still an ordinary false, not a stopped run', () => {
     const level = getLevel('w8-03') as LevelDef;
     const seed = level.seeds[0] as number;

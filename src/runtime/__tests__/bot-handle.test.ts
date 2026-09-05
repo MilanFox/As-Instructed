@@ -173,10 +173,10 @@ describe('recv is causal, so the idiom is send then sync then recv', () => {
     expect((handle(api, 1)['recv']?.() as Message).body).toBe(42);
   });
 
-  test('sending to a bot that is not there is refused, not thrown', () => {
+  test('sending to a bot that is not there stops the run and names the id', () => {
     const { sim } = site(2);
     const api = scopeFor(sim);
-    expect(handle(api, 0)['send']?.(99, 'go')).toBe(false);
+    expect(() => handle(api, 0)['send']?.(99, 'go')).toThrow(/#99/);
   });
 
   test('a handle for an id that was never on site fails at the call, with the engine message', () => {

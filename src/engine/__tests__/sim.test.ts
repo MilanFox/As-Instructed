@@ -978,22 +978,35 @@ describe('send and recv', () => {
     expect(must(sim.recv(2)).body).toBe('late');
   });
 
-  test('send to an unknown bot returns false but still charges', () => {
+  test('send to an unknown bot throws, naming the id, and still charges', () => {
     const world = openWorld(3, 3, 1);
     const sim = new Sim(world);
-    expect(sim.send(0, 99, 'anyone?')).toBe(false);
+    expect(() => sim.send(0, 99, 'anyone?')).toThrow(IllegalActionError);
     expect(bot(world, 0).clock).toBe(DEFAULT_COSTS.send);
     const sends = eventsOfKind(sim.finish().events, 'send');
     expect(must(sends[0]).ok).toBe(false);
     expect(must(sends[0]).to).toBe(99);
   });
 
-  test('send to a dead bot returns false', () => {
+  test('send to a dead bot throws, naming the bot and where it was lost', () => {
     const world = asciiWorld(['..X'], { bots: [vec(0, 0), vec(1, 0)] });
     const sim = new Sim(world);
     sim.move(1, Dir.East);
     expect(bot(world, 1).alive).toBe(false);
-    expect(sim.send(0, 1, 'still there?')).toBe(false);
+
+    let thrown: unknown;
+    try {
+      sim.send(0, 1, 'still there?');
+    } catch (error) {
+      thrown = error;
+    }
+    expect(isSimError(thrown)).toBe(true);
+    const error = thrown as IllegalActionError;
+    expect(error.code).toBe('illegal-action');
+    expect(error.message).toContain('#1');
+    expect(error.message).toContain('(2, 0)');
+    expect(error.message).toContain('bots()');
+    expect(error.at).toEqual(vec(2, 0));
   });
 });
 

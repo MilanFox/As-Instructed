@@ -115,3 +115,74 @@ No par, medal threshold, budget, tick cost or objective changed. `plant()` retur
 optional field on a trace event and prose on a docs page. All 86 reference-solution tests pass
 **unedited**. Full suite: **1626 passing across 64 files**, baseline 1624, so +2 and none removed.
 `npx tsc --noEmit` silent.
+
+---
+
+## 2. `send()` — now throws, like every other verb reached with a bad bot id
+
+**Moved to the throwing side.** `send()` returned `false` when `to` named no bot or a dead one.
+Both states are permanent — no call in the API brings bot #99 into being, and nothing revives a bot
+once `kill` has run — so by the deciding test both belong with the unknown bot id, not with the
+wall.
+
+### Why a throw, and why keeping `false` was wrong
+
+This was never a design choice; it was an inconsistency, and `power()`'s own doc comment
+(`sim.ts:624`) had already named the category out loud while ruling on a different verb: *"It is
+the same category as an unknown bot id."* Every other verb routes a bot id through
+`requireActiveBot`, which throws for exactly these two states. `move(99, Dir.North)` threw and
+`send(0, 99, "x")` shrugged, for the same argument, in the same engine.
+
+Keeping `false` fails the branch test in its purest form. `if (!send(99, "go"))` is a branch that
+can never flip: nothing the program does afterwards makes 99 exist or brings a lost bot back. It
+reads as a control-flow option and is a typo.
+
+The alternative — a reason on the event — is unavailable here for the reason set out above: a trace
+event is not a player channel, and unlike `plant()` there is no free call that recovers the answer
+after the fact. `bots()` tells you which ids are live *before* the send; after a mute `false` the
+player is left with a message that silently went nowhere and a receiver whose `recv()` returns
+null, which is the World 7 symptom that is already hardest to attribute — the causal-delivery rule
+produces an empty inbox for a *correct* program that merely forgot `sync()`. Silently dropping the
+message adds a second cause to that one symptom. That is the incentive failure
+`docs/AUDIT-INCENTIVES.md` finding 1 describes: the player learns to distrust `recv()`.
+
+### What the player now reads
+
+An id that never existed:
+
+> `send(99): there is no bot #99 on this contract, so the message has nowhere to go. bots() returns every id that exists.`
+
+A bot that has been lost:
+
+> `send(2): bot #2 ("hauler-2") was lost at (4, 7) and cannot receive messages. bots() lists only the bots still running.`
+
+Named object, the coordinate where it died, and the free check that answers it — `power()`'s shape,
+one plain sentence each. The dead case carries `at`, so `Verdict.failure.at` points the viewport at
+the wreck; both carry the player's own line number through the existing path.
+
+### Difficulty is unmoved — checked before the change, not after
+
+Every `send()` call in the campaign was read first. There are exactly **two live call sites**:
+`w7-01.ts:19` and `w7-05.ts:151` in the reference solutions, and nothing else in `src/levels/**`.
+Both take their target from `botIds()`, which filters on `alive`, and neither level authors hazard
+terrain or fuel, so neither can hold a dead bot. **No reference solution branches on `send()`'s
+return value** — both calls are bare statements — so nothing in the campaign can observe the change
+except by hitting a bug it never had.
+
+No par, medal threshold, budget, tick cost or objective changed. `send` still costs `costs.send` on
+both paths, and the refused send is still **logged and charged before it throws**, so `applyEvent`
+restores the same clock on replay that the live run spent (docs/ENGINE.md §6).
+
+### What changed
+
+| File | Change |
+|---|---|
+| `src/engine/sim.ts` | `send()` splits the unknown-id case from the dead-bot case and throws `IllegalActionError` for each, after logging the `ok: false` event and charging the tick. The doc comment was one line and described the old behaviour. |
+| `src/engine/trace.ts` | `SendEvent`'s comment said the message "is never delivered" and stopped there; it now records that the send throws immediately after, and why the event still exists. |
+| `src/runtime/api-spec.ts` | The `send` reference page promised a `false` that no longer happens. |
+| `src/engine/__tests__/sim.test.ts` | The two tests asserting the old `false` now assert the throw, the message, the `at`, and that the tick is still charged and the event still written. |
+| `src/runtime/__tests__/bot-handle.test.ts` | `'sending to a bot that is not there is refused, not thrown'` was a test of the defect. Inverted. |
+| `src/runtime/__tests__/run-level.test.ts` | +1 end-to-end test: a real `w7-01` run whose `verdict.failure.message` is the sentence above, on the player's line 2. |
+
+Net **+1 test** (1627 from 1626); three existing tests were rewritten in place rather than added,
+because they asserted the contract that changed.
