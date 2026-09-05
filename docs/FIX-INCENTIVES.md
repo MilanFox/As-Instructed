@@ -180,5 +180,84 @@ current `src/ui/screens/LevelSelect.tsx`, for whatever replaces it:
    is a soft-lock risk, and with two orders open the gate is no longer worth defending that hard.
    My recommendation is to leave `openLevel` permissive and let the screen decide what it offers.
 
+---
+
+## 4. Finding 6 — the six systems that all pay for not bumping. The real answer.
+
+This is the one I was asked to answer properly, so here is the count re-done against the code
+rather than against the audit's summary, because the audit miscounts by one and defends the wrong
+survivor.
+
+| # | system | what it actually tests | verdict |
+|---|---|---|---|
+| 1 | `moveBlocked: 1` in `src/engine/costs.ts`, charged in `sim.ts` | a blocked move costs a tick | **Keep. This is the correct signal and the only one that should exist.** |
+| 2 | `no-contact` / NO CONTACT REPORTED | `blockedMoves === 0` on any level | **Deleted.** |
+| 3 | `w7-01` `no-slack` | `endTick <= floorTicks(ctx) && blockedMoves === 0` | **Query — see below.** |
+| 4 | `w7-03` `no-bumps` | `blockedMoves === 0` | **Defend. The audit is wrong about this one.** |
+| 5 | `w8-05` `no-blocked-moves` | `blockedMoves === 0` | **Cut. The clean one.** |
+| 6 | `w3-01` `clean-run` | `endTick <= PAR && failedPickups === 0` | **Not in this family.** It counts failed *pickups*, not blocked moves. It is finding 7 material — a par restatement with a no-error conjunct — not finding 6 material. |
+
+### The structural defect, stated correctly
+
+The problem is not the count. It is that **a tick cost is proportional and a bonus gate is binary**,
+and only one of those can be traded against.
+
+Bumping a wall twice costs two ticks. You can still take gold. The player is free to use `move`'s
+return value as the free sensing channel the game explicitly teaches — `w1-01`'s own hint sells
+bump-and-turn as a real, slightly-expensive strategy, and `move`'s hardware note says *"Returns
+false if the way is blocked."* The price is real, it is legible, and it leaves the idiom available.
+
+A binary `blockedMoves === 0` gate cannot be traded against. It has exactly one reliable route on a
+multi-seed level: **already know where the walls are.** Put it beside an information budget — "look
+less" — and the pair is jointly satisfiable only by a program that does not need to look because it
+was written against a layout the author had seen. That is a hardcoded route, which is precisely
+what the multi-seed conjunction in `objectivesOnEverySeed` exists to prevent. Two systems, pointing
+at the behaviour a third system is built to defeat.
+
+**So the rule, and it is now DESIGN.md §11 A10:** *an incentive for the absence of an error must be
+proportional, never binary.* Without a rule the finding regrows — the next author writes another
+zero-bumps bonus because each one looks reasonable alone, which is exactly how the streak happened.
+
+### Why `w7-03`'s `no-bumps` should survive, against the audit
+
+The audit calls it "the first idea, graded harder" and groups it with `w8-05`'s. It is not the same
+object. `w7-03`'s required objective is *deliver every crate to the silo bay*; its subject is a
+one-lane tunnel that every bot must cross, and its designed failure is two polite bots deadlocking
+in it. The hints are entirely about scheduling — *"A queue that runs one way empties faster than a
+queue that alternates."* On that level `blockedMoves === 0` is not "did you plan the route"; it is
+**"did you schedule the tunnel, or did you let the bots discover each other?"** That is a strictly
+harder question than the required objective and it needs an idea the required solution does not
+have, which is the audit's own admission test for a good bonus.
+
+It is also the level's only bonus, so cutting it takes the level from four points to three.
+
+The contrast with `w8-05` makes the case: there, `no-blocked-moves` sits beside `under-budget` and
+`fleet-utilisation` on a level that already asks two harder questions, and it is not about
+contention — it is about not driving into scenery. That is the one to cut.
+
+### The query on `w7-01` `no-slack`
+
+`(ctx) => ctx.trace.endTick <= floorTicks(ctx) && blockedMoves(ctx.trace.events) === 0`.
+
+If `floorTicks` is genuinely the theoretical minimum makespan, the second conjunct is **dead
+weight**: a blocked move costs a tick, so any bump already puts `endTick` over the floor and the
+first conjunct has failed. Dropping `&& blockedMoves === 0` would then be a pure simplification
+with no difficulty change at all.
+
+I did not make the change, for one reason: if `floorTicks` has any slack in it, dropping the
+conjunct makes the bonus easier, and difficulty is not mine to lower. **This needs one measurement
+by whoever owns `src/levels/world-7`:** is there a program that hits `floorTicks` with a blocked
+move in it? If no, delete the conjunct. If yes, `floorTicks` is not the floor and that is a
+separate bug.
+
+### What I did not change, and why
+
+**No level content.** The hard constraint is *"Difficulty must not drop. No par, medal threshold,
+budget, tick cost or objective changes."* A bonus objective is an `Objective` in `LevelDef.bonus`,
+and cutting one lowers a level's maximum points and the Performance Review's denominator. I own
+`src/levels/**` but not the licence to change what a level offers, so the two content changes are
+diffs below rather than commits.
+
+
 
 
