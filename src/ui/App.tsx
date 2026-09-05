@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { isGraded } from '../game/score.ts';
 import { currentLevel, useGame } from '../game/store.ts';
 import { CanvasRenderer, RuntimeRunner } from './adapters.ts';
 import { exportSave } from '../game/save.ts';
@@ -9,6 +10,7 @@ import { PublishDialog } from '../meta/ui/PublishDialog.tsx';
 import { mountAudio } from './audio.ts';
 import { mountLibrary } from './library.ts';
 import { IconBook, IconMap, IconSound } from './components/Icons.tsx';
+import { PanelBoundary } from './components/PanelBoundary.tsx';
 import { useKeyboard } from './hooks/useKeyboard.ts';
 import { AudioSettings } from './screens/AudioSettings.tsx';
 import { LevelSelect } from './screens/LevelSelect.tsx';
@@ -57,14 +59,33 @@ export function App(): React.JSX.Element {
           <LevelSelect />
         </div>
       ) : null}
-      <Results />
-      <PublishDialog />
-      {/* The Repository note waits for the hardware crate itself, so order here is cosmetic. */}
-      <RepositoryIssue />
-      {/* Last, so the delivery note stacks above a publish offer raised by the same transition. */}
-      <Requisition />
-      {/* Site map only, and it checks the other four are gone. Nothing here shares its screen. */}
-      <ReviewMemo />
+      {/*
+        One boundary per modal, not one around the layer.
+        A throw in any of these used to unmount the whole tree — the site map, the editor and the
+        player's unsaved program went with it, for a fault in a dialog they did not open
+        (docs/AUDIT-UI.md F21). They are boundaried separately because they stack: a publish offer
+        that falls over must still leave the run report that raised it on the screen.
+      */}
+      <div className="modal-layer">
+        <PanelBoundary label="The run report">
+          <Results />
+        </PanelBoundary>
+        <PanelBoundary label="The publish offer">
+          <PublishDialog />
+        </PanelBoundary>
+        {/* The Repository note waits for the hardware crate itself, so order here is cosmetic. */}
+        <PanelBoundary label="The Repository note">
+          <RepositoryIssue />
+        </PanelBoundary>
+        {/* Last, so the delivery note stacks above a publish offer raised by the same transition. */}
+        <PanelBoundary label="The delivery note">
+          <Requisition />
+        </PanelBoundary>
+        {/* Site map only, and it checks the other four are gone. Nothing here shares its screen. */}
+        <PanelBoundary label="The performance memo">
+          <ReviewMemo />
+        </PanelBoundary>
+      </div>
     </div>
   );
 }
@@ -129,13 +150,18 @@ function TopBar(): React.JSX.Element {
 
       {screen === 'workspace' && level ? (
         <div className="topbar__stats">
+          {/*
+            Par is not a target on an ungraded work order (DESIGN.md §11 A7), so the top bar
+            reports the clock and stops there — no denominator to fall short of, and no amber for
+            falling short of it. The objective rail draws the same distinction for the same reason.
+          */}
           <span className="stat">
             <span className="stat__label">ticks</span>
             <span
-              className={`stat__value${ticks !== undefined && ticks > level.par.ticks ? ' stat__value--over' : ''}`}
+              className={`stat__value${isGraded(level) && ticks !== undefined && ticks > level.par.ticks ? ' stat__value--over' : ''}`}
             >
               {ticks ?? '—'}
-              <span className="stat__par"> / {level.par.ticks}</span>
+              {isGraded(level) ? <span className="stat__par"> / {level.par.ticks}</span> : null}
             </span>
           </span>
         </div>
