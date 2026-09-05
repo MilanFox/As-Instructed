@@ -80,7 +80,10 @@ const BY_CODE: Partial<Record<FailureCode, readonly string[]>> = {
     'Two bots have each yielded to the other. They are still yielding.',
   ],
   [FailureCode.BotLost]: ['The bot is not recoverable. Shipping have been informed.'],
-  [FailureCode.IllegalAction]: ['The bot declined the instruction. The log says only that.'],
+  [FailureCode.IllegalAction]: [
+    'The bot declined the instruction. The console says why, in full.',
+    'Instruction refused, with a reason attached. It is in the console.',
+  ],
   [FailureCode.Compile]: ['It did not compile. Nothing was dispatched, so nothing was billed.'],
 };
 

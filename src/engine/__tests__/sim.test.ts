@@ -19,6 +19,7 @@ import {
   ItemKind,
   LivelockError,
   MachineKind,
+  MANUAL_ONLY,
   Objectives,
   OpLimitError,
   OutOfFuelError,
@@ -723,6 +724,68 @@ describe('power', () => {
     expect(sim.power(0, 'ghost', 'on')).toBe(false);
     expect(bot(world).clock).toBe(DEFAULT_COSTS.power);
     expect(must(eventsOfKind(sim.finish().events, 'act')[0]).ok).toBe(false);
+  });
+
+  test('a manual machine refuses in a sentence that names it and its tile', () => {
+    const world = openWorld(9, 5, 1);
+    placeMachine(world, {
+      id: 'sub-3',
+      kind: MachineKind.Node,
+      at: vec(7, 3),
+      state: 'off',
+      vars: { [MANUAL_ONLY]: 1 },
+    });
+    const sim = new Sim(world);
+
+    let thrown: unknown;
+    try {
+      sim.power(0, 'sub-3', 'on');
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(IllegalActionError);
+    const error = thrown as IllegalActionError;
+    expect(error.message).toContain('power("sub-3")');
+    expect(error.message).toContain('(7, 3)');
+    expect(error.message).toContain('hand-operated');
+    expect(error.message).toContain('use()');
+    expect(error.at).toEqual(vec(7, 3));
+    expect(must(machineById(world, 'sub-3')).state).toBe('off');
+  });
+
+  test('the refused call is charged and logged before it throws', () => {
+    const world = openWorld(9, 5, 1);
+    placeMachine(world, {
+      id: 'sub-3',
+      kind: MachineKind.Node,
+      at: vec(7, 3),
+      state: 'off',
+      vars: { [MANUAL_ONLY]: 1 },
+    });
+    const sim = new Sim(world);
+
+    expect(() => sim.power(0, 'sub-3', 'on')).toThrow(IllegalActionError);
+    expect(bot(world).clock).toBe(DEFAULT_COSTS.power);
+
+    const acts = eventsOfKind(sim.finish().events, 'act');
+    expect(acts).toHaveLength(1);
+    expect(must(acts[0]).name).toBe('power');
+    expect(must(acts[0]).ok).toBe(false);
+    expect(must(acts[0]).detail).toBe('sub-3');
+  });
+
+  test('a machine without the flag is untouched by the rule', () => {
+    const world = openWorld(9, 5, 1);
+    placeMachine(world, {
+      id: 'node',
+      kind: MachineKind.Node,
+      at: vec(7, 3),
+      state: 'off',
+      vars: { [MANUAL_ONLY]: 0 },
+    });
+    const sim = new Sim(world);
+    expect(sim.power(0, 'node', 'on')).toBe(true);
   });
 
   test('power on a linked Door also flips its tiles', () => {
