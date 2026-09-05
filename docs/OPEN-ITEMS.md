@@ -381,3 +381,38 @@ No level became gated; the campaign is still finishable by a player who never op
   already reads by whitelist, so dropping the field from `LevelProgress` is a tolerate-and-drop
   with no new `SAVE_VERSION`. Two fixture tests prove a legacy save keeps its medals, code,
   ticks, stars and objectives.
+
+### 2026-09-05, 15:30 — character-count plumbing deleted (`a3a532f`)
+
+Green at **1369 tests**, tsc / build clean, eslint at the one known false positive.
+
+There were **two** counters, and nothing had noticed because nothing compared them:
+`scoreChars` (a regex in `engine/verdict.ts`) and `countChars` (a 110-line hand-written
+scanner with three private helpers in `game/score.ts`). Both are gone, along with
+`Verdict.stats.chars`, `VerdictInput.chars`, `LevelScore.chars`, `LevelProgress.bestChars`,
+the `chars` arguments through `run-level` and `aggregate`, and `par.chars` from all 34
+level files. `par` is now `{ ticks: number }`. Every tick value is byte-identical — no par,
+medal threshold or budget moved.
+
+Test count 1417 → 1369, accounted rather than assumed: `countChars` suite −10, per-level
+`par.chars` −34, world-level −6, new save fixtures +2. World-2's
+`no bonus label mentions characters or code length` was deliberately **kept** — it is the
+guard against the idea returning through a bonus objective.
+
+**No save version bump, and none needed:** `migrate` already funnels every read through
+`rescueLevels`, which rebuilds progress off a field whitelist rather than spreading the
+stored object, so dropping a field *is* tolerate-and-drop. Two fixtures prove it — a full
+legacy save with `bestChars: 132` restoring to an exact object, and a record containing
+nothing but `bestChars` landing on `emptyProgress()` without throwing.
+
+DESIGN.md §4.6/§5/§7 updated: the "carried for historical reasons" sentence is replaced by
+"Character count does not exist."
+
+### Follow-up left by that work — small, unblocked
+
+`runLevel`'s `options.source` existed only to feed `scoreChars` and went with it. That
+leaves **`SeedRunOptions.source` and `RunRequest.code` with no readers** — `code`'s only
+consumer was `serve.ts` forwarding it into `source`. Removing them touches `protocol.ts`,
+`serve.ts`, `run-level.ts`, `src/ui/adapters.ts`, `src/meta/adapters.ts` and four test
+files, so it was correctly left as its own change rather than smuggled into a deletion.
+`LevelScore` in `score.ts` is also now an exported interface with no reference anywhere.
