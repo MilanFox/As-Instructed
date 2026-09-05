@@ -1,5 +1,13 @@
-import type { ObjectiveContext, Terrain, TraceEvent, Vec, World } from '../../engine/index.ts';
-import { FUEL_BURNING, tileAt } from '../../engine/index.ts';
+import type {
+  DieEvent,
+  Divergence,
+  ObjectiveContext,
+  Terrain,
+  TraceEvent,
+  Vec,
+  World,
+} from '../../engine/index.ts';
+import { FUEL_BURNING, NOTHING, tileAt } from '../../engine/index.ts';
 import { keyOf } from './caves.ts';
 
 /**
@@ -67,4 +75,41 @@ export function botEndsOn(ctx: ObjectiveContext, terrain: Terrain, botId = 0): b
   const bot = ctx.world.bots.find((b) => b.id === botId);
   if (!bot || !bot.alive) return false;
   return tileAt(ctx.world, bot.at)?.terrain === terrain;
+}
+
+/** A coordinate, written the way the brief and the facts table write one. */
+export function at(pos: Vec): string {
+  return `(${String(pos.x)}, ${String(pos.y)})`;
+}
+
+/**
+ * Where the run left the bot, against the tile it was asked to end on.
+ *
+ * Every World 4 goal is randomized per seed, so "not met" hides two different mistakes that look
+ * identical in the editor: a route that stopped short, and a route that went to the wrong chamber.
+ * The pair of coordinates separates them, and both are on the map the player is already looking at.
+ */
+export function endedOn(ctx: ObjectiveContext, terrain: Terrain, botId = 0): Divergence | undefined {
+  const target = tilesWithTerrain(ctx.initialWorld, terrain)[0];
+  if (target === undefined) return undefined;
+  const bot = ctx.world.bots.find((b) => b.id === botId);
+  if (bot === undefined) return { where: 'end of run', expected: at(target), received: NOTHING };
+  return {
+    where: 'end of run',
+    expected: at(target),
+    received: bot.alive ? at(bot.at) : `${at(bot.at)}, and not running`,
+  };
+}
+
+/** The tick and tile the bot stopped on, and what stopped it. */
+export function died(ctx: ObjectiveContext, botId = 0): Divergence | undefined {
+  const death = ctx.trace.events.find(
+    (event): event is DieEvent => event.kind === 'die' && event.botId === botId,
+  );
+  if (death === undefined) return undefined;
+  return {
+    where: `tick ${String(death.t)} · ${at(death.at)}`,
+    expected: 'the bot still running',
+    received: death.reason,
+  };
 }

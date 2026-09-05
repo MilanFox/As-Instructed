@@ -1,5 +1,12 @@
-import type { ObjectiveContext, Rng, Vec, World } from '../../engine/index.ts';
-import { Objectives, Terrain, addBot, createWorld, setTerrain } from '../../engine/index.ts';
+import type { Divergence, ObjectiveContext, Rng, Vec, World } from '../../engine/index.ts';
+import {
+  Objectives,
+  Terrain,
+  addBot,
+  clipValue,
+  createWorld,
+  setTerrain,
+} from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
 import {
   addCycles,
@@ -10,7 +17,14 @@ import {
   keyOf,
   paintCave,
 } from './caves.ts';
-import { botEndsOn, firstVisitOrder, standingKeys, tilesWithTerrain } from './objectives.ts';
+import {
+  at,
+  botEndsOn,
+  endedOn,
+  firstVisitOrder,
+  standingKeys,
+  tilesWithTerrain,
+} from './objectives.ts';
 
 const CELLS = 14;
 const SIZE = 30;
@@ -143,8 +157,49 @@ function tookBestOrder(ctx: ObjectiveContext): boolean {
 
 function visitedCount(ctx: ObjectiveContext): number {
   const stood = standingKeys(ctx);
-  return tilesWithTerrain(ctx.initialWorld, Terrain.Pad).filter((at) => stood.has(keyOf(at)))
+  return tilesWithTerrain(ctx.initialWorld, Terrain.Pad).filter((point) => stood.has(keyOf(point)))
     .length;
+}
+
+/** The first collection point the run never stood on. */
+function missedPoint(ctx: ObjectiveContext): Divergence | undefined {
+  const stood = standingKeys(ctx);
+  const missed = tilesWithTerrain(ctx.initialWorld, Terrain.Pad).find(
+    (point) => !stood.has(keyOf(point)),
+  );
+  if (missed === undefined) return undefined;
+  return { where: at(missed), expected: 'stood on', received: 'never reached' };
+}
+
+/**
+ * The route the run took, priced against the best of the six, in the level's own unit.
+ *
+ * Both numbers are shortest-route costs, so the comparison is about the *order* and nothing else —
+ * a player who took the right order badly is not told they took the wrong one. It reports the
+ * order taken, which is the player's own output, and the cost of the best order, which is a number
+ * they could have computed and did not. It does not report the best order: six permutations is the
+ * work the bonus is asking for, and handing over the answer would leave nothing to do.
+ */
+function orderTaken(ctx: ObjectiveContext): Divergence | undefined {
+  const { points, lift, start } = landmarks(ctx.initialWorld);
+  if (points.length !== 3 || lift === undefined || start === undefined) return undefined;
+  const order = firstVisitOrder(ctx, points);
+  if (order.length !== points.length) {
+    return {
+      where: 'the collection points',
+      expected: `all ${String(points.length)}, in some order`,
+      received: `${String(order.length)} of ${String(points.length)}`,
+    };
+  }
+  const best = Math.min(
+    ...permutations(points).map((perm) => tourCost(ctx.initialWorld, start, perm, lift)),
+  );
+  const took = tourCost(ctx.initialWorld, start, order, lift);
+  return {
+    where: clipValue(order.map(at).join(' → ')),
+    expected: `${String(best)} steps`,
+    received: Number.isFinite(took) ? `${String(took)} steps` : 'no route',
+  };
 }
 
 /**
@@ -206,15 +261,21 @@ export const w4_04: LevelDef = {
       'collect-all',
       'Stand on all three collection points',
       (ctx) => visitedCount(ctx) === 3,
-      (ctx) => [visitedCount(ctx), 3],
+      { progress: (ctx) => [visitedCount(ctx), 3], divergence: missedPoint },
     ),
-    Objectives.custom('end-on-lift', 'End the run on the lift', (ctx) =>
-      botEndsOn(ctx, Terrain.Depot),
+    Objectives.custom(
+      'end-on-lift',
+      'End the run on the lift',
+      (ctx) => botEndsOn(ctx, Terrain.Depot),
+      { divergence: (ctx) => endedOn(ctx, Terrain.Depot) },
     ),
   ],
   bonus: [
-    Objectives.custom('best-order', 'Take the collection points in the best order', (ctx) =>
-      tookBestOrder(ctx),
+    Objectives.custom(
+      'best-order',
+      'Take the collection points in the best order',
+      (ctx) => tookBestOrder(ctx),
+      { divergence: orderTaken },
     ),
   ],
   starter: [

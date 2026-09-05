@@ -1,4 +1,4 @@
-import type { MoveEvent, Rng, Vec, World } from '../../engine/index.ts';
+import type { Divergence, MoveEvent, ObjectiveContext, Rng, Vec, World } from '../../engine/index.ts';
 import {
   Objectives,
   Terrain,
@@ -9,6 +9,7 @@ import {
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
 import { carveTunnel, cellTile, paintCave } from './caves.ts';
+import { at, endedOn } from './objectives.ts';
 
 const CELLS = 11;
 const SIZE = 2 * CELLS + 1;
@@ -40,6 +41,29 @@ function standingTiles(start: Vec, events: readonly { kind: string }[]): Vec[] {
     if (move.ok) out.push(move.to);
   }
   return out;
+}
+
+/** The first tile the run stood on twice, and the tick it first stood there. */
+function firstRepeat(ctx: ObjectiveContext): Divergence | undefined {
+  const start = ctx.initialWorld.bots[0];
+  if (!start) return undefined;
+  const seen = new Map<string, number>([[`${String(start.at.x)},${String(start.at.y)}`, 0]]);
+  for (const event of ctx.trace.events) {
+    if (event.kind !== 'move') continue;
+    const move = event as MoveEvent;
+    if (!move.ok) continue;
+    const key = `${String(move.to.x)},${String(move.to.y)}`;
+    const first = seen.get(key);
+    if (first !== undefined) {
+      return {
+        where: `tick ${String(move.t)} · ${at(move.to)}`,
+        expected: 'a tile the bot has not been on',
+        received: `stood here at tick ${String(first)}`,
+      };
+    }
+    seen.set(key, move.t);
+  }
+  return undefined;
 }
 
 /**
@@ -81,19 +105,29 @@ export const w4_01: LevelDef = {
   par: { ticks: 52 },
   build,
   objectives: [
-    Objectives.custom('reach-tunnel-end', 'Park the bot on the pad at the far end', (ctx) => {
-      const bot = ctx.world.bots[0];
-      if (!bot || !bot.alive) return false;
-      return tileAt(ctx.world, bot.at)?.terrain === Terrain.Pad;
-    }),
+    Objectives.custom(
+      'reach-tunnel-end',
+      'Park the bot on the pad at the far end',
+      (ctx) => {
+        const bot = ctx.world.bots[0];
+        if (!bot || !bot.alive) return false;
+        return tileAt(ctx.world, bot.at)?.terrain === Terrain.Pad;
+      },
+      { divergence: (ctx) => endedOn(ctx, Terrain.Pad) },
+    ),
   ],
   bonus: [
-    Objectives.custom('single-pass', 'Reach the pad without entering a tile twice', (ctx) => {
-      const bot = ctx.initialWorld.bots[0];
-      if (!bot) return false;
-      const tiles = standingTiles(bot.at, ctx.trace.events);
-      return new Set(tiles.map((at) => `${at.x},${at.y}`)).size === tiles.length;
-    }),
+    Objectives.custom(
+      'single-pass',
+      'Reach the pad without entering a tile twice',
+      (ctx) => {
+        const bot = ctx.initialWorld.bots[0];
+        if (!bot) return false;
+        const tiles = standingTiles(bot.at, ctx.trace.events);
+        return new Set(tiles.map((tile) => `${tile.x},${tile.y}`)).size === tiles.length;
+      },
+      { divergence: firstRepeat },
+    ),
   ],
   starter: [
     '// look(dir, 1) returns a single tile view; look(dir) returns up to eight.',

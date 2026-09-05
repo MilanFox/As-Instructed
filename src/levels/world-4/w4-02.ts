@@ -11,7 +11,7 @@ import {
   keyOf,
   paintCave,
 } from './caves.ts';
-import { botEndsOn, markCount } from './objectives.ts';
+import { botEndsOn, endedOn, markCount } from './objectives.ts';
 
 const CELLS = 9;
 const SIZE = 20;
@@ -90,8 +90,11 @@ export const w4_02: LevelDef = {
   budget: { maxTicks: 1600 },
   build,
   objectives: [
-    Objectives.custom('reach-vein', 'Park the bot on the ore vein', (ctx) =>
-      botEndsOn(ctx, Terrain.Pad),
+    Objectives.custom(
+      'reach-vein',
+      'Park the bot on the ore vein',
+      (ctx) => botEndsOn(ctx, Terrain.Pad),
+      { divergence: (ctx) => endedOn(ctx, Terrain.Pad) },
     ),
   ],
   bonus: [
@@ -99,7 +102,14 @@ export const w4_02: LevelDef = {
       'mark-budget',
       `Reach the vein having placed fewer than ${MARK_BUDGET} marks`,
       (ctx) => markCount(ctx) < MARK_BUDGET,
-      (ctx) => [Math.min(markCount(ctx), MARK_BUDGET), MARK_BUDGET],
+      {
+        progress: (ctx) => [Math.min(markCount(ctx), MARK_BUDGET), MARK_BUDGET],
+        divergence: (ctx) => ({
+          where: 'marks placed',
+          expected: `fewer than ${String(MARK_BUDGET)}`,
+          received: String(markCount(ctx)),
+        }),
+      },
     ),
   ],
   starter: [

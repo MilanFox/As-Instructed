@@ -23,7 +23,7 @@ import {
   linkDirs,
   paintCave,
 } from './caves.ts';
-import { botEndsOn, fuelBurned } from './objectives.ts';
+import { botEndsOn, died, endedOn, fuelBurned } from './objectives.ts';
 
 const CELLS = 19;
 const SIZE = 40;
@@ -154,13 +154,17 @@ export const w4_05: LevelDef = {
       id: 'ore-quota',
       label: `Carry ${ORE_QUOTA} ore out of the shaft`,
     }),
-    Objectives.custom('end-on-lift', 'End the run standing on the lift', (ctx) =>
-      botEndsOn(ctx, Terrain.Depot),
+    Objectives.custom(
+      'end-on-lift',
+      'End the run standing on the lift',
+      (ctx) => botEndsOn(ctx, Terrain.Depot),
+      { divergence: (ctx) => endedOn(ctx, Terrain.Depot) },
     ),
     Objectives.custom(
       'bot-recovered',
       'Bring the bot back in one piece',
       (ctx) => ctx.world.bots[0]?.alive === true,
+      { divergence: (ctx) => died(ctx) },
     ),
   ],
   bonus: [
@@ -168,6 +172,13 @@ export const w4_05: LevelDef = {
       'fuel-reserve',
       'Finish the job on one tank with a fifth of it unused',
       (ctx) => fuelBurned(ctx) <= tankSize(ctx) * 0.8,
+      {
+        divergence: (ctx) => ({
+          where: 'fuel burned',
+          expected: `${String(Math.floor(tankSize(ctx) * 0.8))} of ${String(tankSize(ctx))}`,
+          received: `${String(fuelBurned(ctx))} of ${String(tankSize(ctx))}`,
+        }),
+      },
     ),
   ],
   starter: [
