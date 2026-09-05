@@ -27,6 +27,16 @@ export const SETTLE_TICKS = 0.9;
 /** Ticks a tread mark stays visible. */
 export const TREAD_FADE_TICKS = 7;
 
+/**
+ * Fraction of a move spent winding up.
+ *
+ * Anticipation is a *squash*, never a retreat. Backing up before setting off would read
+ * beautifully and would also make `poseAt(0.5)` stop being the midpoint of the move, which the
+ * renderer's agreement with `replayTo` depends on. Easing puts the bot only three hundredths of a
+ * tile down the road by the end of the wind-up anyway, so a crouch there reads as one.
+ */
+export const ANTICIPATION = 0.18;
+
 export interface BotSegment {
   t0: number;
   t1: number;
@@ -62,6 +72,16 @@ export interface BotPose {
   settle: number;
   /** 0..1 intensity of the "this move failed" flash. */
   blocked: number;
+  /**
+   * 0..1 wind-up before a move commits. Drives the crouch and the antenna lag; the bot is a cheap
+   * machine deciding to do a thing, and it should look like it takes a moment.
+   */
+  anticipate: number;
+  /**
+   * 0..1, decaying after a bump. The beat where the bot collects itself before pretending nothing
+   * happened. Purely cosmetic — the blocked *signal* is `blocked`, which W7 puzzles depend on.
+   */
+  recoil: number;
   /** 0..1 through a non-move action. */
   action: number;
   actionKind: string;
@@ -94,6 +114,8 @@ export function createPose(id = -1): BotPose {
     stretch: 0,
     settle: 0,
     blocked: 0,
+    anticipate: 0,
+    recoil: 0,
     action: 0,
     actionKind: SEGMENT_IDLE,
     idle: 0,
@@ -140,6 +162,32 @@ export function blockedFlash(u: number): number {
   if (u <= 0) return 0;
   if (u < 0.28) return u / 0.28;
   return Math.exp(-3.2 * (u - 0.28));
+}
+
+/**
+ * The stretch profile of one successful move: crouch, launch, and back to neutral on arrival so
+ * the landing wobble can take over cleanly. Squash-and-stretch is the whole reason a bot that
+ * moves *correctly* can still move *badly*.
+ */
+export function moveStretch(k: number): number {
+  if (k <= 0 || k >= 1) return 0;
+  if (k < ANTICIPATION) return -0.115 * Math.sin((Math.PI * k) / ANTICIPATION);
+  return 0.19 * Math.sin((Math.PI * (k - ANTICIPATION)) / (1 - ANTICIPATION));
+}
+
+/** How hard the wind-up is being felt at `k` through a move. */
+export function anticipationAt(k: number): number {
+  if (k <= 0 || k >= ANTICIPATION) return 0;
+  return Math.sin((Math.PI * k) / ANTICIPATION);
+}
+
+/**
+ * The beat after a bump. Zero until the tick is spent, then a decaying shimmy — the bot shaking
+ * itself off. Ends at hard zero so a trace that finishes on a blocked move is not left twitching.
+ */
+export function recoilAt(u: number): number {
+  if (u <= 1 || u > 3) return 0;
+  return Math.exp(-2.1 * (u - 1));
 }
 
 /** Damped landing wobble, in "stretch" units. `age` is in ticks since arrival. */
@@ -219,6 +267,8 @@ export class BotTimeline {
     out.stretch = 0;
     out.settle = 0;
     out.blocked = 0;
+    out.anticipate = 0;
+    out.recoil = 0;
     out.action = 0;
     out.actionKind = SEGMENT_IDLE;
     out.idle = 0;
@@ -253,7 +303,8 @@ export class BotTimeline {
       out.x = seg.fromX + (seg.toX - seg.fromX) * e;
       out.y = seg.fromY + (seg.toY - seg.fromY) * e;
       out.travel = k;
-      out.stretch = k < 1 ? Math.sin(Math.PI * k) * 0.16 : 0;
+      out.stretch = moveStretch(k);
+      out.anticipate = anticipationAt(k);
       if (t >= seg.t1) {
         const age = t - seg.t1;
         out.settle = Math.max(0, 1 - age / SETTLE_TICKS);
@@ -272,6 +323,8 @@ export class BotTimeline {
       out.x = seg.fromX + seg.dx * push;
       out.y = seg.fromY + seg.dy * push;
       out.blocked = Math.max(0, Math.min(1, blockedFlash(Math.min(k, 2))));
+      out.recoil = recoilAt(k);
+      out.anticipate = anticipationAt(Math.min(k, 1));
       out.stretch = -Math.abs(push) * 0.9;
       out.actionKind = 'blocked';
       return out;

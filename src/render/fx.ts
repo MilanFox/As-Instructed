@@ -20,6 +20,13 @@ const SHAPE_SHARD = 3;
 interface Particle {
   active: boolean;
   serial: number;
+  /**
+   * Seconds of particle time before the particle wakes up. A burst that needs to arrive *after*
+   * the event that caused it — the dust a bot kicks up when it lands, the second ring of a medal
+   * flourish — is one emit with staggered delays rather than a timer, because a timer would
+   * survive a scrub and a delay does not: `clear()` takes the whole schedule with it.
+   */
+  delay: number;
   /** Tile units. */
   x: number;
   y: number;
@@ -46,6 +53,7 @@ function makeParticle(): Particle {
   return {
     active: false,
     serial: 0,
+    delay: 0,
     x: 0,
     y: 0,
     vx: 0,
@@ -81,7 +89,10 @@ export type FxName =
   | 'blocked'
   | 'send'
   | 'sendFail'
-  | 'objective';
+  | 'objective'
+  | 'land'
+  | 'flourish'
+  | 'medal';
 
 export interface FxOptions {
   /** Direction the action pointed, in tile units. Used by dust and chip cones. */
@@ -91,6 +102,14 @@ export interface FxOptions {
   accent?: string;
   /** Deterministic jitter source, so a replayed tick looks the same twice. */
   seed?: number;
+  /**
+   * How much of the burst to fire, 0..1. The escalating fx (`flourish`, `medal`) read it as
+   * "which tier is this", and every caller can read it as "damp this down" — a reduced-motion
+   * frame passes a small number rather than skipping the emit and losing the information.
+   */
+  strength?: number;
+  /** Seconds of particle time to hold the whole burst back by. */
+  delay?: number;
 }
 
 export class ParticleSystem {
@@ -106,6 +125,8 @@ export class ParticleSystem {
   private stealCursor = 0;
   private serial = 0;
   private liveCount = 0;
+  /** Base delay for the burst currently being emitted. Read by `add`, reset by `emit`. */
+  private emitDelay = 0;
   /** Scales particle ageing with playback speed so fx do not smear at 8x. */
   timeScale = 1;
 
@@ -128,7 +149,9 @@ export class ParticleSystem {
   clear(): void {
     const pool = this.pool;
     for (let i = 0; i < pool.length; i++) {
-      (pool[i] as Particle).active = false;
+      const p = pool[i] as Particle;
+      p.active = false;
+      p.delay = 0;
       this.free[i] = i;
     }
     this.freeCount = pool.length;
@@ -169,8 +192,9 @@ export class ParticleSystem {
     gravity: number,
     drag: number,
     spin: number,
-  ): void {
+  ): Particle {
     const p = this.claim();
+    p.delay = this.emitDelay;
     p.x = x;
     p.y = y;
     p.vx = vx;
@@ -187,6 +211,7 @@ export class ParticleSystem {
     p.drag = drag;
     p.rot = 0;
     p.spin = spin;
+    return p;
   }
 
   /**
@@ -197,6 +222,8 @@ export class ParticleSystem {
     const dx = options.dx ?? 0;
     const dy = options.dy ?? 0;
     const accent = options.accent ?? fxColors.pulse;
+    const strength = options.strength ?? 1;
+    this.emitDelay = options.delay ?? 0;
     let s = (options.seed ?? 0) | 0;
     const rand = (): number => {
       s = (s * 1664525 + 1013904223) | 0;
@@ -451,11 +478,129 @@ export class ParticleSystem {
       }
       case 'objective': {
         this.add(x, y, 0, 0, 0.9, 0.15, 1.1, fxColors.good, SHAPE_RING, FX_LAYER_OVER, 1, 0, 1, 0);
+        this.add(x, y, 0, 0, 0.7, 0.1, 0.7, fxColors.good, SHAPE_RING, FX_LAYER_OVER, 0.5, 0, 1, 0)
+          .delay = this.emitDelay + 0.09;
+        break;
+      }
+      case 'land': {
+        // The puff a bot pushes out from under itself as it settles onto a tile. Low, slow and
+        // almost transparent: the point is that the tile the bot arrived on has been *arrived on*.
+        const count = 3 + Math.round(strength * 3);
+        for (let i = 0; i < count; i++) {
+          const a = rand() * Math.PI * 2;
+          const speed = 0.12 + rand() * 0.16;
+          this.add(
+            x + Math.cos(a) * 0.12,
+            y + Math.sin(a) * 0.08 + 0.08,
+            Math.cos(a) * speed,
+            Math.sin(a) * speed * 0.5,
+            0.32 + rand() * 0.18,
+            0.02 + rand() * 0.02,
+            0.09,
+            fxColors.dust,
+            SHAPE_DOT,
+            FX_LAYER_UNDER,
+            0.22 * strength,
+            0,
+            0.84,
+            0,
+          );
+        }
+        break;
+      }
+      case 'flourish': {
+        // The last objective of the run. Same vocabulary as `objective`, escalated: three rings
+        // on the beat instead of one, and a slow upward drift that reads as "and that is that".
+        for (let i = 0; i < 3; i++) {
+          this.add(
+            x,
+            y,
+            0,
+            0,
+            0.85 + i * 0.12,
+            0.12,
+            1.05 + i * 0.35,
+            i === 1 ? fxColors.spark : fxColors.good,
+            SHAPE_RING,
+            FX_LAYER_OVER,
+            (1 - i * 0.24) * strength,
+            0,
+            1,
+            0,
+          ).delay = this.emitDelay + i * 0.11;
+        }
+        const motes = Math.round(7 * strength);
+        for (let i = 0; i < motes; i++) {
+          const a = rand() * Math.PI * 2;
+          this.add(
+            x + Math.cos(a) * 0.3,
+            y + Math.sin(a) * 0.3,
+            Math.cos(a) * 0.12,
+            -0.28 - rand() * 0.22,
+            0.75 + rand() * 0.35,
+            0.028,
+            0.004,
+            i % 3 === 0 ? fxColors.spark : fxColors.good,
+            SHAPE_DOT,
+            FX_LAYER_OVER,
+            0.85,
+            -0.05,
+            0.94,
+            0,
+          ).delay = this.emitDelay + rand() * 0.22;
+        }
+        break;
+      }
+      case 'medal': {
+        // Synchronised to the medal stinger in `src/audio/sounds.ts`: one ring per note of the
+        // quartal figure, on the same step. `strength` selects the tier — 2 notes, 3, or 4.
+        const notes = Math.max(2, Math.min(4, Math.round(strength)));
+        const step = notes >= 4 ? 0.075 : notes === 3 ? 0.08 : 0.085;
+        for (let i = 0; i < notes; i++) {
+          this.add(
+            x,
+            y,
+            0,
+            0,
+            0.6 + i * 0.14,
+            0.1 + i * 0.06,
+            0.9 + i * 0.55,
+            accent,
+            SHAPE_RING,
+            FX_LAYER_OVER,
+            0.85 - i * 0.12,
+            0,
+            1,
+            0,
+          ).delay = this.emitDelay + i * step;
+        }
+        const motes = notes >= 4 ? 14 : notes === 3 ? 8 : 4;
+        for (let i = 0; i < motes; i++) {
+          const a = rand() * Math.PI * 2;
+          const speed = 0.3 + rand() * 0.5;
+          this.add(
+            x,
+            y,
+            Math.cos(a) * speed,
+            Math.sin(a) * speed - 0.2,
+            0.9 + rand() * 0.6,
+            0.022 + rand() * 0.016,
+            0.004,
+            i % 4 === 0 ? '#ffffff' : accent,
+            SHAPE_DOT,
+            FX_LAYER_OVER,
+            0.8,
+            0.16,
+            0.93,
+            0,
+          ).delay = this.emitDelay + (notes - 1) * step + rand() * 0.16;
+        }
         break;
       }
       default:
         break;
     }
+    this.emitDelay = 0;
   }
 
   update(dt: number): void {
@@ -465,6 +610,10 @@ export class ParticleSystem {
     for (let i = 0; i < pool.length; i++) {
       const p = pool[i] as Particle;
       if (!p.active) continue;
+      if (p.delay > 0) {
+        p.delay -= step;
+        continue;
+      }
       p.life -= step;
       if (p.life <= 0) {
         p.active = false;
@@ -491,7 +640,7 @@ export class ParticleSystem {
     ctx.save();
     for (let i = 0; i < pool.length; i++) {
       const p = pool[i] as Particle;
-      if (!p.active || p.layer !== layer) continue;
+      if (!p.active || p.layer !== layer || p.delay > 0) continue;
       const u = 1 - p.life / p.maxLife;
       const a = p.alpha0 * (1 - u * u);
       if (a <= 0.01) continue;

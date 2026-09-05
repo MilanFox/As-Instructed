@@ -70,7 +70,14 @@ export type ActionSound =
   | 'scrub';
 
 export type OutcomeSound =
-  'objective' | 'objectiveLost' | 'passed' | 'failed' | 'medalBronze' | 'medalSilver' | 'medalGold';
+  | 'objective'
+  | 'objectiveLost'
+  | 'passed'
+  | 'failed'
+  | 'medalBronze'
+  | 'medalSilver'
+  | 'medalGold'
+  | 'commend';
 
 export type UiSound =
   'runStart' | 'compileError' | 'cancel' | 'panelOpen' | 'panelClose' | 'button';
@@ -156,16 +163,28 @@ function renderUse(engine: AudioEngine, voice: Voice, at: number, seed: number):
   blip(ctx, voice.out, at + 0.045, 'square', 180, 150, 0.12, 0.002, 0.06);
 }
 
+/**
+ * A tank filling and a nozzle latching.
+ *
+ * The first version was a wide bandpass sweeping across pink noise, which is a whoosh: it says
+ * "something moved", not "the level went up". What makes a fill legible is *resonance* climbing —
+ * a narrow band rising is the sound of the air column in a tank getting shorter — so the Q is
+ * high and the sweep is the whole event. The latch on the end is what says it finished.
+ */
 function renderRefuel(engine: AudioEngine, voice: Voice, at: number, seed: number): void {
   const ctx = engine.ctx;
+  tick(ctx, voice.out, at, 220, 0.9, 0.5, 0.05, seed);
+
   const envelope = gainNode(ctx, 0);
-  const band = filterNode(ctx, 'bandpass', 500, 1.2);
-  sweep(band.frequency, at, 500, 1400, 0.2);
-  const source = noise(ctx, at, 0.3, 'pink', seed);
+  const band = filterNode(ctx, 'bandpass', 380, 4.5);
+  sweep(band.frequency, at + 0.02, 380, 1500, 0.17);
+  const source = noise(ctx, at + 0.02, 0.2, 'pink', seed);
   chain(source, band, envelope, voice.out);
-  ahd(envelope.gain, at, 0.5, 0.06, 0.06, 0.12);
+  ahd(envelope.gain, at + 0.02, 1.6, 0.03, 0.09, 0.07);
   voice.own(source);
-  blip(ctx, voice.out, at, 'sine', 92, 92, 0.18, 0.03, 0.18);
+
+  tick(ctx, voice.out, at + 0.2, 1600, 6, 0.28, 0.015, seed + 1);
+  blip(ctx, voice.out, at + 0.2, 'triangle', 587.33, 587.33, 0.16, 0.003, 0.06);
 }
 
 function renderMark(engine: AudioEngine, voice: Voice, at: number, seed: number): void {
@@ -198,17 +217,31 @@ function renderSendFail(engine: AudioEngine, voice: Voice, at: number, seed: num
   tick(ctx, voice.out, at, 300, 1, 0.3, 0.04, seed);
 }
 
+/**
+ * A relay closing and a chassis coming up.
+ *
+ * The two stacked triangles this used to end on were a fifth, which is a *reward* interval, and a
+ * World 7 trace spawning twenty bots therefore congratulated itself twenty times. It is now one
+ * rising body under a resonant spin-up: a machine starting, said once.
+ */
 function renderSpawn(engine: AudioEngine, voice: Voice, at: number, seed: number): void {
   const ctx = engine.ctx;
+  tick(ctx, voice.out, at, 700, 1.2, 0.5, 0.03, seed);
+
   const envelope = gainNode(ctx, 0);
-  const band = filterNode(ctx, 'bandpass', 300, 1.5);
-  sweep(band.frequency, at, 300, 1200, 0.12);
-  const source = noise(ctx, at, 0.24, 'white', seed);
+  const band = filterNode(ctx, 'bandpass', 240, 3.5);
+  sweep(band.frequency, at, 240, 1100, 0.16);
+  const source = noise(ctx, at, 0.2, 'pink', seed);
   chain(source, band, envelope, voice.out);
-  ahd(envelope.gain, at, 0.3, 0.04, 0.03, 0.12);
+  ahd(envelope.gain, at, 1.1, 0.02, 0.08, 0.09);
   voice.own(source);
-  blip(ctx, voice.out, at + 0.03, 'triangle', 330, 330, 0.22, 0.01, 0.15);
-  blip(ctx, voice.out, at + 0.05, 'triangle', 495, 495, 0.16, 0.01, 0.13);
+
+  const glide = gainNode(ctx, 0);
+  const body = osc(ctx, 'triangle', 165, at, 0.24);
+  sweep(body.frequency, at + 0.02, 165, 330, 0.12);
+  chain(body, glide, voice.out);
+  ad(glide.gain, at + 0.02, 0.26, 0.02, 0.16);
+  voice.own(body);
 }
 
 function renderDie(engine: AudioEngine, voice: Voice, at: number, seed: number): void {
@@ -287,6 +320,14 @@ interface MedalShape {
   step: number;
   /** Level of the octave-up sine doubling each note. */
   octave: number;
+  /**
+   * How much the figure grows across its notes, 0..1. Zero is a flat arpeggio; at 0.35 the top
+   * note is nearly twice the level of the first. This is the difference between a stinger that
+   * *arrives* and one that trails off after its own downbeat, which is what gold used to do.
+   */
+  rise: number;
+  /** Corner of the lowpass over the figure. Brighter is bigger, and it is the cheapest tier tell. */
+  bright: number;
   /** Bandpassed noise tail. The "plate" of the stamp. */
   shimmer: number;
   shimmerDecay: number;
@@ -299,6 +340,8 @@ const BRONZE: MedalShape = {
   notes: [293.66, 440],
   step: 0.085,
   octave: 0,
+  rise: 0.12,
+  bright: 3200,
   shimmer: 0,
   shimmerDecay: 0.12,
   stamp: 0,
@@ -308,6 +351,8 @@ const SILVER: MedalShape = {
   notes: [293.66, 440, 587.33],
   step: 0.08,
   octave: 0.1,
+  rise: 0.2,
+  bright: 4400,
   shimmer: 0.05,
   shimmerDecay: 0.18,
   stamp: 0,
@@ -316,34 +361,41 @@ const SILVER: MedalShape = {
 const GOLD: MedalShape = {
   notes: [293.66, 440, 587.33, 880],
   step: 0.075,
-  octave: 0.16,
-  shimmer: 0.07,
-  shimmerDecay: 0.32,
-  stamp: 0.4,
-  space: 0.32,
+  octave: 0.2,
+  rise: 0.42,
+  bright: 6800,
+  shimmer: 0.09,
+  shimmerDecay: 0.3,
+  stamp: 0.26,
+  space: 0.28,
 };
 
 /**
  * One gesture, three sizes. Bronze is the figure; silver adds a note, an octave and a little
  * air; gold adds the fourth note, a low stamp under the downbeat and a real tail. They have to
  * be recognisably the same object or the escalation reads as three unrelated jingles.
+ *
+ * The escalation runs *inside* each one as well as between them: the notes get louder and the
+ * lowpass opens as the tier goes up, so gold is four notes climbing into their own brightest
+ * moment rather than a thump followed by three quieter ones.
  */
 function renderMedal(engine: AudioEngine, voice: Voice, at: number, shape: MedalShape): void {
   const ctx = engine.ctx;
-  const body = filterNode(ctx, 'lowpass', 5200, 0.7);
+  const body = filterNode(ctx, 'lowpass', shape.bright, 0.7);
   body.connect(voice.out);
 
   if (shape.stamp > 0) {
-    blip(ctx, voice.out, at, 'sine', 73.42, 73.42, shape.stamp, 0.006, 0.42);
+    blip(ctx, voice.out, at, 'sine', 73.42, 73.42, shape.stamp, 0.01, 0.36);
   }
 
   const last = shape.notes.length - 1;
   shape.notes.forEach((note, index) => {
     const when = at + index * shape.step;
-    const decay = index === last ? 0.36 : 0.16;
-    blip(ctx, body, when, 'triangle', note, note, 0.3, 0.005, decay);
+    const decay = index === last ? 0.34 : 0.16;
+    const swell = 1 + shape.rise * (last === 0 ? 0 : (index / last) * 2 - 1);
+    blip(ctx, body, when, 'triangle', note, note, 0.3 * swell, 0.005, decay);
     if (shape.octave > 0)
-      blip(ctx, body, when, 'sine', note * 2, note * 2, shape.octave, 0.008, decay * 0.8);
+      blip(ctx, body, when, 'sine', note * 2, note * 2, shape.octave * swell, 0.008, decay * 0.8);
   });
 
   if (shape.shimmer > 0) {
@@ -357,6 +409,34 @@ function renderMedal(engine: AudioEngine, voice: Voice, at: number, shape: Medal
   }
 
   voice.sendTo(engine.space, shape.space);
+}
+
+/**
+ * The quartal ladder the whole reward family is built from. `commend` walks up it.
+ */
+const LADDER: readonly number[] = [293.66, 440, 587.33, 880, 1174.66];
+
+/**
+ * One commendation landing.
+ *
+ * The results screen lands these one at a time, and there can be a lot of them, so this is the
+ * smallest possible member of the reward family: a single note off the same ladder the medals
+ * use, climbing one rung per commendation and then holding at the top. A run of them reads as one
+ * ascending phrase rather than as the same ping fifteen times, and it cannot outstay its welcome
+ * because there is only ever one note.
+ *
+ * `seed` is the commendation's index, not a jitter source — this is the one sound in the file that
+ * is deliberately *not* varied, because the variation is the melody.
+ */
+function renderCommend(engine: AudioEngine, voice: Voice, at: number, seed: number): void {
+  const ctx = engine.ctx;
+  const step = Math.max(0, Math.min(LADDER.length - 1, Math.round(seed)));
+  const note = LADDER[step] as number;
+  const body = filterNode(ctx, 'lowpass', 5000, 0.7);
+  body.connect(voice.out);
+  blip(ctx, body, at, 'triangle', note, note, 0.3, 0.004, 0.14);
+  blip(ctx, body, at, 'sine', note * 2, note * 2, 0.07, 0.006, 0.1);
+  voice.sendTo(engine.space, 0.12);
 }
 
 // ---------------------------------------------------------------------------
@@ -522,9 +602,11 @@ export const SOUNDS: Readonly<Record<SoundName, SoundSpec>> = {
   spawn: {
     bus: 'sfx',
     priority: 3,
-    duration: 0.3,
+    duration: 0.26,
     minIntervalMs: 90,
-    gain: 0.426,
+    // A World 7 trace spawns twenty of these. Loud enough to notice once, quiet enough that
+    // twenty in a second is a factory starting up rather than an alarm.
+    gain: 0.24,
     render: renderSpawn,
   },
   die: {
@@ -603,10 +685,21 @@ export const SOUNDS: Readonly<Record<SoundName, SoundSpec>> = {
   medalGold: {
     bus: 'sfx',
     priority: 7,
-    duration: 0.95,
+    // Measured silence at 0.63s. The old 0.95 held a pool slot a third of a second past the end
+    // of the sound, and "short and bright" is the whole brief for this one.
+    duration: 0.78,
     minIntervalMs: 400,
-    gain: 0.647,
+    gain: 0.72,
     render: (engine, voice, at) => renderMedal(engine, voice, at, GOLD),
+  },
+
+  commend: {
+    bus: 'sfx',
+    priority: 5,
+    duration: 0.35,
+    minIntervalMs: 90,
+    gain: 0.44,
+    render: renderCommend,
   },
 
   runStart: {

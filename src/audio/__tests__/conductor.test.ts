@@ -318,3 +318,30 @@ describe('transport and settings', () => {
     expect(test.conductor.eventsPerSecond).toBeGreaterThan(TEXTURE_ON);
   });
 });
+
+describe('the end-of-run arc, staged', () => {
+  it('plays the verdict and the medal separately as well as together', () => {
+    const combined = rig([]);
+    combined.conductor.outcome({ passed: true, medal: 'gold' });
+    const both = combined.engine.activeVoices;
+
+    const staged = rig([]);
+    staged.conductor.verdict(true);
+    staged.conductor.medal('gold');
+    expect(staged.engine.activeVoices).toBe(both);
+  });
+
+  it('says nothing for a run that earned no medal', () => {
+    const { conductor, engine } = rig([]);
+    conductor.medal('none');
+    conductor.medal(undefined);
+    expect(engine.activeVoices).toBe(0);
+  });
+
+  it('lets commendations through even while a storm is thinning everything else', () => {
+    const { conductor, engine } = rig([]);
+    // Commendations are protected, so the density stretch that thins `move` cannot drop them.
+    for (let i = 0; i < 4; i++) conductor.commend(i, i * 0.12);
+    expect(engine.activeVoices).toBeGreaterThan(1);
+  });
+});

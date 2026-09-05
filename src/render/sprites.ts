@@ -105,6 +105,45 @@ export interface BotDrawOptions {
   showFuel: boolean;
   /** Draw the bot id when there is room for it. */
   showLabel: boolean;
+  /**
+   * 0..1 by playback speed. Adds the speed lines that make a 200-tick solution at 8x read as
+   * *fast* rather than as *jerky*. Zero at ordinary speeds and under reduced motion.
+   */
+  rush: number;
+  /** Honour `prefers-reduced-motion`: no smear, no sway, no shimmy. Every tell stays. */
+  reduced: boolean;
+}
+
+/**
+ * The smear behind a bot in transit, plus the speed lines at high playback rates.
+ *
+ * Drawn in the bot's local frame (+X is the way it faces) and stretched backwards, so it costs
+ * one rounded rect and three line segments and reads as momentum rather than as a ghost.
+ */
+function drawSmear(
+  ctx: CanvasRenderingContext2D,
+  tilePx: number,
+  accent: string,
+  glide: number,
+  rush: number,
+): void {
+  const back = (0.3 + rush * 0.85) * glide * tilePx;
+  if (back < 1) return;
+  ctx.fillStyle = alpha(accent, 0.09 * glide);
+  roundRect(ctx, -back - tilePx * 0.3, -tilePx * 0.24, back + tilePx * 0.34, tilePx * 0.48, tilePx * 0.2);
+  ctx.fill();
+  if (rush <= 0.02) return;
+  ctx.strokeStyle = alpha(accent, 0.2 * rush * glide);
+  ctx.lineWidth = Math.max(1, tilePx * 0.035);
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (let i = -1; i <= 1; i++) {
+    const y = i * tilePx * 0.2;
+    const length = back * (1.35 - Math.abs(i) * 0.3);
+    ctx.moveTo(-tilePx * 0.3 - length, y);
+    ctx.lineTo(-tilePx * 0.34, y);
+  }
+  ctx.stroke();
 }
 
 /**
@@ -212,6 +251,8 @@ function drawBotChip(
   const cy = (pose.y + 0.5) * tilePx;
   const r = tilePx * 0.34;
   const dead = !pose.alive;
+  const glide = pose.travel > 0 && pose.travel < 1 ? Math.sin(Math.PI * pose.travel) : 0;
+  const shimmy = options.reduced ? 0 : Math.sin(pose.recoil * 30) * pose.recoil * 0.09;
 
   ctx.save();
   ctx.translate(cx, cy);
@@ -220,7 +261,10 @@ function drawBotChip(
   ctx.ellipse(0, r * 0.5, r, r * 0.42, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.rotate(facingAngle(pose.facing));
+  ctx.rotate(facingAngle(pose.facing) + shimmy);
+  if (glide > 0.02 && !dead && !options.reduced) {
+    drawSmear(ctx, tilePx, options.accent, glide, options.rush);
+  }
   const stretch = 1 + pose.stretch;
   ctx.scale(stretch, 1 / stretch);
 
@@ -278,6 +322,18 @@ export function drawBot(
   const cy = (pose.y + 0.5) * tilePx;
   const accent = options.accent;
   const dead = !pose.alive;
+  const reduced = options.reduced;
+
+  /** Peaks in the middle of a move and is zero at rest. Everything about momentum reads off it. */
+  const glide = pose.travel > 0 && pose.travel < 1 ? Math.sin(Math.PI * pose.travel) : 0;
+  /**
+   * Cargo is heavy and the suspension is not good. Four items is as bad as it gets, because a
+   * sorting-yard bot carrying twenty of something should still be legible.
+   */
+  const load = Math.min(1, options.carrying / 4);
+  const wobble = reduced ? 0 : Math.sin(options.time * 6.5 + pose.id * 2.1) * load * (0.35 + glide);
+  /** The bot shaking off a wall it just drove into. Comic, and gone in under a tick. */
+  const shimmy = reduced ? 0 : Math.sin(pose.recoil * 30) * pose.recoil * 0.09;
 
   ctx.save();
   ctx.translate(cx, cy);
@@ -302,8 +358,10 @@ export function drawBot(
     ctx.restore();
   }
 
-  ctx.rotate(facingAngle(pose.facing));
+  ctx.rotate(facingAngle(pose.facing) + shimmy + wobble * 0.05);
   if (dead) ctx.rotate(0.35);
+
+  if (glide > 0.02 && !dead && !reduced) drawSmear(ctx, tilePx, accent, glide, options.rush);
 
   const stretch = 1 + pose.stretch;
   ctx.scale(stretch, 1 / stretch);
@@ -387,7 +445,14 @@ export function drawBot(
 
   // Antenna: a short mast off the back that bobs, whipping harder while the bot is moving.
   if (!dead) {
-    const bob = Math.sin(options.time * 3.4 + pose.id * 1.7) * 2.2 + pose.travel * -3.4;
+    // The mast lags whatever the chassis is doing: it hangs forward through the wind-up, whips
+    // back on the launch, and rattles for a moment after a bump.
+    const bob =
+      Math.sin(options.time * 3.4 + pose.id * 1.7) * 2.2 +
+      pose.travel * -3.4 +
+      pose.anticipate * 3.4 +
+      (reduced ? 0 : Math.sin(pose.recoil * 44) * pose.recoil * 5) -
+      wobble * 1.6;
     ctx.strokeStyle = botTheme.rim;
     ctx.lineWidth = 1.4;
     ctx.beginPath();
@@ -400,8 +465,11 @@ export function drawBot(
     ctx.fill();
   }
 
-  // Cargo pip.
+  // Cargo pip. It is not bolted down, and a loaded bot in transit says so.
   if (options.carrying > 0 && !dead) {
+    ctx.save();
+    ctx.translate(0, wobble * 2.6);
+    ctx.rotate(wobble * 0.09);
     ctx.fillStyle = palette.bgVoid;
     roundRect(ctx, -6, -6, 12, 12, 2);
     ctx.fill();
@@ -410,6 +478,7 @@ export function drawBot(
     ctx.stroke();
     ctx.fillStyle = palette.accent2;
     ctx.fillRect(-3, -3, 6, 6);
+    ctx.restore();
   }
 
   // Action tell: the manipulator arm extends toward the target cell while acting.
@@ -430,8 +499,10 @@ export function drawBot(
   ctx.restore();
 
   // Blocked tell, drawn unrotated so it reads the same whichever way the bot faces.
-  if (pose.blocked > 0.02) {
-    drawBlockedTell(ctx, pose, tilePx, cx, cy);
+  if (pose.blocked > 0.02 || pose.recoil > 0.04) {
+    // The id badge lives directly above the chassis in multi-bot levels, so the bang has to clear
+    // it or the two stack into an unreadable smudge exactly when legibility matters most.
+    drawBlockedTell(ctx, pose, tilePx, cx, cy, reduced, options.showLabel ? 15 : 0);
   }
 
   // Idle tell. `sync` emits one event per bot that actually idled, so a bot parked at a barrier
@@ -478,33 +549,41 @@ function drawBlockedTell(
   tilePx: number,
   cx: number,
   cy: number,
+  reduced: boolean,
+  lift: number,
 ): void {
   const s = tilePx / REF;
   const k = pose.blocked;
   ctx.save();
   ctx.translate(cx, cy);
 
-  ctx.save();
-  ctx.rotate(facingAngle(pose.facing));
-  ctx.strokeStyle = alpha(palette.danger, 0.95 * k);
-  ctx.lineWidth = Math.max(1.5, 3 * s);
-  ctx.lineCap = 'round';
-  for (let i = 0; i < 2; i++) {
-    const r = (20 + i * 6) * s;
+  if (k > 0.02) {
+    ctx.save();
+    ctx.rotate(facingAngle(pose.facing));
+    ctx.strokeStyle = alpha(palette.danger, 0.95 * k);
+    ctx.lineWidth = Math.max(1.5, 3 * s);
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 2; i++) {
+      const r = (20 + i * 6) * s;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, -0.7, 0.7);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    ctx.strokeStyle = alpha(palette.danger, 0.75 * k);
+    ctx.lineWidth = Math.max(1.5, 2.5 * s);
     ctx.beginPath();
-    ctx.arc(0, 0, r, -0.7, 0.7);
+    ctx.arc(0, 0, 19 * s, 0, Math.PI * 2);
     ctx.stroke();
   }
-  ctx.restore();
 
-  ctx.strokeStyle = alpha(palette.danger, 0.75 * k);
-  ctx.lineWidth = Math.max(1.5, 2.5 * s);
-  ctx.beginPath();
-  ctx.arc(0, 0, 19 * s, 0, Math.PI * 2);
-  ctx.stroke();
-
-  const by = -30 * s - k * 3 * s;
-  ctx.fillStyle = alpha(palette.danger, k);
+  // The bang outlasts the impact by a beat and hops while the bot collects itself. A wall is
+  // funnier than an error dialog, and this is the part that makes it one.
+  const bang = Math.max(k, pose.recoil * 0.85);
+  const hop = reduced ? 0 : Math.abs(Math.sin(pose.recoil * 9)) * pose.recoil * 4 * s;
+  const by = (-30 - lift) * s - bang * 3 * s - hop;
+  ctx.fillStyle = alpha(palette.danger, bang);
   roundRect(ctx, -2 * s, by, 4 * s, 10 * s, 1.5 * s);
   ctx.fill();
   ctx.beginPath();

@@ -108,16 +108,19 @@ export function drawGoals(
   tilePx: number,
   time: number,
   met: boolean,
+  /** 0..1 decaying just after the run finishes. The brackets take a breath and let go. */
+  completion = 0,
 ): void {
   if (cells.length === 0) return;
-  const pulse = 0.55 + 0.45 * Math.sin(time * (Math.PI * 2) / 0.8);
+  const pulse = 0.55 + 0.45 * Math.sin((time * (Math.PI * 2)) / 0.8);
   const color = met ? palette.ok : overlay.goal;
+  const lift = completion * completion;
   for (const cell of cells) {
     ctx.save();
-    ctx.fillStyle = alpha(color, 0.08 + pulse * 0.06);
+    ctx.fillStyle = alpha(color, 0.08 + pulse * 0.06 + lift * 0.1);
     ctx.fillRect(cell.x * tilePx, cell.y * tilePx, tilePx, tilePx);
     ctx.restore();
-    drawBrackets(ctx, cell.x, cell.y, tilePx, color, 0.5 + pulse * 0.5);
+    drawBrackets(ctx, cell.x, cell.y, tilePx, color, Math.min(1, 0.5 + pulse * 0.5 + lift * 0.4));
   }
 }
 
@@ -235,6 +238,46 @@ export function drawVignette(ctx: CanvasRenderingContext2D, width: number, heigh
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, width, height);
+  ctx.restore();
+}
+
+const celebrationGradients = new Map<string, CanvasGradient>();
+
+/**
+ * The full-screen tint behind a celebration.
+ *
+ * A wash from the edges inward rather than a flash: at its peak the centre of the screen — where
+ * the bots and any text are — is barely touched, and the colour arrives in the periphery, which
+ * is where a human notices a change without having to look at it. No bloom, no flash frame, and
+ * nothing here survives `strength` reaching zero.
+ */
+export function drawCelebration(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  color: string,
+  strength: number,
+): void {
+  if (strength <= 0.005) return;
+  const key = `${Math.round(width)}x${Math.round(height)}:${color}`;
+  let gradient = celebrationGradients.get(key);
+  if (!gradient) {
+    const cx = width / 2;
+    const cy = height / 2;
+    const r = Math.hypot(cx, cy);
+    gradient = ctx.createRadialGradient(cx, cy, r * 0.2, cx, cy, r);
+    gradient.addColorStop(0, alpha(color, 0));
+    gradient.addColorStop(0.62, alpha(color, 0.35));
+    gradient.addColorStop(1, alpha(color, 1));
+    // One entry per viewport size per medal colour: five colours and a resize or two, not a leak.
+    if (celebrationGradients.size > 24) celebrationGradients.clear();
+    celebrationGradients.set(key, gradient);
+  }
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = Math.min(1, strength);
+  ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, width, height);
   ctx.restore();
 }

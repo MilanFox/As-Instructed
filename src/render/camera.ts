@@ -65,6 +65,25 @@ export interface CameraOptions {
   smoothing?: number;
 }
 
+/**
+ * Ceiling on a camera kick, in CSS pixels.
+ *
+ * DESIGN.md §8 rules out screen-shake that makes text hard to read, and the player is reading
+ * code four inches away from this. Three pixels, decaying in about a fifth of a second, registers
+ * as a thump and is gone before the eye can call it a shake.
+ */
+export const MAX_KICK_PX = 3;
+
+/**
+ * How far a focus may pull the view off centre, in CSS pixels.
+ *
+ * Most levels fit the viewport outright, and `clampCentre` pins a fitted axis to the middle — so
+ * without an explicit allowance a "lean towards the finish" is silently a no-op on exactly the
+ * levels a player spends most of their time on. This is that allowance, and it is deliberately
+ * smaller than the fit padding, so leaning never crops the grid.
+ */
+export const MAX_FOCUS_PX = 44;
+
 export class Camera {
   /** Viewport in CSS pixels. */
   viewWidth = 1;
@@ -87,6 +106,17 @@ export class Camera {
   private followTarget: { x: number; y: number } | null = null;
   private readonly fitPadding: number;
   private readonly smoothing: number;
+
+  /** Live kick offset in CSS pixels, decaying towards zero. Added to the origin, never eased. */
+  private kickX = 0;
+  private kickY = 0;
+  /** Temporary point of interest and the seconds left on it. See `focus`. */
+  private focusX = 0;
+  private focusY = 0;
+  private focusLeft = 0;
+  private focusPull = 0;
+  /** How far off centre the clamp is currently willing to go, in tiles. Eases in and back out. */
+  private focusSlack = 0;
 
   constructor(options: CameraOptions = {}) {
     this.fitPadding = options.fitPadding ?? 0.06;
@@ -116,6 +146,7 @@ export class Camera {
 
   /** Frames the whole grid. `immediate` skips the easing, which is what you want on level load. */
   fit(immediate = true): void {
+    this.releaseFocus();
     const padded = 1 - this.fitPadding * 2;
     const rawX = (this.viewWidth * padded * this.dpr) / this.cols;
     const rawY = (this.viewHeight * padded * this.dpr) / this.rows;
@@ -170,6 +201,7 @@ export class Camera {
       this.targetY = before.y - (anchorY! - this.viewHeight / 2) / tile;
     }
     this.followTarget = null;
+    this.releaseFocus();
     this.clampTarget();
   }
 
@@ -178,6 +210,7 @@ export class Camera {
     this.targetX -= dx / this.tilePx;
     this.targetY -= dy / this.tilePx;
     this.followTarget = null;
+    this.releaseFocus();
     this.clampTarget();
   }
 
@@ -200,12 +233,68 @@ export class Camera {
     return this.followTarget !== null;
   }
 
+  /**
+   * A one-off nudge in a direction, in CSS pixels. Not a shake: there is no oscillation and no
+   * second impulse, so it reads as the camera being shoved and recovering.
+   */
+  kick(dx: number, dy: number, strength = 1): void {
+    const length = Math.hypot(dx, dy) || 1;
+    const amount = Math.min(MAX_KICK_PX, MAX_KICK_PX * Math.max(0, strength));
+    this.kickX = (dx / length) * amount;
+    this.kickY = (dy / length) * amount;
+  }
+
+  /**
+   * Leans the view towards a cell for a moment and then lets go — the camera taking an interest
+   * without taking control. `pull` is how far it commits, 0..1; the default barely moves on a
+   * grid that already fits, which is exactly right, because most of them do.
+   */
+  focus(x: number, y: number, seconds = 1.6, pull = 0.5): void {
+    this.focusX = x;
+    this.focusY = y;
+    this.focusLeft = Math.max(0, seconds);
+    this.focusPull = Math.max(0, Math.min(1, pull));
+  }
+
+  /** Drops a focus and any kick in flight. A celebration must never outlive being skipped. */
+  releaseFocus(): void {
+    this.focusLeft = 0;
+    this.focusSlack = 0;
+    this.kickX = 0;
+    this.kickY = 0;
+  }
+
+  get focusing(): boolean {
+    return this.focusLeft > 0;
+  }
+
   update(dt: number): void {
     if (this.followTarget) {
       this.targetX = this.followTarget.x + 0.5;
       this.targetY = this.followTarget.y + 0.5;
       this.clampTarget();
+    } else if (this.focusLeft > 0) {
+      this.focusLeft -= dt;
+      // Fades in over the first fifth and back out over the last third, so the drift has no
+      // start and no stop — only the middle, where it is already moving.
+      const ease = Math.min(1, this.focusLeft * 3) * this.focusPull;
+      this.focusSlack = (MAX_FOCUS_PX / this.tilePx) * ease;
+      this.targetX += (this.focusX + 0.5 - this.targetX) * Math.min(1, ease * dt * 2.2);
+      this.targetY += (this.focusY + 0.5 - this.targetY) * Math.min(1, ease * dt * 2.2);
+      this.clampTarget();
+    } else if (this.focusSlack > 0) {
+      // Letting go is the same clamp closing: the view is dragged back to centre by the shrinking
+      // allowance rather than by a separate animation, so it cannot fight the player panning.
+      this.focusSlack = Math.max(0, this.focusSlack - dt * 3);
+      this.clampTarget();
     }
+    const decay = Math.exp(-16 * Math.max(0, dt));
+    this.kickX *= decay;
+    this.kickY *= decay;
+    // Snapped to zero well below the point an eye could see it, so a kick genuinely ends rather
+    // than leaving the world origin a twentieth of a pixel off for the rest of the session.
+    if (Math.abs(this.kickX) < 0.05) this.kickX = 0;
+    if (Math.abs(this.kickY) < 0.05) this.kickY = 0;
     // Zoom is discrete, so it snaps; only the pan eases. Easing the scale as well would put the
     // cached terrain layer on a fractional scale for the whole transition and blur it.
     this.deviceTilePx = this.targetDeviceTilePx;
@@ -219,18 +308,19 @@ export class Camera {
 
   /** Drops any in-flight easing. Use after a seek, where a lerping camera reads as lag. */
   settle(): void {
+    this.releaseFocus();
     this.deviceTilePx = this.targetDeviceTilePx;
     this.x = this.targetX;
     this.y = this.targetY;
   }
 
-  /** CSS pixel position of the world origin (tile 0,0 top-left corner). */
+  /** CSS pixel position of the world origin (tile 0,0 top-left corner), kick included. */
   originX(): number {
-    return this.viewWidth / 2 - this.x * this.tilePx;
+    return this.viewWidth / 2 - this.x * this.tilePx + this.kickX;
   }
 
   originY(): number {
-    return this.viewHeight / 2 - this.y * this.tilePx;
+    return this.viewHeight / 2 - this.y * this.tilePx + this.kickY;
   }
 
   worldToScreen(tileX: number, tileY: number, out: { x: number; y: number }): void {
@@ -290,8 +380,22 @@ export class Camera {
     const tile = tilePx;
     const halfW = this.viewWidth / 2 / tile;
     const halfH = this.viewHeight / 2 / tile;
-    const cx = this.cols <= halfW * 2 ? this.cols / 2 : Math.min(Math.max(x, halfW), this.cols - halfW);
-    const cy = this.rows <= halfH * 2 ? this.rows / 2 : Math.min(Math.max(y, halfH), this.rows - halfH);
+    // A focus buys a little slack on both branches: room to drift off centre on an axis that
+    // fits, and room to overshoot the edge on one that does not. It is bounded by `MAX_FOCUS_PX`,
+    // which is small enough that nothing ever leaves the frame.
+    const slack = this.focusSlack;
+    const cx =
+      this.cols <= halfW * 2
+        ? clampAround(x, this.cols / 2, slack)
+        : Math.min(Math.max(x, halfW - slack), this.cols - halfW + slack);
+    const cy =
+      this.rows <= halfH * 2
+        ? clampAround(y, this.rows / 2, slack)
+        : Math.min(Math.max(y, halfH - slack), this.rows - halfH + slack);
     return { x: cx, y: cy };
   }
+}
+
+function clampAround(value: number, centre: number, slack: number): number {
+  return Math.min(Math.max(value, centre - slack), centre + slack);
 }

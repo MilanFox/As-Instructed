@@ -118,3 +118,91 @@ function energy(buffer: Float32Array): number {
   for (let i = 0; i < buffer.length; i++) sum += Math.abs(buffer[i] as number);
   return Math.round(sum * 1e6);
 }
+
+describe('the medal figure builds instead of trailing off', () => {
+  /** Loudest 20ms window, and where it is. A stinger that lands peaks at its top note. */
+  function loudestAt(name: SoundName): { at: number; peak: number } {
+    const { buffer, rate } = renderOne(name);
+    const window = Math.round(rate * 0.02);
+    let best = 0;
+    let bestAt = 0;
+    for (let start = 0; start + window < buffer.length; start += window) {
+      let peak = 0;
+      for (let i = start; i < start + window; i++) peak = Math.max(peak, Math.abs(buffer[i] as number));
+      if (peak > best) {
+        best = peak;
+        bestAt = start / rate;
+      }
+    }
+    return { at: bestAt, peak: best };
+  }
+
+  it('puts gold’s loudest moment on its last note, not its downbeat', () => {
+    const gold = loudestAt('medalGold');
+    // Four notes on a 75ms step from t = 0.01, so the top note is around 0.235s.
+    expect(gold.at).toBeGreaterThan(0.15);
+    expect(gold.at).toBeLessThan(0.32);
+  });
+
+  it('keeps every tier inside its declared duration with the tail to spare', () => {
+    for (const name of ['medalBronze', 'medalSilver', 'medalGold'] as SoundName[]) {
+      const { buffer, rate } = renderOne(name);
+      const stats = analyse(buffer, rate);
+      expect(stats.lastSound).toBeLessThan(SOUNDS[name].duration);
+    }
+  });
+
+  it('brightens as the tier rises, so the escalation is timbral as well as loud', () => {
+    const brightness = (name: SoundName): number => {
+      const { buffer, rate } = renderOne(name);
+      let crossings = 0;
+      let counted = 0;
+      for (let i = 1; i < buffer.length; i++) {
+        const a = buffer[i - 1] as number;
+        const b = buffer[i] as number;
+        if (Math.abs(b) < 1e-4) continue;
+        counted++;
+        if (a < 0 !== b < 0) crossings++;
+      }
+      return counted > 0 ? (crossings / counted) * rate : 0;
+    };
+    expect(brightness('medalGold')).toBeGreaterThan(brightness('medalSilver'));
+    expect(brightness('medalSilver')).toBeGreaterThan(brightness('medalBronze'));
+  });
+});
+
+describe('commendations land as one ascending phrase', () => {
+  /** Dominant frequency by counting zero crossings of the loudest stretch. */
+  function pitch(seed: number): number {
+    const { buffer, rate } = renderOne('commend', seed);
+    let crossings = 0;
+    let counted = 0;
+    for (let i = 1; i < buffer.length; i++) {
+      const a = buffer[i - 1] as number;
+      const b = buffer[i] as number;
+      if (Math.abs(b) < 2e-3) continue;
+      counted++;
+      if (a < 0 !== b < 0) crossings++;
+    }
+    return counted > 0 ? (crossings / counted) * rate * 0.5 : 0;
+  }
+
+  it('climbs one rung per commendation', () => {
+    const steps = [0, 1, 2, 3].map(pitch);
+    for (let i = 1; i < steps.length; i++) {
+      expect(steps[i]).toBeGreaterThan(steps[i - 1] as number);
+    }
+  });
+
+  it('holds at the top rather than climbing out of the audible range', () => {
+    // Fifteen commendations exist. The fifteenth must not be a dog whistle.
+    expect(pitch(14)).toBeCloseTo(pitch(4) as number, -2);
+    expect(pitch(14)).toBeLessThan(4000);
+  });
+
+  it('stays smaller than the medal it is decorating', () => {
+    const peak = (name: SoundName, seed = 7): number =>
+      analyse(renderOne(name, seed).buffer, 44100).peak;
+    expect(peak('commend', 4)).toBeLessThan(peak('medalBronze'));
+  });
+});

@@ -31,8 +31,9 @@ import type { Bot, GroundStack, Machine, Trace, TraceEvent, Vec, World } from '.
 import { Camera } from './camera.ts';
 import type { ViewRange } from './camera.ts';
 import { ParticleSystem, FX_LAYER_OVER, FX_LAYER_UNDER } from './fx.ts';
-import type { FxName } from './fx.ts';
+import type { FxName, FxOptions } from './fx.ts';
 import {
+  drawCelebration,
   drawGoals,
   drawGrid,
   drawHover,
@@ -70,6 +71,58 @@ import type { BotPose } from './timeline.ts';
 /** Playback speed is expressed in engine ticks per wall-clock second. */
 export const DEFAULT_SPEED = 4;
 
+/**
+ * What the end of a run felt like. `pass` and `fail` are the verdict on its own; the three medals
+ * are the verdict plus a medal, and each is visually the same gesture at a different size — the
+ * same escalation the audio stingers make (docs/AUDIO.md §8).
+ */
+export type CelebrationKind = 'gold' | 'silver' | 'bronze' | 'pass' | 'fail';
+
+export interface CelebrationOptions {
+  /** Where the flourish is centred, in tile coordinates. Defaults to the last acting bot. */
+  at?: Vec;
+  /**
+   * Seconds to hold the screen wash for. The default is matched to the medal stinger; passing
+   * anything much longer will start to feel like a cutscene, which this is not.
+   */
+  seconds?: number;
+}
+
+interface CelebrationState {
+  kind: CelebrationKind;
+  color: string;
+  peak: number;
+  elapsed: number;
+  duration: number;
+}
+
+/**
+ * Delay, in seconds, between `celebrate()` and the medal figure starting.
+ *
+ * `Conductor.outcome` plays the verdict immediately and the medal stinger 140ms later. The rings
+ * are scheduled against the same number so the first ring lands on the first note, and the rest
+ * step with it. Getting this wrong is the difference between "synchronised" and "nearly".
+ *
+ * It is duplicated from `MEDAL_BEAT` in `src/audio/conductor.ts` rather than imported: the
+ * renderer does not depend on the audio system, and this is the one number the two must agree on.
+ */
+const MEDAL_BEAT = 0.14;
+
+/**
+ * `peak` is the opacity of the screen wash at the very edge of the viewport, measured rather than
+ * guessed: at 0.3 a gold corner reads RGB 79 against a void of RGB 6, which is a glow, and glow is
+ * exactly what DESIGN.md §8 forbids. At 0.2 it is unmistakably gold and still furniture.
+ */
+const CELEBRATION_TIERS: Readonly<
+  Record<CelebrationKind, { color: string; peak: number; strength: number }>
+> = {
+  gold: { color: palette.gold, peak: 0.2, strength: 4 },
+  silver: { color: palette.silver, peak: 0.13, strength: 3 },
+  bronze: { color: palette.bronze, peak: 0.1, strength: 2 },
+  pass: { color: palette.ok, peak: 0.09, strength: 0 },
+  fail: { color: palette.danger, peak: 0.09, strength: 0 },
+};
+
 export interface FrameInfo {
   tick: number;
   endTick: number;
@@ -91,6 +144,13 @@ export interface RendererOptions {
   onFrame?: (info: FrameInfo) => void;
   onComplete?: () => void;
   onHover?: (readout: TileReadout | null) => void;
+  /** Mirrors `settings.celebrations`. Default true; false makes the whole arc a no-op. */
+  celebrations?: boolean;
+  /**
+   * Forces the reduced-motion behaviour on or off. Omit to follow
+   * `prefers-reduced-motion: reduce`, which is what it should normally do.
+   */
+  reducedMotion?: boolean;
 }
 
 const EMPTY_RANGE: ViewRange = { x0: 0, y0: 0, x1: 0, y1: 0 };
@@ -123,6 +183,23 @@ export class Renderer {
   private readonly markCells: number[] = [];
   private readonly conveyorCells: number[] = [];
 
+  /**
+   * One reused options bag for every `particles.emit`.
+   *
+   * A fresh object literal per emitted event is a small, *steady* allocation — a busy World 7
+   * trace crosses hundreds of events a second — and steady small allocations are what turn into a
+   * periodic multi-frame GC pause halfway through a replay. `emit` reads this synchronously and
+   * never retains it, so one bag is enough. Every field is written on every call.
+   */
+  private readonly fx: Required<FxOptions> = {
+    dx: 0,
+    dy: 0,
+    accent: palette.accent,
+    seed: 0,
+    strength: 1,
+    delay: 0,
+  };
+
   private readonly poses = new Map<number, BotPose>();
   private readonly drawOrder: number[] = [];
   private readonly range: ViewRange = { ...EMPTY_RANGE };
@@ -140,6 +217,8 @@ export class Renderer {
     fuel: 1,
     showFuel: false,
     showLabel: false,
+    rush: 0,
+    reduced: false,
   };
 
   private highlights: readonly Vec[] = [];
@@ -165,6 +244,24 @@ export class Renderer {
   private emitCursor = 0;
   private disposed = false;
 
+  /** Index of the `objective` event that completes the run. `-1` when the trace has none. */
+  private finalObjective = -1;
+  /** 0..1, decaying. The breath the picture takes when the run reaches its last tick. */
+  private completion = 0;
+  private celebration: CelebrationState | null = null;
+  /** Mirrors `settings.celebrations`. False makes `celebrate` and `pulse` no-ops outright. */
+  private celebrationsEnabled = true;
+  /** Varies the staged pulses so fifteen commendations are not fifteen identical rings. */
+  private pulseSeed = 0;
+  private reducedOverride: boolean | null = null;
+  private reducedMatch = false;
+  private motionQuery: MediaQueryList | null = null;
+  /**
+   * Wall clock of the last camera kick. Twenty bots deadlocking against each other in World 7
+   * would otherwise ask for twenty kicks on one frame, which is a shake, which is banned.
+   */
+  private lastKick = -1;
+
   private resizeObserver: ResizeObserver | null = null;
   private dprQuery: MediaQueryList | null = null;
   private dragging = false;
@@ -176,6 +273,9 @@ export class Renderer {
     this.options = options;
     this.worldNumber = options.world ?? 1;
     this.biome = biomeForWorld(this.worldNumber);
+    this.reducedOverride = options.reducedMotion ?? null;
+    this.celebrationsEnabled = options.celebrations !== false;
+    this.watchMotion();
   }
 
   // -------------------------------------------------------------------------
@@ -208,6 +308,10 @@ export class Renderer {
     this.stopLoop();
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
+    if (this.motionQuery) {
+      this.motionQuery.removeEventListener('change', this.onMotionChange);
+      this.motionQuery = null;
+    }
     if (this.dprQuery) {
       this.dprQuery.removeEventListener('change', this.onDprChange);
       this.dprQuery = null;
@@ -239,6 +343,9 @@ export class Renderer {
     this.terrain.invalidate();
     this.poses.clear();
     this.drawOrder.length = 0;
+    this.skipCelebration();
+    this.completion = 0;
+    this.finalObjective = lastObjectiveIndex(this.trace);
 
     if (trace && this.timeline) {
       for (const id of this.timeline.botOrder) this.poses.set(id, createPose(id));
@@ -269,6 +376,12 @@ export class Renderer {
   seek(tick: number): void {
     const end = this.endTick;
     const next = Math.max(0, Math.min(end, tick));
+    // Any deliberate move of the playhead outranks a celebration. Scrub-safety is the same rule
+    // for pixels as for sound: nothing left ringing, nothing left on screen.
+    if (next !== this.currentTick) {
+      this.skipCelebration();
+      this.completion = 0;
+    }
     if (next < this.currentTick) {
       this.particles.clear();
       this.emitCursor = this.trace ? eventIndexAt(this.trace, next) : 0;
@@ -292,6 +405,7 @@ export class Renderer {
 
   play(speed?: number): void {
     if (speed !== undefined) this.speed = speed;
+    this.skipCelebration();
     if (this.currentTick >= this.endTick) this.seek(0);
     this.playing = true;
   }
@@ -360,6 +474,161 @@ export class Renderer {
   }
 
   // -------------------------------------------------------------------------
+  // Celebrations
+  // -------------------------------------------------------------------------
+
+  /**
+   * Plays the end-of-run flourish for a verdict.
+   *
+   * Call it at the same moment as `GameAudio.outcome({ passed, medal })` and the two line up:
+   * the wash rises with the verdict tone, and one ring lands on each note of the medal figure.
+   * There is no callback and nothing to await — it is decoration, it never blocks anything, and
+   * a second call replaces the first rather than queueing behind it.
+   *
+   * ```ts
+   * audio.outcome({ passed: verdict.passed, medal });
+   * renderer.celebrate(medal === 'none' ? 'pass' : medal);
+   * ```
+   *
+   * Under `prefers-reduced-motion` this still runs: the colour still arrives and the rings still
+   * mark the beats, but the camera does not move and the burst does not fly.
+   */
+  celebrate(kind: CelebrationKind, options: CelebrationOptions = {}): void {
+    const tier = CELEBRATION_TIERS[kind];
+    if (!tier || !this.celebrationsEnabled) return;
+    const reduced = this.reducedMotion;
+    this.celebration = {
+      kind,
+      color: tier.color,
+      peak: tier.peak,
+      elapsed: 0,
+      duration: options.seconds ?? (tier.strength > 0 ? 1.5 : 1),
+    };
+
+    const at = options.at ?? this.celebrationCell();
+    if (tier.strength > 0) {
+      this.burst('medal', at.x + 0.5, at.y + 0.5, tier.color, kind.length * 7919, 0, 0, tier.strength, MEDAL_BEAT);
+      // Silver and gold hand the moment to the machines that earned it: one small ring per bot,
+      // rippling outward from the objective in the order they happen to be standing in. Cheap,
+      // and it stops a good result being one ring in one corner of an otherwise still picture.
+      if (tier.strength >= 3) {
+        const order = this.drawOrder;
+        const limit = Math.min(order.length, 6);
+        for (let i = 0; i < limit; i++) {
+          const pose = this.poses.get(order[i] as number);
+          if (!pose?.present) continue;
+          this.burst(
+            'flourish',
+            pose.x + 0.5,
+            pose.y + 0.5,
+            tier.color,
+            i * 131 + 7,
+            0,
+            0,
+            reduced ? 0.35 : 0.6,
+            MEDAL_BEAT + 0.12 + i * 0.07,
+          );
+        }
+      }
+    } else {
+      this.burst('objective', at.x + 0.5, at.y + 0.5, tier.color, 5, 0, 0, 1, 0);
+    }
+    if (!reduced) {
+      this.camera.focus(at.x, at.y, 1.8, tier.strength > 0 ? 0.55 : 0.3);
+      if (kind === 'gold') this.camera.kick(0, -1, 0.7);
+    }
+  }
+
+  /**
+   * One small beat on the objective, for a results screen that reveals itself in stages.
+   *
+   * `celebrate` is the medal landing — one call, one arc. A panel that ticks objectives off one at
+   * a time, or lands commendations one by one, wants a beat per item instead, and this is it: a
+   * single ring on the pad, no camera movement, no screen wash. Call it as each row arrives.
+   *
+   * ```ts
+   * objectives.forEach((o, i) => { audio.cue('objective', i); renderer.pulse(); });
+   * audio.medal(medal); renderer.celebrate(medal);
+   * commendations.forEach((_, i) => { audio.commend(i); renderer.pulse('commend'); });
+   * ```
+   */
+  pulse(kind: 'objective' | 'commend' = 'objective', at?: Vec): void {
+    if (!this.celebrationsEnabled) return;
+    const cell = at ?? this.celebrationCell();
+    const color = kind === 'commend' ? palette.accent2 : palette.ok;
+    this.burst(
+      'objective',
+      cell.x + 0.5,
+      cell.y + 0.5,
+      color,
+      this.pulseSeed++,
+      0,
+      0,
+      this.reducedMotion ? 0.5 : 1,
+      0,
+    );
+  }
+
+  /**
+   * Master switch for everything on this page, mirroring `settings.celebrations`.
+   *
+   * Off means off: `celebrate` and `pulse` become no-ops rather than quieter, and anything already
+   * in flight is cut. A player who has turned the reward sequence off has said something about
+   * every run from now on, not about the volume of this one.
+   */
+  setCelebrationsEnabled(enabled: boolean): void {
+    this.celebrationsEnabled = enabled;
+    if (!enabled) this.skipCelebration();
+  }
+
+  get celebrationsAllowed(): boolean {
+    return this.celebrationsEnabled;
+  }
+
+  /** Cuts a celebration dead. Called by every transport control, and safe to call at any time. */
+  skipCelebration(): void {
+    if (this.celebration) {
+      this.celebration = null;
+      this.camera.releaseFocus();
+    }
+  }
+
+  get celebrating(): boolean {
+    return this.celebration !== null;
+  }
+
+  /** Pass `null` to go back to following the media query. */
+  setReducedMotion(value: boolean | null): void {
+    this.reducedOverride = value;
+  }
+
+  get reducedMotion(): boolean {
+    return this.reducedOverride ?? this.reducedMatch;
+  }
+
+  private onMotionChange = (): void => {
+    this.reducedMatch = this.motionQuery?.matches ?? false;
+  };
+
+  private watchMotion(): void {
+    if (typeof matchMedia === 'undefined') return;
+    this.motionQuery = matchMedia('(prefers-reduced-motion: reduce)');
+    this.reducedMatch = this.motionQuery.matches;
+    this.motionQuery.addEventListener('change', this.onMotionChange);
+  }
+
+  /** Where a flourish belongs when the caller does not say: the objective, else the active bot. */
+  private celebrationCell(): Vec {
+    const highlight = this.highlights[this.highlights.length - 1];
+    if (highlight) return highlight;
+    const active = this.activeBot === null ? undefined : this.poses.get(this.activeBot);
+    const pose = active ?? this.poses.get(this.drawOrder[0] ?? -1);
+    if (pose) return { x: Math.round(pose.x), y: Math.round(pose.y) };
+    const world = this.snapshot;
+    return { x: world ? world.w / 2 - 0.5 : 0, y: world ? world.h / 2 - 0.5 : 0 };
+  }
+
+  // -------------------------------------------------------------------------
   // Loop
   // -------------------------------------------------------------------------
 
@@ -417,15 +686,43 @@ export class Renderer {
         this.currentTick = this.endTick;
         this.playing = false;
         this.emitPending();
+        // The run landing is its own small beat, before whatever the UI decides to say about it.
+        // Everything settles for a second: the goal brackets brighten and the frame breathes in.
+        this.completion = 1;
         this.options.onComplete?.();
       } else {
         this.currentTick = next;
       }
     }
     this.emitPending();
+    if (this.completion > 0) {
+      this.completion = Math.max(0, this.completion - dt / 0.9);
+    }
+    if (this.celebration) {
+      this.celebration.elapsed += dt;
+      if (this.celebration.elapsed >= this.celebration.duration) this.celebration = null;
+    }
     this.particles.timeScale = Math.max(0.6, Math.min(3, this.speed / DEFAULT_SPEED));
     this.particles.update(dt);
     this.camera.update(dt);
+  }
+
+  /**
+   * How hard playback is being pushed, 0..1. Below 8 ticks per second a bot moving one tile in
+   * 125ms needs no help reading as motion; above it, the eye starts seeing teleports instead of
+   * travel, and the smear and speed lines put the travel back.
+   */
+  private get rush(): number {
+    if (this.reducedMotion) return 0;
+    return Math.max(0, Math.min(1, (this.speed - 8) / 24));
+  }
+
+  /** Rate-limited so a room full of blocked bots produces one nudge, not a shake. */
+  private nudge(dx: number, dy: number, strength: number): void {
+    if (this.reducedMotion) return;
+    if (this.elapsed - this.lastKick < 0.28) return;
+    this.lastKick = this.elapsed;
+    this.camera.kick(dx, dy, strength);
   }
 
   /** Fires fx for every trace event the playhead has passed since the last frame. */
@@ -436,43 +733,91 @@ export class Renderer {
     while (this.emitCursor < events.length) {
       const event = events[this.emitCursor] as TraceEvent;
       if (event.t > this.currentTick) break;
-      this.emitFor(event);
+      this.emitFor(event, this.emitCursor);
       this.emitCursor++;
     }
   }
 
-  private emitFor(event: TraceEvent): void {
+  /** Fills the reused options bag and fires one burst. Never allocates. */
+  private burst(
+    name: FxName,
+    x: number,
+    y: number,
+    accent: string,
+    seed: number,
+    dx = 0,
+    dy = 0,
+    strength = 1,
+    delay = 0,
+  ): void {
+    const fx = this.fx;
+    fx.accent = accent;
+    fx.seed = seed;
+    fx.dx = dx;
+    fx.dy = dy;
+    fx.strength = strength;
+    fx.delay = delay;
+    this.particles.emit(name, x, y, fx);
+  }
+
+  private emitFor(event: TraceEvent, index: number): void {
     const accent = 'botId' in event && typeof event.botId === 'number'
       ? botAccent(event.botId)
       : palette.accent;
+    const damp = this.reducedMotion;
     switch (event.kind) {
       case 'fx':
-        this.particles.emit(event.fx as FxName, event.at.x + 0.5, event.at.y + 0.5, {
+        this.burst(
+          event.fx as FxName,
+          event.at.x + 0.5,
+          event.at.y + 0.5,
           accent,
-          seed: event.t * 31 + event.at.x * 7 + event.at.y,
-        });
+          event.t * 31 + event.at.x * 7 + event.at.y,
+        );
         break;
       case 'move': {
         const from = event.from;
         const dx = event.to.x - from.x;
         const dy = event.to.y - from.y;
         if (event.ok) {
-          this.particles.emit('move', from.x + 0.5 + dx * 0.5, from.y + 0.5 + dy * 0.5, {
+          this.burst(
+            'move',
+            from.x + 0.5 + dx * 0.5,
+            from.y + 0.5 + dy * 0.5,
+            accent,
+            event.t * 17 + event.botId,
             dx,
             dy,
+          );
+          // The arrival puff, held back until the bot is actually there. In particle time, which
+          // scales with playback speed, one engine tick is one `DEFAULT_SPEED`-th of a second.
+          const dwell = ('dt' in event && typeof event.dt === 'number' ? event.dt : 1) / DEFAULT_SPEED;
+          this.burst(
+            'land',
+            event.to.x + 0.5,
+            event.to.y + 0.5,
             accent,
-            seed: event.t * 17 + event.botId,
-          });
+            event.t * 19 + event.botId,
+            0,
+            0,
+            damp ? 0.5 : 1,
+            dwell,
+          );
         } else {
           // DESIGN.md §11 A5. The bump is drawn by the bot itself; this is the impact burst.
           const dirX = dirDeltaX(event.dir);
           const dirY = dirDeltaY(event.dir);
-          this.particles.emit('blocked', from.x + 0.5, from.y + 0.5, {
-            dx: dirX,
-            dy: dirY,
+          this.burst(
+            'blocked',
+            from.x + 0.5,
+            from.y + 0.5,
             accent,
-            seed: event.t * 23 + event.botId,
-          });
+            event.t * 23 + event.botId,
+            dirX,
+            dirY,
+          );
+          // A wall pushing back on the camera, once. It is the joke landing, not an alarm.
+          this.nudge(dirX, dirY, 0.5);
         }
         break;
       }
@@ -480,16 +825,40 @@ export class Renderer {
         // A failed transmission gets the same "this did not work" language as a blocked move.
         const pose = this.poses.get(event.botId);
         if (!pose) break;
-        this.particles.emit(event.ok ? 'send' : 'sendFail', pose.x + 0.5, pose.y + 0.5, {
+        this.burst(
+          event.ok ? 'send' : 'sendFail',
+          pose.x + 0.5,
+          pose.y + 0.5,
           accent,
-          seed: event.t * 29 + event.botId,
-        });
+          event.t * 29 + event.botId,
+        );
         break;
       }
       case 'objective':
         if (event.state === 'met') {
-          for (const cell of this.highlights) {
-            this.particles.emit('objective', cell.x + 0.5, cell.y + 0.5, { accent: palette.ok });
+          // The last objective of a run is the one the whole thing was for, so it gets the bigger
+          // gesture and the camera leans towards it. Every other one stays a quiet acknowledgement.
+          const finale = index === this.finalObjective;
+          const cells = this.highlights;
+          const limit = Math.min(cells.length, 12);
+          for (let i = 0; i < limit; i++) {
+            const cell = cells[i] as Vec;
+            this.burst(
+              finale ? 'flourish' : 'objective',
+              cell.x + 0.5,
+              cell.y + 0.5,
+              palette.ok,
+              event.t * 13 + i,
+              0,
+              0,
+              damp ? 0.45 : 1,
+              finale ? i * 0.04 : 0,
+            );
+          }
+          if (finale) {
+            const focus = cells[0];
+            if (focus && !damp) this.camera.focus(focus.x, focus.y, 1.5, 0.35);
+            this.nudge(0, -1, 0.45);
           }
         }
         break;
@@ -618,7 +987,7 @@ export class Renderer {
 
     drawGrid(ctx, tilePx, this.range, 5);
     drawOutOfBounds(ctx, world.w, world.h, tilePx);
-    drawGoals(ctx, this.highlights, tilePx, this.elapsed, this.highlightsMet);
+    drawGoals(ctx, this.highlights, tilePx, this.elapsed, this.highlightsMet, this.completion);
 
     // --- features ----------------------------------------------------------
     ctx.imageSmoothingEnabled = tilePx < cacheTile;
@@ -657,6 +1026,15 @@ export class Renderer {
     if (this.hoverCell) drawHover(ctx, this.hoverCell, tilePx);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     drawVignette(ctx, deviceW, deviceH);
+
+    const show = this.celebration;
+    if (show) {
+      // In, hold, out. The rise is short enough to feel like a response and long enough that it
+      // is a fade rather than a flash — nothing here is ever one frame of bright.
+      const u = show.elapsed / show.duration;
+      const envelope = u < 0.12 ? u / 0.12 : Math.max(0, 1 - (u - 0.12) / 0.88);
+      drawCelebration(ctx, deviceW, deviceH, show.color, envelope * show.peak);
+    }
   }
 
   private inRange(x: number, y: number): boolean {
@@ -775,6 +1153,8 @@ export class Renderer {
       }
     }
     const opts = this.botOptions;
+    opts.rush = this.rush;
+    opts.reduced = this.reducedMotion;
     for (let i = 0; i < order.length; i++) {
       const id = order[i] as number;
       const pose = this.poses.get(id) as BotPose;
@@ -917,6 +1297,23 @@ function botRecord(world: World, id: number): Bot | undefined {
     if (bot.id === id) return bot;
   }
   return undefined;
+}
+
+/**
+ * Index of the `objective` event that finishes the run, or `-1`.
+ *
+ * "The last objective met" is deliberately positional rather than semantic: the renderer has no
+ * business knowing which objective mattered, only that this was the one after which nothing else
+ * was achieved, which is precisely the one worth a flourish.
+ */
+function lastObjectiveIndex(trace: Trace | null): number {
+  if (!trace) return -1;
+  const events = trace.events;
+  for (let i = events.length - 1; i >= 0; i--) {
+    const event = events[i] as TraceEvent;
+    if (event.kind === 'objective' && event.state === 'met') return i;
+  }
+  return -1;
 }
 
 function dirDeltaX(dir: number): number {

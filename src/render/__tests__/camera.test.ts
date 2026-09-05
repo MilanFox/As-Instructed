@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { Camera, MAX_FIT_CSS_TILE_PX, ZOOM_LADDER, ladderIndex, snapTilePx } from '../camera.ts';
+import {
+  Camera,
+  MAX_FIT_CSS_TILE_PX,
+  MAX_KICK_PX,
+  ZOOM_LADDER,
+  ladderIndex,
+  snapTilePx,
+} from '../camera.ts';
 import { TILE_PX } from '../tiles.ts';
 
 function camera(width: number, height: number, dpr: number, cols: number, rows: number): Camera {
@@ -181,5 +188,55 @@ describe('follow and easing', () => {
     cam.setZoom(48);
     cam.update(1 / 60);
     expect(cam.deviceTilePx).toBe(48);
+  });
+});
+
+describe('the camera performing', () => {
+  it('nudges within the readability budget and recovers on its own', () => {
+    const cam = camera(800, 600, 1, 20, 20);
+    cam.fit(true);
+    const rest = cam.originY();
+    cam.kick(0, -1, 1);
+    const kicked = cam.originY();
+    expect(rest - kicked).toBeGreaterThan(0);
+    expect(rest - kicked).toBeLessThanOrEqual(MAX_KICK_PX + 1e-9);
+
+    // A kick is a push, not a shake: it decays monotonically and is gone inside a few frames.
+    let previous = rest - cam.originY();
+    for (let i = 0; i < 20; i++) {
+      cam.update(1 / 60);
+      const now = rest - cam.originY();
+      expect(now).toBeLessThanOrEqual(previous + 1e-9);
+      previous = now;
+    }
+    expect(cam.originY()).toBeCloseTo(rest, 6);
+  });
+
+  it('clamps an over-enthusiastic caller rather than shaking the screen', () => {
+    const cam = camera(800, 600, 1, 20, 20);
+    cam.fit(true);
+    const rest = cam.originX();
+    cam.kick(1, 0, 40);
+    expect(Math.abs(cam.originX() - rest)).toBeLessThanOrEqual(MAX_KICK_PX + 1e-9);
+  });
+
+  it('leans towards a focus and lets go of it again', () => {
+    const cam = camera(400, 400, 1, 40, 40);
+    cam.fit(true);
+    const startX = cam.x;
+    cam.focus(38, 38, 1.5, 1);
+    expect(cam.focusing).toBe(true);
+    for (let i = 0; i < 60; i++) cam.update(1 / 60);
+    expect(cam.x).toBeGreaterThan(startX);
+    for (let i = 0; i < 120; i++) cam.update(1 / 60);
+    expect(cam.focusing).toBe(false);
+  });
+
+  it('drops a focus the moment the player touches the camera', () => {
+    const cam = camera(400, 400, 1, 40, 40);
+    cam.fit(true);
+    cam.focus(38, 38, 5, 1);
+    cam.panBy(10, 10);
+    expect(cam.focusing).toBe(false);
   });
 });

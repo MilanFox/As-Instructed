@@ -140,6 +140,18 @@ document.getElementById('grid')?.addEventListener('click', (event) => {
   const el = event.currentTarget as HTMLElement;
   el.classList.toggle('on');
 });
+for (const kind of ['bronze', 'silver', 'gold'] as const) {
+  const id = `celebrate${kind[0]?.toUpperCase()}${kind.slice(1)}`;
+  document.getElementById(id)?.addEventListener('click', () => renderer.celebrate(kind));
+}
+
+document.getElementById('reduced')?.addEventListener('click', (event) => {
+  const el = event.currentTarget as HTMLElement;
+  const on = !el.classList.contains('on');
+  el.classList.toggle('on', on);
+  renderer.setReducedMotion(on ? true : null);
+});
+
 document.getElementById('bench')?.addEventListener('click', () => {
   const stress = scenes.find((s) => s.id === 'stress');
   if (stress && current.id !== 'stress') loadScene(stress);
@@ -173,6 +185,10 @@ window.addEventListener('keydown', (event) => {
     playPause.classList.remove('on');
   },
   zoom: (steps: number) => renderer.camera.zoomBy(steps),
+  celebrate: (kind: 'bronze' | 'silver' | 'gold' | 'pass' | 'fail') => renderer.celebrate(kind),
+  reduced: (on: boolean | null) => renderer.setReducedMotion(on),
+  speed: (ticksPerSecond: number) => renderer.setSpeed(ticksPerSecond),
+  play: (ticksPerSecond?: number) => renderer.play(ticksPerSecond),
   /**
    * Synchronous frame-cost measurement. rAF is throttled to a few hertz in a background tab, so
    * an fps counter there measures Chrome's scheduler, not the renderer.

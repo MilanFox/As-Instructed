@@ -42,6 +42,7 @@ export {
   soundFor,
   BASE_TICKS_PER_SECOND,
   LOOKAHEAD,
+  MEDAL_BEAT,
   MAX_NEW_PER_FRAME,
   TEXTURE_ON,
   TEXTURE_FULL,
@@ -224,6 +225,36 @@ export class GameAudio {
 
   outcome(report: { passed: boolean; medal?: Medal }): void {
     this.ensureConductor()?.outcome(report);
+  }
+
+  /**
+   * The three parts of the end-of-run arc, separately.
+   *
+   * `outcome` plays the verdict and the medal a beat apart, which is what a results panel that
+   * appears all at once wants. A panel that *stages* its reveal — objectives ticking off, then the
+   * medal landing, then commendations arriving one by one — should place each beat itself:
+   *
+   * ```ts
+   * audio.verdict(passed);                       // as the panel opens
+   * for (const [i] of objectives.entries()) audio.cue('objective', i);
+   * audio.medal(medal);                          // as the medal springs in
+   * renderer.celebrate(medal ?? 'pass');         // the same instant, so the rings hit the notes
+   * commendations.forEach((_, i) => audio.commend(i));
+   * ```
+   *
+   * All three are protected sounds: never thinned, never ducked, never stolen from.
+   */
+  verdict(passed: boolean): void {
+    this.ensureConductor()?.verdict(passed);
+  }
+
+  medal(medal: Medal | undefined, after = 0): void {
+    this.ensureConductor()?.medal(medal, after);
+  }
+
+  /** `index` walks the note up the reward ladder, so a run of them is one ascending phrase. */
+  commend(index = 0, after = 0): void {
+    this.ensureConductor()?.commend(index, after);
   }
 
   /**

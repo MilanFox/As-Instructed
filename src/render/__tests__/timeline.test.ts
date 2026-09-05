@@ -13,11 +13,15 @@ import {
 } from '../../engine/index.ts';
 import type { Trace } from '../../engine/index.ts';
 import {
+  ANTICIPATION,
   BUMP_DISTANCE,
   TraceTimeline,
+  anticipationAt,
   blockedFlash,
   bumpCurve,
   createPose,
+  moveStretch,
+  recoilAt,
   revisionAt,
   settleCurve,
 } from '../timeline.ts';
@@ -252,5 +256,59 @@ describe('layer invalidation', () => {
     const timeline = new TraceTimeline(walkTrace());
     expect(timeline.terrainTicks.ticks).toEqual([]);
     expect(timeline.terrainRevision(999)).toBe(0);
+  });
+});
+
+describe('bot character', () => {
+  it('crouches before it launches and is neutral at both ends', () => {
+    expect(moveStretch(0)).toBe(0);
+    expect(moveStretch(1)).toBe(0);
+    // Squash through the wind-up, stretch through the travel.
+    expect(moveStretch(ANTICIPATION / 2)).toBeLessThan(-0.05);
+    expect(moveStretch(0.6)).toBeGreaterThan(0.1);
+    expect(anticipationAt(0)).toBe(0);
+    expect(anticipationAt(ANTICIPATION / 2)).toBeCloseTo(1, 5);
+    expect(anticipationAt(0.5)).toBe(0);
+  });
+
+  it('keeps the wind-up out of the position the bot reports', () => {
+    const trace = walkTrace();
+    const bot = new TraceTimeline(trace).timelineFor(0)!;
+    const pose = createPose();
+    // Anticipation is a squash, never a retreat: the agreement with `replayTo` depends on it.
+    let previous = -Infinity;
+    for (let t = 0; t <= 1; t += 0.02) {
+      bot.poseAt(t, pose);
+      expect(pose.x).toBeGreaterThanOrEqual(previous - 1e-9);
+      expect(pose.x).toBeGreaterThanOrEqual(1 - 1e-9);
+      previous = pose.x;
+    }
+  });
+
+  it('shakes off a bump and then stops shaking', () => {
+    expect(recoilAt(0.5)).toBe(0);
+    expect(recoilAt(1)).toBe(0);
+    expect(recoilAt(1.2)).toBeGreaterThan(0.4);
+    expect(recoilAt(2.5)).toBeLessThan(0.1);
+    expect(recoilAt(4)).toBe(0);
+  });
+
+  it('gives a blocked move a recoil a successful one never gets', () => {
+    const trace = walkTrace();
+    const bot = new TraceTimeline(trace).timelineFor(0)!;
+    const pose = createPose();
+    let blockedRecoil = 0;
+    for (let t = 3; t <= 4.5; t += 0.02) {
+      bot.poseAt(t, pose);
+      blockedRecoil = Math.max(blockedRecoil, pose.recoil);
+    }
+    expect(blockedRecoil).toBeGreaterThan(0.5);
+
+    let okRecoil = 0;
+    for (let t = 0; t <= 2; t += 0.02) {
+      bot.poseAt(t, pose);
+      okRecoil = Math.max(okRecoil, pose.recoil);
+    }
+    expect(okRecoil).toBe(0);
   });
 });

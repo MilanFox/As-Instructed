@@ -18,9 +18,22 @@
  */
 
 export { Renderer, DEFAULT_SPEED } from './renderer.ts';
-export type { RendererOptions, FrameInfo } from './renderer.ts';
+export type {
+  CelebrationKind,
+  CelebrationOptions,
+  FrameInfo,
+  RendererOptions,
+} from './renderer.ts';
 
-export { Camera, ZOOM_LADDER, MAX_FIT_CSS_TILE_PX, snapTilePx, ladderIndex } from './camera.ts';
+export {
+  Camera,
+  ZOOM_LADDER,
+  MAX_FIT_CSS_TILE_PX,
+  MAX_FOCUS_PX,
+  MAX_KICK_PX,
+  snapTilePx,
+  ladderIndex,
+} from './camera.ts';
 export type { CameraOptions, CameraBounds, ViewRange } from './camera.ts';
 
 export {
@@ -49,6 +62,7 @@ export type { FxName, FxOptions } from './fx.ts';
 export {
   describeTile,
   drawBrackets,
+  drawCelebration,
   drawGoals,
   drawGrid,
   drawHover,
@@ -72,12 +86,16 @@ export type { BotDrawOptions } from './sprites.ts';
 export {
   BotTimeline,
   TraceTimeline,
+  ANTICIPATION,
   BUMP_DISTANCE,
   SETTLE_TICKS,
   TREAD_FADE_TICKS,
+  anticipationAt,
   blockedFlash,
   bumpCurve,
   createPose,
+  moveStretch,
+  recoilAt,
   revisionAt,
   settleCurve,
 } from './timeline.ts';

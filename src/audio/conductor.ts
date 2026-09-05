@@ -44,6 +44,14 @@ export const LOOKAHEAD = 0.02;
 /** New voices one frame may start. The pool cap is a backstop; this is the real limiter. */
 export const MAX_NEW_PER_FRAME = 4;
 
+/**
+ * Gap between the verdict tone and the medal stinger when `outcome` plays both.
+ *
+ * `Renderer.celebrate` schedules its rings against the same number, which is what makes the first
+ * ring land on the first note of the figure instead of near it. Change one and change the other.
+ */
+export const MEDAL_BEAT = 0.14;
+
 /** Events per second at which the texture bed starts, and where it is fully open. */
 export const TEXTURE_ON = 18;
 export const TEXTURE_FULL = 90;
@@ -256,13 +264,37 @@ export class Conductor {
    * trace says "you passed".
    */
   outcome(report: OutcomeReport): void {
-    const at = this.engine.now() + LOOKAHEAD;
-    this.emit(report.passed ? 'passed' : 'failed', at, 0, 1, true);
-    const medal = report.medal;
-    if (!report.passed || !medal || medal === 'none') return;
+    this.verdict(report.passed);
+    if (report.passed) this.medal(report.medal, MEDAL_BEAT);
+  }
+
+  /**
+   * Just the verdict tone.
+   *
+   * `outcome` fires the verdict and the medal `MEDAL_BEAT` apart, which is right when the two land
+   * together. A results screen that *stages* its reveal — objectives ticking off, then the medal,
+   * then commendations — needs to place each beat itself, so the three parts are separately
+   * callable and `outcome` is the convenience that plays them back to back.
+   */
+  verdict(passed: boolean): void {
+    this.emit(passed ? 'passed' : 'failed', this.engine.now() + LOOKAHEAD, 0, 1, true);
+  }
+
+  /** The medal stinger on its own. `after` delays it, in seconds. */
+  medal(medal: Medal | undefined, after = 0): void {
+    if (!medal || medal === 'none') return;
     const name =
       medal === 'gold' ? 'medalGold' : medal === 'silver' ? 'medalSilver' : 'medalBronze';
-    this.emit(name, at + 0.14, 0, 1, true);
+    this.emit(name, this.engine.now() + LOOKAHEAD + Math.max(0, after), 0, 1, true);
+  }
+
+  /**
+   * One commendation landing. `index` walks the note up the reward family's ladder, so calling
+   * this once per commendation as each one arrives produces an ascending phrase rather than the
+   * same ping repeated. Protected, like every other outcome sound.
+   */
+  commend(index = 0, after = 0): void {
+    this.emit('commend', this.engine.now() + LOOKAHEAD + Math.max(0, after), index, 1, true);
   }
 
   dispose(): void {

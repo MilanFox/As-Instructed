@@ -152,3 +152,42 @@ describe('pool pressure', () => {
     expect(system.live).toBe(8);
   });
 });
+
+describe('scheduled particles', () => {
+  /**
+   * The arrival puff, the second ring of a flourish and every beat of a medal figure are one emit
+   * with staggered delays. A timer would survive a scrub; a delay does not, which is the whole
+   * reason it is built this way.
+   */
+  it('holds a delayed burst back and then runs it', () => {
+    const system = new ParticleSystem(64);
+    system.emit('medal', 1, 1, { strength: 4, delay: 0.5, seed: 1 });
+    expect(system.live).toBeGreaterThan(0);
+    const scheduled = system.live;
+
+    // Nothing has aged yet, so nothing has died: the whole burst is still pending.
+    for (let i = 0; i < 20; i++) system.update(1 / 60);
+    expect(system.live).toBe(scheduled);
+
+    drain(system);
+    expect(system.live).toBe(0);
+  });
+
+  it('drops the whole schedule on clear, so a seek cannot fire stale bursts', () => {
+    const system = new ParticleSystem(64);
+    system.emit('flourish', 2, 2, { delay: 1, seed: 4 });
+    system.clear();
+    expect(system.live).toBe(0);
+    for (let i = 0; i < 200; i++) system.update(1 / 60);
+    expect(system.live).toBe(0);
+  });
+
+  it('scales a burst with strength without changing what it is', () => {
+    const full = new ParticleSystem(128);
+    const damped = new ParticleSystem(128);
+    full.emit('land', 0, 0, { strength: 1, seed: 2 });
+    damped.emit('land', 0, 0, { strength: 0.5, seed: 2 });
+    expect(damped.live).toBeGreaterThan(0);
+    expect(damped.live).toBeLessThanOrEqual(full.live);
+  });
+});
