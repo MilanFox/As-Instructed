@@ -17,11 +17,14 @@ import './library.css';
  * later work order imports and calls, and offering nineteen of them turns the dialog into a wall
  * that gets dismissed unread. Ticking a routine takes the helpers and the state it closes over
  * with it, so one click publishes something that actually runs.
+ *
+ * What is ticked stays here, in component state, and reaches the store exactly once — as the
+ * argument to `confirmPublish`. It must never be written back into `offer`: `selection` is derived
+ * from `offer`, and a derivation that replaces the thing it derives from cannot settle.
  */
 export function PublishDialog(): React.JSX.Element | null {
   const offer = useLibrary((state) => state.offer);
   const source = useLibrary((state) => state.source);
-  const setSelection = useLibrary((state) => state.setSelection);
   const confirm = useLibrary((state) => state.confirmPublish);
   const skip = useLibrary((state) => state.skipPublish);
 
@@ -49,10 +52,6 @@ export function PublishDialog(): React.JSX.Element | null {
       })),
     [offer, picked, names],
   );
-
-  useEffect(() => {
-    setSelection(selection);
-  }, [selection, setSelection]);
 
   const plan = useMemo(() => {
     if (!offer || selection.length === 0) return null;
@@ -155,7 +154,7 @@ export function PublishDialog(): React.JSX.Element | null {
             disabled={
               selection.length === 0 || invalid || conflicts.length > 0 || refusals.length > 0
             }
-            onClick={() => void confirm()}
+            onClick={() => void confirm(selection)}
           >
             {PUBLISH.confirm}
           </button>

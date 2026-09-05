@@ -54,6 +54,15 @@ export interface MetaHost {
   openLevel(levelId: string): void;
 }
 
+/**
+ * A work order the Repository could take something from, frozen at the moment it closed.
+ *
+ * Write-once for its whole life: `offerPublish` mints it, `confirmPublish` and `skipPublish`
+ * clear it, and nothing in between ever replaces it. What the player has ticked is *not* part of
+ * it — that is a draft the dialog owns and hands over once, at the press of the button. Keeping
+ * the draft here cost the game a black screen (docs/FIX-PUBLISH-CRASH.md): a component that
+ * derives from an object and writes the derivation back into that object never settles.
+ */
 export interface PublishOffer {
   levelId: string;
   /**
@@ -66,7 +75,6 @@ export interface PublishOffer {
    */
   code: string;
   declarations: Declaration[];
-  selection: PublishSelection[];
 }
 
 /**
@@ -118,8 +126,8 @@ export interface MetaState {
   /** Raises the notice, if one is owed, while the result is still on screen. */
   reviewForPublish(levelId: string, code: string, hardware: readonly string[]): void;
   muteNotice(): void;
-  setSelection(selection: PublishSelection[]): void;
-  confirmPublish(): Promise<void>;
+  /** Takes the ticked routines as an argument; the offer never holds them. See `PublishOffer`. */
+  confirmPublish(selection: PublishSelection[]): Promise<void>;
   skipPublish(forever: boolean): void;
 
   probeForDiscrepancy(): Promise<void>;
@@ -318,7 +326,7 @@ export const useLibrary = create<MetaState>((set, get) => {
       // Nothing to tick means nothing to show. The player is not left in silence — `reviewForPublish`
       // has already said so on the result itself, in a sentence rather than an empty dialog.
       if (!declarations.some((each) => each.callable)) return;
-      set({ offer: { levelId, code, declarations, selection: [] } });
+      set({ offer: { levelId, code, declarations } });
     },
 
     /**
@@ -349,22 +357,16 @@ export const useLibrary = create<MetaState>((set, get) => {
       write({ ...save, publishMuted: true });
     },
 
-    setSelection(selection: PublishSelection[]): void {
-      const offer = get().offer;
-      if (!offer) return;
-      set({ offer: { ...offer, selection } });
-    },
-
-    async confirmPublish(): Promise<void> {
+    async confirmPublish(selection: PublishSelection[]): Promise<void> {
       const { offer, save } = get();
       const active = requireHost();
-      if (!offer || offer.selection.length === 0 || !active) return;
+      if (!offer || selection.length === 0 || !active) return;
 
       const plan = planPublication({
         levelSource: offer.code,
         librarySource: save.source,
         declarations: offer.declarations,
-        selection: offer.selection,
+        selection,
         levelId: offer.levelId,
       });
       if (plan.conflicts.length > 0 || plan.refusals.length > 0) return;
