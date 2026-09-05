@@ -103,7 +103,7 @@ export const w3_02: LevelDef = {
     },
   ],
   seeds: [1, 2, 3, 4],
-  par: { ticks: PAR_TICKS, chars: 1230 },
+  par: { ticks: PAR_TICKS },
   build(seed: number): World {
     const world = createWorld({ w: 16, h: 12, seed, fill: Terrain.Floor });
     frame(world);

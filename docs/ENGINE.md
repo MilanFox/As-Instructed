@@ -51,7 +51,7 @@ const trace = sim.finish();                      // call exactly once, even afte
 const verdict = buildVerdict({
   objectives: level.objectives,
   world: sim.world, trace, initialWorld,
-  ops: sim.ops, chars: scoreChars(source), seeds: 1,
+  ops: sim.ops, seeds: 1,
 });
 ```
 
@@ -212,7 +212,7 @@ export const w2_03: LevelDef = {
   },
   objectives: [Objectives.inventoryAtLeast('crop', 6)],
   seeds: [1, 2, 3],
-  par: { ticks: 84, chars: 320 },
+  par: { ticks: 84 },
   starter: '…', hints: ['…'],
 };
 ```

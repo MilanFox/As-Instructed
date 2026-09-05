@@ -236,7 +236,7 @@ export const w5_05: LevelDef = {
     },
   ],
   seeds: [1, 2, 3, 4, 5],
-  par: { ticks: 56, chars: 900 },
+  par: { ticks: 56 },
   build(seed: number): World {
     const { stations, mstWeight: weight, cableBudget } = blackoutPlan(seed);
     const world = createWorld({

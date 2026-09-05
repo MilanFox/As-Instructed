@@ -96,7 +96,7 @@ export const w7_03: LevelDef = {
     },
   ],
   seeds: [1, 2, 3, 4],
-  par: { ticks: 200, chars: 3200 },
+  par: { ticks: 200 },
   build(seed: number): World {
     const site = siteFor(seed);
     const width = siteWidth(site);

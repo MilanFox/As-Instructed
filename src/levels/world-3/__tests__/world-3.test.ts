@@ -5,7 +5,6 @@ import {
   countItemsAt,
   evaluateObjectives,
   medalFor,
-  scoreChars,
 } from '../../../engine/index.ts';
 import type { LevelRunResult } from '../../harness.ts';
 import { runLevel, runReference } from '../../harness.ts';
@@ -288,12 +287,6 @@ describe('World 3 — structure', () => {
           expect(level.build(seed)).toEqual(level.build(seed));
         }
       });
-
-      test('par.chars covers the reference source', () => {
-        const solution = SOLUTIONS[level.id];
-        expect(solution).toBeDefined();
-        expect(level.par.chars).toBeGreaterThanOrEqual(scoreChars(solution!.source));
-      });
     });
   }
 });
@@ -386,7 +379,7 @@ describe('World 3 — the starter alone passes nothing', () => {
     test(`${level.id}`, () => {
       const drive = starters[level.id]!;
       for (const seed of level.seeds) {
-        expect(runLevel(level, seed, drive, { source: level.starter }).verdict.passed).toBe(false);
+        expect(runLevel(level, seed, drive).verdict.passed).toBe(false);
       }
     });
   }

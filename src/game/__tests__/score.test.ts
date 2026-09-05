@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   BONUS_STAR_POINTS,
   Medal,
-  countChars,
   levelMaxPoints,
   levelPoints,
   medalFor,
@@ -81,58 +80,5 @@ describe('reviewTier', () => {
     expect(reviewTier(Number.NaN).rank).toBe(1);
     expect(reviewTier(-40).rank).toBe(1);
     expect(reviewTier(4000).rank).toBe(5);
-  });
-});
-
-describe('countChars', () => {
-  it('strips line and block comments', () => {
-    expect(countChars('move(); // go east')).toBe('move();'.length);
-    expect(countChars('/* header */\nmove();')).toBe('move();'.length);
-    expect(countChars('a();/* mid */b();')).toBe('a();b();'.length);
-  });
-
-  it('strips leading whitespace and blank lines', () => {
-    const source = 'if (x) {\n    move();\n\n}\n';
-    expect(countChars(source)).toBe('if (x) {\nmove();\n}'.length);
-  });
-
-  it('keeps a // that lives inside a string', () => {
-    const source = 'const s = "a // b";';
-    expect(countChars(source)).toBe(source.length);
-    const single = "const s = 'http://x';";
-    expect(countChars(single)).toBe(single.length);
-  });
-
-  it('keeps a block comment opener inside a string', () => {
-    const source = 'const s = "/* not a comment */";';
-    expect(countChars(source)).toBe(source.length);
-  });
-
-  it('keeps template literal content, including comment-looking text', () => {
-    const source = 'print(`x // y`);';
-    expect(countChars(source)).toBe(source.length);
-  });
-
-  it('strips comments inside a template substitution but keeps the literal', () => {
-    expect(countChars('print(`v=${x /* c */}`);')).toBe('print(`v=${x }`);'.length);
-  });
-
-  it('handles nested templates', () => {
-    const source = 'print(`a${`b${c}d`}e`);';
-    expect(countChars(source)).toBe(source.length);
-  });
-
-  it('handles an escaped backtick and escaped quotes', () => {
-    const source = 'const s = `a\\`b`;\nconst t = "q\\"r";';
-    expect(countChars(source)).toBe(source.length);
-  });
-
-  it('does not eat an unterminated comment marker at end of file', () => {
-    expect(countChars('move();\n/* dangling')).toBe('move();'.length);
-  });
-
-  it('counts an empty program as zero', () => {
-    expect(countChars('')).toBe(0);
-    expect(countChars('// only a comment\n\n   \n')).toBe(0);
   });
 });

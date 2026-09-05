@@ -50,7 +50,7 @@ export const w1_05: LevelDef = {
     { label: 'An entry', value: 'One tile entered once. Enter it twice and it is filed twice.' },
   ],
   seeds: [21, 1, 2, 6, 8],
-  par: { ticks: 50, chars: 420 },
+  par: { ticks: 50 },
   build(seed: number): World {
     const { width, height, divider } = bayLayout(seed);
     const world = createWorld({ w: width + 2, h: height + 2, seed, fill: Terrain.Wall });

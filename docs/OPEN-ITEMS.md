@@ -91,8 +91,11 @@ testers would have quit in. Gold on nine of the first ten levels, first honest r
 
 ### Decided, not yet started
 
-- **Remove character-count plumbing entirely** — `countChars`, `scoreChars`, `par.chars`,
-  `bestChars`, `stats.chars`. Touches all 40 level files, so it waits for the level agents.
+- ~~**Remove character-count plumbing entirely.**~~ Done, in an isolated worktree — see
+  `docs/FIX-CHARCOUNT.md`. `countChars`, `scoreChars`, `par.chars`, `bestChars` and
+  `Verdict.stats.chars` are gone from `src/` and from `DESIGN.md`. 34 level files, not 40: the
+  compression cut landed first. Saves carrying the old fields still load — the save reader
+  whitelists fields, so a retired one is dropped on read, proved by a fixture test.
 - ~~**The Library needs a moment.**~~ Done, in an isolated worktree — see
   `docs/FIX-LIBRARY-MOMENT.md`. The unlock moved from the close of `w3-04` to the close of
   `w2-05` and now arrives as a delivery note in the `Requisition` ceremony. Note for whoever
@@ -373,6 +376,8 @@ No level became gated; the campaign is still finishable by a player who never op
 - **Viewport aspect** — running. Told to re-measure: the brief panel is much shorter and
   the objective rail taller than when it took its "before" screenshots, so its layout
   problem changed shape underneath it.
-- **Character-count plumbing removal** — started now that `src/levels/**` is free. The save
-  format is the risk: `bestChars` and `stats.chars` are persisted, so existing saves must
-  keep loading with a fixture test to prove it.
+- ~~**Character-count plumbing removal**~~ — done in a worktree, not yet merged. See
+  `docs/FIX-CHARCOUNT.md`. The save risk resolved to nothing structural: `rescueLevels`
+  already reads by whitelist, so dropping the field from `LevelProgress` is a tolerate-and-drop
+  with no new `SAVE_VERSION`. Two fixture tests prove a legacy save keeps its medals, code,
+  ticks, stars and objectives.

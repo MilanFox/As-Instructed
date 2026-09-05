@@ -1,5 +1,5 @@
 import type { Trace, Verdict, World } from '../engine/index.ts';
-import { Sim, buildVerdict, cloneWorld, scoreChars } from '../engine/index.ts';
+import { Sim, buildVerdict, cloneWorld } from '../engine/index.ts';
 import type { LevelDef, ReferenceSolution } from './types.ts';
 
 export interface LevelRunResult {
@@ -20,7 +20,6 @@ export function runLevel(
   level: LevelDef,
   seed: number,
   drive: (sim: Sim, botId: number) => void,
-  options: { source?: string } = {},
 ): LevelRunResult {
   const world = level.build(seed);
   const initialWorld = cloneWorld(world);
@@ -41,7 +40,6 @@ export function runLevel(
     trace,
     initialWorld,
     ops: sim.ops,
-    chars: scoreChars(options.source ?? ''),
     seeds: 1,
     spend: sim.spendTotals(),
   });
@@ -62,7 +60,5 @@ export function runReference(
   seed: number,
   solution: ReferenceSolution,
 ): LevelRunResult {
-  return runLevel(level, seed, (sim, botId) => solution.run(sim, botId), {
-    source: solution.source,
-  });
+  return runLevel(level, seed, (sim, botId) => solution.run(sim, botId));
 }

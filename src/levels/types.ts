@@ -33,7 +33,7 @@ export interface LevelDef {
   objectives: Objective[];
   /** ALL must pass. `length > 1` demands a general solution. `>= 3` from World 2 on. */
   seeds: number[];
-  par: { ticks: number; chars: number };
+  par: { ticks: number };
   /** Pre-filled editor content. */
   starter: string;
   /** Progressive nudges. Never code, never a full solution. */

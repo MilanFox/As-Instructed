@@ -27,7 +27,6 @@ function seedRun(options: {
     stats: {
       ticks: options.ticks ?? 10,
       ops: options.ops ?? 5,
-      chars: 42,
       seeds: 1,
       spend: options.spend ?? {},
       senses: {},

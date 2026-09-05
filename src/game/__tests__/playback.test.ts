@@ -53,7 +53,7 @@ function corridor(): { level: LevelDef; trace: Trace } {
       Objectives.botAt({ x: 5, y: 0 }, { id: 'the-pad', label: 'Reach the pad' }),
     ],
     seeds: [1],
-    par: { ticks: 5, chars: 100 },
+    par: { ticks: 5 },
     starter: '',
     hints: [],
   } as unknown as LevelDef;
@@ -176,7 +176,7 @@ describe('progress', () => {
         }),
       ],
       seeds: [1],
-      par: { ticks: 3, chars: 100 },
+      par: { ticks: 3 },
       starter: '',
       hints: [],
     } as unknown as LevelDef;

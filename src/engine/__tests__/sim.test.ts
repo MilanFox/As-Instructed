@@ -1532,7 +1532,6 @@ describe('spend', () => {
       trace: sim.finish(),
       initialWorld,
       ops: sim.ops,
-      chars: 0,
       seeds: 1,
       spend: sim.spendTotals(),
     });

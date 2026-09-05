@@ -282,7 +282,7 @@ export const w6_05: LevelDef = {
     },
   ],
   seeds: [1, 2, 3, 4, 5],
-  par: { ticks: ROUTE_MOVES, chars: 2400 },
+  par: { ticks: ROUTE_MOVES },
   build(seed: number): World {
     const plan = telemetryFor(seed);
     const world = createWorld({ w: FIELD, h: FIELD, seed, fill: Terrain.Pit, vars: { seed } });

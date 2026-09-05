@@ -126,7 +126,7 @@ export const w7_02: LevelDef = {
     { label: 'Carrying', value: 'Every bot holds up to 99 crops. No hauling on this order.' },
   ],
   seeds: [1, 2, 3, 4],
-  par: { ticks: 55, chars: 1750 },
+  par: { ticks: 55 },
   build(seed: number): World {
     const layout = layoutFor(seed);
     const world = createWorld({ w: WIDTH, h: HEIGHT, seed, fill: Terrain.Wall });

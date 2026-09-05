@@ -188,7 +188,7 @@ export const w7_04: LevelDef = {
     },
   ],
   seeds: [1, 2, 3, 4, 5],
-  par: { ticks: 79, chars: 2600 },
+  par: { ticks: 79 },
   budget: { maxTicks: 4000 },
   build(seed: number): World {
     const { bots } = requisitionFor(seed);

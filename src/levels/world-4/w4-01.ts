@@ -78,7 +78,7 @@ export const w4_01: LevelDef = {
     { label: 'The pad', value: 'The only tile in the tunnel that is not plain floor.' },
   ],
   seeds: [1, 2, 3],
-  par: { ticks: 52, chars: 250 },
+  par: { ticks: 52 },
   build,
   objectives: [
     Objectives.custom('reach-tunnel-end', 'Park the bot on the pad at the far end', (ctx) => {

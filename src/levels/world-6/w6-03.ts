@@ -166,7 +166,7 @@ export const w6_03: LevelDef = {
     },
   ],
   seeds: [1, 2, 3, 4],
-  par: { ticks: 38, chars: 800 },
+  par: { ticks: 38 },
   build(seed: number): World {
     const world = createWorld({ w: FIELD, h: FIELD, seed, fill: Terrain.Pit });
     const rng = new Rng(seed * 7919 + 63);

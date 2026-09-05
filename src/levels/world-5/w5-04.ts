@@ -164,7 +164,7 @@ export const w5_04: LevelDef = {
     },
   ],
   seeds: [1, 2, 3, 4, 5],
-  par: { ticks: 40, chars: 620 },
+  par: { ticks: 40 },
   build(seed: number): World {
     const { capacities, draws } = yardPlan(seed);
     const rng = new Rng(seed * 8677 + 23);

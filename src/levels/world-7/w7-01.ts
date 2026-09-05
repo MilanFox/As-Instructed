@@ -83,7 +83,7 @@ export const w7_01: LevelDef = {
     { label: '`sync()`', value: 'Raises every living bot to the highest clock in the fleet.' },
   ],
   seeds: [1, 2, 3],
-  par: { ticks: 10, chars: 260 },
+  par: { ticks: 10 },
   build(seed: number): World {
     const [lenA, lenB] = lengthsFor(seed);
     const world = createWorld({ w: WIDTH, h: HEIGHT, seed, fill: Terrain.Wall });

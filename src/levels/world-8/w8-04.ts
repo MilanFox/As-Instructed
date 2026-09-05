@@ -367,7 +367,7 @@ export const w8_04: LevelDef = {
     { label: 'A move into rock', value: 'Goes nowhere and still costs a tick.' },
   ],
   seeds: [1, 2, 3, 4, 5],
-  par: { ticks: 223, chars: 4200 },
+  par: { ticks: 223 },
   budget: { maxTicks: 3000 },
   build,
   objectives: [

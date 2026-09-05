@@ -165,7 +165,7 @@ export const w8_01: LevelDef = {
     },
   ],
   seeds: [1, 2, 3, 4],
-  par: { ticks: PAR_TICKS, chars: 772 },
+  par: { ticks: PAR_TICKS },
   build,
   objectives: [
     Objectives.custom(

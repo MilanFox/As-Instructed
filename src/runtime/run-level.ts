@@ -1,5 +1,5 @@
 import type { CostOverrides, Trace, Verdict } from '../engine/index.ts';
-import { Sim, buildVerdict, cloneWorld, scoreChars } from '../engine/index.ts';
+import { Sim, buildVerdict, cloneWorld } from '../engine/index.ts';
 import type { LevelDef } from '../levels/index.ts';
 import type { LibraryRequest, LibraryUsage, PerSeedResult, RuntimeFailure } from './protocol.ts';
 import { buildPlayerScope } from './api-bindings.ts';
@@ -22,7 +22,7 @@ export interface SeedRunOptions {
   seed: number;
   /** Emitted JavaScript, not TypeScript. */
   js: string;
-  /** The original source, scored for `chars`. */
+  /** The original source, as the player typed it. Carried for diagnostics; never executed. */
   source: string;
   /** Emitted-line to source-line map from `compile.ts`. See `sourcemap.ts`. */
   lineMap?: readonly number[];
@@ -51,7 +51,7 @@ export function wrapperOffset(): number {
 }
 
 export function runSeed(options: SeedRunOptions): SeedRun {
-  const { level, seed, js, source, unlockedHardware } = options;
+  const { level, seed, js, unlockedHardware } = options;
 
   const world = level.build(seed);
   const initialWorld = cloneWorld(world);
@@ -101,7 +101,6 @@ export function runSeed(options: SeedRunOptions): SeedRun {
     trace,
     initialWorld,
     ops: sim.ops,
-    chars: scoreChars(source),
     seeds: 1,
     spend: sim.spendTotals(),
     ...(failure ? { failure: toVerdictFailure(failure) } : {}),

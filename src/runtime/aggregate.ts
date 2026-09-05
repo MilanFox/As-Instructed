@@ -87,7 +87,6 @@ export function aggregate(runs: SeedRun[]): RunResponse {
     stats: {
       ticks: maxOf(runs.map((run) => run.verdict.stats.ticks)),
       ops: maxOf(runs.map((run) => run.verdict.stats.ops)),
-      chars: reported.verdict.stats.chars,
       seeds: runs.length,
       spend: mergeSpend(runs),
       senses: mergeSenses(runs),

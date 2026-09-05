@@ -13,8 +13,6 @@ export interface Verdict {
     /** `max(bot.clock)` — the makespan. The primary score. */
     ticks: number;
     ops: number;
-    /** Source length after stripping comments and leading whitespace. DESIGN.md §7. */
-    chars: number;
     /** How many seeds this verdict covers. */
     seeds: number;
     /**
@@ -36,7 +34,6 @@ export interface Verdict {
 export interface VerdictInput extends ObjectiveContext {
   objectives: readonly Objective[];
   ops: number;
-  chars: number;
   seeds: number;
   /** Defaults to `{}`. Pass `sim.spendTotals()`. */
   spend?: Record<string, number>;
@@ -74,7 +71,6 @@ export function buildVerdict(input: VerdictInput): Verdict {
     stats: {
       ticks: input.trace.endTick,
       ops: input.ops,
-      chars: input.chars,
       seeds: input.seeds,
       spend: { ...(input.spend ?? {}) },
       senses: { ...senses },
@@ -88,17 +84,6 @@ function unmetMessage(labels: readonly string[]): string {
   if (labels.length === 0) return 'The contract was not fulfilled.';
   if (labels.length === 1) return `Contract not fulfilled: ${labels[0]}.`;
   return `Contract not fulfilled. Outstanding: ${labels.join('; ')}.`;
-}
-
-/** DESIGN.md §7: source length after stripping comments and leading whitespace. */
-export function scoreChars(source: string): number {
-  const withoutBlockComments = source.replace(/\/\*[\s\S]*?\*\//g, '');
-  const withoutLineComments = withoutBlockComments.replace(/(^|[^:])\/\/[^\n]*/g, '$1');
-  return withoutLineComments
-    .split('\n')
-    .map((line) => line.replace(/^[ \t]+/, ''))
-    .filter((line) => line.length > 0)
-    .join('\n').length;
 }
 
 /** DESIGN.md §11 A4. The Performance Review tiers assume exactly these weights. */
