@@ -1,6 +1,7 @@
-import type { ObjectiveContext, Vec, World } from '../../engine/index.ts';
+import type { Divergence, MoveEvent, ObjectiveContext, Vec, World } from '../../engine/index.ts';
 import {
   Dir,
+  NOTHING,
   Objectives,
   Terrain,
   addBot,
@@ -11,6 +12,7 @@ import {
   vec,
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
+import { at, crates, ordinal } from './objectives.ts';
 import { frame, key, tilePicker, warm } from './yard.ts';
 
 const PAR_TICKS = 365;
@@ -40,6 +42,21 @@ const slotLedger = (world: World): Map<string, number[]> => {
     }
   }
   return ledger;
+};
+
+/** Every crate the shift opened with, as an arrival number and the slot it was stencilled on. */
+const arrivalsOf = (world: World): { index: number; at: Vec }[] => {
+  const out: { index: number; at: Vec }[] = [];
+  for (let y = 0; y < world.h; y++) {
+    for (let x = 0; x < world.w; x++) {
+      const mark = world.tiles[y * world.w + x]?.mark;
+      const index = mark === undefined ? Number.NaN : Number(mark);
+      if (Number.isInteger(index) && countItemsAt(world, vec(x, y), 'crate') > 0) {
+        out.push({ index, at: vec(x, y) });
+      }
+    }
+  }
+  return out.sort((a, b) => a.index - b.index);
 };
 
 const arrivalCount = (world: World): number => slotLedger(world).size;
@@ -102,6 +119,64 @@ const slotsTrodden = (ctx: ObjectiveContext): number => {
   return ctx.trace.events.filter(
     (event) => event.kind === 'move' && event.ok && vacant.has(key(event.to)),
   ).length;
+};
+
+/**
+ * The lowest-numbered crate the run never set down on the bay, named by the slot it started in.
+ *
+ * A round that ships fifteen of sixteen is looking at a full-looking yard and a bay it has walked
+ * to fifteen times; the one slot it never visited is the whole of what it is missing.
+ */
+const strandedCrate = (ctx: ObjectiveContext): Divergence => {
+  const delivered = new Set(shipped(ctx));
+  const missing = arrivalsOf(ctx.initialWorld).find((crate) => !delivered.has(crate.index));
+  if (missing === undefined) {
+    const bay = bayOf(ctx.initialWorld);
+    return {
+      where: `the bay at ${at(bay)}`,
+      expected: crates(arrivalCount(ctx.initialWorld)),
+      received: crates(countItemsAt(ctx.world, bay, 'crate')),
+    };
+  }
+  return {
+    where: `arrival ${String(missing.index)}, from ${at(missing.at)}`,
+    expected: 'on the outbound bay',
+    received: 'still in the yard',
+  };
+};
+
+/** The place in the bay stack where the order first came apart, and what went down there. */
+const outOfOrder = (ctx: ObjectiveContext): Divergence | undefined => {
+  const order = shipped(ctx);
+  const matched = inOrder(ctx);
+  if (matched >= arrivalCount(ctx.initialWorld)) return undefined;
+  const got = order[matched];
+  return {
+    where: `${ordinal(matched + 1)} crate onto the bay`,
+    expected: `arrival ${String(matched + 1)}`,
+    received: got === undefined ? NOTHING : `arrival ${String(got)}`,
+  };
+};
+
+/** The step that spent the slot allowance, and how far past it the round went in the end. */
+const overTrodden = (ctx: ObjectiveContext): Divergence => {
+  const vacant = vacantSlots(ctx.initialWorld);
+  const steps = ctx.trace.events.filter(
+    (event): event is MoveEvent => event.kind === 'move' && event.ok && vacant.has(key(event.to)),
+  );
+  const breaking = steps[SLOT_BUDGET];
+  if (breaking === undefined) {
+    return {
+      where: 'empty slots trodden',
+      expected: `at most ${String(SLOT_BUDGET)}`,
+      received: String(steps.length),
+    };
+  }
+  return {
+    where: `tick ${String(breaking.t)} · ${at(breaking.to)}`,
+    expected: `${String(SLOT_BUDGET)} empty slots at most`,
+    received: `the ${ordinal(SLOT_BUDGET + 1)}, of ${String(steps.length)} in the run`,
+  };
 };
 
 /**
@@ -187,19 +262,25 @@ export const w3_04: LevelDef = {
       'Move every crate onto the outbound bay',
       (ctx) =>
         countItemsAt(ctx.world, bayOf(ctx.initialWorld), 'crate') >= arrivalCount(ctx.initialWorld),
-      (ctx) => [
-        Math.min(
-          countItemsAt(ctx.world, bayOf(ctx.initialWorld), 'crate'),
+      {
+        progress: (ctx) => [
+          Math.min(
+            countItemsAt(ctx.world, bayOf(ctx.initialWorld), 'crate'),
+            arrivalCount(ctx.initialWorld),
+          ),
           arrivalCount(ctx.initialWorld),
-        ),
-        arrivalCount(ctx.initialWorld),
-      ],
+        ],
+        divergence: strandedCrate,
+      },
     ),
     Objectives.custom(
       'bay-in-order',
       'Set the crates down in ascending arrival order',
       (ctx) => inOrder(ctx) === arrivalCount(ctx.initialWorld),
-      (ctx) => [inOrder(ctx), arrivalCount(ctx.initialWorld)],
+      {
+        progress: (ctx) => [inOrder(ctx), arrivalCount(ctx.initialWorld)],
+        divergence: outOfOrder,
+      },
     ),
   ],
   bonus: [
@@ -207,7 +288,10 @@ export const w3_04: LevelDef = {
       'aisle-discipline',
       `Tread no more than ${String(SLOT_BUDGET)} slots that started the shift empty`,
       (ctx) => slotsTrodden(ctx) <= SLOT_BUDGET,
-      (ctx) => [slotsTrodden(ctx), SLOT_BUDGET],
+      {
+        progress: (ctx) => [slotsTrodden(ctx), SLOT_BUDGET],
+        divergence: overTrodden,
+      },
     ),
   ],
   budget: { maxTicks: 5000 },

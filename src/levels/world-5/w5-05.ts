@@ -1,18 +1,21 @@
-import type { Machine, ObjectiveContext, Vec, World } from '../../engine/index.ts';
+import type { Divergence, Machine, ObjectiveContext, Vec, World } from '../../engine/index.ts';
 import {
   Dir,
   MachineKind,
+  NOTHING,
   Objectives,
   Rng,
   Terrain,
   addBot,
   addMachine,
+  clipValue,
   createWorld,
   manhattan,
   setTerrain,
   vec,
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
+import { at, cableLegs } from './objectives.ts';
 
 const WIDTH = 30;
 const HEIGHT = 24;
@@ -125,7 +128,8 @@ function neighbourhood(machines: readonly Machine[]): Map<string, Set<string>> {
   return graph;
 }
 
-function connectedCount(world: World): number {
+/** Every machine the cable joins to the reactor, however many hops away. */
+function reachable(world: World): Set<string> {
   const graph = neighbourhood(world.machines);
   const seen = new Set<string>(['reactor']);
   const queue: string[] = ['reactor'];
@@ -137,8 +141,26 @@ function connectedCount(world: World): number {
       queue.push(next);
     }
   }
+  return seen;
+}
+
+function connectedCount(world: World): number {
+  const seen = reachable(world);
   return substations(world).filter((machine) => seen.has(machine.id)).length;
 }
+
+/** The first substation no run of cable reaches, and what the run did join it to instead. */
+const unreached = (ctx: ObjectiveContext): Divergence | undefined => {
+  const seen = reachable(ctx.world);
+  const stray = substations(ctx.world).find((machine) => !seen.has(machine.id));
+  if (stray === undefined) return undefined;
+  const joined = [...(neighbourhood(ctx.world.machines).get(stray.id) ?? [])];
+  return {
+    where: `${stray.id} · ${at(stray.at)}`,
+    expected: 'a cable back to the reactor',
+    received: joined.length === 0 ? NOTHING : clipValue(`cabled to ${joined.join(', ')}`),
+  };
+};
 
 export function cableSpent(ctx: ObjectiveContext): number {
   let total = 0;
@@ -153,7 +175,13 @@ export function cableSpent(ctx: ObjectiveContext): number {
  * reveal each energisation by position. A station counts only when a cable already joined it to
  * the part of the grid that is already live.
  */
-function liveOrderCount(ctx: ObjectiveContext): number {
+interface LiveOrder {
+  valid: Set<string>;
+  /** The first station switched on with no live cable already reaching it. */
+  dead?: { id: string; t: number };
+}
+
+function liveOrder(ctx: ObjectiveContext): LiveOrder {
   const ids = new Map(
     ctx.initialWorld.machines.map((machine) => [`${machine.at.x},${machine.at.y}`, machine.id]),
   );
@@ -165,6 +193,7 @@ function liveOrderCount(ctx: ObjectiveContext): number {
   };
   const live = new Set<string>(['reactor']);
   const valid = new Set<string>();
+  let dead: LiveOrder['dead'];
 
   for (const event of ctx.trace.events) {
     if (event.kind === 'machineChange') {
@@ -182,12 +211,59 @@ function liveOrderCount(ctx: ObjectiveContext): number {
     const id = ids.get(`${event.at.x},${event.at.y}`);
     if (id === undefined || !id.startsWith('sub-')) continue;
     const touchesLive = [...(graph.get(id) ?? [])].some((other) => live.has(other));
-    if (!touchesLive) continue;
+    if (!touchesLive) {
+      dead ??= { id, t: event.t };
+      continue;
+    }
     live.add(id);
     valid.add(id);
   }
-  return valid.size;
+  return dead === undefined ? { valid } : { valid, dead };
 }
+
+const liveOrderCount = (ctx: ObjectiveContext): number => liveOrder(ctx).valid.size;
+
+/**
+ * The first switch-on the cable could not carry, or — when every switch-on landed — the station
+ * the run never came back for. The tree the player laid is their own; what the report adds is the
+ * tick at which the order they switched it on in ran ahead of it.
+ */
+const notLive = (ctx: ObjectiveContext): Divergence | undefined => {
+  const { valid, dead } = liveOrder(ctx);
+  if (dead !== undefined) {
+    return {
+      where: `tick ${String(dead.t)} · ${dead.id}`,
+      expected: 'a live cable already reaching it',
+      received: 'nothing live was joined to it',
+    };
+  }
+  const missed = substations(ctx.world).find(
+    (machine) => !valid.has(machine.id) || machine.state !== 'on',
+  );
+  if (missed === undefined) return undefined;
+  return { where: `${missed.id} · ${at(missed.at)}`, expected: 'on', received: missed.state };
+};
+
+/** The cable that took the run past the drum, and what the drum held in the first place. */
+const overDrum = (ctx: ObjectiveContext): Divergence => {
+  const budget = ctx.world.vars.cableBudget ?? 0;
+  let spent = 0;
+  for (const leg of cableLegs(ctx)) {
+    spent += leg.amount;
+    if (spent <= budget) continue;
+    if (leg.from === '' || leg.to === '') break;
+    return {
+      where: `${leg.from} → ${leg.to}`,
+      expected: `${String(budget)} of cable in all`,
+      received: `${String(spent)} spent by this one`,
+    };
+  }
+  return {
+    where: 'cable spent',
+    expected: `at most ${String(budget)}`,
+    received: String(cableSpent(ctx)),
+  };
+};
 
 /**
  * Par: the reference lays one cable per substation and energises each once, so its clock is
@@ -277,15 +353,21 @@ export const w5_05: LevelDef = {
       'connected',
       'Join every substation to the reactor',
       (ctx) => connectedCount(ctx.world) === substations(ctx.world).length,
-      (ctx) => [connectedCount(ctx.world), substations(ctx.world).length],
+      {
+        progress: (ctx) => [connectedCount(ctx.world), substations(ctx.world).length],
+        divergence: unreached,
+      },
     ),
     Objectives.custom(
       'budget',
       'Stay inside the cable drum',
       (ctx) => cableSpent(ctx) <= (ctx.world.vars.cableBudget ?? 0),
-      (ctx) => {
-        const budget = ctx.world.vars.cableBudget ?? 0;
-        return [Math.min(cableSpent(ctx), budget), budget];
+      {
+        progress: (ctx) => {
+          const budget = ctx.world.vars.cableBudget ?? 0;
+          return [Math.min(cableSpent(ctx), budget), budget];
+        },
+        divergence: overDrum,
       },
     ),
     Objectives.custom(
@@ -298,14 +380,34 @@ export const w5_05: LevelDef = {
           stations.every((machine) => machine.state === 'on')
         );
       },
-      (ctx) => [liveOrderCount(ctx), substations(ctx.world).length],
+      {
+        progress: (ctx) => [liveOrderCount(ctx), substations(ctx.world).length],
+        divergence: notLive,
+      },
     ),
   ],
   bonus: [
-    Objectives.custom('tight', 'Finish within 2% of the shortest possible run', (ctx) => {
-      const tight = ctx.world.vars.tightBudget ?? 0;
-      return cableSpent(ctx) <= tight;
-    }),
+    /*
+     * The star reports what the shortest run costs and never how it is laid out — the same trade
+     * `w4-04`'s bonus makes. The tight allowance is the one number in the district the reactor
+     * does not report, and it is a number the player could have worked out from positions that
+     * are free to read; the tree that achieves it is the star.
+     */
+    Objectives.custom(
+      'tight',
+      'Finish within 2% of the shortest possible run',
+      (ctx) => {
+        const tight = ctx.world.vars.tightBudget ?? 0;
+        return cableSpent(ctx) <= tight;
+      },
+      {
+        divergence: (ctx) => ({
+          where: 'the whole run',
+          expected: `${String(ctx.world.vars.tightBudget ?? 0)} of cable`,
+          received: `${String(cableSpent(ctx))} of cable`,
+        }),
+      },
+    ),
   ],
   starter: [
     "// import { waves } from 'lib';",

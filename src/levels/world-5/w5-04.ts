@@ -1,12 +1,14 @@
-import type { Machine, Vec, World } from '../../engine/index.ts';
+import type { Divergence, Machine, ObjectiveContext, Vec, World } from '../../engine/index.ts';
 import {
   Dir,
   MachineKind,
+  NOTHING,
   Objectives,
   Rng,
   Terrain,
   addBot,
   addMachine,
+  clipValue,
   createWorld,
   setTerrain,
   vec,
@@ -110,6 +112,62 @@ function largestFeeder(world: World): Machine | undefined {
   }
   return best;
 }
+
+const cabledTo = (world: World, feeder: Machine): string[] =>
+  consumers(world)
+    .filter((consumer) => feeder.vars[`link:${consumer.id}`] === 1)
+    .map((consumer) => consumer.id);
+
+/** The first consumer that did not end the shift on exactly one feeder, and what it is on. */
+const misassigned = (ctx: ObjectiveContext): Divergence | undefined => {
+  for (const consumer of consumers(ctx.world)) {
+    const on = feedersOf(ctx.world, consumer.id);
+    if (on.length === 1) continue;
+    return {
+      where: consumer.id,
+      expected: 'exactly 1 feeder',
+      received: on.length === 0 ? NOTHING : clipValue(on.map((feeder) => feeder.id).join(', ')),
+    };
+  }
+  return undefined;
+};
+
+/**
+ * The first feeder the run took past its ceiling, with the load it ended up carrying.
+ *
+ * The cable is permanent, so the point of the report is which feeder was overfilled and by how
+ * much — never which consumer should have gone somewhere else, because deciding that is the level.
+ */
+const overCapacity = (ctx: ObjectiveContext): Divergence | undefined => {
+  for (const feeder of feeders(ctx.world)) {
+    const load = loadOn(ctx.world, feeder);
+    if (load <= (feeder.vars.capacity ?? 0)) continue;
+    return {
+      where: feeder.id,
+      expected: `at most ${String(feeder.vars.capacity ?? 0)}`,
+      received: `${String(load)}, from ${String(cabledTo(ctx.world, feeder).length)} consumers`,
+    };
+  }
+  return undefined;
+};
+
+/**
+ * What the highest-capacity feeder was left carrying, against the nothing the star asks for.
+ *
+ * Every capacity is a free read, so which feeder is the largest is not a secret — the comparison
+ * the level already ran to grade the star is the whole of the report.
+ */
+const largestLoaded = (ctx: ObjectiveContext): Divergence | undefined => {
+  const largest = largestFeeder(ctx.world);
+  if (largest === undefined) return undefined;
+  return {
+    where: `${largest.id}, the largest at ${String(largest.vars.capacity ?? 0)}`,
+    expected: 'no consumers on it',
+    received: `${String(cabledTo(ctx.world, largest).length)}, drawing ${String(
+      loadOn(ctx.world, largest),
+    )}`,
+  };
+};
 
 /** Feeders sit down the West wall; consumers are scattered across the yard. */
 function feederAt(index: number): Vec {
@@ -215,20 +273,31 @@ export const w5_04: LevelDef = {
       'assigned',
       'Leave every consumer on exactly one feeder',
       (ctx) => assignedCount(ctx.world) === consumers(ctx.world).length,
-      (ctx) => [assignedCount(ctx.world), consumers(ctx.world).length],
+      {
+        progress: (ctx) => [assignedCount(ctx.world), consumers(ctx.world).length],
+        divergence: misassigned,
+      },
     ),
     Objectives.custom(
       'within-capacity',
       'Keep every feeder at or under its capacity',
       (ctx) => withinCapacityCount(ctx.world) === feeders(ctx.world).length,
-      (ctx) => [withinCapacityCount(ctx.world), feeders(ctx.world).length],
+      {
+        progress: (ctx) => [withinCapacityCount(ctx.world), feeders(ctx.world).length],
+        divergence: overCapacity,
+      },
     ),
   ],
   bonus: [
-    Objectives.custom('largest-idle', 'Leave the highest-capacity feeder cold', (ctx) => {
-      const largest = largestFeeder(ctx.world);
-      return largest !== undefined && loadOn(ctx.world, largest) === 0;
-    }),
+    Objectives.custom(
+      'largest-idle',
+      'Leave the highest-capacity feeder cold',
+      (ctx) => {
+        const largest = largestFeeder(ctx.world);
+        return largest !== undefined && loadOn(ctx.world, largest) === 0;
+      },
+      { divergence: largestLoaded },
+    ),
   ],
   starter: [
     '// A cable cannot be undone.',

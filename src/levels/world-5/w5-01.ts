@@ -1,4 +1,4 @@
-import type { Machine, ObjectiveContext, Vec, World } from '../../engine/index.ts';
+import type { Divergence, Machine, ObjectiveContext, Vec, World } from '../../engine/index.ts';
 import {
   Dir,
   MachineKind,
@@ -8,11 +8,13 @@ import {
   addBot,
   addMachine,
   createWorld,
+  dirName,
   machineById,
   setTerrain,
   vec,
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
+import { at, firstNotIn } from './objectives.ts';
 
 const WIDTH = 22;
 const HEIGHT = 5;
@@ -64,11 +66,19 @@ const energisedCount = (world: World): number =>
  * `use` cycles a node off -> on whether or not its feeder is live, so the world alone cannot tell
  * a correct energisation from a futile one. Only the trace can, and only in order.
  */
-function latchAudit(ctx: ObjectiveContext): { good: Set<string>; bad: Set<string> } {
+interface LatchLog {
+  good: Set<string>;
+  bad: Set<string>;
+  /** The first station switched on while the machine feeding it was still off. */
+  early?: { id: string; feeder: string; t: number };
+}
+
+function latchAudit(ctx: ObjectiveContext): LatchLog {
   const state = new Map<string, string>();
   for (const machine of ctx.initialWorld.machines) state.set(machine.id, machine.state);
   const good = new Set<string>();
   const bad = new Set<string>();
+  let early: LatchLog['early'];
 
   for (const event of ctx.trace.events) {
     if (event.kind !== 'use' || !event.ok || event.machineId === null) continue;
@@ -82,11 +92,60 @@ function latchAudit(ctx: ObjectiveContext): { good: Set<string>; bad: Set<string
     const feeder = feederOf(machine);
     const feederLive = feeder === 'reactor' || state.get(feeder) === 'on';
     if (feederLive) good.add(machine.id);
-    else bad.add(machine.id);
+    else {
+      bad.add(machine.id);
+      early ??= { id: machine.id, feeder, t: event.t };
+    }
   }
 
-  return { good, bad };
+  return early === undefined ? { good, bad } : { good, bad, early };
 }
+
+/**
+ * The first station the run switched on before the machine feeding it had come up.
+ *
+ * The chain is the level's whole content and it is readable for nothing — every station reports
+ * the index of what feeds it — so naming the pair and the tick gives back the run's own decision,
+ * not the answer. A run that simply never latched a station is told that instead.
+ */
+const latchedEarly = (ctx: ObjectiveContext): Divergence | undefined => {
+  const { good, bad, early } = latchAudit(ctx);
+  if (early !== undefined) {
+    return {
+      where: `tick ${String(early.t)} · ${early.id}`,
+      expected: `${early.feeder} already on`,
+      received: `${early.feeder} was still off`,
+    };
+  }
+  const missed = substations(ctx.world).find(
+    (machine) => !good.has(machine.id) || bad.has(machine.id),
+  );
+  if (missed === undefined) return undefined;
+  return {
+    where: `${missed.id} · ${at(missed.at)}`,
+    expected: `switched on after ${feederOf(missed)}`,
+    received: 'never switched on',
+  };
+};
+
+/** The tick and tile at which the run turned round, against the way it had been going. */
+const doubledBack = (ctx: ObjectiveContext): Divergence | undefined => {
+  let started: Dir | undefined;
+  for (const event of ctx.trace.events) {
+    if (event.kind !== 'move' || !event.ok) continue;
+    if (started === undefined) {
+      started = event.dir;
+      continue;
+    }
+    if (event.dir === started) continue;
+    return {
+      where: `tick ${String(event.t)} · ${at(event.to)}`,
+      expected: `${dirName(started).toLowerCase()}, the way the run started`,
+      received: dirName(event.dir).toLowerCase(),
+    };
+  }
+  return undefined;
+};
 
 const orderedCount = (ctx: ObjectiveContext): number => {
   const { good, bad } = latchAudit(ctx);
@@ -180,23 +239,34 @@ export const w5_01: LevelDef = {
       'energised',
       'Leave every substation on',
       (ctx) => energisedCount(ctx.world) === substations(ctx.world).length,
-      (ctx) => [energisedCount(ctx.world), substations(ctx.world).length],
+      {
+        progress: (ctx) => [energisedCount(ctx.world), substations(ctx.world).length],
+        divergence: (ctx) => firstNotIn(substations(ctx.world), 'on'),
+      },
     ),
     Objectives.custom(
       'in-order',
       'Latch each substation only after its feeder is live',
       (ctx) => orderedCount(ctx) === substations(ctx.world).length,
-      (ctx) => [orderedCount(ctx), substations(ctx.world).length],
+      {
+        progress: (ctx) => [orderedCount(ctx), substations(ctx.world).length],
+        divergence: latchedEarly,
+      },
     ),
   ],
   bonus: [
-    Objectives.custom('one-pass', 'Make one pass. Never double back.', (ctx) => {
-      const directions = new Set<Dir>();
-      for (const event of ctx.trace.events) {
-        if (event.kind === 'move' && event.ok) directions.add(event.dir);
-      }
-      return directions.size <= 1;
-    }),
+    Objectives.custom(
+      'one-pass',
+      'Make one pass. Never double back.',
+      (ctx) => {
+        const directions = new Set<Dir>();
+        for (const event of ctx.trace.events) {
+          if (event.kind === 'move' && event.ok) directions.add(event.dir);
+        }
+        return directions.size <= 1;
+      },
+      { divergence: doubledBack },
+    ),
   ],
   starter: [
     '// probe(id) reads any machine in the world. use() switches the one under the bot.',

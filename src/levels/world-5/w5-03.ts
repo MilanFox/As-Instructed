@@ -1,7 +1,8 @@
-import type { Machine, ObjectiveContext, Vec, World } from '../../engine/index.ts';
+import type { Divergence, Machine, ObjectiveContext, Vec, World } from '../../engine/index.ts';
 import {
   Dir,
   MachineKind,
+  NOTHING,
   Objectives,
   Rng,
   Terrain,
@@ -14,6 +15,7 @@ import {
   vec,
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
+import { at, firstNotIn } from './objectives.ts';
 
 const WIDTH = 24;
 const HEIGHT = 18;
@@ -184,14 +186,14 @@ const byPosition = (world: World): Map<string, string> =>
   new Map(world.machines.map((machine) => [`${machine.at.x},${machine.at.y}`, machine.id]));
 
 /** Successful energisations, in trace order. `power` events name a position, not an id. */
-function energisations(ctx: ObjectiveContext): string[] {
+function energisations(ctx: ObjectiveContext): { id: string; t: number }[] {
   const ids = byPosition(ctx.initialWorld);
-  const order: string[] = [];
+  const order: { id: string; t: number }[] = [];
   for (const event of ctx.trace.events) {
     if (event.kind !== 'act' || event.name !== 'power' || !event.ok) continue;
     if (event.detail !== 'on' || event.at === undefined) continue;
     const id = ids.get(`${event.at.x},${event.at.y}`);
-    if (id !== undefined) order.push(id);
+    if (id !== undefined) order.push({ id, t: event.t });
   }
   return order;
 }
@@ -204,7 +206,7 @@ function energisations(ctx: ObjectiveContext): string[] {
 function orderedCount(ctx: ObjectiveContext): number {
   const live = new Set<string>(['reactor']);
   const valid = new Set<string>();
-  for (const id of energisations(ctx)) {
+  for (const { id } of energisations(ctx)) {
     const machine = machineById(ctx.world, id);
     if (!machine || !machine.id.startsWith('sub-')) continue;
     if (!prereqsOf(machine).every((prereq) => live.has(prereq))) continue;
@@ -215,16 +217,93 @@ function orderedCount(ctx: ObjectiveContext): number {
 }
 
 function travelled(ctx: ObjectiveContext): number {
-  let at = machineById(ctx.initialWorld, 'reactor')?.at ?? REACTOR_AT;
+  let from = machineById(ctx.initialWorld, 'reactor')?.at ?? REACTOR_AT;
   let total = 0;
-  for (const id of energisations(ctx)) {
+  for (const { id } of energisations(ctx)) {
     const machine = machineById(ctx.initialWorld, id);
     if (!machine) continue;
-    total += manhattan(at, machine.at);
-    at = machine.at;
+    total += manhattan(from, machine.at);
+    from = machine.at;
   }
   return total;
 }
+
+/** The first prerequisite on the district's own list that no cable was ever run for. */
+const missingCable = (ctx: ObjectiveContext): Divergence | undefined => {
+  for (const station of substations(ctx.world)) {
+    for (const prereq of prereqsOf(station)) {
+      if (machineById(ctx.world, prereq)?.vars[`link:${station.id}`] === 1) continue;
+      return { where: `${prereq} → ${station.id}`, expected: 'a cable', received: NOTHING };
+    }
+  }
+  return undefined;
+};
+
+/**
+ * The first station the run brought up while something it waits on was still off.
+ *
+ * The station's own list of what it waits on is a free read, so naming the one that was not ready
+ * hands back the run's own ordering decision rather than the order the district wants.
+ */
+const poweredEarly = (ctx: ObjectiveContext): Divergence | undefined => {
+  const live = new Set<string>(['reactor']);
+  const valid = new Set<string>();
+  for (const { id, t } of energisations(ctx)) {
+    const machine = machineById(ctx.world, id);
+    if (!machine || !machine.id.startsWith('sub-')) continue;
+    const waiting = prereqsOf(machine).find((prereq) => !live.has(prereq));
+    if (waiting !== undefined) {
+      return {
+        where: `tick ${String(t)} · ${id}`,
+        expected: `${waiting} already on`,
+        received: `${waiting} was still off`,
+      };
+    }
+    live.add(id);
+    valid.add(id);
+  }
+  const missed = substations(ctx.world).find((machine) => !valid.has(machine.id));
+  if (missed === undefined) return undefined;
+  const waits = prereqsOf(missed)[0];
+  return {
+    where: `${missed.id} · ${at(missed.at)}`,
+    expected: waits === undefined ? 'brought up' : `brought up after ${waits}`,
+    received: 'never brought up',
+  };
+};
+
+/**
+ * The leg of the crew walk on which the allowance ran out.
+ *
+ * The allowance itself is reported by the reactor, so the number is not news; which pair of
+ * stations the walk was crossing when it ran out is. It names no better order, only the point the
+ * run's own order stopped fitting.
+ */
+const walkOverran = (ctx: ObjectiveContext): Divergence => {
+  const budget = ctx.world.vars.travelBudget ?? 0;
+  let from = machineById(ctx.initialWorld, 'reactor')?.at ?? REACTOR_AT;
+  let fromId = 'reactor';
+  let total = 0;
+  for (const { id } of energisations(ctx)) {
+    const machine = machineById(ctx.initialWorld, id);
+    if (!machine) continue;
+    total += manhattan(from, machine.at);
+    from = machine.at;
+    if (total > budget) {
+      return {
+        where: `${fromId} → ${id}`,
+        expected: `${String(budget)} steps in all`,
+        received: `${String(total)} steps by this leg`,
+      };
+    }
+    fromId = id;
+  }
+  return {
+    where: 'the crew walk',
+    expected: `${String(budget)} steps`,
+    received: `${String(total)} steps`,
+  };
+};
 
 /**
  * Par: the reference lays every cable once and energises every station once, so its clock is
@@ -327,7 +406,7 @@ export const w5_03: LevelDef = {
         const [laid, total] = cabledCount(ctx.world);
         return laid === total;
       },
-      (ctx) => cabledCount(ctx.world),
+      { progress: (ctx) => cabledCount(ctx.world), divergence: missingCable },
     ),
     Objectives.custom(
       'energised',
@@ -336,16 +415,22 @@ export const w5_03: LevelDef = {
         const stations = substations(ctx.world);
         return stations.every((machine) => machine.state === 'on');
       },
-      (ctx) => [
-        substations(ctx.world).filter((machine) => machine.state === 'on').length,
-        substations(ctx.world).length,
-      ],
+      {
+        progress: (ctx) => [
+          substations(ctx.world).filter((machine) => machine.state === 'on').length,
+          substations(ctx.world).length,
+        ],
+        divergence: (ctx) => firstNotIn(substations(ctx.world), 'on'),
+      },
     ),
     Objectives.custom(
       'in-order',
       'Energise each station only after its upstream is on',
       (ctx) => orderedCount(ctx) === substations(ctx.world).length,
-      (ctx) => [orderedCount(ctx), substations(ctx.world).length],
+      {
+        progress: (ctx) => [orderedCount(ctx), substations(ctx.world).length],
+        divergence: poweredEarly,
+      },
     ),
   ],
   bonus: [
@@ -353,8 +438,11 @@ export const w5_03: LevelDef = {
       'tight-order',
       'Keep the crew walk inside the reported allowance, in steps',
       (ctx) => travelled(ctx) <= (ctx.world.vars.travelBudget ?? 0),
-      /* Unclamped: a walk of 61 against an allowance of 48 has to read as 61, not as 48. */
-      (ctx) => [travelled(ctx), ctx.world.vars.travelBudget ?? 0],
+      {
+        /* Unclamped: a walk of 61 against an allowance of 48 has to read as 61, not as 48. */
+        progress: (ctx) => [travelled(ctx), ctx.world.vars.travelBudget ?? 0],
+        divergence: walkOverran,
+      },
     ),
     Objectives.withinSenses('probe', READ_BUDGET, {
       label: `Bring the district up on ${String(READ_BUDGET)} reads or fewer`,

@@ -1,6 +1,7 @@
-import type { ObjectiveContext, Vec, World } from '../../engine/index.ts';
+import type { Divergence, ObjectiveContext, PickupEvent, Vec, World } from '../../engine/index.ts';
 import {
   Dir,
+  NOTHING,
   Objectives,
   Terrain,
   addBot,
@@ -11,6 +12,7 @@ import {
   vec,
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
+import { at } from './objectives.ts';
 import { frame, warm } from './yard.ts';
 
 const PAR_TICKS = 157;
@@ -48,6 +50,40 @@ const loadedPads = (ctx: ObjectiveContext): number =>
 
 const failedPickups = (ctx: ObjectiveContext): number =>
   ctx.trace.events.filter((event) => event.kind === 'pickup' && !event.ok).length;
+
+/**
+ * The first pad the run left bare. Which rows the pads sit in changes between shifts, so a run
+ * that loaded five of six has no way of telling from its own source which one it walked past.
+ */
+const barePad = (ctx: ObjectiveContext): Divergence | undefined => {
+  const bare = pads(ctx.initialWorld).find((pad) => countItemsAt(ctx.world, pad, 'crate') === 0);
+  if (bare === undefined) return undefined;
+  return { where: at(bare), expected: 'a crate', received: NOTHING };
+};
+
+/**
+ * The grab that came up empty, or — when none did — the clock.
+ *
+ * The empty grab is named first because it is the thing the level teaches and the thing the run
+ * cannot see: the tick and the tile are in the log, and the source only says `pickup()`.
+ */
+const cleanRun = (ctx: ObjectiveContext): Divergence => {
+  const empty = ctx.trace.events.find(
+    (event): event is PickupEvent => event.kind === 'pickup' && !event.ok,
+  );
+  if (empty !== undefined) {
+    return {
+      where: `tick ${String(empty.t)} · ${at(empty.at)}`,
+      expected: 'a grab that takes a crate',
+      received: 'took nothing, and cost a tick',
+    };
+  }
+  return {
+    where: 'the whole run',
+    expected: `${String(PAR_TICKS)} ticks`,
+    received: `${String(ctx.trace.endTick)} ticks`,
+  };
+};
 
 /**
  * The whole level is one clamp and two sidings. Capacity is 1, so the obvious "load everything,
@@ -100,7 +136,10 @@ export const w3_01: LevelDef = {
       'pads-loaded',
       'Leave a crate on every pad',
       (ctx) => loadedPads(ctx) === pads(ctx.initialWorld).length,
-      (ctx) => [loadedPads(ctx), pads(ctx.initialWorld).length],
+      {
+        progress: (ctx) => [loadedPads(ctx), pads(ctx.initialWorld).length],
+        divergence: barePad,
+      },
     ),
   ],
   bonus: [
@@ -108,7 +147,10 @@ export const w3_01: LevelDef = {
       'clean-run',
       `Finish inside ${String(PAR_TICKS)} ticks with no grab that comes up empty`,
       (ctx) => ctx.trace.endTick <= PAR_TICKS && failedPickups(ctx) === 0,
-      (ctx) => [Math.min(ctx.trace.endTick, PAR_TICKS), PAR_TICKS],
+      {
+        progress: (ctx) => [Math.min(ctx.trace.endTick, PAR_TICKS), PAR_TICKS],
+        divergence: cleanRun,
+      },
     ),
   ],
   budget: { maxTicks: 2500 },

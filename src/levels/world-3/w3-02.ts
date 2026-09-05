@@ -1,4 +1,4 @@
-import type { ItemKind, ObjectiveContext, World } from '../../engine/index.ts';
+import type { Divergence, ItemKind, ObjectiveContext, World } from '../../engine/index.ts';
 import {
   Dir,
   Objectives,
@@ -9,6 +9,7 @@ import {
   createWorld,
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
+import { at, crates } from './objectives.ts';
 import {
   YARD_CLASSES,
   depotPad,
@@ -59,6 +60,61 @@ const depotSwitches = (ctx: ObjectiveContext): number => {
     last = at;
   }
   return switches;
+};
+
+/**
+ * The first depot that ended the shift short, counted against everything of its class in the yard.
+ *
+ * The pad is named by tile and not by class. The class is stencilled on it and `scan` reads that
+ * for nothing, so the tile costs the player one look; printing the class here would hand back a
+ * row of the very table the level exists to make them build.
+ */
+const shortDepot = (ctx: ObjectiveContext): Divergence | undefined => {
+  for (const depot of stencilledDepots(ctx.initialWorld)) {
+    const want = groundTotal(ctx.initialWorld, depot.kind);
+    const got = countItemsAt(ctx.world, depot.at, depot.kind);
+    if (got >= want) continue;
+    return { where: `the depot at ${at(depot.at)}`, expected: crates(want), received: crates(got) };
+  }
+  return undefined;
+};
+
+/**
+ * The first drop that came back to a depot the round had already walked away from.
+ *
+ * Both ticks are reported. A round that works the yard by proximity crosses its own path dozens of
+ * times and the count alone never says which crossing was the one that broke the rule.
+ */
+const cameBack = (ctx: ObjectiveContext): Divergence => {
+  const pads = new Set(stencilledDepots(ctx.initialWorld).map((depot) => key(depot.at)));
+  const leftAt = new Map<string, number>();
+  let last = '';
+  let lastTick = 0;
+  for (const event of ctx.trace.events) {
+    if (event.kind !== 'drop' || !event.ok) continue;
+    const here = key(event.at);
+    if (!pads.has(here)) continue;
+    if (here === last) {
+      lastTick = event.t;
+      continue;
+    }
+    if (last !== '') leftAt.set(last, lastTick);
+    const before = leftAt.get(here);
+    if (before !== undefined) {
+      return {
+        where: `tick ${String(event.t)} · ${at(event.at)}`,
+        expected: 'a depot not used yet',
+        received: `last used at tick ${String(before)}, then left`,
+      };
+    }
+    last = here;
+    lastTick = event.t;
+  }
+  return {
+    where: 'depot changes',
+    expected: `at most ${String(Math.max(0, depotsWorked(ctx.initialWorld) - 1))}`,
+    received: String(depotSwitches(ctx)),
+  };
 };
 
 /**
@@ -128,7 +184,10 @@ export const w3_02: LevelDef = {
       'crates-sorted',
       'Put every crate on the depot for its class',
       (ctx) => sorted(ctx) === totalCrates(ctx.initialWorld),
-      (ctx) => [sorted(ctx), totalCrates(ctx.initialWorld)],
+      {
+        progress: (ctx) => [sorted(ctx), totalCrates(ctx.initialWorld)],
+        divergence: shortDepot,
+      },
     ),
   ],
   bonus: [
@@ -136,7 +195,10 @@ export const w3_02: LevelDef = {
       'one-depot-at-a-time',
       'Finish each depot before you start the next',
       (ctx) => depotSwitches(ctx) <= depotsWorked(ctx.initialWorld) - 1,
-      (ctx) => [depotSwitches(ctx), Math.max(0, depotsWorked(ctx.initialWorld) - 1)],
+      {
+        progress: (ctx) => [depotSwitches(ctx), Math.max(0, depotsWorked(ctx.initialWorld) - 1)],
+        divergence: cameBack,
+      },
     ),
   ],
   budget: { maxTicks: 4000 },

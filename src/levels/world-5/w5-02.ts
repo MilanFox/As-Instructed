@@ -1,12 +1,14 @@
-import type { Machine, World } from '../../engine/index.ts';
+import type { Divergence, Machine, ObjectiveContext, World } from '../../engine/index.ts';
 import {
   Dir,
   MachineKind,
+  NOTHING,
   Objectives,
   Rng,
   Terrain,
   addBot,
   addMachine,
+  clipValue,
   createWorld,
   setTerrain,
   vec,
@@ -52,6 +54,37 @@ const patchedIds = (world: World): string[] =>
   relays(world)
     .filter((machine) => machine.state === 'patched')
     .map((machine) => machine.id);
+
+/**
+ * What the patch report may say, and — the harder half — what it may not.
+ *
+ * It reports how many relays ended up patched and which, because a search that tests with `power`
+ * instead of `probe` leaves three or four of them behind and cannot see that from its own source.
+ * It never reports which side of the patched relay the break is on, and never that relay's own
+ * `live` reading, because either one is a free reading: a player told the direction after every
+ * run could close the two hundred segments by running eight times and never bisect anything.
+ * Finding the break is the level. The only thing said about a wrong single patch is that it is
+ * wrong, which the run already knows.
+ */
+const patchReport = (ctx: ObjectiveContext): Divergence => {
+  const patched = patchedIds(ctx.world);
+  const only = patched[0];
+  if (patched.length !== 1 || only === undefined) {
+    return {
+      where: 'relays patched',
+      expected: 'exactly 1',
+      received:
+        patched.length === 0
+          ? NOTHING
+          : clipValue(`${String(patched.length)}: ${patched.join(', ')}`),
+    };
+  }
+  return {
+    where: only,
+    expected: 'the segment the run goes dead at',
+    received: 'patched, and it is not that one',
+  };
+};
 
 /**
  * Par: the reference spends exactly one `power`, so 2 ticks is the whole clock cost and par is
@@ -142,11 +175,14 @@ export const w5_02: LevelDef = {
         const patched = patchedIds(ctx.world);
         return patched.length === 1 && patched[0] === broken;
       },
-      (ctx) => {
-        const broken = `relay-${ctx.world.vars.breakAt ?? -1}`;
-        const patched = patchedIds(ctx.world);
-        const stray = patched.filter((id) => id !== broken).length;
-        return [patched.includes(broken) && stray === 0 ? 1 : 0, 1 + stray];
+      {
+        progress: (ctx) => {
+          const broken = `relay-${ctx.world.vars.breakAt ?? -1}`;
+          const patched = patchedIds(ctx.world);
+          const stray = patched.filter((id) => id !== broken).length;
+          return [patched.includes(broken) && stray === 0 ? 1 : 0, 1 + stray];
+        },
+        divergence: patchReport,
       },
     ),
     /* Id left as `withinSenses` mints it: `game/achievements.ts` recognises an information
