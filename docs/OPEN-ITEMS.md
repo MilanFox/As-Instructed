@@ -683,3 +683,56 @@ found earlier today. **That is three duplicated-constant bugs in one day; worth 
   pre-compression versions. Deliberately not folded into the par change.
 - Worlds 3–8 pars unmeasured against the lazy/smart criterion; World 3 already silvers a
   beginner three times.
+
+### 2026-09-05, 16:30 — `w4-02`'s failure is visible (merged)
+
+Green at **1410 tests** (1389 + 21: 16 trail, 5 docs-cost), tsc / build clean.
+Defect 2 in the list above is closed, and `FIX-POWER.md` §2 can be struck.
+
+**Heat, not a flag** — and the agent measured before writing renderer code, which decided
+the design. `w4-02` solved correctly touches its worst tile **3** times; failed, **25 to
+113**. A binary "was this tile visited" trail would have painted the two runs identically:
+the defect restated in colour. Only revisits draw; one visit is invisible.
+
+**Always on, no level flag, no toggle**, because the measurement showed three
+non-overlapping regimes: solutions that never double back peak at heat 1 and draw nothing,
+honest working solutions sit at 2–6, and the designed failure at 25+. An absolute ramp
+separates them without configuration.
+
+The naive tunnel-follower now paints the closed circuit as a **solid red ring against bare
+grey rock** by the time it halts, with the branches it never entered untouched. Controls
+both check out: the same level solved with breadcrumbs shows a faint darkening and no red;
+`w4-01` with the same program shows nothing at all.
+
+**The calibration no test could have caught.** The first ramp ran `inkDim` → `danger` and
+drew *nothing* below ~8 visits, because `inkDim` (`#6a7a8c`) is within a few points of the
+World 4 cave floor's own grey. The cold end is now `bgVoid` — a darkening, luminance first —
+with hue and alpha on separate curves. There is now a test that fails if the cold end stops
+being a darkening.
+
+Cost is bounded by the **grid, not the tick budget**: worst case `w8-05` at 351 cells,
+`w4-02` at most 77, zero on levels that never double back. No per-frame allocation.
+
+**DESIGN §11 A5 gained a fourth bullet.**
+
+**The sibling requirement was already implemented, and well.** Blocked moves get a different
+segment *shape*, a red rim, an impact chevron, a hopping `!`, sparks and a ring; `w7-03`'s
+livelock trips after 8 all-blocked rounds, so it is seen for eight rounds before it lands.
+Nothing to do. The trail also lights `w7-03` up, orthogonally to its `blockedMoves === 0`
+bonus, since a blocked move produces no arrival.
+
+**`DocsPanel` per-level `costs` — fixed** in the same pass. `w7-02`, `w7-04` and `w8-05`
+were showing a price the player does not pay. The `typeof` guard matters: `wait`'s cost is
+the string `'n'`.
+
+### Handed to the divergence agent
+
+Dot's *"the tunnels join up"* line in `w4-02`'s brief can now go — the condition that
+justified keeping it is gone. Sent as a decision to make deliberately, not a rubber stamp,
+since the trail only speaks *after* a run while the line speaks before it.
+
+### Browser gotchas, now three — `FIX-VIEWPORT.md` §4
+
+`resize_window` does not work in this environment; Chrome suspends ResizeObserver delivery
+in a hidden tab; and **Vite HMR of a `src/render/**` module does not reliably reach a hidden
+tab's mounted renderer**, so a stale module looks exactly like a bug. Hard reload.
