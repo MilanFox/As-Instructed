@@ -6,8 +6,9 @@ until the shift ends, and the replay drew no evidence of it. The bot moved; noth
 been there before.
 
 Branch `worktree-agent-a821e9af07425cc55`, worktree from `main` at `d08dc45`. Main was merged
-again mid-flight for the `power()` engine fix; the merge was clean and touched nothing in
-`src/render/**`.
+twice more mid-flight — once for the `power()` engine fix, once for the par recalibration. Both
+merges were clean; neither touched `src/render/**`, and the only overlap was DESIGN.md §11 A5,
+which git resolved without help.
 
 ---
 
@@ -334,11 +335,11 @@ rather than fixtures, so they fail if an override is added or removed without th
 | check | result |
 | --- | --- |
 | `npx tsc --noEmit` | clean |
-| `npx vitest run` | **1405 passed**, 53 files (baseline 1384 + 21) |
+| `npx vitest run` | **1410 passed**, 53 files (post-merge baseline 1389 + 21) |
 | `npm run build` | clean |
 | `npx eslint src` | the one known `w5-01` `rules-of-hooks` false positive, nothing else |
 
-**21 new tests**, all in files this change owns:
+All four re-run after the final merge with main. **21 new tests**, all in files this change owns:
 
 - `src/render/__tests__/trail.test.ts` — **16**. Eleven on `VisitTrail`: draws nothing when no
   tile is revisited; counts the start tile; records *how often* rather than *whether*; lists a
