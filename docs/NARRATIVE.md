@@ -892,15 +892,27 @@ different registers on purpose:
 
 ---
 
-## 7. The Performance Review Screen
+## 7. The Performance Review Memo
 
-Shown per world and cumulatively (DESIGN.md §7). Tier is chosen by **medal points earned as a
-percentage of medal points available** in the scope being reviewed, so the same five tiers work
-for one world or for all forty levels.
+**Delivered, not hosted.** The memo used to be a screen behind a top-bar icon and neither
+playtester opened it once. It is now raised on the site map — the one screen with no other
+ceremony on it — and each tier is delivered exactly once, ever, the way a hardware requisition is.
+There is one scope, the whole campaign; the per-world slicing went with the screen, because the
+site map already carries a per-world row.
 
-Points: gold 3, silver 2, bronze 1, bonus star +1. **Unchanged by the removal of the character
-axis** (DESIGN.md §7) — the medal was always ticks-only in the maths, so every tier threshold
-below still means exactly what it meant.
+Tier is chosen by **medal points earned as a percentage of medal points available**, counting only
+work orders the contractor has *closed*. A work order still open is unfinished, not a zero, and a
+bonus star is not part of the standard — so a contractor eight orders in with a gold on every one
+of them reads 100%, which is what the tier below claims about them.
+
+Points: gold 3, silver 2, bronze 1, bonus star +1 (DESIGN.md §11 A4). The star is counted and
+shown; it is not in the denominator. An ungraded level (§11 A7) carries no medal, so it enters
+neither side of the fraction.
+
+**Tier 1 no longer has a reachable band.** The cheapest closed work order is a bronze at 1 of 3, so
+the floor of a graded record is 33%, and below that there is no record to grade and no memo is
+sent. `DEVELOPING` is kept here as written; whether the five bands should be re-spaced across
+33–100% is a scoring question, and the thresholds live in `src/game/score.ts`.
 
 **The escalation runs upward.** The better you do, the more management feels the need to manage
 it. A weak review is gentle and a little sad; a perfect review is a barely-concealed threat
@@ -961,7 +973,7 @@ protects both of us, and I would ask you to read that generously.
 
 ---
 
-### Tier 4 — 75–92% · "EXCEPTIONAL (NON-BINDING)"
+### Tier 4 — 75–99% · "EXCEPTIONAL (NON-BINDING)"
 
 ```
 PERFORMANCE REVIEW — CONTRACTOR #4471
@@ -981,13 +993,13 @@ Contractor #4470 held this grade for two consecutive quarters.
 
 ---
 
-### Tier 5 — 93–100% · "RETAINED"
+### Tier 5 — 100% · "RETAINED"
 
 ```
 PERFORMANCE REVIEW — CONTRACTOR #4471
 GRADE: RETAINED
 
-Every work order on this site is closed at or under par. There is no
+Every work order issued to you is closed at or under par. There is no
 grade above this one. There has never needed to be.
 
 Your engagement has been marked for retention. Retention is not a

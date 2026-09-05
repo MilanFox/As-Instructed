@@ -1,11 +1,12 @@
 /*
- * Site Map and Performance Review chrome. Palette and type come from tokens.css (DESIGN.md §8);
- * nothing here may introduce a colour that a token already names. Everything is scoped under
- * `.sitemap` / `.review` so it cannot leak into the workspace shell.
+ * Site Map chrome, plus the Vance memo's body type. Palette and type come from tokens.css
+ * (DESIGN.md §8); nothing here may introduce a colour that a token already names. Everything is
+ * scoped under `.sitemap` so it cannot leak into the workspace shell — except the `.memo__*`
+ * rules, which are deliberately unscoped because the requisition note borrows the dot aside and
+ * the delivered review borrows the rest.
  */
 
-.sitemap,
-.review {
+.sitemap {
   --screen-gutter: clamp(20px, 3.2vw, 56px);
   --world-accent: var(--accent);
 
@@ -27,8 +28,7 @@
 
 /* ---------------------------------------------------------------- shared */
 
-.sitemap .screen-title,
-.review .screen-title {
+.sitemap .screen-title {
   margin: 0;
   font-family: var(--font-mono);
   font-size: clamp(20px, 1.7vw, 28px);
@@ -37,8 +37,7 @@
   color: var(--ink);
 }
 
-.sitemap .screen-org,
-.review .screen-org {
+.sitemap .screen-org {
   margin: 4px 0 0;
   font-size: 12px;
   color: var(--ink-dim);
@@ -52,70 +51,35 @@
   opacity: 0.75;
 }
 
-.sitemap .screen-btn,
-.review .screen-btn {
-  flex: none;
-  padding: 10px 18px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  background: var(--bg-raised);
-  color: var(--ink);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  letter-spacing: 0.14em;
-  cursor: pointer;
-  transition:
-    border-color 120ms ease,
-    color 120ms ease,
-    background 120ms ease;
-}
-
-.sitemap .screen-btn:hover,
-.review .screen-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.sitemap .screen-btn--primary {
-  border-color: color-mix(in srgb, var(--accent) 50%, var(--border-strong));
-  color: var(--accent);
-}
-
-.sitemap .screen-stat,
-.review .screen-stat {
+.sitemap .screen-stat {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
 }
 
-.sitemap .screen-stat dt,
-.review .screen-stat dt {
+.sitemap .screen-stat dt {
   font-size: 10px;
   letter-spacing: 0.16em;
   color: var(--ink-dim);
 }
 
-.sitemap .screen-stat dd,
-.review .screen-stat dd {
+.sitemap .screen-stat dd {
   margin: 0;
   font-size: 14px;
   color: var(--ink);
   white-space: nowrap;
 }
 
-.sitemap .screen-stat__gold,
-.review .screen-stat__gold {
+.sitemap .screen-stat__gold {
   color: var(--gold);
 }
 
-.sitemap .screen-stat__silver,
-.review .screen-stat__silver {
+.sitemap .screen-stat__silver {
   color: var(--silver);
 }
 
-.sitemap .screen-stat__bronze,
-.review .screen-stat__bronze {
+.sitemap .screen-stat__bronze {
   color: var(--bronze);
 }
 
@@ -431,99 +395,7 @@
   color: var(--world-accent);
 }
 
-/* ------------------------------------------------------- performance review */
-
-.review__header {
-  display: flex;
-  flex: none;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-5);
-  padding: var(--space-4) var(--screen-gutter);
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-panel);
-}
-
-.review__scopes {
-  display: flex;
-  flex: none;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--screen-gutter);
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-void);
-}
-
-.review .scope {
-  padding: 6px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: transparent;
-  color: var(--ink-dim);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  cursor: pointer;
-  transition:
-    border-color 120ms ease,
-    color 120ms ease;
-}
-
-.review .scope:hover:not(:disabled) {
-  border-color: var(--world-accent, var(--accent));
-  color: var(--ink);
-}
-
-.review .scope--on {
-  border-color: var(--world-accent, var(--accent));
-  background: color-mix(in srgb, var(--world-accent, var(--accent)) 12%, transparent);
-  color: var(--ink);
-}
-
-.review .scope--empty {
-  opacity: 0.35;
-  cursor: default;
-}
-
-.review__scroll {
-  display: grid;
-  flex: 1 1 auto;
-  grid-template-columns: minmax(0, 1fr);
-  align-content: start;
-  gap: var(--space-6);
-  min-height: 0;
-  overflow-y: auto;
-  padding: var(--space-6) var(--screen-gutter) 96px;
-}
-
-@media (width >= 1180px) {
-  .review__scroll {
-    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
-    max-width: 1680px;
-    margin-inline: auto;
-    width: 100%;
-  }
-}
-
-.memo {
-  position: relative;
-  padding: var(--space-5);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  background: var(--bg-panel);
-}
-
-.memo__head {
-  padding-bottom: var(--space-3);
-  border-bottom: 1px solid var(--border);
-}
-
-.memo__line {
-  margin: 0;
-  font-size: 12px;
-  letter-spacing: 0.14em;
-  color: var(--ink-dim);
-}
+/* ---------------------------------------------- the Vance memo, as delivered */
 
 .memo__grade {
   margin: 6px 0 0;
@@ -547,13 +419,6 @@
   min-width: 0;
 }
 
-/* Beats `.review .screen-stat dd { white-space: nowrap }` on specificity: the memo's own values
-   are sentences, and a nowrap sentence lands on top of the column beside it. */
-.review .memo__meta dd {
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-
 .memo__body {
   margin-top: var(--space-4);
   max-width: 62ch;
@@ -569,10 +434,6 @@
 
 .memo__body p:last-child {
   margin-bottom: 0;
-}
-
-.memo__body--empty {
-  color: var(--ink-dim);
 }
 
 .memo__mark {
@@ -621,155 +482,6 @@
   margin-top: 4px;
 }
 
-.memo__ladder {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-top: var(--space-5);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--border);
-}
-
-.ladder__rung {
-  padding: 3px 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  font-size: 9.5px;
-  letter-spacing: 0.1em;
-  color: var(--ink-dim);
-  opacity: 0.6;
-}
-
-.ladder__rung--on {
-  border-color: var(--accent-2);
-  color: var(--accent-2);
-  opacity: 1;
-}
-
-/* ---------------------------------------------------------- medal wall */
-
-.wall {
-  align-self: start;
-  padding: var(--space-5);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-panel);
-}
-
-.wall__title {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  color: var(--ink-dim);
-}
-
-.wall__counts {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-3);
-  margin: var(--space-4) 0;
-  padding-bottom: var(--space-4);
-  border-bottom: 1px solid var(--border);
-}
-
-.wall__counts dd {
-  font-size: 20px;
-}
-
-.wall__table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-}
-
-.wall__table th,
-.wall__table td {
-  padding: 8px 6px;
-  border-bottom: 1px solid var(--border);
-  text-align: left;
-  vertical-align: middle;
-}
-
-.wall__table thead th {
-  font-family: var(--font-mono);
-  font-size: 9.5px;
-  font-weight: 500;
-  letter-spacing: 0.12em;
-  color: var(--ink-dim);
-}
-
-.wall__num {
-  text-align: right;
-  white-space: nowrap;
-}
-
-.wall__row--open {
-  color: var(--ink-dim);
-}
-
-.wall__link {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.wall__link:hover .wall__name {
-  color: var(--accent);
-}
-
-.wall__link .numeric {
-  font-size: 10.5px;
-  letter-spacing: 0.08em;
-  color: var(--ink-dim);
-}
-
-.wall__name {
-  font-weight: 500;
-  color: var(--ink);
-}
-
-.chip {
-  display: inline-block;
-  padding: 2px 8px;
-  border: 1px solid currentcolor;
-  border-radius: var(--radius);
-  font-family: var(--font-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.12em;
-}
-
-.chip--gold {
-  color: var(--gold);
-}
-
-.chip--silver {
-  color: var(--silver);
-}
-
-.chip--bronze {
-  color: var(--bronze);
-}
-
-.chip--none {
-  border-style: dashed;
-  color: var(--ink-dim);
-}
-
-.wall__empty {
-  margin: var(--space-4) 0 0;
-  font-size: 12px;
-  color: var(--ink-dim);
-}
-
 /* --------------------------------------------------------------- narrow */
 
 @media (width <= 900px) {
@@ -805,10 +517,7 @@
   }
 
   .world__rail-fill,
-  .node__disc,
-  .sitemap .screen-btn,
-  .review .screen-btn,
-  .review .scope {
+  .node__disc {
     transition: none;
   }
 }

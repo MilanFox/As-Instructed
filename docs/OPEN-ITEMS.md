@@ -132,40 +132,14 @@ testers would have quit in. Gold on nine of the first ten levels, first honest r
   2 graded in full. Table in `docs/FIX-PAR.md` §6.
 - Housekeeping: 2 pre-existing eslint false positives; delete branch `wip/wave1-interrupted`.
 
-### Backlog — i18n, German toggle
+### Scratched — i18n and the German toggle
 
-Requested 2026-09-05. Not started, and deliberately not started small: this is a
-structural change, not a string sweep.
+**Cut 2026-09-05 by the user, before any work started.** Nothing was built: no locale
+lookup, no extracted strings, no toggle. The only trace was the backlog entry that used to
+sit here (`4a554ef`) and this note. **Do not re-propose it** — it was considered in detail,
+specced, and dropped deliberately.
 
-**Scope.** Player-facing prose lives in four places and none of it is extracted:
-briefs and hints inline in the 34 level files (~2200 quoted lines), `src/ui/copy.ts`
-(316), `src/meta/copy.ts` (263), and the docs entries in `src/runtime/api-spec.ts`
-(793, mixed prose and signatures). Plus commendation titles/notes/requirements in
-`src/game/achievements.ts`, verdict and failure copy, and the objective labels that
-`budgets.ts` now parses for their unit.
-
-**Three things make this harder than a normal i18n job:**
-
-1. **The API must stay English.** `move`, `harvest`, `scan().crop`, `Dir.North` are real
-   TypeScript the player writes. Identifiers, the generated `.d.ts`, starter code and
-   every code sample stay as they are. So `api-spec.ts` splits: signatures fixed,
-   surrounding prose translated. Same for briefs, which quote the API inline.
-2. **`budgets.ts` parses English labels.** A label ending `, in <plural noun>` is how a
-   budget declares its unit, and label words are matched against event kinds. That
-   coupling has to be replaced with explicit structured fields *before* any label is
-   translated, or German labels silently stop being budgets.
-3. **The tone is the product.** The dry corporate register — work orders, requisitions,
-   Scheduling, "the last recorded instance was in 2204 and is disputed" — is most of the
-   game's character. Machine-translated German would read as flat instructions and lose
-   it. The German copy has to be *written*, by someone who can be funny in German, against
-   the English as a reference rather than a source.
-
-**Order of work:** decouple `budgets.ts` from label prose → extract strings behind a
-lookup keyed by id, English as the fallback locale → verify nothing regressed with the
-English still in place → then write the German. Steps 1–3 are the engineering and are
-worth doing on their own; step 4 is a writing job.
-
-A language toggle belongs in Settings next to the layout controls, persisted in the save.
+One thing it was carrying survives on its own merits, below.
 
 ### Done since that list was written
 
@@ -302,11 +276,10 @@ convicted:
 - `tolerance` (5) — check what it modifies; if it names a threshold the player must hit,
   it is load-bearing.
 
-**Non-native readers make this worse**, and this game has a German toggle on the backlog:
-uncommon English abstractions are exactly what fails first for a reader working in a
-second language, and they are also the hardest words to translate without losing the joke.
-Do this pass **before** any string extraction for i18n, so the German is written against
-copy that is already clear.
+**Non-native readers make this worse**: uncommon English abstractions are exactly what fails
+first for a reader working in a second language. That was doubly true when a German toggle
+was on the backlog; the toggle is scratched and this reason stands on its own, since the
+game is played in English by people who do not think in it.
 
 **Deliverable.** Every player-facing term classified flavour / load-bearing / borderline,
 with the load-bearing ones rewritten and shown in context. A report that reclassifies
@@ -789,3 +762,80 @@ Tier 5 goes `min: 93 → 100` in `score.ts` (divergence agent) and its text "Eve
 medals-only denominator 100% means every closed order is gold, which is what the tier's own
 text claims; at 93% a player carries seven silvers and is told otherwise. **No test depends
 on the value**, which is exactly why it needed routing rather than leaving to be noticed.
+
+### Open — `budgets.ts` infers a budget's unit by parsing its English label
+
+This was written down as an i18n prerequisite. **i18n is scratched; this item is not**, and
+it should never have needed a translation project to justify it.
+
+`src/game/budgets.ts` decides what a budget measures by reading the words of its own label:
+`TICK_WORDS`/`OP_WORDS` regexes against the lowercased label, sense and resource names
+matched word-by-word, and `declaredUnit()` parsing a label that ends `…, in ticks` or
+`…, in tiles`. A label is player-facing prose. **Reword the prose and the budget silently
+stops being a budget** — no error, no failing test, just a number that quietly stops scoring.
+
+The risk is not hypothetical here: every brief and objective label in the campaign was
+rewritten today, and `makespan`, `precedence` and `audit` were removed from player-facing
+text in the same pass. That pass happened to leave the load-bearing words intact. The next
+one has no reason to.
+
+The fix is a structured field on the objective declaring its unit, with the label free to
+say whatever reads best. The parsing can stay as a fallback for levels that have not
+declared, but a level that declares should never be guessed at. Worth a test that fails when
+a label changes in a way that changes the inferred unit.
+
+### 2026-09-05, 17:05 — Performance Review cut (merged). SESSION HANDOFF POINT.
+
+Green at **1445 tests**, tsc / build clean. Main is `HEAD` of everything below; nothing of
+value is unmerged except the divergence agent's branch, described further down.
+
+**−500 lines net.** Gone: `PerformanceReview.tsx`, the `review` route and `Screen` member,
+the top-bar icon, the site-map button, and the scope/rows machinery in `review.ts`.
+`screens.css` 931 → 669. **Nothing lost that the site map does not already carry** — checked
+line by line. The wall's one unique datum was `TICKS / PAR` per work order, and `Results.tsx`
+already prints `· best {bestTicks}` on every run report, which is when it is actionable. It
+deliberately did *not* add a tick column to the site map: that would rebuild the deleted
+surface one screen to the left. Correct instinct.
+
+**Three cuts beyond the ruling, all right:** the five-rung tier ladder (a progress meter, in
+a game that had just deleted its second completion fraction, where every tier's prose already
+says where it sits); the `POINTS 102/102` row, which used a *different denominator* from the
+site map's own `POINTS x/y` — two disagreeing readings of one word; and the `SCOPE` row. The
+percentage moved onto the grade line.
+
+**The memo lands on the site map**, gated like `RepositoryIssue`. That is the only screen
+with zero ceremonies — the close-a-work-order transition already stacks the run report, the
+publish offer and the hardware crate, which was the veteran's complaint. It is also where the
+game starts, so a memo earned at the end of a session opens the next one.
+
+**Delivery is once per tier, ever** (`save.reviewedRanks`), not on tier change. Firing on
+change misbehaves under the new medals-only scoring: the first gold reads 100%, so the grade
+**oscillates across the tier-5 boundary** and would re-issue `RETAINED` repeatedly. That is
+the kind of thing only found by actually running it.
+
+### Left over, small, none blocking
+
+1. `src/ui/components/Icons.tsx` — `IconReview` is now a dead export. Diff in
+   `docs/FIX-REVIEW-CUT.md`.
+2. `docs/DESIGN.md:258` and `README.md:59` still describe the deleted screen. Diffs in the
+   same report.
+3. **Tier 1 can never be shown.** The medals-only denominator floors a graded record at
+   `1/3` = 33.3%, so `DEVELOPING` (0–24%) is unreachable and tier 2 needs a nearly all-bronze
+   record. Fell out of the morning's scoring fix, not the cut. `NARRATIVE.md` §7 records it;
+   moving the thresholds is a design call in `score.ts`.
+
+### If this session ended here — how to resume
+
+One agent was still running: **divergence**, branch `worktree-agent-a7462ef9324db5988`. It
+had already committed the mechanism, Worlds 1, 2 and 8, and the `score.ts` tier-5 change
+(`d73d6ac`), with more uncommitted in its worktree and a 33KB `docs/FIX-DIVERGENCE.md`
+written incrementally. **Merge what is committed, salvage the rest, read the report for which
+levels are converted.** Its remaining bundled items were the silver-band widening, the dead
+`SILVER_FACTOR`, the two `power()` fact-row deletions, and a judgement call on cutting Dot's
+"the tunnels join up" line from `w4-02`'s brief.
+
+The queue after that, in order: apply leftovers 1–3 above; implement **DESIGN §11 A7**
+(`graded?: boolean`, measured set `w1-01, w1-03, w5-02, w6-01, w6-03, w6-05`); sweep for more
+duplicated constants (**three found in one day**); work `AUDIT-INCENTIVES.md` findings 3 and
+5–12; the ranked mute verbs (`plant()`, `send()`, and `use()` returning a mute *success*);
+the UI/visual audit, now unblocked; then the loose content items.

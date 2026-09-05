@@ -8,14 +8,14 @@ import { worldMeta } from '../levels/index.ts';
 import { PublishDialog } from '../meta/ui/PublishDialog.tsx';
 import { mountAudio } from './audio.ts';
 import { mountLibrary } from './library.ts';
-import { IconBook, IconMap, IconReview, IconSound } from './components/Icons.tsx';
+import { IconBook, IconMap, IconSound } from './components/Icons.tsx';
 import { useKeyboard } from './hooks/useKeyboard.ts';
 import { AudioSettings } from './screens/AudioSettings.tsx';
 import { LevelSelect } from './screens/LevelSelect.tsx';
-import { PerformanceReview } from './screens/PerformanceReview.tsx';
 import { RepositoryIssue } from './screens/RepositoryIssue.tsx';
 import { Requisition } from './screens/Requisition.tsx';
 import { Results } from './screens/Results.tsx';
+import { ReviewMemo } from './screens/ReviewMemo.tsx';
 import './styles/fonts.css';
 import './styles/app.css';
 
@@ -57,17 +57,14 @@ export function App(): React.JSX.Element {
           <LevelSelect />
         </div>
       ) : null}
-      {screen === 'review' ? (
-        <div className="screen">
-          <PerformanceReview />
-        </div>
-      ) : null}
       <Results />
       <PublishDialog />
       {/* The Repository note waits for the hardware crate itself, so order here is cosmetic. */}
       <RepositoryIssue />
       {/* Last, so the delivery note stacks above a publish offer raised by the same transition. */}
       <Requisition />
+      {/* Site map only, and it checks the other four are gone. Nothing here shares its screen. */}
+      <ReviewMemo />
     </div>
   );
 }
@@ -154,16 +151,6 @@ function TopBar(): React.JSX.Element {
           aria-label="Site map"
         >
           <IconMap />
-        </button>
-        <button
-          type="button"
-          className="icon-btn"
-          onClick={() => goto('review')}
-          aria-pressed={screen === 'review'}
-          title="Performance review"
-          aria-label="Performance review"
-        >
-          <IconReview />
         </button>
         {screen === 'workspace' ? (
           <button
