@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { describe, expect, test } from 'vitest';
 import type { LevelDef, ReferenceSolution } from '../../levels/index.ts';
@@ -6,10 +5,19 @@ import { LEVELS, getLevel } from '../../levels/index.ts';
 import { Runner } from '../host.ts';
 import type { WorkerLike } from '../host.ts';
 import type { RunRequest, RunResponse, WorkerRequestMessage } from '../protocol.ts';
-import { buildAmbientDts, unlockedApiNames } from '../ambient.ts';
+import { unlockedApiNames } from '../ambient.ts';
+import {
+  LIB_FILE_PATH,
+  PLAYER_FILE_PATH,
+  compileLibrary,
+  compilePlayerCode,
+  configurePlayerLanguage,
+  getPlayerDiagnostics,
+} from '../compile.ts';
 import { decodeLineMap } from '../sourcemap.ts';
 import { runSeed } from '../run-level.ts';
 import { serveRunRequest } from '../serve.ts';
+import { createFakeMonaco } from './fake-monaco.ts';
 
 import { solution as w1_01 } from '../../levels/world-1/__solutions__/w1-01.ts';
 import { solution as w1_02 } from '../../levels/world-1/__solutions__/w1-02.ts';
@@ -80,23 +88,9 @@ const SOLUTIONS: Record<string, ReferenceSolution> = {
 /**
  * Sources that are still sketches rather than programs, with the reason and with every name they
  * invent. CONTENT owns these; the list is asserted in both directions, so fixing one turns this
- * suite red until the entry is removed.
+ * suite red until the entry is removed. Empty, and meant to stay that way.
  */
-const NOT_YET_A_PROGRAM: Record<string, { why: string; invents: string[] }> = {
-  'w8-02': {
-    why:
-      'The source calls names that exist only in the test fixtures, so the program stops on its ' +
-      'second line. Neither the player API nor this level\'s Repository requirement provides them.',
-    invents: ['KnownMap', 'capacity', 'follow', 'stepped'],
-  },
-  'w8-05': {
-    why:
-      'The source is a different algorithm from the run() that proves the level. Its walker gives ' +
-      'up the first time a parked bot refuses it a tile, so the electrician never leaves the ' +
-      'apron and the grid stays dark. Every name it calls does exist.',
-    invents: [],
-  },
-};
+const NOT_YET_A_PROGRAM: Record<string, { why: string; invents: string[] }> = {};
 
 /**
  * Levels the `bot(id)` handle exists for: the whole of World 7, plus any later level that puts
@@ -124,6 +118,7 @@ function transpile(source: string): Compiled {
     compilerOptions: {
       target: ts.ScriptTarget.ESNext,
       module: ts.ModuleKind.ESNext,
+      moduleDetection: ts.ModuleDetectionKind.Force,
       sourceMap: true,
       removeComments: false,
     },
@@ -135,53 +130,29 @@ function transpile(source: string): Compiled {
   };
 }
 
-const AMBIENT_FILE = '/firmware.d.ts';
-const PLAYER_FILE = '/program.ts';
+/**
+ * The editor, as the player has it: one language service, reconfigured per level.
+ *
+ * `configurePlayerLanguage` is what decides which names exist and how strictly what the player
+ * wrote is judged, so every check below goes through it rather than through a second set of
+ * compiler options that could drift away from the real ones.
+ */
+const editor = createFakeMonaco();
 
-const CHECK_OPTIONS: ts.CompilerOptions = {
-  target: ts.ScriptTarget.ESNext,
-  module: ts.ModuleKind.ESNext,
-  lib: ['lib.es2022.d.ts'],
-  strict: true,
-  noEmit: true,
-  skipLibCheck: true,
-};
-
-/** Type-checks a program against the declarations this level's hardware generates. */
-function diagnose(levelId: string, program: string): ts.Diagnostic[] {
-  const sources = new Map<string, string>([
-    [AMBIENT_FILE, buildAmbientDts(unlockedApiNames(levelId))],
-    [PLAYER_FILE, program],
-  ]);
-  const defaultLib = ts.getDefaultLibFilePath(CHECK_OPTIONS);
-  const host: ts.CompilerHost = {
-    fileExists: (fileName) => sources.has(fileName) || fileName === defaultLib,
-    readFile: (fileName) => sources.get(fileName) ?? readFileSync(fileName, 'utf8'),
-    getSourceFile: (fileName, languageVersion) =>
-      ts.createSourceFile(
-        fileName,
-        sources.get(fileName) ?? readFileSync(fileName, 'utf8'),
-        languageVersion,
-        true,
-      ),
-    getDefaultLibFileName: () => defaultLib,
-    writeFile: () => undefined,
-    getCurrentDirectory: () => '/',
-    getCanonicalFileName: (fileName) => fileName,
-    useCaseSensitiveFileNames: () => true,
-    getNewLine: () => '\n',
-  };
-  const compilation = ts.createProgram([AMBIENT_FILE, PLAYER_FILE], CHECK_OPTIONS, host);
-  return [...compilation.getSyntacticDiagnostics(), ...compilation.getSemanticDiagnostics()];
+function playerModel(levelId: string, source: string) {
+  configurePlayerLanguage(editor.monaco, { levelId });
+  return editor.model(PLAYER_FILE_PATH, source);
 }
 
 /** `error TS2304: Cannot find name 'bot'` — the shape of a missing binding. */
-function unknownNames(levelId: string, program: string): string[] {
+async function unknownNames(levelId: string, program: string): Promise<string[]> {
   const names = new Set<string>();
-  for (const diagnostic of diagnose(levelId, program)) {
+  for (const diagnostic of await getPlayerDiagnostics(
+    editor.monaco,
+    playerModel(levelId, program),
+  )) {
     if (diagnostic.code !== 2304) continue;
-    const text = ts.flattenDiagnosticMessageText(diagnostic.messageText, ' ');
-    names.add(/'([^']+)'/.exec(text)?.[1] ?? text);
+    names.add(/'([^']+)'/.exec(diagnostic.message)?.[1] ?? diagnostic.message);
   }
   return [...names].sort();
 }
@@ -242,8 +213,11 @@ describe('the reference sources are real programs', () => {
   for (const level of LEVELS) {
     const known = NOT_YET_A_PROGRAM[level.id];
 
-    test(`${level.id} names only API that exists at that level`, () => {
-      const missing = unknownNames(level.id, (SOLUTIONS[level.id] as ReferenceSolution).source);
+    test(`${level.id} names only API that exists at that level`, async () => {
+      const missing = await unknownNames(
+        level.id,
+        (SOLUTIONS[level.id] as ReferenceSolution).source,
+      );
       expect(missing, known?.why ?? level.id).toEqual(known?.invents ?? []);
     });
 
@@ -275,7 +249,7 @@ describe('the reference sources are real programs', () => {
 
   test('every multi-bot level is playable through the player API', { timeout: 120_000 }, () => {
     const broken = MULTI_BOT.filter((id) => NOT_YET_A_PROGRAM[id] !== undefined);
-    expect(broken, 'w8-05 is the only multi-bot source still owed').toEqual(['w8-05']);
+    expect(broken, 'every multi-bot source is a program the player could have written').toEqual([]);
 
     for (const id of MULTI_BOT) {
       if (NOT_YET_A_PROGRAM[id] !== undefined) continue;
@@ -284,6 +258,74 @@ describe('the reference sources are real programs', () => {
         expect(runSource(level, seed).passed, `${id} seed ${String(seed)}`).toBe(true);
       }
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Compiling the way the player compiles
+// ---------------------------------------------------------------------------
+
+/**
+ * `compilePlayerCode` on every reference source, which is the gate a player hits on Run.
+ *
+ * The sources are written the way a person writes JavaScript — arrow parameters without
+ * annotations, a `Map.get` used without a null guard — and under `noImplicitAny` most of them
+ * were rejected before a tick was simulated. The player-facing options relax exactly those two
+ * flags, so the checks that mean something still mean something: hardware you have not installed
+ * is still `Cannot find name`, and a `Dir` that is really a string is still an error.
+ */
+describe('the player-facing compiler accepts ordinary JavaScript', () => {
+  test('all 40 reference sources compile cleanly', { timeout: 120_000 }, async () => {
+    const rejected: string[] = [];
+    for (const level of LEVELS) {
+      const source = (SOLUTIONS[level.id] as ReferenceSolution).source;
+      const result = await compilePlayerCode(editor.monaco, playerModel(level.id, source));
+      if (!result.ok) rejected.push(`${level.id}: ${result.error.message}`);
+      else if (result.js !== compiledSource(level.id).js) {
+        /* The suite runs the `transpileModule` emit above, so it is only the real path as long as
+           the editor's own emit is the same text. */
+        rejected.push(`${level.id}: the editor emits different JavaScript`);
+      }
+    }
+    expect(rejected).toEqual([]);
+    expect(LEVELS.length).toBe(40);
+  });
+
+  test('an untyped arrow parameter is not an error', async () => {
+    const source = 'const doubled = [1, 2, 3].map((n) => n * 2);\nprint(String(doubled.length));\n';
+    const result = await compilePlayerCode(editor.monaco, playerModel('w1-02', source));
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.diagnostics).toEqual([]);
+  });
+
+  test('the library is judged by the same standard, being player-authored too', async () => {
+    configurePlayerLanguage(editor.monaco, { levelId: 'w4-01' });
+    const lib = editor.model(
+      LIB_FILE_PATH,
+      'export function firstOpen(views, pick) {\n  return views.find((v) => pick(v)) || null;\n}\n',
+    );
+    const result = await compileLibrary(editor.monaco, lib);
+    expect(result.ok ? [] : [result.error.message]).toEqual([]);
+    if (result.ok) expect(result.exports).toContain('firstOpen');
+  });
+
+  test('hardware the level has not installed is still TS2304', async () => {
+    const result = await compilePlayerCode(editor.monaco, playerModel('w1-01', 'scan();'));
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toContain(2304);
+    expect(result.error.message).toContain("Cannot find name 'scan'");
+  });
+
+  test('a wrong argument type is still an error', async () => {
+    const result = await compilePlayerCode(editor.monaco, playerModel('w1-01', 'move("north");'));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.message).toContain('not assignable');
+  });
+
+  test('a misspelled API name is still an error', async () => {
+    const result = await compilePlayerCode(editor.monaco, playerModel('w2-01', 'scann();'));
+    expect(result.ok).toBe(false);
   });
 });
 

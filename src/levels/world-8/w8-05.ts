@@ -583,8 +583,10 @@ const BRIEF = [
   '',
   '**Fuel.** Every bot has a finite cell. Acting burns fuel equal to the ticks the',
   'action costs; waiting, sensing and refuelling burn none. `refuel()` fills the cell',
-  'to `fuelMax()` and only works while the bot is standing on a depot tile. There are',
-  'several depot tiles and they are not where you would have put them.',
+  'and only works while the bot is standing on a depot tile. There are several depot',
+  'tiles and they are not where you would have put them. There is no gauge for the size',
+  'of a full cell: every bot starts the shift full, so `fuel()` before anybody moves is',
+  'the number.',
   '',
   '**The airlock.** `airlock` starts sealed. One `use()` advances it one stage and',
   'costs one tick, and `probe("airlock")` publishes `vars.stages`, which is exactly',
@@ -635,7 +637,10 @@ export const w8_05: LevelDef = {
   hardware: [],
   brief: BRIEF,
   seeds: [1, 2, 3, 4, 5, 6, 7],
-  par: { ticks: 2300, chars: 7000 },
+  /* Both halves of the reference — the `Sim` driver and the player-facing source — come in
+     between 560 and 1130 ticks across the seven seeds, so par sits just above the slower of the
+     two. The old 2300 was measured against a walker that could not finish the level at all. */
+  par: { ticks: 1300, chars: 13000 },
   costs: { use: 1 },
   budget: { maxTicks: 16000, maxOps: 8_000_000 },
   build,

@@ -609,6 +609,7 @@ export interface ProgramModule {
 }
 
 const IMPORT_SPECIFIER = /from\s*(['"])([^'"]*)\1/;
+const EMPTY_EXPORT = /^export\s*\{\s*\}\s*;?$/;
 
 /**
  * Rewrites `import … from 'lib'` into a destructuring binding on the linked library object.
@@ -625,6 +626,14 @@ export function rewriteProgramImports(emittedJs: string): ProgramModule {
 
   for (const statement of statements) {
     if (statement.keyword === 'export') {
+      /* `export {};` with nothing in it is not the player's: it is the marker the compiler
+         synthesizes for a file with no imports, because `compile.ts` forces every program to be a
+         module so the player's own names shadow the firmware instead of colliding with it. It
+         publishes nothing, so it is blanked rather than reported. */
+      if (EMPTY_EXPORT.test(statement.text.trim())) {
+        edits.push({ start: statement.start, end: statement.end, text: blank(statement.text) });
+        continue;
+      }
       problems.push({
         line: statement.line,
         message:

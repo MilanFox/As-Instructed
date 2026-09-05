@@ -152,7 +152,10 @@ function deliveredBeforeSurveyDone(ctx: ObjectiveContext): number {
   return early;
 }
 
-const PAR_TICKS = 1200;
+/* The reference heuristic's worst seed is 632 ticks; par leaves a working margin over it and
+   nothing like enough for a survey followed by a separate delivery round, which is the whole
+   claim the brief makes about the budget. */
+const PAR_TICKS = 700;
 
 /**
  * Explore, route and deliver, with no seam between them.
@@ -186,8 +189,9 @@ export const w8_02: LevelDef = {
     'opaque, so `look` stops at the first wall it meets. A bay shows up as a `machineId` on any',
     'tile you can see, and `probe(id)` reports its position from anywhere afterwards. **The id is',
     'how you learn the class**: `depot-ore` takes ore and nothing else. Which classes are down',
-    'here, and which bay takes which, is different every shift. `capacity()` reports how many',
-    'crates the bot can hold at once.',
+    'here, and which bay takes which, is different every shift. The arms hold a fixed number of',
+    'crates and there is no gauge for it: a `pickup` that takes fewer than you asked for is the',
+    'arms telling you they are full.',
     '',
     'The shift budget does not allow for a survey followed by a delivery round. Both have to',
     'happen at once.',

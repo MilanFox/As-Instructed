@@ -24,6 +24,17 @@ type TsDiagnostic = MonacoEditor.languages.typescript.Diagnostic;
 export const PLAYER_FILE_PATH = 'file:///bootstrap/program.ts';
 const AMBIENT_FILE_PATH = 'file:///bootstrap/firmware.d.ts';
 
+/**
+ * `ts.ModuleDetectionKind.Force`, which Monaco's namespace does not re-export.
+ *
+ * Without it a program with no `import` is a *script*, sharing one scope with the firmware
+ * declarations, and `const clock = []` collides with the `clock()` the hardware provides —
+ * "Cannot redeclare block-scoped variable", from a name the player is not even using. As a module
+ * the same line simply shadows it, which is what the emitted JavaScript does anyway: the player's
+ * code runs inside a function whose parameters are the API. Emit is unchanged either way.
+ */
+const MODULE_DETECTION_FORCE = 3;
+
 export interface CompileDiagnostic {
   message: string;
   /** 1-based, in the player's source. */
@@ -81,6 +92,13 @@ function resolveUnlocked(options: LanguageOptions): string[] {
  * player who writes `const name = ...` collides with `window.name` and gets an error they cannot
  * possibly understand.
  *
+ * `noImplicitAny` and `strictNullChecks` are off for the same reason. The type checker is here to
+ * catch calling hardware you have not installed, passing a `Dir` where a number belongs, or
+ * misspelling an API name — real mistakes, every one of them still an error. It is not here to
+ * demand an annotation on `xs.map((x) => x * 2)` or a null guard on a `Map.get` the player knows
+ * is populated. A player who annotates everything still gets those checks on what they wrote; a
+ * player on level three writing ordinary JavaScript is not stopped by them.
+ *
  * Call once per level change; it replaces the ambient declarations wholesale, so a function that
  * was unlocked by the previous level stops existing the moment the player opens an earlier one.
  */
@@ -93,10 +111,11 @@ export function configurePlayerLanguage(monaco: MonacoApi, options: LanguageOpti
     target: ts.ScriptTarget.ESNext,
     module: ts.ModuleKind.ESNext,
     moduleResolution: ts.ModuleResolutionKind.NodeJs,
+    moduleDetection: MODULE_DETECTION_FORCE,
     lib: ['es2022'],
     strict: true,
-    noImplicitAny: true,
-    strictNullChecks: true,
+    noImplicitAny: false,
+    strictNullChecks: false,
     allowNonTsExtensions: true,
     noEmitHelpers: false,
     removeComments: false,

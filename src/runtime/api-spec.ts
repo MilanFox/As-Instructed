@@ -35,51 +35,76 @@ const TYPES: ApiTypeSpec[] = [
   {
     name: 'Dir',
     declaration: `declare const Dir: {
-  readonly North: 0;
-  readonly East: 1;
-  readonly South: 2;
-  readonly West: 3;
+  readonly North: Dir;
+  readonly East: Dir;
+  readonly South: Dir;
+  readonly West: Dir;
 };
-type Dir = (typeof Dir)[keyof typeof Dir];`,
-    doc: 'The four cardinal directions. A plain frozen object, not a TypeScript enum, so `Dir.North` survives transpilation into your program.',
+type Dir = number;`,
+    doc: 'The four cardinal directions. A plain frozen object, not a TypeScript enum, so `Dir.North` survives transpilation into your program. The values are `0` North, `1` East, `2` South, `3` West, and they are plain numbers on purpose: `(dir + 1) % 4` turns right, and `let facing = Dir.North` can be reassigned later.',
   },
   {
     name: 'Terrain',
-    declaration: `declare const Terrain: {
-  readonly Void: 'void';
-  readonly Floor: 'floor';
-  readonly Wall: 'wall';
-  readonly Pad: 'pad';
-  readonly Regolith: 'regolith';
-  readonly Soil: 'soil';
-  readonly Rock: 'rock';
-  readonly Ore: 'ore';
-  readonly Rubble: 'rubble';
-  readonly Ice: 'ice';
-  readonly Pit: 'pit';
-  readonly Cable: 'cable';
-  readonly Depot: 'depot';
-  readonly Conveyor: 'conveyor';
-};
-type Terrain = (typeof Terrain)[keyof typeof Terrain];`,
+    declaration: `type Terrain =
+  | 'void'
+  | 'floor'
+  | 'wall'
+  | 'pad'
+  | 'regolith'
+  | 'soil'
+  | 'rock'
+  | 'ore'
+  | 'rubble'
+  | 'ice'
+  | 'pit'
+  | 'cable'
+  | 'depot'
+  | 'conveyor';
+declare const Terrain: {
+  readonly Void: Terrain;
+  readonly Floor: Terrain;
+  readonly Wall: Terrain;
+  readonly Pad: Terrain;
+  readonly Regolith: Terrain;
+  readonly Soil: Terrain;
+  readonly Rock: Terrain;
+  readonly Ore: Terrain;
+  readonly Rubble: Terrain;
+  readonly Ice: Terrain;
+  readonly Pit: Terrain;
+  readonly Cable: Terrain;
+  readonly Depot: Terrain;
+  readonly Conveyor: Terrain;
+};`,
     doc: 'What a tile is made of. `void` is outside the playable area, `pit` is walkable but kills a bot that stops on it.',
   },
   {
     name: 'ItemKind',
-    declaration: `declare const ItemKind: {
-  readonly Regolith: 'regolith';
-  readonly Stone: 'stone';
-  readonly Ore: 'ore';
-  readonly Ice: 'ice';
-  readonly Scrap: 'scrap';
-  readonly Seed: 'seed';
-  readonly Crop: 'crop';
-  readonly Crate: 'crate';
-  readonly Part: 'part';
-  readonly Cell: 'cell';
-  readonly Chip: 'chip';
-};
-type ItemKind = (typeof ItemKind)[keyof typeof ItemKind];`,
+    declaration: `type ItemKind =
+  | 'regolith'
+  | 'stone'
+  | 'ore'
+  | 'ice'
+  | 'scrap'
+  | 'seed'
+  | 'crop'
+  | 'crate'
+  | 'part'
+  | 'cell'
+  | 'chip';
+declare const ItemKind: {
+  readonly Regolith: ItemKind;
+  readonly Stone: ItemKind;
+  readonly Ore: ItemKind;
+  readonly Ice: ItemKind;
+  readonly Scrap: ItemKind;
+  readonly Seed: ItemKind;
+  readonly Crop: ItemKind;
+  readonly Crate: ItemKind;
+  readonly Part: ItemKind;
+  readonly Cell: ItemKind;
+  readonly Chip: ItemKind;
+};`,
     doc: 'Every kind of item a bot can hold, drop, plant or deliver. The values are plain strings, so `plant("seed")` and `plant(ItemKind.Seed)` are the same call.',
   },
   {
