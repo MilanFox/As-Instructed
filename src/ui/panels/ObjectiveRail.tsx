@@ -74,6 +74,19 @@ export function ObjectiveRail(): React.JSX.Element {
     });
   }, [level, verdict, playback, atEnd, active, flooredTick, trace]);
 
+  /*
+   * Objective credit is banked per objective, not per run (`LevelProgress.objectives`), and a
+   * multi-seed level is the one place a player cannot see it any other way: an objective that has
+   * held on every layout is closed work, even on a run where its neighbour failed. Without this
+   * line the rail resets to the last run and five objectives read as one unfinished bit.
+   */
+  const banked = useGame((state) => (level ? state.save.levels[level.id]?.objectives : undefined));
+  const bankedCount = useMemo(() => {
+    if (!level || !banked) return 0;
+    const ids = new Set(banked);
+    return level.objectives.filter((objective) => ids.has(objective.id)).length;
+  }, [level, banked]);
+
   const showFuel = useMemo(() => (level ? levelUsesFuel(level) : false), [level]);
   const fuel = useMemo(() => {
     if (!showFuel || !trace) return null;
@@ -137,6 +150,14 @@ export function ObjectiveRail(): React.JSX.Element {
           <span className="par-row__label">seeds</span>
           <span>{level.seeds.length}</span>
         </div>
+        {level.objectives.length > 1 ? (
+          <div className="par-row">
+            <span className="par-row__label">closed on every seed</span>
+            <span className={bankedCount === total ? 'par-row__value--good' : undefined}>
+              {bankedCount} / {level.objectives.length}
+            </span>
+          </div>
+        ) : null}
       </div>
 
       {fuel ? (

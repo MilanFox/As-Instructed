@@ -97,6 +97,21 @@ function ResultsReport(): JSX.Element | null {
     ...(verdict ? { stats: verdict.stats } : {}),
     ...(historyFor(id) ? { history: historyFor(id) } : {}),
   });
+  /*
+   * Per objective, per seed — the fifteen results a five-objective, three-seed level actually
+   * produces. The aggregate verdict already reports each objective from its worst seed; this is
+   * what turns that into something a player can read, so a change that trades one layout for
+   * another is a chip going red rather than the same sentence twice.
+   */
+  const multiSeed = seedResults.length > 1;
+  const seedMarks = (id: string): { seed: number; met: boolean }[] =>
+    seedResults.map((result) => ({
+      seed: result.seed,
+      met: result.objectives.some((entry) => entry.id === id && entry.met),
+    }));
+  const closedEverywhere = required.filter((objective) =>
+    seedMarks(objective.id).every((mark) => mark.met),
+  ).length;
   const causes = passed
     ? []
     : failureCauses(required, { trace, ...(verdict ? { stats: verdict.stats } : {}) }, sourceFor);
@@ -290,13 +305,21 @@ function ResultsReport(): JSX.Element | null {
 
           {required.length > 0 ? (
             <section className="report-section">
-              <div className="rail__label">objectives</div>
+              <div className="rail__label">
+                objectives
+                {multiSeed ? (
+                  <span className="rail__label-note numeric">
+                    {closedEverywhere}/{required.length} closed on every seed
+                  </span>
+                ) : null}
+              </div>
               {required.map((objective, index) => (
                 <ReportObjective
                   key={objective.id}
                   objective={objective}
                   source={sourceFor(objective.id)}
                   shown={!passed || stage > index}
+                  {...(multiSeed ? { seeds: seedMarks(objective.id) } : {})}
                 />
               ))}
             </section>
@@ -409,18 +432,36 @@ function ResultsReport(): JSX.Element | null {
             </section>
           ) : null}
 
-          {seedResults.length > 1 ? (
+          {multiSeed ? (
             <section className="report-section">
               <div className="rail__label">seeds</div>
-              {seedResults.map((result) => (
-                <div className="seed-row" key={result.seed}>
-                  <span className="tag">seed {result.seed}</span>
-                  <span style={{ color: result.passed ? 'var(--ok)' : 'var(--danger)' }}>
-                    {result.passed ? 'passed' : 'failed'}
-                  </span>
-                  <span style={{ color: 'var(--ink-dim)' }}>{result.ticks} ticks</span>
-                </div>
-              ))}
+              {seedResults.map((result) => {
+                const outstanding = result.objectives.filter(
+                  (entry) => !entry.met && !bonusIds.has(entry.id),
+                );
+                return (
+                  <div className="seed-row" key={result.seed}>
+                    <span className="tag">seed {result.seed}</span>
+                    <span style={{ color: result.passed ? 'var(--ok)' : 'var(--danger)' }}>
+                      {result.passed ? 'passed' : 'failed'}
+                    </span>
+                    <span style={{ color: 'var(--ink-dim)' }}>{result.ticks} ticks</span>
+                    {/* Naming the objective is the whole point: "seed 4 failed" and "seed 4 failed
+                        the quota, eleven of fifteen" are not the same bug report. */}
+                    {outstanding.length > 0 ? (
+                      <span className="seed-row__outstanding">
+                        {outstanding
+                          .map((entry) =>
+                            entry.progress
+                              ? `${entry.label} (${String(entry.progress[0])}/${String(entry.progress[1])})`
+                              : entry.label,
+                          )
+                          .join(' · ')}
+                      </span>
+                    ) : null}
+                  </div>
+                );
+              })}
             </section>
           ) : null}
 
@@ -520,11 +561,13 @@ function ReportObjective({
   source,
   shown,
   bonus = false,
+  seeds,
 }: {
   objective: ObjectiveReading;
   source: BudgetSource;
   shown: boolean;
   bonus?: boolean;
+  seeds?: { seed: number; met: boolean }[];
 }): JSX.Element {
   const budget: Budget | null = budgetFor(objective, source);
   const over = budget !== null && budget.over > 0;
@@ -555,7 +598,36 @@ function ReportObjective({
           {objective.progress[0]}/{objective.progress[1]}
         </span>
       ) : null}
+      {seeds ? <SeedStrip seeds={seeds} /> : null}
       {budget ? <BudgetBar budget={budget} /> : null}
     </div>
+  );
+}
+
+/**
+ * One chip per seed, green where this objective held and red where it did not.
+ *
+ * The smallest thing that answers "which layout is it still open on", which is the question a
+ * player asks after a three-line change moves the failure from one seed to another.
+ */
+function SeedStrip({ seeds }: { seeds: { seed: number; met: boolean }[] }): JSX.Element {
+  const missed = seeds.filter((entry) => !entry.met).map((entry) => entry.seed);
+  return (
+    <span className="objective__seeds">
+      {seeds.map((entry) => (
+        <span
+          key={entry.seed}
+          className={`seed-chip${entry.met ? ' seed-chip--met' : ' seed-chip--missed'}`}
+          aria-hidden="true"
+        >
+          {entry.seed}
+        </span>
+      ))}
+      <span className="sr-only">
+        {missed.length === 0
+          ? 'held on every seed'
+          : `still open on ${missed.length === 1 ? 'seed' : 'seeds'} ${missed.join(', ')}`}
+      </span>
+    </span>
   );
 }

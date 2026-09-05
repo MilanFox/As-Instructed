@@ -19,6 +19,15 @@ export interface LevelProgress {
   medal: Medal;
   /** Bonus objective ids ever met on this level. */
   stars: string[];
+  /**
+   * Required objective ids that have held on *every* seed at once, across all runs so far.
+   *
+   * A five-objective level scored as one bit tells a player who closed four of them nothing, and
+   * a change that trades one objective for another is invisible. This is the record that makes
+   * partial progress a thing the game remembers rather than a thing the last run happened to
+   * show. Nothing is gated on it and it never comes back off (DESIGN.md §7.1).
+   */
+  objectives?: string[];
   bestTicks?: number;
   /**
    * Shortest source ever submitted for this order. Kept because a save must never lose a number a
@@ -189,6 +198,10 @@ function rescueLevels(raw: unknown): Record<string, LevelProgress> {
     if (isMedal(value['medal'])) progress.medal = value['medal'];
     if (Array.isArray(value['stars'])) {
       progress.stars = value['stars'].filter((s): s is string => typeof s === 'string');
+    }
+    if (Array.isArray(value['objectives'])) {
+      const banked = value['objectives'].filter((s): s is string => typeof s === 'string');
+      if (banked.length > 0) progress.objectives = banked;
     }
     if (isPositive(value['bestTicks'])) progress.bestTicks = value['bestTicks'];
     if (isPositive(value['bestChars'])) progress.bestChars = value['bestChars'];
@@ -379,6 +392,8 @@ export function mergeProgress(
     stars: [...new Set([...current.stars, ...next.stars])],
     attempts: Math.max(current.attempts, next.attempts),
   };
+  const objectives = [...new Set([...(current.objectives ?? []), ...(next.objectives ?? [])])];
+  if (objectives.length > 0) merged.objectives = objectives;
   const code = next.code ?? current.code;
   if (code !== undefined) merged.code = code;
   const ticks = minDefined(current.bestTicks, next.bestTicks);

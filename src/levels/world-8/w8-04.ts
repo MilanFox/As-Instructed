@@ -381,9 +381,11 @@ export const w8_04: LevelDef = {
   bonus: [
     Objectives.custom(
       'no-resurvey',
-      'Walk almost nothing the plan already described',
+      'Stay inside the allowance for ground the plan already described, in tiles',
       (ctx) => offPlan(ctx) <= strayAllowance(ctx),
-      (ctx) => [Math.min(offPlan(ctx), strayAllowance(ctx)), strayAllowance(ctx)],
+      /* Unclamped on purpose. The clamp is what turned an overrun into `44 / 44` and a blank
+         box, which says a budget was missed and nothing about by how much. */
+      (ctx) => [offPlan(ctx), strayAllowance(ctx)],
     ),
   ],
   starter: [

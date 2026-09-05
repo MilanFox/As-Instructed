@@ -341,12 +341,10 @@ export const w5_03: LevelDef = {
   bonus: [
     Objectives.custom(
       'tight-order',
-      'Keep the crew walk inside the reported allowance',
+      'Keep the crew walk inside the reported allowance, in steps',
       (ctx) => travelled(ctx) <= (ctx.world.vars.travelBudget ?? 0),
-      (ctx) => {
-        const budget = ctx.world.vars.travelBudget ?? 0;
-        return [Math.min(travelled(ctx), budget), budget];
-      },
+      /* Unclamped: a walk of 61 against an allowance of 48 has to read as 61, not as 48. */
+      (ctx) => [travelled(ctx), ctx.world.vars.travelBudget ?? 0],
     ),
     Objectives.withinSenses('probe', READ_BUDGET, {
       label: `Bring the district up on ${String(READ_BUDGET)} reads or fewer`,

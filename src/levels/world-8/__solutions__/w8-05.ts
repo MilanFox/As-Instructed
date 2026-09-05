@@ -1,26 +1,17 @@
 import type { Dir, Sim, Vec } from '../../../engine/index.ts';
 import { ALL_DIRS, ItemKind, Terrain, manhattan, step } from '../../../engine/index.ts';
 import type { ReferenceSolution } from '../../types.ts';
-import {
-  KEY_SPACE,
-  KnownMap,
-  distancesOn,
-  drainAntenna,
-  key,
-  pathOn,
-  readPacket,
-} from '../shared.ts';
+import { KnownMap, distancesOn, drainAntenna, key, pathOn, readPacket } from '../shared.ts';
 
 /**
  * TEST FIXTURE. Never imported from src/main.tsx — vite.config.ts fails the build if it is.
  *
  * The shift, run by a fleet with roles.
  *
- * One experiment on the band recovers the shift and the checksums throw away the packets that
- * lie, which turns the site from a search into a list of coordinates. Walking the workings is
- * then the single most expensive thing left, so nobody does it alone: the whole fleet spreads
- * out until every coordinate the band handed over is joined to the bay, and only then does
- * anybody start work.
+ * The manifest on the band turns the site from a search into a list of coordinates. Walking the
+ * workings is then the single most expensive thing left, so nobody does it alone: the whole fleet
+ * spreads out until every coordinate the band handed over is joined to the bay, and only then
+ * does anybody start work.
  *
  * After that the shift runs as three interleaved streams. The grid is taken one dependency rank
  * at a time with a `sync` either side of the rank, which makes precedence true by construction
@@ -73,36 +64,12 @@ export const solution: ReferenceSolution = {
     const passable = (at: Vec): boolean => map.passable(at);
     for (const id of fleet) map.observe(sim, id, WIDTH);
 
-    // ---- the band --------------------------------------------------------
-    const unshift = (text: string, cipherKey: number): string => {
-      const by = ((-cipherKey % KEY_SPACE) + KEY_SPACE) % KEY_SPACE;
-      let out = '';
-      for (const character of text) {
-        const code = character.charCodeAt(0);
-        out +=
-          code < 32 || code > 126
-            ? character
-            : String.fromCharCode(((code - 32 + by) % KEY_SPACE) + 32);
-      }
-      return out;
-    };
-
+    // ---- the manifest ----------------------------------------------------
     const raw = drainAntenna(sim, fleet[0] as number);
-    let cipherKey = 0;
-    let bestCount = -1;
-    for (let candidate = 0; candidate < KEY_SPACE; candidate++) {
-      let count = 0;
-      for (const packet of raw) if (readPacket(unshift(packet, candidate)).valid) count++;
-      if (count > bestCount) {
-        bestCount = count;
-        cipherKey = candidate;
-      }
-    }
-
     const crates: Crate[] = [];
     let form: Vec | null = null;
     for (const packet of raw) {
-      const { fields, valid } = readPacket(unshift(packet, cipherKey));
+      const { fields, valid } = readPacket(packet);
       if (!valid) continue;
       const at = { x: Number(fields[1]), y: Number(fields[2]) };
       if (fields[0] === 'CRATE') crates.push({ at, kind: String(fields[3]) });
@@ -657,27 +624,14 @@ export const solution: ReferenceSolution = {
     '',
     'const raw = [];',
     'for (let p = receive(); p !== null; p = receive()) raw.push(p);',
-    'const sum = (t) => {',
-    '  let n = 0;',
-    '  for (const c of t) n += c.charCodeAt(0);',
-    '  return n % 1000;',
-    '};',
     'const holds = (t) => {',
     "  const parts = t.split('|');",
-    "  if (parts.length < 3 || parts[0] !== 'KD4470') return null;",
-    "  const body = parts.slice(0, -1).join('|');",
-    '  return String(sum(body)) === parts[parts.length - 1] ? parts.slice(1, -1) : null;',
+    "  return parts.length >= 3 && parts[0] === 'KD4470' ? parts.slice(1, -1) : null;",
     '};',
-    'let shift = 0;',
-    'let most = -1;',
-    'for (let c = 0; c < 95; c++) {',
-    '  const n = raw.filter((p) => holds(decode(p, c))).length;',
-    '  if (n > most) { most = n; shift = c; }',
-    '}',
     'const crates = [];',
     'let form = null;',
     'for (const p of raw) {',
-    '  const f = holds(decode(p, shift));',
+    '  const f = holds(p);',
     '  if (!f) continue;',
     '  const at = { x: Number(f[1]), y: Number(f[2]) };',
     "  if (f[0] === 'CRATE') crates.push({ at, kind: f[3] });",
