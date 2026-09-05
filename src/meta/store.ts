@@ -295,7 +295,7 @@ export const useLibrary = create<MetaState>((set, get) => {
       const save = get().save;
       if (!save.unlocked || save.publishMuted || save.publishDeclined.includes(levelId)) return;
       const declarations = publishableDeclarations(code, hardware);
-      if (declarations.length === 0) return;
+      if (!declarations.some((each) => each.callable)) return;
       set({ offer: { levelId, code, declarations, selection: [] } });
     },
 
@@ -317,7 +317,7 @@ export const useLibrary = create<MetaState>((set, get) => {
         selection: offer.selection,
         levelId: offer.levelId,
       });
-      if (plan.conflicts.length > 0) return;
+      if (plan.conflicts.length > 0 || plan.refusals.length > 0) return;
 
       const revision = revisionOf(plan.librarySource, 'publish', {
         fromLevel: offer.levelId,

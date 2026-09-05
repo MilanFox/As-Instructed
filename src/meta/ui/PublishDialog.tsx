@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type * as React from 'react';
 import { PUBLISH } from '../copy.ts';
-import { isValidName, libraryExportNames, planPublication } from '../publish.ts';
+import { closureOf, isValidName, libraryExportNames, planPublication } from '../publish.ts';
 import { useLibrary } from '../store.ts';
 import './library.css';
 
@@ -12,6 +12,11 @@ import './library.css';
  * "Stop offering" turns the whole prompt off for the rest of the game and is reversible from the
  * Repository panel. A player who never publishes anything finishes the campaign with the same
  * medals as one who does.
+ *
+ * The list is routines, not declarations. A tile map or a best-so-far counter is not something a
+ * later work order imports and calls, and offering nineteen of them turns the dialog into a wall
+ * that gets dismissed unread. Ticking a routine takes the helpers and the state it closes over
+ * with it, so one click publishes something that actually runs.
  */
 export function PublishDialog(): React.JSX.Element | null {
   const offer = useLibrary((state) => state.offer);
@@ -31,14 +36,18 @@ export function PublishDialog(): React.JSX.Element | null {
   }, [offer?.levelId]);
 
   const taken = useMemo(() => new Set(libraryExportNames(source)), [source]);
+  const offered = useMemo(
+    () => (offer?.declarations ?? []).filter((each) => each.callable),
+    [offer],
+  );
 
   const selection = useMemo(
     () =>
-      [...picked].map((name) => ({
+      closureOf(offer?.declarations ?? [], [...picked]).map((name) => ({
         name,
         ...(names[name] && names[name] !== name ? { publishAs: names[name] as string } : {}),
       })),
-    [picked, names],
+    [offer, picked, names],
   );
 
   useEffect(() => {
@@ -48,7 +57,7 @@ export function PublishDialog(): React.JSX.Element | null {
   const plan = useMemo(() => {
     if (!offer || selection.length === 0) return null;
     return planPublication({
-      levelSource: '',
+      levelSource: offer.code,
       librarySource: source,
       declarations: offer.declarations,
       selection,
@@ -62,6 +71,7 @@ export function PublishDialog(): React.JSX.Element | null {
   const conflicts = selection
     .map((each) => each.publishAs ?? each.name)
     .filter((name) => taken.has(name));
+  const refusals = plan?.refusals ?? [];
 
   return (
     <div className="lib-modal" role="dialog" aria-modal="true" aria-label={PUBLISH.title}>
@@ -69,12 +79,15 @@ export function PublishDialog(): React.JSX.Element | null {
         <h2 className="lib-modal__title">{PUBLISH.title}</h2>
         <p className="lib-modal__lede">{PUBLISH.lede}</p>
 
-        {offer.declarations.length === 0 ? (
+        {offered.length === 0 ? (
           <p className="lib__empty">{PUBLISH.nothingToPublish}</p>
         ) : (
-          offer.declarations.map((declaration, index) => {
+          offered.map((declaration, index) => {
             const chosen = picked.has(declaration.name);
             const as = names[declaration.name] ?? declaration.name;
+            const brings = closureOf(offer.declarations, [declaration.name]).filter(
+              (name) => name !== declaration.name,
+            );
             return (
               <label className="lib-pick" key={declaration.name}>
                 <input
@@ -91,9 +104,12 @@ export function PublishDialog(): React.JSX.Element | null {
                 <span>
                   <span className="lib-pick__name">{declaration.name}</span>{' '}
                   <span className="lib-pick__kind">
-                    {declaration.kind} · lines {declaration.startLine}–{declaration.endLine}
+                    lines {declaration.startLine}–{declaration.endLine}
                   </span>
-                  {declaration.hardware.length > 0 ? (
+                  {chosen && brings.length > 0 ? (
+                    <div className="lib-pick__kind">{PUBLISH.brings(brings)}</div>
+                  ) : null}
+                  {chosen && declaration.hardware.length > 0 ? (
                     <div className="lib__warn">
                       {PUBLISH.hardwareWarning(declaration.hardware, offer.levelId)}
                     </div>
@@ -126,12 +142,19 @@ export function PublishDialog(): React.JSX.Element | null {
           </p>
         ))}
         {invalid ? <p className="lib__warn">{PUBLISH.nameInvalid}</p> : null}
+        {refusals.map((refusal) => (
+          <p className="lib__warn" key={refusal.message}>
+            {refusal.message}
+          </p>
+        ))}
 
         <div className="lib-modal__actions">
           <button
             type="button"
             className="lib__btn lib__btn--primary"
-            disabled={selection.length === 0 || invalid || conflicts.length > 0}
+            disabled={
+              selection.length === 0 || invalid || conflicts.length > 0 || refusals.length > 0
+            }
             onClick={() => void confirm()}
           >
             {PUBLISH.confirm}

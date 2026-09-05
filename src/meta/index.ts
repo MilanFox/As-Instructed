@@ -64,10 +64,12 @@ export {
   requirementsFor,
 } from './unlock.ts';
 
-export type { Declaration, PublishPlan, PublishSelection } from './publish.ts';
+export type { Declaration, PublishPlan, PublishRefusal, PublishSelection } from './publish.ts';
 export {
+  closureOf,
   isValidName,
   libraryExportNames,
+  libraryRefusals,
   planPublication,
   publishableDeclarations,
   renameIdentifier,

@@ -80,6 +80,16 @@ export const PUBLISH = {
   dependencyWarning: (missing: readonly string[]): string =>
     `This also uses ${missing.map((name) => `\`${name}\``).join(', ')}, which would stay behind. ` +
     'Publish those too, or the subroutine will not run.',
+  brings: (names: readonly string[]): string =>
+    `Brings ${names.map((name) => `\`${name}\``).join(', ')} with it.`,
+  refusedDeclaration: (name: string): string =>
+    `\`${name}\` cannot be lifted out whole, so nothing was published. lib.ts is unchanged.`,
+  refusedLibrary: (line: number): string =>
+    `lib.ts does not close what it opens on line ${line}, so nothing was appended to it. ` +
+    'lib.ts is unchanged.',
+  refusedRemoval:
+    'Taking this out would leave the work order unreadable, so nothing was moved. Both files are ' +
+    'unchanged.',
   hardwareWarning: (names: readonly string[], level: string): string =>
     `This calls ${names.map((name) => `\`${name}()\``).join(', ')}. A work order before ${level} ` +
     'has no such hardware installed, and the call will fail there.',

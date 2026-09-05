@@ -35,6 +35,9 @@ const AMBIENT_FILE_PATH = 'file:///bootstrap/firmware.d.ts';
  */
 const MODULE_DETECTION_FORCE = 3;
 
+/** What `installLanguageOptions` last pushed, per Monaco, so a level change does not push again. */
+const installedCompilerOptions = new WeakMap<object, string>();
+
 export interface CompileDiagnostic {
   message: string;
   /** 1-based, in the player's source. */
@@ -105,7 +108,7 @@ function resolveUnlocked(options: LanguageOptions): string[] {
 export function configurePlayerLanguage(monaco: MonacoApi, options: LanguageOptions): void {
   const ts = monaco.languages.typescript;
 
-  ts.typescriptDefaults.setCompilerOptions({
+  installLanguageOptions(monaco, {
     /* Monaco's `ScriptTarget` enum stops at ES2020; `ESNext` is the honest way to say "do not
        downlevel", which also keeps the emit close to line-for-line. */
     target: ts.ScriptTarget.ESNext,
@@ -125,6 +128,30 @@ export function configurePlayerLanguage(monaco: MonacoApi, options: LanguageOpti
     skipLibCheck: true,
   });
 
+  currentAmbientDts = buildAmbientDts(resolveUnlocked(options));
+  if (options.libraryDeclaration !== undefined) currentLibTypes = options.libraryDeclaration;
+  installExtraLibs(monaco);
+}
+
+/**
+ * Pushes the compiler and diagnostic settings, but only when they are not already installed.
+ *
+ * Every one of these setters fires `typescriptDefaults.onDidChange`, and Monaco answers that by
+ * disposing the TypeScript web worker and building a new one — which rejects whatever was in
+ * flight and throws away the program it had already type-checked. None of these values varies
+ * between work orders; only the ambient `.d.ts` does, and `setExtraLibs` updates the live worker
+ * instead of replacing it. So a level change costs an ambient rebuild and nothing else.
+ */
+function installLanguageOptions(
+  monaco: MonacoApi,
+  compilerOptions: MonacoEditor.languages.typescript.CompilerOptions,
+): void {
+  const ts = monaco.languages.typescript;
+  const fingerprint = JSON.stringify(compilerOptions);
+  if (installedCompilerOptions.get(monaco) === fingerprint) return;
+  installedCompilerOptions.set(monaco, fingerprint);
+
+  ts.typescriptDefaults.setCompilerOptions(compilerOptions);
   ts.typescriptDefaults.setDiagnosticsOptions({
     noSemanticValidation: false,
     noSyntaxValidation: false,
@@ -132,11 +159,7 @@ export function configurePlayerLanguage(monaco: MonacoApi, options: LanguageOpti
     /* 1375/1378: top-level await. 2669: augmentation in a non-module. Neither is the player's problem. */
     diagnosticCodesToIgnore: [1375, 1378, 2669],
   });
-
   ts.typescriptDefaults.setEagerModelSync(true);
-  currentAmbientDts = buildAmbientDts(resolveUnlocked(options));
-  if (options.libraryDeclaration !== undefined) currentLibTypes = options.libraryDeclaration;
-  installExtraLibs(monaco);
 }
 
 /** The ambient `.d.ts` as the editor would see it. Exported for the docs panel and for tests. */

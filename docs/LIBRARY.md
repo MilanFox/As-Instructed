@@ -169,8 +169,18 @@ Everything below is re-exported from `src/meta/index.ts`. UI components come fro
 `requirementsFor`, `isLibraryUnlocked`
 
 ### Publishing — `publish.ts`
-`Declaration`, `PublishPlan`, `PublishSelection` · `publishableDeclarations(source, hardware)`,
-`planPublication`, `libraryExportNames`, `withLibraryImport`, `renameIdentifier`, `isValidName`
+`Declaration`, `PublishPlan`, `PublishRefusal`, `PublishSelection` ·
+`publishableDeclarations(source, hardware)`, `planPublication`, `closureOf`, `libraryRefusals`,
+`libraryExportNames`, `withLibraryImport`, `renameIdentifier`, `isValidName`
+
+`Declaration.callable` is what the publish dialog offers: a `function`, a `class`, or a binding
+whose value is a function. Data and scratch are still found — `closureOf` needs them — but they are
+never checkboxes; ticking a routine takes its transitive `uses` closure with it.
+
+`planPublication` composes `lib.ts` and then **verifies it before returning it**: every delimiter,
+string, template and comment must close, and the composed file must scan back to the same
+declarations, byte for byte. A plan with `refusals` returns both sources unchanged, so no caller
+can write a damaged file. See `docs/FIX-LIBRARY.md`.
 
 ### Structure — `structure.ts`
 `LibraryFunction`, `StructureRow`, `LibraryStructure` · `buildStructure`
@@ -300,7 +310,7 @@ throws `MissingLibraryError` — which is a correct, in-voice failure, but it is
 
 ## 8. Tests
 
-`src/meta/__tests__/` — 127 tests.
+`src/meta/__tests__/` — 151 tests.
 
 | File | Covers |
 |---|---|
@@ -312,3 +322,4 @@ throws `MissingLibraryError` — which is a correct, in-voice failure, but it is
 | `profile.test.ts` (9) | Attribution roll-up, stale exclusion, medal-upgrade projection, cheapest useful saving, no-projection case |
 | `save.test.ts` (21) | Migration from every shape that has ever plausibly been written, source never discarded, revision cap, merge, storage failure, discrepancy pacing and candidate selection |
 | `pipeline.test.ts` (4) | The whole loop end to end: publish a declaration, import it from the next work order, run it, be charged for it, and get the right `lib.ts` line when it throws |
+| `publish-roundtrip.test.ts` (24) | The corpus: one row per declaration shape, published, parsed with the real compiler, re-linked and asserted to behave exactly as it did before it moved. Plus the refusal gate, removal not damaging neighbours, and the offer rule |
