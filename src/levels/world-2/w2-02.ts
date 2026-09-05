@@ -73,7 +73,7 @@ export const w2_02: LevelDef = {
     { label: 'The hopper', value: 'Far more seed than the field needs.' },
   ],
   seeds: [1, 2, 3, 4],
-  par: { ticks: 76, chars: 600 },
+  par: { ticks: 76 },
   build(seed: number): World {
     const world = createWorld({ w: FIELD + 2, h: FIELD + 2, seed, fill: Terrain.Wall });
     sowField(world);

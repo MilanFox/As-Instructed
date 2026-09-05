@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { Objective, ObjectiveContext, Sim, Vec } from '../../../engine/index.ts';
-import { Dir, ItemKind, evaluateObjectives, medalFor, scoreChars } from '../../../engine/index.ts';
+import { Dir, ItemKind, evaluateObjectives, medalFor } from '../../../engine/index.ts';
 import type { Budget } from '../../../game/budgets.ts';
 import { budgetFor } from '../../../game/budgets.ts';
 import { playbackFor } from '../../../game/playback.ts';
@@ -309,7 +309,6 @@ describe('world 2 shape', () => {
           'gold',
         );
       }
-      expect(level.par.chars).toBeGreaterThanOrEqual(scoreChars(solution.source));
     });
   }
 

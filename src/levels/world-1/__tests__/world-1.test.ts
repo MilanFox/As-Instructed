@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { Dir as DirType, Objective, Sim } from '../../../engine/index.ts';
-import { Dir, evaluateObjectives, medalFor, scoreChars, senseTotals } from '../../../engine/index.ts';
+import { Dir, evaluateObjectives, medalFor, senseTotals } from '../../../engine/index.ts';
 import type { LevelRunResult } from '../../harness.ts';
 import { runLevel, runReference } from '../../harness.ts';
 import type { LevelDef, ReferenceSolution } from '../../types.ts';
@@ -66,7 +66,6 @@ describe('world 1 shape', () => {
       expect(level.objectives.length).toBeGreaterThan(0);
       expect(level.seeds.length).toBeGreaterThan(0);
       expect(level.par.ticks).toBeGreaterThan(0);
-      expect(level.par.chars).toBeGreaterThan(0);
     }
   });
 
@@ -141,10 +140,6 @@ describe('reference solutions', () => {
           });
         }
       }
-
-      test('the player-facing source fits the char par', () => {
-        expect(scoreChars(solution.source)).toBeLessThanOrEqual(level.par.chars);
-      });
 
       test('the starter compiles against this level firmware', () => {
         expect(compileErrors(level.id, level.starter)).toEqual([]);

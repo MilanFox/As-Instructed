@@ -85,22 +85,72 @@ describe('migrate', () => {
 
   it('round-trips through export', () => {
     const save = emptySave();
-    save.levels['w1-01'] = { ...emptyProgress(), code: 'const a = `x`;', bestChars: 12 };
+    save.levels['w1-01'] = { ...emptyProgress(), code: 'const a = `x`;', bestTicks: 12 };
     const restored = parseSave(exportSave(save));
     expect(restored.levels['w1-01']?.code).toBe('const a = `x`;');
-    expect(restored.levels['w1-01']?.bestChars).toBe(12);
+    expect(restored.levels['w1-01']?.bestTicks).toBe(12);
+  });
+
+  /*
+   * `bestChars` was written by every build up to this one. A player who opens the game after
+   * updating must land on the medals, code and objectives they went to bed with — the retired
+   * field is dropped on read, and nothing beside it moves.
+   */
+  it('loads a save written before the character count was removed', () => {
+    const legacy = {
+      version: SAVE_VERSION,
+      updatedAt: 1_700_000_000_000,
+      levels: {
+        'w1-01': {
+          code: 'move(Dir.East);',
+          completed: true,
+          medal: 'gold',
+          stars: ['fast'],
+          objectives: ['reach'],
+          bestTicks: 9,
+          bestChars: 132,
+          attempts: 4,
+          clearedAt: 1_699_000_000_000,
+        },
+      },
+      settings: { layout: DEFAULT_LAYOUT, speed: 2, consoleCap: 200, celebrations: false },
+      achievements: { 'first-light': 1_699_000_000_000 },
+      stats: { runs: 12, passes: 5, fails: 7 },
+      seenRequisitions: ['w1'],
+    };
+
+    const restored = migrate(legacy);
+    const progress = restored.levels['w1-01'];
+
+    expect(progress).toEqual({
+      code: 'move(Dir.East);',
+      completed: true,
+      medal: 'gold',
+      stars: ['fast'],
+      objectives: ['reach'],
+      bestTicks: 9,
+      attempts: 4,
+      clearedAt: 1_699_000_000_000,
+    });
+    expect(restored.achievements).toEqual({ 'first-light': 1_699_000_000_000 });
+    expect(restored.stats).toEqual({ runs: 12, passes: 5, fails: 7 });
+    expect(restored.settings.speed).toBe(2);
+  });
+
+  it('survives a legacy save whose only level record is a bestChars', () => {
+    const restored = migrate({ version: 1, levels: { 'w2-01': { bestChars: 400 } } });
+    expect(restored.levels['w2-01']).toEqual(emptyProgress());
   });
 });
 
 describe('mergeProgress', () => {
   it('keeps the better medal and the lower records', () => {
     const merged = mergeProgress(
-      { ...emptyProgress(), medal: 'silver', bestTicks: 10, bestChars: 90, stars: ['a'] },
-      { ...emptyProgress(), medal: 'bronze', bestTicks: 8, bestChars: 120, stars: ['b'] },
+      { ...emptyProgress(), medal: 'silver', bestTicks: 10, stars: ['a'] },
+      { ...emptyProgress(), medal: 'bronze', bestTicks: 8, stars: ['b'] },
     );
     expect(merged.medal).toBe('silver');
     expect(merged.bestTicks).toBe(8);
-    expect(merged.bestChars).toBe(90);
     expect(merged.stars).toEqual(['a', 'b']);
   });
 

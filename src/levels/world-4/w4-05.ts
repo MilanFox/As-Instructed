@@ -146,7 +146,7 @@ export const w4_05: LevelDef = {
     },
   ],
   seeds: [1, 2, 3, 4, 5],
-  par: { ticks: 700, chars: 3200 },
+  par: { ticks: 700 },
   budget: { maxTicks: 2600 },
   build,
   objectives: [

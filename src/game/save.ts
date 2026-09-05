@@ -29,11 +29,6 @@ export interface LevelProgress {
    */
   objectives?: string[];
   bestTicks?: number;
-  /**
-   * Shortest source ever submitted for this order. Kept because a save must never lose a number a
-   * past build wrote — but it is **not** scored, ranked, or compared to anything. DESIGN.md §7.
-   */
-  bestChars?: number;
   attempts: number;
   /** Epoch ms of the first passing run. */
   clearedAt?: number;
@@ -204,7 +199,6 @@ function rescueLevels(raw: unknown): Record<string, LevelProgress> {
       if (banked.length > 0) progress.objectives = banked;
     }
     if (isPositive(value['bestTicks'])) progress.bestTicks = value['bestTicks'];
-    if (isPositive(value['bestChars'])) progress.bestChars = value['bestChars'];
     if (isPositive(value['attempts'])) progress.attempts = value['attempts'];
     if (isPositive(value['clearedAt'])) progress.clearedAt = value['clearedAt'];
     if (isPositive(value['hintsRevealed'])) progress.hintsRevealed = value['hintsRevealed'];
@@ -395,8 +389,6 @@ export function mergeProgress(
   if (hints > 0) merged.hintsRevealed = hints;
   const ticks = minDefined(current.bestTicks, next.bestTicks);
   if (ticks !== undefined) merged.bestTicks = ticks;
-  const chars = minDefined(current.bestChars, next.bestChars);
-  if (chars !== undefined) merged.bestChars = chars;
   const clearedAt = minDefined(current.clearedAt, next.clearedAt);
   if (clearedAt !== undefined) merged.clearedAt = clearedAt;
   return merged;

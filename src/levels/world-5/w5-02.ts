@@ -96,7 +96,7 @@ export const w5_02: LevelDef = {
     },
   ],
   seeds: [1, 2, 3, 4, 5],
-  par: { ticks: 2, chars: 260 },
+  par: { ticks: 2 },
   build(seed: number): World {
     const broken = breakIndex(seed);
     const world = createWorld({

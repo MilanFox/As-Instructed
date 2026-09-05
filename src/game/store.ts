@@ -20,7 +20,7 @@ import type { RunFacts } from './achievements.ts';
 import { earnedBy, isSenseBudget } from './achievements.ts';
 import type { LevelProgress, SaveFile } from './save.ts';
 import { emptyProgress, importSave, loadSave, mergeProgress, writeSave } from './save.ts';
-import { countChars, medalFor, objectivesOnEverySeed } from './score.ts';
+import { medalFor, objectivesOnEverySeed } from './score.ts';
 
 export type Screen = 'levels' | 'workspace' | 'review';
 export type RunState = 'idle' | 'running';
@@ -459,7 +459,6 @@ export const useGame = create<GameState>((set, get) => {
           })),
         );
 
-        const chars = countChars(get().code);
         const medal = medalFor(verdict.passed, verdict.stats.ticks, levelDef.par.ticks);
         pushLines([
           {
@@ -486,7 +485,7 @@ export const useGame = create<GameState>((set, get) => {
           resultId: get().resultId + 1,
           ...(verdict.passed ? {} : { failureCursor: get().failureCursor + 1 }),
         });
-        recordResult(levelDef, verdict, medal, chars, trace, results);
+        recordResult(levelDef, verdict, medal, trace, results);
       }
 
       /**
@@ -500,7 +499,6 @@ export const useGame = create<GameState>((set, get) => {
         levelDef: LevelDef,
         verdict: Verdict,
         medal: Medal,
-        chars: number,
         trace: Trace,
         results: PerSeedResult[],
       ): void {
@@ -527,7 +525,7 @@ export const useGame = create<GameState>((set, get) => {
           medal: verdict.passed ? medal : previous.medal,
           stars: verdict.passed ? [...previous.stars, ...earned] : previous.stars,
           objectives: [...(previous.objectives ?? []), ...closed],
-          ...(verdict.passed ? { bestTicks: verdict.stats.ticks, bestChars: chars } : {}),
+          ...(verdict.passed ? { bestTicks: verdict.stats.ticks } : {}),
           ...(verdict.passed && !previous.clearedAt ? { clearedAt: Date.now() } : {}),
           code: get().code,
         });

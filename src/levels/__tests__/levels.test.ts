@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { Dir, evaluateObjectives, medalFor, scoreChars } from '../../engine/index.ts';
+import { Dir, evaluateObjectives, medalFor } from '../../engine/index.ts';
 import { apiUnlockedAt } from '../../runtime/api-spec.ts';
 import { LIBRARY_FIRST_WORLD, requirementsFor } from '../../meta/unlock.ts';
 import { LEVELS, campaignOrder, getLevel, hardwareUnlockedBy, levelsByWorld } from '../index.ts';
@@ -185,7 +185,6 @@ describe('registry', () => {
       expect(level.brief.trim().length, level.id).toBeGreaterThan(0);
       expect(level.starter.trim().length, level.id).toBeGreaterThan(0);
       expect(level.par.ticks, level.id).toBeGreaterThan(0);
-      expect(level.par.chars, level.id).toBeGreaterThan(0);
       if (level.world >= 2) expect(level.seeds.length, level.id).toBeGreaterThanOrEqual(3);
     }
   });
@@ -240,10 +239,6 @@ describe('reference solutions', () => {
           expect(medalFor(true, result.ticks, level.par.ticks)).toBe('gold');
         });
       }
-
-      test('the player-facing source is within the char par', () => {
-        expect(scoreChars(solution.source)).toBeLessThanOrEqual(level.par.chars);
-      });
 
       test('replaying the trace reproduces the final world', () => {
         const seed = level.seeds[0] as number;

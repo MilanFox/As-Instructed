@@ -36,8 +36,7 @@ const expected = (ctx: ObjectiveContext): Objective =>
  * No traversal, no bonus, one objective.
  *
  * Par: every verb the level unlocks is free, so the reference finishes in 0 ticks. `par.ticks` is
- * 1 because the registry test requires a positive par. `par.chars` is scoreChars(source) = 86,
- * rounded up.
+ * 1 because the registry test requires a positive par.
  */
 export const w6_01: LevelDef = {
   id: 'w6-01',
@@ -62,7 +61,7 @@ export const w6_01: LevelDef = {
     { label: 'The queue', value: 'A different length every shift. Some shifts it is empty.' },
   ],
   seeds: [1, 2, 3],
-  par: { ticks: 1, chars: 100 },
+  par: { ticks: 1 },
   build(seed: number): World {
     const world = createWorld({ w: 10, h: 6, seed, fill: Terrain.Floor });
     paintAscii(world, SHACK, LEGEND);

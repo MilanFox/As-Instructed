@@ -273,7 +273,7 @@ export const w8_03: LevelDef = {
     { label: 'Your score', value: 'The clock stops when the last bot stops.' },
   ],
   seeds: [1, 2, 3, 4, 5],
-  par: { ticks: 128, chars: 2500 },
+  par: { ticks: 128 },
   build(seed: number): World {
     const layout = layoutFor(seed);
     const world = createWorld({ w: WIDTH, h: HEIGHT, seed, fill: Terrain.Floor });

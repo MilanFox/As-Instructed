@@ -205,7 +205,7 @@ export const w8_02: LevelDef = {
     { label: 'The budget', value: 'Par does not allow a full survey and then a delivery round.' },
   ],
   seeds: [1, 2, 3, 4, 5],
-  par: { ticks: PAR_TICKS, chars: 2400 },
+  par: { ticks: PAR_TICKS },
   build,
   objectives: [
     Objectives.custom(

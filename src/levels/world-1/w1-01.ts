@@ -72,7 +72,7 @@ export const w1_01: LevelDef = {
     { label: 'One move', value: 'One tick — even a move into a wall.' },
   ],
   seeds: [1],
-  par: { ticks: PAR_TICKS, chars: 400 },
+  par: { ticks: PAR_TICKS },
   build(seed: number): World {
     const world = createWorld({ w: 25, h: 14, seed, fill: Terrain.Wall });
     carveRoute(world);

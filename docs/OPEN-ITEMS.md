@@ -91,8 +91,11 @@ testers would have quit in. Gold on nine of the first ten levels, first honest r
 
 ### Decided, not yet started
 
-- **Remove character-count plumbing entirely** — `countChars`, `scoreChars`, `par.chars`,
-  `bestChars`, `stats.chars`. Touches all 40 level files, so it waits for the level agents.
+- ~~**Remove character-count plumbing entirely.**~~ Done, in an isolated worktree — see
+  `docs/FIX-CHARCOUNT.md`. `countChars`, `scoreChars`, `par.chars`, `bestChars` and
+  `Verdict.stats.chars` are gone from `src/` and from `DESIGN.md`. 34 level files, not 40: the
+  compression cut landed first. Saves carrying the old fields still load — the save reader
+  whitelists fields, so a retired one is dropped on read, proved by a fixture test.
 - ~~**The Library needs a moment.**~~ Done, in an isolated worktree — see
   `docs/FIX-LIBRARY-MOMENT.md`. The unlock moved from the close of `w3-04` to the close of
   `w2-05` and now arrives as a delivery note in the `Requisition` ceremony. Note for whoever
@@ -318,3 +321,98 @@ worktrees clean and fully merged — nothing was lost to the window, nothing to 
 Housekeeping done: the five merged agent worktrees and their branches are pruned, leaving
 only the three live ones. `wip/wave1-interrupted` was already gone — the earlier note listing
 it as outstanding was wrong.
+
+### 2026-09-05, 14:30 — prose and Library merged
+
+Main is green at **1417 tests**, tsc / build clean. One eslint error remains, the known
+`rules-of-hooks` false positive on `w5-01`'s solution (the game API has a `use()` verb).
+
+**Prose pass, merged.** Mean brief 220 → **58 words**, worst 560 → 96, total −74%. The
+interesting part is not the cutting but where the facts went: three things the UI already
+had and never drew are now on screen. `budget.maxTicks` is set by ten levels and the brief
+was the only place to learn it — `w8-05`'s brief claimed "the objectives panel shows the
+number", which was simply false until now. `LIBRARY_REQUIREMENTS` was a structured table
+rendered nowhere, re-typed as prose in every affected brief. And `LevelDef.facts` now
+carries ~190 rows of numbers that used to be buried in paragraphs. DESIGN.md §5 gained the
+rule: prose is read once, a row can be re-read, and players are frequently reading in a
+second language.
+
+`makespan`, `precedence` and `audit` are gone from player-facing text; the domain nouns
+and the flavour stayed. The accessible-language item is therefore **done**, folded into
+this pass.
+
+**Library moment, merged.** The verification step was worth more than the fix. Of the
+original complaint: "one grey status-bar line" was exactly right — `UnlockMemo` rendered
+only *inside* the panel, behind a toggle nobody clicks, while `wait()` gets a modal with a
+staged reveal and an audio cue. "Unlocks too late" was already stale, the cut moved it from
+14/40 to 10/34. "Hand-written six times" was wrong — it was four, and it referred to a
+serpentine sweep that is not on the Library ladder at all.
+
+The real defect was the opposite shape: **zero of the six earned routines existed before
+the unlock**, so the Repository was provisioned at level 10 and sat empty for three work
+orders — meaning moving it earlier *on its own* would have made that window longer. Unlock
+now closes `w2-05` (level 7) with a `RepositoryIssue` ceremony reusing the Requisition
+modal, and both of its "why" lines are computed from `LIBRARY_REQUIREMENTS` rather than
+written, so they cannot drift. `offerPublish` also bailed unless the player already had a
+callable top-level declaration — the entry point was gated on the habit the system exists
+to teach, which is why the beginner never saw it and rated it 1/5.
+
+No level became gated; the campaign is still finishable by a player who never opens it.
+
+### Defects found while doing the above — not fixed, ranked
+
+1. **`power()` on a manual machine fails silently** — charges the tick, returns false,
+   explains nothing. `w8-03` and `w8-05` cannot teach it by failure until this speaks.
+2. **`w4-02`'s designed failure is invisible** — no visited-tile trail in the replay, so
+   the loop teaches nothing. Dot's warning had to be trimmed rather than removed.
+3. **`w7-02`/`w7-03` now diverge from CURRICULUM.md §11** — the KD-2704 courtesy memo was
+   cut because the engine's `LivelockError` already says it at the moment it bites. Either
+   amend the doc or reverse the call.
+4. Dead `docs` ids on `w8-05`; two `costs` overrides the reference page contradicts;
+   `w8-05`'s 16000-vs-3000 limit mismatch. Detail in `docs/FIX-PROSE.md`.
+
+### In flight
+
+- **Viewport aspect** — running. Told to re-measure: the brief panel is much shorter and
+  the objective rail taller than when it took its "before" screenshots, so its layout
+  problem changed shape underneath it.
+- ~~**Character-count plumbing removal**~~ — done in a worktree, not yet merged. See
+  `docs/FIX-CHARCOUNT.md`. The save risk resolved to nothing structural: `rescueLevels`
+  already reads by whitelist, so dropping the field from `LevelProgress` is a tolerate-and-drop
+  with no new `SAVE_VERSION`. Two fixture tests prove a legacy save keeps its medals, code,
+  ticks, stars and objectives.
+
+### 2026-09-05, 15:30 — character-count plumbing deleted (`a3a532f`)
+
+Green at **1369 tests**, tsc / build clean, eslint at the one known false positive.
+
+There were **two** counters, and nothing had noticed because nothing compared them:
+`scoreChars` (a regex in `engine/verdict.ts`) and `countChars` (a 110-line hand-written
+scanner with three private helpers in `game/score.ts`). Both are gone, along with
+`Verdict.stats.chars`, `VerdictInput.chars`, `LevelScore.chars`, `LevelProgress.bestChars`,
+the `chars` arguments through `run-level` and `aggregate`, and `par.chars` from all 34
+level files. `par` is now `{ ticks: number }`. Every tick value is byte-identical — no par,
+medal threshold or budget moved.
+
+Test count 1417 → 1369, accounted rather than assumed: `countChars` suite −10, per-level
+`par.chars` −34, world-level −6, new save fixtures +2. World-2's
+`no bonus label mentions characters or code length` was deliberately **kept** — it is the
+guard against the idea returning through a bonus objective.
+
+**No save version bump, and none needed:** `migrate` already funnels every read through
+`rescueLevels`, which rebuilds progress off a field whitelist rather than spreading the
+stored object, so dropping a field *is* tolerate-and-drop. Two fixtures prove it — a full
+legacy save with `bestChars: 132` restoring to an exact object, and a record containing
+nothing but `bestChars` landing on `emptyProgress()` without throwing.
+
+DESIGN.md §4.6/§5/§7 updated: the "carried for historical reasons" sentence is replaced by
+"Character count does not exist."
+
+### Follow-up left by that work — small, unblocked
+
+`runLevel`'s `options.source` existed only to feed `scoreChars` and went with it. That
+leaves **`SeedRunOptions.source` and `RunRequest.code` with no readers** — `code`'s only
+consumer was `serve.ts` forwarding it into `source`. Removing them touches `protocol.ts`,
+`serve.ts`, `run-level.ts`, `src/ui/adapters.ts`, `src/meta/adapters.ts` and four test
+files, so it was correctly left as its own change rather than smuggled into a deletion.
+`LevelScore` in `score.ts` is also now an exported interface with no reference anywhere.

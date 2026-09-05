@@ -90,7 +90,7 @@ export const w2_04: LevelDef = {
     { label: 'At `maxGrowth`', value: 'Growth stops. The docking does not.' },
   ],
   seeds: [1, 2, 3, 4],
-  par: { ticks: 52, chars: 1050 },
+  par: { ticks: 52 },
   build(seed: number): World {
     const world = createWorld({ w: PLOT_W + 2, h: PLOT_H + 2, seed, fill: Terrain.Wall });
     sowPlot(world);

@@ -30,7 +30,7 @@ export const w1_03: LevelDef = {
     { label: 'The bay', value: '30 tiles end to end. The corridor has never run the whole of it.' },
   ],
   seeds: [1, 4, 7],
-  par: { ticks: 24, chars: 60 },
+  par: { ticks: 24 },
   build(seed: number): World {
     const world = createWorld({ w: 30, h: 3, seed, fill: Terrain.Wall });
     // Drawn per seed: no integer constant survives all three shifts.

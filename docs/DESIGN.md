@@ -162,7 +162,7 @@ interface Verdict {
   passed: boolean;
   objectives: { id: string; label: string; met: boolean; progress?: [number, number] }[];
   failure?: { code: FailureCode; message: string; at?: Vec; line?: number };
-  stats: { ticks: number; ops: number; chars: number; seeds: number };  // chars: not scored, §7
+  stats: { ticks: number; ops: number; seeds: number };
 }
 ```
 
@@ -180,7 +180,7 @@ interface LevelDef {
   build(seed: number): World;    // must be pure & deterministic given seed
   objectives: Objective[];       // evaluated against final world + trace
   seeds: number[];               // ALL must pass. length > 1 => generalization required
-  par: { ticks: number; chars: number };   // chars is retained but never scored — see §7
+  par: { ticks: number };        // the medal axis, and the only par there is — see §7
   starter: string;               // pre-filled editor content
   hints: string[];               // progressive, NEVER a full solution
   docs?: string[];               // extra doc page ids to surface
@@ -195,8 +195,7 @@ Rules for level authors:
   `vite.config.ts` and never reachable from the UI. Vitest asserts every level is solvable
   on every seed and that the reference solution's tick count is `<= par.ticks`.
 - `par.ticks` must be *achievable but tight*: aim for reference solution ticks, then subtract
-  ~10% so that a clever player is rewarded. `par.chars` is carried for historical reasons and is
-  not scored (§7); do not tune it and do not surface it.
+  ~10% so that a clever player is rewarded. It is the only par a level has (§7).
 - `hints` are nudges ("What happens if the field is empty when you arrive?"), never code.
 - `brief` is two or three sentences of roleplay and then the ask, capped at 110 words and tested.
   Every number, unit, budget, reach, dimension and wire format belongs in `facts`, in an objective
@@ -232,10 +231,11 @@ silver, a pass is bronze. Nothing else moves a medal.
 - **Bonus objectives**: extra star. Weights unchanged (§11 A4): gold 3, silver 2, bronze 1,
   star +1, so the Performance Review tiers in `NARRATIVE.md` §7 are unaffected.
 
-**`par.chars` is not scored.** It stays in `LevelDef` so level data does not churn, but it must
-not appear in medal maths, in a ranking, in a target, or as anything the UI colours or compares.
-Character count may appear at most as a quiet neutral stat next to the editor. `LevelProgress`
-keeps `bestChars` so no past save loses a number, and nothing reads it.
+**Character count does not exist.** There is no char par, no char stat on a `Verdict`, no
+`bestChars` in the save, and no function anywhere that measures the length of a player's program.
+It is not scored, not ranked, not stored, and not displayed — not as a target, not as a personal
+best, not as a neutral readout. A save written by a build that had one still loads; the retired
+field is dropped on read and everything beside it survives.
 
 Code golf is not a skill this game rewards. A verbose readable solution and a terse one that take
 the same number of ticks get the same medal, deliberately.

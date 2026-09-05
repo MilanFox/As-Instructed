@@ -59,7 +59,7 @@ function okResponse(seed: number): RunResponse {
   const verdict = {
     passed: true,
     objectives: [],
-    stats: { ticks: 6, ops: 6, chars: 10, seeds: 1, spend: {}, senses: {} },
+    stats: { ticks: 6, ops: 6, seeds: 1, spend: {}, senses: {} },
   } as Verdict;
   return {
     ok: true,

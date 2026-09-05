@@ -149,7 +149,6 @@ describe('the verdict carries the divergence, and only where there is one', () =
       ...ctx,
       objectives: [Objectives.printedSequence(MANIFEST)],
       ops: 0,
-      chars: 0,
       seeds: 1,
     });
 

@@ -156,7 +156,7 @@ export const w6_04: LevelDef = {
     },
   ],
   seeds: [1, 2, 3, 4],
-  par: { ticks: 14, chars: 800 },
+  par: { ticks: 14 },
   build(seed: number): World {
     const { key, tailKey } = shiftFor(seed);
     const band = bandFor(seed);

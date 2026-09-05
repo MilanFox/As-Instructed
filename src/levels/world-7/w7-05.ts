@@ -169,7 +169,7 @@ export const w7_05: LevelDef = {
     },
   ],
   seeds: [1, 2, 3, 4, 5],
-  par: { ticks: 100, chars: 5200 },
+  par: { ticks: 100 },
   budget: { maxTicks: 6000 },
   build(seed: number): World {
     const detail = detailFor(seed);

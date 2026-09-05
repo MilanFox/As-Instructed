@@ -79,7 +79,7 @@ export const w3_01: LevelDef = {
     { label: 'The clamp', value: 'One crate at a time.' },
   ],
   seeds: [1, 2, 3],
-  par: { ticks: PAR_TICKS, chars: 1100 },
+  par: { ticks: PAR_TICKS },
   build(seed: number): World {
     const world = createWorld({ w: 14, h: 5, seed, fill: Terrain.Floor });
     frame(world);

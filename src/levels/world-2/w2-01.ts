@@ -55,7 +55,7 @@ export const w2_01: LevelDef = {
     },
   ],
   seeds: [1, 2, 8, 13],
-  par: { ticks: 18, chars: 320 },
+  par: { ticks: 18 },
   build(seed: number): World {
     const world = createWorld({ w: 12, h: 3, seed, fill: Terrain.Wall });
     const readings = rowReadings(world);

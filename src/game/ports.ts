@@ -10,7 +10,6 @@ import type { Trace, Vec, Verdict } from '../engine/index.ts';
 import { FailureCode, Sim, buildVerdict, cloneWorld, isSimError } from '../engine/index.ts';
 import type { RunResponse } from '../runtime/protocol.ts';
 import { getLevel } from '../levels/index.ts';
-import { countChars } from './score.ts';
 
 /** What the shell knows at Run time. Transpiling to JS is the adapter's job, not the shell's. */
 export interface RunSubmission {
@@ -172,7 +171,6 @@ export class FakeRunner implements RunnerPort {
       trace,
       initialWorld,
       ops: sim.ops,
-      chars: countChars(submission.code),
       seeds: submission.seeds.length,
       spend: sim.spendTotals(),
       ...(failure ? { failure } : {}),

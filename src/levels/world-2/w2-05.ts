@@ -122,7 +122,7 @@ export const w2_05: LevelDef = {
     },
   ],
   seeds: [1, 2, 3, 4, 5],
-  par: { ticks: 74, chars: 700 },
+  par: { ticks: 74 },
   budget: { maxTicks: SHIFT },
   build(seed: number): World {
     const world = createWorld({ w: WIDTH + 2, h: HEIGHT + 2, seed, fill: Terrain.Wall });

@@ -16,117 +16,6 @@ export const BONUS_STAR_POINTS = 1;
 export const SILVER_FACTOR = 1.25;
 
 /**
- * Source length after stripping comments and surrounding whitespace. DESIGN.md §7.
- *
- * Trailing whitespace goes too: a removed comment must not leave the space in front of it behind,
- * or a comment would cost the player a character.
- *
- * Scanned rather than regexed, because a `//` inside a string literal is not a comment and a
- * player who discovers otherwise has been robbed of characters they paid for. Template literals
- * nest, so the scanner tracks brace depth inside `${}`.
- */
-export function countChars(source: string): number {
-  const out: string[] = [];
-  scanCode(source, 0, out, false);
-  return out
-    .join('')
-    .split('\n')
-    .map((line) => line.replace(/^[ \t]+/, '').replace(/[ \t]+$/, ''))
-    .filter((line) => line.length > 0)
-    .join('\n').length;
-}
-
-/**
- * Copies code into `out` with comments removed. Returns the index it stopped at. When
- * `untilCloseBrace` is set it stops after the `}` that closes a `${` substitution.
- */
-function scanCode(source: string, from: number, out: string[], untilCloseBrace: boolean): number {
-  let i = from;
-  let depth = 0;
-  while (i < source.length) {
-    const ch = source[i] as string;
-    const next = source[i + 1];
-
-    if (ch === '/' && next === '/') {
-      while (i < source.length && source[i] !== '\n') i++;
-      continue;
-    }
-    if (ch === '/' && next === '*') {
-      i += 2;
-      while (i < source.length && !(source[i] === '*' && source[i + 1] === '/')) i++;
-      i = Math.min(i + 2, source.length);
-      continue;
-    }
-    if (ch === '"' || ch === "'") {
-      i = scanQuoted(source, i, out, ch);
-      continue;
-    }
-    if (ch === '`') {
-      out.push(ch);
-      i = scanTemplate(source, i + 1, out);
-      continue;
-    }
-    if (untilCloseBrace) {
-      if (ch === '{') depth++;
-      if (ch === '}') {
-        if (depth === 0) {
-          out.push(ch);
-          return i + 1;
-        }
-        depth--;
-      }
-    }
-    out.push(ch);
-    i++;
-  }
-  return i;
-}
-
-/** Copies a `'` or `"` literal verbatim, including its terminator. */
-function scanQuoted(source: string, from: number, out: string[], quote: string): number {
-  out.push(quote);
-  let i = from + 1;
-  while (i < source.length) {
-    const ch = source[i] as string;
-    out.push(ch);
-    i++;
-    if (ch === '\\') {
-      if (i < source.length) out.push(source[i] as string);
-      i++;
-      continue;
-    }
-    if (ch === quote || ch === '\n') break;
-  }
-  return i;
-}
-
-/** Copies a template literal from just after its opening backtick, recursing into `${}`. */
-function scanTemplate(source: string, from: number, out: string[]): number {
-  let i = from;
-  while (i < source.length) {
-    const ch = source[i] as string;
-    if (ch === '\\') {
-      out.push(ch);
-      if (i + 1 < source.length) out.push(source[i + 1] as string);
-      i += 2;
-      continue;
-    }
-    if (ch === '`') {
-      out.push(ch);
-      return i + 1;
-    }
-    if (ch === '$' && source[i + 1] === '{') {
-      out.push('$', '{');
-      i = scanCode(source, i + 2, out, true);
-      continue;
-    }
-    out.push(ch);
-    i++;
-  }
-  return i;
-}
-
-/**
  * Stars actually earned on a level, counting only bonus objectives the level still offers.
  *
  * A save outlives the level definition that wrote it. When a work order's bonus is retired or
@@ -164,7 +53,6 @@ export interface LevelScore {
   /** Bonus objective ids met on this run. */
   stars: number;
   ticks: number;
-  chars: number;
 }
 
 /** Medal points for one level result. DESIGN.md §11 A4: gold 3, silver 2, bronze 1, star +1. */

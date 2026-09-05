@@ -10,7 +10,7 @@ import type { ObjectiveReport, Trace, Verdict } from '../engine/index.ts';
 
 /** Main thread -> worker. */
 export interface RunRequest {
-  /** The player's TypeScript source, exactly as typed. Scored for `chars`, never executed. */
+  /** The player's TypeScript source, exactly as typed. Carried for diagnostics, never executed. */
   code: string;
   /**
    * The emitted JavaScript. Monaco's TypeScript worker only exists on the main thread, so the

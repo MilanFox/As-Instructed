@@ -294,7 +294,6 @@ describe('information budget objectives', () => {
       trace,
       initialWorld,
       ops: sim.ops,
-      chars: 0,
       seeds: 1,
       senses: sim.senseTotals(),
     });
@@ -320,7 +319,6 @@ describe('information budget objectives', () => {
       trace,
       initialWorld,
       ops: sim.ops,
-      chars: 0,
       seeds: 1,
     });
     expect(verdict.stats.senses).toEqual({ pos: 6 });
@@ -431,7 +429,6 @@ describe('information budget objectives', () => {
       trace: sim.finish(),
       initialWorld,
       ops: sim.ops,
-      chars: 0,
       seeds: 1,
       senses: sim.senseTotals(),
     });
