@@ -317,3 +317,11 @@ const REQUISITION_DOT = [
 export function requisitionDot(salt: number): string {
   return pick(REQUISITION_DOT, salt);
 }
+
+/** The Performance Review memo, delivered on the site map. NARRATIVE.md §7. */
+export const REVIEW = {
+  from: 'Personnel & Scheduling — for information only, pending review',
+  title: 'PERFORMANCE REVIEW — CONTRACTOR #4471',
+  author: 'Deputy Site Coordinator M. Vance',
+  dismiss: 'Acknowledge receipt',
+} as const;

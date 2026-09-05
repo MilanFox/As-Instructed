@@ -22,7 +22,7 @@ import type { LevelProgress, SaveFile } from './save.ts';
 import { emptyProgress, importSave, loadSave, mergeProgress, writeSave } from './save.ts';
 import { medalFor, objectivesOnEverySeed } from './score.ts';
 
-export type Screen = 'levels' | 'workspace' | 'review';
+export type Screen = 'levels' | 'workspace';
 export type RunState = 'idle' | 'running';
 export type ConsoleKind = 'print' | 'system' | 'error' | 'success';
 
@@ -114,6 +114,8 @@ export interface GameState {
   dismissResults(): void;
   advanceToNextLevel(): void;
   signRequisition(): void;
+  /** Marks a Performance Review tier as read. A memo is delivered once per tier, ever. */
+  fileReview(rank: number): void;
   setCelebrations(on: boolean): void;
   /** Records a commendation raised outside a run — the Repository's, mostly. Idempotent. */
   award(id: string): void;
@@ -619,6 +621,12 @@ export const useGame = create<GameState>((set, get) => {
       if (!pending) return;
       const seen = [...new Set([...get().save.seenRequisitions, ...pending.hardware])];
       persist({ ...get().save, seenRequisitions: seen });
+    },
+
+    fileReview(rank) {
+      const save = get().save;
+      if (save.reviewedRanks.includes(rank)) return;
+      persist({ ...save, reviewedRanks: [...save.reviewedRanks, rank].sort((a, b) => a - b) });
     },
 
     setCelebrations(on) {
