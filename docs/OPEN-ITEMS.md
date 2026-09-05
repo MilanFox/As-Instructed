@@ -318,3 +318,61 @@ worktrees clean and fully merged — nothing was lost to the window, nothing to 
 Housekeeping done: the five merged agent worktrees and their branches are pruned, leaving
 only the three live ones. `wip/wave1-interrupted` was already gone — the earlier note listing
 it as outstanding was wrong.
+
+### 2026-09-05, 14:30 — prose and Library merged
+
+Main is green at **1417 tests**, tsc / build clean. One eslint error remains, the known
+`rules-of-hooks` false positive on `w5-01`'s solution (the game API has a `use()` verb).
+
+**Prose pass, merged.** Mean brief 220 → **58 words**, worst 560 → 96, total −74%. The
+interesting part is not the cutting but where the facts went: three things the UI already
+had and never drew are now on screen. `budget.maxTicks` is set by ten levels and the brief
+was the only place to learn it — `w8-05`'s brief claimed "the objectives panel shows the
+number", which was simply false until now. `LIBRARY_REQUIREMENTS` was a structured table
+rendered nowhere, re-typed as prose in every affected brief. And `LevelDef.facts` now
+carries ~190 rows of numbers that used to be buried in paragraphs. DESIGN.md §5 gained the
+rule: prose is read once, a row can be re-read, and players are frequently reading in a
+second language.
+
+`makespan`, `precedence` and `audit` are gone from player-facing text; the domain nouns
+and the flavour stayed. The accessible-language item is therefore **done**, folded into
+this pass.
+
+**Library moment, merged.** The verification step was worth more than the fix. Of the
+original complaint: "one grey status-bar line" was exactly right — `UnlockMemo` rendered
+only *inside* the panel, behind a toggle nobody clicks, while `wait()` gets a modal with a
+staged reveal and an audio cue. "Unlocks too late" was already stale, the cut moved it from
+14/40 to 10/34. "Hand-written six times" was wrong — it was four, and it referred to a
+serpentine sweep that is not on the Library ladder at all.
+
+The real defect was the opposite shape: **zero of the six earned routines existed before
+the unlock**, so the Repository was provisioned at level 10 and sat empty for three work
+orders — meaning moving it earlier *on its own* would have made that window longer. Unlock
+now closes `w2-05` (level 7) with a `RepositoryIssue` ceremony reusing the Requisition
+modal, and both of its "why" lines are computed from `LIBRARY_REQUIREMENTS` rather than
+written, so they cannot drift. `offerPublish` also bailed unless the player already had a
+callable top-level declaration — the entry point was gated on the habit the system exists
+to teach, which is why the beginner never saw it and rated it 1/5.
+
+No level became gated; the campaign is still finishable by a player who never opens it.
+
+### Defects found while doing the above — not fixed, ranked
+
+1. **`power()` on a manual machine fails silently** — charges the tick, returns false,
+   explains nothing. `w8-03` and `w8-05` cannot teach it by failure until this speaks.
+2. **`w4-02`'s designed failure is invisible** — no visited-tile trail in the replay, so
+   the loop teaches nothing. Dot's warning had to be trimmed rather than removed.
+3. **`w7-02`/`w7-03` now diverge from CURRICULUM.md §11** — the KD-2704 courtesy memo was
+   cut because the engine's `LivelockError` already says it at the moment it bites. Either
+   amend the doc or reverse the call.
+4. Dead `docs` ids on `w8-05`; two `costs` overrides the reference page contradicts;
+   `w8-05`'s 16000-vs-3000 limit mismatch. Detail in `docs/FIX-PROSE.md`.
+
+### In flight
+
+- **Viewport aspect** — running. Told to re-measure: the brief panel is much shorter and
+  the objective rail taller than when it took its "before" screenshots, so its layout
+  problem changed shape underneath it.
+- **Character-count plumbing removal** — started now that `src/levels/**` is free. The save
+  format is the risk: `bestChars` and `stats.chars` are persisted, so existing saves must
+  keep loading with a fixture test to prove it.
