@@ -104,8 +104,32 @@ testers would have quit in. Gold on nine of the first ten levels, first honest r
   *not* too late in the campaign; it was too early to hold anything. See §1 of that file.
 - Viewport aspect: 891×393, 56% of width wasted on square grids.
 - Refill the achievement set further if it reads thin once the cut lands.
-- Par is default-gold through World 2. Deliberately frozen until the above lands, because
-  the fix is either "raise par" or "par is not the axis" and that depends on the new bonuses.
+- ~~**Par is default-gold through World 2.**~~ Done, in an isolated worktree — see
+  `docs/FIX-PAR.md`. The recorded framing was wrong in a way the measurement settles: par was
+  never *loose*. On 21 of 34 levels it is set to exactly the reference solution's worst seed, so
+  there was nothing to tighten. The answer splits by world. **World 1: par is not the axis** —
+  the tick-optimal route is the first route a player writes (measured: on `w1-03` the answer with
+  no idea in it ties the reference, and the star-earning stride costs *more*), so nothing moved.
+  **World 2: raise par, on the two levels where par paid gold for ignoring the level's own
+  hardware** — `w2-01` 18 → 16 and `w2-05` 74 → 60, with both reference solutions rewritten to the
+  route par now rewards. The lazier route still passes every seed and now takes silver. `w2-02`
+  and `w2-04` were measured and left alone. Note for whoever reads this next: **the bonus rework
+  did its job** — the reference now fails five of the six World 1–2 bonuses — but the playtest
+  measured which instrument a player acts on, and it is the medal, not the star. See §2 of that
+  file.
+- **Silver is arithmetically unreachable on `w5-02` and `w6-01`.** Found by the incentive audit
+  (`docs/AUDIT-INCENTIVES.md` §8), confirmed and pinned by a test. Ticks are integers and silver is
+  `(par, par × 1.25]`, so the band holds no integer below a par of four. Both pars are placeholders
+  rather than design figures — `w6-01`'s own comment says it is 1 "because the registry test
+  requires a positive par". Not fixable by moving a number. Two exit routes, both written out in
+  `docs/FIX-PAR.md` §6–7: the `graded: false` schema change, which covers both levels as a side
+  effect, or a one-line widening of the band in `src/engine/verdict.ts` that is behaviour-preserving
+  on the other 32 levels. **Left for the orchestrator: it is a DESIGN §7 amendment and it reaches
+  `src/ui/panels/**`.**
+- The audit's `graded: false` proposal is sound in principle and **wrong in scope** — measured
+  against the reference solutions it is 4 right and 7 wrong out of eleven, and it misses `w6-03`
+  and `w6-05`. The measured set is `w1-01, w1-03, w5-02, w6-01, w6-03, w6-05`, and it leaves World
+  2 graded in full. Table in `docs/FIX-PAR.md` §6.
 - Housekeeping: 2 pre-existing eslint false positives; delete branch `wip/wave1-interrupted`.
 
 ### Backlog — i18n, German toggle
@@ -353,9 +377,13 @@ the unlock**, so the Repository was provisioned at level 10 and sat empty for th
 orders — meaning moving it earlier *on its own* would have made that window longer. Unlock
 now closes `w2-05` (level 7) with a `RepositoryIssue` ceremony reusing the Requisition
 modal, and both of its "why" lines are computed from `LIBRARY_REQUIREMENTS` rather than
-written, so they cannot drift. `offerPublish` also bailed unless the player already had a
-callable top-level declaration — the entry point was gated on the habit the system exists
-to teach, which is why the beginner never saw it and rated it 1/5.
+written, so they cannot drift. `offerPublish` also bails unless the player already has a
+callable top-level declaration — the entry point is gated on the habit the system exists
+to teach, which is why the beginner never saw it and rated it 1/5. **Correction, 16:20:
+that was recorded here as fixed and it is not.** The Library work added the `briefed` gate
+and the ceremony; `src/meta/store.ts`'s `if (!declarations.some(each => each.callable))
+return;` is untouched. Verified by reading the line. The error was mine, over-reading the
+agent's report, not the agent's.
 
 No level became gated; the campaign is still finishable by a player who never opens it.
 
@@ -527,3 +555,131 @@ that still promise the old silent `false`. **Ruling: delete them rather than cor
 The prose pass kept those rows *because* the failure was mute; that condition is gone, and a
 row explaining what an error message now says out loud is the "told me" half of
 PLAYTEST-BEGINNER §9. Apply once par merges.
+
+### 2026-09-05, 16:20 — incentive audit landed (`docs/AUDIT-INCENTIVES.md`, 920 lines)
+
+Read-only instrument, no source touched. It did what it was built to do: the top finding is
+structural and neither playtest saw it.
+
+**1. 31 of 34 levels cannot report *where* a run failed.** 71 of 82 `Objectives.*` calls in
+the level files are `Objectives.custom`; only 25 pass a progress tuple, and only **three
+levels** (`w6-01`, `w6-03`, `w6-05`) can produce an actual `Divergence`. Everything else
+falls through `failureCauses` to `'not met'`. `w4-04`'s bonus knows the order you took and
+the best order and reports neither. **The "read" step of run → fail → read → revise is
+empty**, so the loop degrades to guessing — and `RAISED, AND RAISED AGAIN` then pays out for
+ten runs of guessing. Proposed fix: make `divergence` non-optional in `custom`, add a
+`checkbox` variant for genuinely binary objectives, and guard it with a campaign-wide test.
+Blocked on the par agent holding `src/levels/**`.
+
+**2. The publish gate is not fixed.** See the correction above. Now assigned.
+
+**3. Strictly linear unlock** — 33 single points of failure, hint ladder the only escape and
+it ends. The gate is already leaky: `openLevel` does not check it, and the Performance
+Review's medal wall opens any row.
+
+**4. The Performance Review is a completion percentage wearing a rank.** Scoped to all 34
+levels regardless of progress, so a player at 17/17 with flawless golds reads **38%** and is
+told they are average. All-gold-no-stars is **76.1%**, below the 93% `RETAINED` tier whose
+own text is *"Every work order closed at or under par"* — which that player has done.
+**Neither tester opened this screen once.** Now assigned.
+
+Findings 5–12 cover `AS PER THE BRIEF` versus the 4th/10th-run commendations; four bonuses
+plus `NO CONTACT REPORTED` plus the tick cost all paying for not bumping, which jointly
+rewards hardcoding; the bonus layer being 27 tightenings out of 37; a Discrepancy reporting
+a failure on a layout **there is no seed picker to run**; a bonus star graded on one seed
+while the medal beside it is graded on all of them; and **DESIGN.md §7.1 still binding
+agents to implement the streak** that was deleted this morning.
+
+### The audit's par ruling — forwarded to the par agent
+
+**Par is not the axis, and raising it is the wrong fix.** Par is two measurements sharing
+one badge: on traversal levels (`w3-02` 332, `w4-04` 970, `w8-05` 1050) it prices route
+quality honestly; on reasoning levels the route is forced — eight level files' own comments
+say par *is* the correct solution's cost — so it measures nothing. Raising par there turns
+"gold for correct" into "silver for correct", replacing a truthful signal with a lie about
+headroom that does not exist. Proposal: `graded: false` on reasoning levels, keeping tuned
+par only where the route is a genuine choice.
+
+**Verified independently:** `SILVER_FACTOR = 1.25`, `w6-01` is `par: { ticks: 1 }` and
+`w5-02` is `par: { ticks: 2 }`, so the silver band contains no integer and **silver is
+arithmetically unreachable on those levels.** A ladder bug independent of tuning.
+
+### Where the audit corrected itself against the playtests
+
+Marked inline, which is the discipline working. Its behavioural claim in finding 5 is
+**refuted** — both testers ran freely (42 runs across 17 levels, 11 on one) and neither
+hesitated, so only the incoherence survives. Finding 9's prediction is **refuted at the top
+of the skill range** — the veteran used the Repository unprompted, for intrinsic reasons.
+And it withdrew a claim that `personalBestLine` was tick-golf pressure: both testers name it
+the best reward in the game, correctly, because it is a diff against your own past work with
+no threshold. **Do not touch it.**
+
+Three problems the playtests found and the audit missed are in its §18. The largest: both
+testers say the commendation layer changed their behaviour **exactly zero times**, which
+makes deletions cheap and raises whether fifteen commendations should be five.
+
+### 2026-09-05, 16:25 — par recalibration merged (`c36e07f`)
+
+Green at **1389 tests**, tsc / build clean.
+
+**The recorded framing was wrong, and this is the headline: par was never loose.** Measured
+against every reference solution on every seed, **21 of 34 levels have par set to exactly
+the worst seed's cost**; median headroom across the campaign is **0.0%**. There was nothing
+to tighten. A par of 70 on `w1-01` would make gold unreachable by the only program the level
+admits. What the testers felt as generosity was the solution space being a single point.
+
+The decisive measurement was not headroom but a *lazy* versus a *smart* program per level,
+both driven through the harness. `w1-03` is the proof: the idea-free answer **ties** the
+reference exactly, because sensing is free — and the star-earning stride costs *more*.
+
+**World 1: par is not the axis. Nothing moved.** **World 2: raise par, on the two levels
+paying gold for ignoring the level's own hardware** — `w2-01` 18 → 16, `w2-05` 74 → 60, both
+reference solutions rewritten to the route par now rewards. The lazy route still passes every
+seed and now takes **silver with margin**. `w2-02` and `w2-04` measured and left alone.
+
+The evidence for fixing the medal rather than the star: the beginner finished ten ticks over
+par on `w1-05`, knew which ten, and *"did not go back. The reward for doing so is 4 points
+instead of 3."* The veteran's silver-to-gold rewrite on `w2-04` was *"the single best moment
+in my first ninety minutes."*
+
+### On the audit's `graded: false` proposal — principle agreed, scope rejected
+
+The audit picked its set by **par magnitude**; the measured criterion is **can any correct
+program cost fewer ticks than another**. It was right on 4 of 11 and wrong on 7, and it
+missed `w6-03` and `w6-05` entirely. Measured set: **`w1-01`, `w1-03`, `w5-02`, `w6-01`,
+`w6-03`, `w6-05`** — leaving **World 2 graded in full**, the opposite of both the original
+item and the audit's proposal.
+
+`w2-04` fixed the criterion's wording. Ticks cannot tell lapping from waiting there, so the
+clock cannot see the lesson — but it graded both testers at 63 against par 52, and ungrading
+it would delete the best medal event in two playtests. **"The clock cannot see the lesson"
+is not "the clock cannot grade."** Written up as **DESIGN §11 A7** (`958e96e`), my ruling.
+Implementation is blocked: it reaches `ObjectiveRail.tsx` (renderer agent) and `store.ts`,
+`achievements.ts`, `save.ts` (rewards agent).
+
+### The silver-band fact, confirmed and bounded
+
+Silver's band is empty below par 4 (`floor(3 x 1.25) = 3`), which bites **exactly two**
+levels, `w5-02` and `w6-01` — and neither par is a design figure. `w6-01`'s own comment says
+its par is 1 *because the registry test requires a positive par*; the reference costs 0. A
+test now fails if a third appears. Second finding on the way through: **`SILVER_FACTOR` in
+`score.ts` was dead** — nothing read it, the live 1.25 is inline in `medalFor`. Two copies,
+one authoritative: the same shape as the two tick counters and the two character counters
+found earlier today. **That is three duplicated-constant bugs in one day; worth a sweep.**
+
+### In flight
+
+- **Divergence** — the audit's top finding. Also carrying the silver-band widening, the dead
+  `SILVER_FACTOR`, and the two `power()` fact-row deletions.
+- **`w4-02` visited-tile trail**, plus the `DocsPanel` per-level `costs` bug.
+- **Publish gate + Performance Review scoping.**
+
+### Still open, unassigned
+
+- `w1-01` has no bonus and cannot have the obvious one: nothing in a trace distinguishes a
+  loop from 78 `move()` calls, and character count stays deleted. Recorded so it is not
+  re-litigated.
+- CURRICULUM drift on `w2-01`/`w2-05` — `premise`/`world`/`bonus` rows still describe
+  pre-compression versions. Deliberately not folded into the par change.
+- Worlds 3–8 pars unmeasured against the lazy/smart criterion; World 3 already silvers a
+  beginner three times.

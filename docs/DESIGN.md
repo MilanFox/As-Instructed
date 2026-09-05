@@ -337,3 +337,23 @@ Review tiers in `docs/NARRATIVE.md` §7 assume exactly this.
 **A6 — `FailureCode.BLOCKED_LIVELOCK`.** When every bot in a multi-bot level has its move blocked
 for N consecutive resolution rounds, fail with a dedicated code and a message that names livelock
 explicitly. Silent livelock reads as an engine bug and will make players quit.
+
+**A7 — A level may be ungraded.** `LevelDef` gains `graded?: boolean`, default `true`. An ungraded
+level shows `CLOSED` on a pass, has no medal ladder, and is still worth 3 points. This overrides §7,
+which assumes every level carries a medal.
+
+The criterion is measured, not editorial: **can any correct program cost fewer ticks than another
+correct program?** Where it cannot, the route is forced, and par is not a budget — it is the cost of
+the only solution the level admits. A medal ladder there teaches the player the grade is noise, and
+they learn that exactly where the grade is about to start carrying information.
+
+The set, measured by driving a *lazy* and a *smart* program through the harness on every seed:
+**`w1-01`, `w1-03`, `w5-02`, `w6-01`, `w6-03`, `w6-05`.** World 2 stays graded in full — on
+`w2-01` and `w2-05` a lazy route genuinely costs more than a smart one, which is why their par
+moved instead.
+
+`w2-04` is the case that fixes the criterion's wording. Ticks there cannot tell lapping from
+waiting, so the clock cannot see the lesson — but it still graded both testers at 63 against par
+52, and the veteran's silver-to-gold rewrite was the best moment of his first ninety minutes.
+**"The clock cannot see the lesson" is not "the clock cannot grade."** Only the second ungrades a
+level.

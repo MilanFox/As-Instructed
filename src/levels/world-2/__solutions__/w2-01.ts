@@ -4,8 +4,10 @@ import type { ReferenceSolution } from '../../types.ts';
 /**
  * TEST FIXTURE. Never imported from src/main.tsx — vite.config.ts fails the build if it is.
  *
- * Walk the row once reading every tile, keep the best reading and where it came from, then drive
- * back to it. The sensor is free, so the only cost is the walk out and the walk back.
+ * Walk East keeping the best reading and where it came from, and stop the moment a reading is at
+ * the top of the scale — nothing in the row can beat it, so there is nothing left to compare and
+ * no reason to walk back. The argmax is still carried in case the row somehow ends without one,
+ * which is the same program with the early exit removed.
  */
 export const solution: ReferenceSolution = {
   levelId: 'w2-01',
@@ -18,6 +20,7 @@ export const solution: ReferenceSolution = {
         bestGrowth = here.growth;
         bestX = sim.pos(botId).x;
       }
+      if (here.crop !== null && here.growth >= here.maxGrowth) break;
       if (!sim.canMove(botId, Dir.East)) break;
       sim.move(botId, Dir.East);
     }
@@ -33,6 +36,7 @@ export const solution: ReferenceSolution = {
     '    bestGrowth = here.growth;',
     '    bestX = pos().x;',
     '  }',
+    '  if (here.crop !== null && here.growth >= here.maxGrowth) break;',
     '  if (!canMove(Dir.East)) break;',
     '  move(Dir.East);',
     '}',

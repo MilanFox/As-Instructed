@@ -12,11 +12,24 @@ const SHIFT = 84;
  * Distinct tiles a shift may enter.
  *
  * `scan(Dir.North)` and `scan(Dir.South)` mean a bot walking one row reads three, so two lanes
- * survey the whole field from a quarter of it. Measured: that route fills the hopper on 22–27
- * tiles and inside 51 ticks across the five seeds, while the serpentine that passes the level
- * enters 41–49. Set above the first and well under the second.
+ * survey the whole field from a quarter of it. Measured: that route fills the hopper on 22–28
+ * tiles across the five seeds, while the serpentine that also passes the level enters 41–49. Set
+ * above the first and well under the second.
  */
 const FOOTPRINT = 32;
+
+/**
+ * Gold is the sensor reach, and the reach is on the facts table.
+ *
+ * Two routes pass. The serpentine reads only the tile under the wheels and costs 58–68 across the
+ * seeds; the two lanes, reading the rows either side and stepping off for a ripe crop, cost 46–54.
+ * Par sits between them: the lane route golds with six ticks spare on its worst seed, and the
+ * serpentine lands on silver at 68 against a silver line of 75.
+ *
+ * Not a trim of the old 74. That number was the serpentine's own cost plus a margin, so it paid
+ * gold for ignoring the one instrument this level exists to teach.
+ */
+const PAR_TICKS = 60;
 
 /** Row-major serpentine, which is the order a bot with no long-range sensor will meet the field. */
 function sweepOrder(): Vec[] {
@@ -122,7 +135,7 @@ export const w2_05: LevelDef = {
     },
   ],
   seeds: [1, 2, 3, 4, 5],
-  par: { ticks: 74 },
+  par: { ticks: PAR_TICKS },
   budget: { maxTicks: SHIFT },
   build(seed: number): World {
     const world = createWorld({ w: WIDTH + 2, h: HEIGHT + 2, seed, fill: Terrain.Wall });
@@ -152,6 +165,8 @@ export const w2_05: LevelDef = {
     'The hopper does not open. A slot spent on the wrong thing is spent for the rest of the shift.',
     'The shift is shorter than the field. Once the hopper is full, every further tile is a tick spent on nothing.',
     'A tile three ticks from ripe may be worth three ticks. A tile thirty ticks from ripe is somebody else’s shift.',
+    'The sensor reads the row above and the row below. A bot driving the second row has already surveyed the first three, and two more rows of driving cover the rest of the field.',
+    'Read the lane, and only step off it for something the sensor has already said is worth the two ticks.',
   ],
   docs: ['scan', 'harvest', 'inventory'],
 };
