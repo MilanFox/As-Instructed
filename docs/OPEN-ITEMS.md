@@ -1312,3 +1312,45 @@ weight.
 **Unchanged and still outranking all of it: readability beats beauty.** The player debugs by
 reading the board. A direction that makes the grid harder to count, the bot harder to find or a
 divergence harder to see is wrong however good it looks, and each must state that cost honestly.
+
+### 2026-09-05, 23:45 — window reset. Two more agents out; UI punch list deliberately held.
+
+State verified: main `d8ac109`, **1692 tests / 68 files**, tsc / build clean. The wake-up brief
+was four hours stale — everything it listed as in flight had already merged. Trust the last
+sections of this file over any resume brief.
+
+**Scheduling call: the UI audit's ~19 remaining findings are held until the art spike lands.**
+Most are contrast, spacing and palette fixes on the exact stylesheets the spike is replacing.
+Doing them now is work thrown away twice, and worse, it would make the spike merge against a
+moving target. They get **re-triaged against whatever direction wins** — some will be obsolete,
+some more urgent. Three stay live regardless because they are structural rather than stylistic:
+F9 (the report's last paragraph is drawn under its own footer), F22 (`aria-label` on the speed
+control), and the medal legend.
+
+### In flight — four agents, disjoint
+
+- **Art direction** — highest value, and the one the user is waiting on. Brief was sharpened
+  from restyle to art style; scope now includes authoring real assets.
+- **Publish crash** — the cure; the containment already merged.
+- **Incentives** — audit findings 3 and 5–12, plus cutting fifteen commendations to about five.
+  The evidence that makes it cheap: **both testers say the layer changed their behaviour zero
+  times.** Told to keep `REOPENED ON PURPOSE` and `A SECOND LOOK, AND A THIRD` unless it can
+  argue otherwise — they were added this week to replace the streak and they pay for the loop
+  the game is made of — and to leave `personalBestLine` alone entirely.
+- **Invariants** — the guards. Primary deliverable is *not* more fixes: it is the test that
+  enforces the 24 confessed `verbatim`/`mirrors`/`authoritative` claims, plus unused-export
+  detection, judged by which of the five known instances each would have caught.
+
+### Two rulings issued with that work
+
+1. **`budgets.ts` gets a structured unit field.** The label goes back to saying whatever reads
+   best; parsing survives only as a fallback, and a level that declares is never guessed at.
+   Same shape as the guards: replace an invariant maintained by prose with one maintained by
+   the type system.
+2. **Delete Performance Review tier 1.** `DEVELOPING` (0–24%) is unreachable — the medals-only
+   denominator floors a graded record at 33%. A grade nobody can ever see is dead content, and
+   this game deleted an entire screen on that reasoning three hours earlier. Four tiers. The
+   agent was told to verify my arithmetic first and to propose the honest ladder if tier 2 is
+   also unreachable in practice.
+
+Next wake-up armed for 04:42.
