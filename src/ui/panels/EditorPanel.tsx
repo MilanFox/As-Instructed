@@ -1,7 +1,6 @@
 import Editor, { type OnMount } from '@monaco-editor/react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { currentLevel, useGame } from '../../game/store.ts';
-import { countChars } from '../../game/score.ts';
 import { PLAYER_FILE_PATH } from '../../runtime/index.ts';
 import { THEME, monaco, setupMonaco } from '../monaco-setup.ts';
 
@@ -69,9 +68,6 @@ export function EditorPanel(): React.JSX.Element {
     editor.focus();
   };
 
-  // A count, not a target. Nothing scores, ranks, or nags about it. DESIGN.md §7.
-  const chars = useMemo(() => countChars(code), [code]);
-
   return (
     <section className="panel" aria-label="Program">
       <header className="panel__head">
@@ -128,8 +124,6 @@ export function EditorPanel(): React.JSX.Element {
         <span className={problems > 0 ? 'editor-status__error' : undefined}>
           {problems === 0 ? 'no problems' : `${problems} problem${problems === 1 ? '' : 's'}`}
         </span>
-        <span>·</span>
-        <span>{chars} chars</span>
         <span className="panel__head-spacer" />
         <span>{runState === 'running' ? 'running…' : 'ctrl+enter to run'}</span>
       </footer>

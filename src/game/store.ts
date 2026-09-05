@@ -460,7 +460,7 @@ export const useGame = create<GameState>((set, get) => {
             t: trace.endTick,
             kind: verdict.passed ? 'success' : 'error',
             text: verdict.passed
-              ? `work order closed — ${verdict.stats.ticks} ticks, ${chars} chars`
+              ? `work order closed — ${verdict.stats.ticks} ticks`
               : (verdict.failure?.message ?? 'Run complete. The objective is still open.'),
           },
         ]);
