@@ -69,7 +69,13 @@ Two failure philosophies, applied consistently:
 | Situation | Behaviour |
 |---|---|
 | The world says no (wall, empty tile, full inventory, no machine) | returns `false` / `null` / `0`, **still charges the full tick cost** |
-| The program is incoherent (unknown bot id, dead bot, negative count) | throws `IllegalActionError` |
+| The program is incoherent (unknown bot id, dead bot, negative count, `power` on a `vars.manual` machine) | throws `IllegalActionError` |
+
+The line between the two is whether the identical call could succeed later in the same run. A wall
+can open and an inventory can empty; an unknown bot id cannot become known, and nothing in the API
+clears `vars.manual`, so `power("sub-3", "on")` is wrong for the whole run rather than wrong now.
+A `false` the player could branch on would be a branch that can never flip. The refused `power`
+is still logged and still charged before it throws, so the trace and the live world stay in step.
 | Budget blown | throws `HaltError` / `OpLimitError` |
 | Bot ran dry | throws `OutOfFuelError` **before mutating anything** |
 | Every bot blocked, forever | throws `LivelockError` |
