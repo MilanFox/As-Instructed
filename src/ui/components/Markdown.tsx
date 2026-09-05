@@ -183,6 +183,12 @@ function block(item: Block, key: string): React.ReactNode {
   }
 }
 
+/** The same inline pass without a block wrapper, for table cells and other one-line slots. */
+export function InlineMarkdown({ source }: { source: string }): React.JSX.Element {
+  const parts = useMemo(() => inline(source, 'i'), [source]);
+  return <>{parts}</>;
+}
+
 export function Markdown({
   source,
   className,

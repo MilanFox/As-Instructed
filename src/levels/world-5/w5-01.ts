@@ -113,15 +113,33 @@ export const w5_01: LevelDef = {
     'recorded which end it started from. The reactor is at one of them.',
     '',
     'Bring every substation on the line to `on`.',
-    '',
-    '- The bot starts parked on the reactor. The substations run away from it in a single line.',
-    '- Drive onto a substation and call `use()` to switch it from `off` to `on`. That costs 2 ticks.',
-    '- **A substation only latches if the machine that feeds it is already `on`.**',
-    '- The substations are `sub-1` upward. `probe(id)` reads any machine anywhere in the world',
-    '  for free and returns `null` past the last one.',
-    '- Each substation reports `index` (its position in the chain, the reactor being 0) and `feed`',
-    '  (the index of the machine that feeds it).',
   ].join('\n'),
+  facts: [
+    {
+      label: 'The line',
+      value:
+        'The bot starts on the reactor. The substations run away from it in one straight line.',
+    },
+    {
+      label: '`use()`',
+      value: 'Switches the substation under the bot from `off` to `on`. Costs 2 ticks.',
+    },
+    {
+      label: 'Latching',
+      value:
+        '`use()` flips a substation on either way. It only **counts** if the machine feeding it was already `on`.',
+    },
+    {
+      label: '`probe(id)`',
+      value:
+        'Reads any machine anywhere, for free. Substations are `sub-1` upward; past the last one it returns `null`.',
+    },
+    {
+      label: 'What a station reports',
+      value:
+        '`index` — its place in the chain, the reactor being 0. `feed` — the index of the machine that feeds it.',
+    },
+  ],
   seeds: [1, 2, 3],
   par: { ticks: 37, chars: 460 },
   build(seed: number): World {

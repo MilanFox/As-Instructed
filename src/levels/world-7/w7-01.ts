@@ -65,20 +65,23 @@ export const w7_01: LevelDef = {
     'reads is the finish time of the last one. not the total. the total is a much larger',
     'number that nobody upstairs has ever asked for.',
     '',
-    'Park each bot on the pad at the end of its own corridor, and have each bot receive the',
-    "other bot's arrival message.",
-    '',
-    'Two things about this world that are not obvious:',
-    '',
-    '1. **Your score is the makespan** — the largest bot clock at the end of the run, not the',
-    '   sum. Issuing `bot(0).move(...)` and then `bot(1).move(...)` does not make bot 1 wait for',
-    '   bot 0. The clocks are independent and both moves happen in the same tick.',
-    '2. **A message is not readable until the reader has caught up to the sender.** `recv()`',
-    '   returns `null` while the receiving bot\'s own clock is still behind the tick the message',
-    '   was sent at. `sync()` raises every living bot to the highest clock in the fleet.',
-    '',
-    '`sync()` costs no ticks of its own. A bot it drags forward does the rest from the higher clock.',
+    'Park each bot on the pad at the end of its own corridor, and have each one hear from',
+    'the other.',
   ].join('\n'),
+  facts: [
+    { label: 'Your score', value: 'The clock stops when the **last** bot stops. Not the total.' },
+    {
+      label: 'The clocks',
+      value:
+        'One per bot, running at once. `bot(0).move(...)` then `bot(1).move(...)` both happen in the same tick.',
+    },
+    {
+      label: 'Messages',
+      value:
+        "`recv()` gives back `null` until the reader's own clock reaches the tick the message was sent at.",
+    },
+    { label: '`sync()`', value: 'Raises every living bot to the highest clock in the fleet.' },
+  ],
   seeds: [1, 2, 3],
   par: { ticks: 10, chars: 260 },
   build(seed: number): World {
@@ -129,9 +132,9 @@ export const w7_01: LevelDef = {
     '',
   ].join('\n'),
   hints: [
-    'Both corridors are dead ends. Neither bot needs to know how long its own corridor is before it starts walking — it only needs to know when it has stopped being able to walk.',
+    'Both corridors are dead ends. A bot does not need to know how long its corridor is. It needs to know when it can no longer walk.',
     'Nothing you write makes one bot wait for another. Only sync() does that. So the question is not how to run them in parallel; it is where you are accidentally stopping them.',
-    'A bot that is behind in virtual time has not heard anything yet. Ask yourself how far along the shorter walk the fleet is when you call sync(), and what the other bot still has left to do at that moment.',
+    'A bot that is behind in time has not heard anything yet. When you call sync(), how far along is the shorter walk, and what does the other bot still have left?',
   ],
-  docs: ['bot', 'bots', 'sync', 'send', 'recv'],
+  docs: ['ticks', 'bot', 'bots', 'sync', 'send', 'recv'],
 };

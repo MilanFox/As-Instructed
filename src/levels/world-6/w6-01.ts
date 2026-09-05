@@ -52,11 +52,15 @@ export const w6_01: LevelDef = {
     'it is not a long queue. some shifts there is nothing on it at all, and nothing is still',
     'a reading.',
     '',
-    'Print every packet queued on the band, in order, exactly as it arrived.',
-    '',
-    '`receive()` returns the next packet as a string, or `null` once the queue is empty. It is',
-    'free. The number of packets changes between shifts.',
+    'Print every packet on the band, in order, exactly as it arrived.',
   ].join('\n'),
+  facts: [
+    {
+      label: '`receive()`',
+      value: 'The next packet as a string, or `null` once the queue is empty. Free.',
+    },
+    { label: 'The queue', value: 'A different length every shift. Some shifts it is empty.' },
+  ],
   seeds: [1, 2, 3],
   par: { ticks: 1, chars: 100 },
   build(seed: number): World {

@@ -69,19 +69,32 @@ export const w5_02: LevelDef = {
     '**RE:** Feeder run 12, discontinuity',
     '',
     'Feeder run 12 is two hundred segments long and one of them has failed. The test set is',
-    'rated for ten readings per shift. It is rated for ten readings because it is rated for ten',
-    'readings.',
+    'rated for ten readings per shift. It is rated for ten readings because it is rated for',
+    'ten readings.',
     '',
     'Find the broken segment and patch it.',
-    '',
-    '- The run is `relay-0` through `relay-199`, in order, from the reactor outward.',
-    '- `probe(id).vars.live` is `1` while the run is still continuous that far and `0` once it',
-    '  is not. The first segment reading `0` is the broken one.',
-    '- Patch it with `power(id, "patched")`, for 2 ticks.',
-    '- **Exactly one relay may end up patched, and it must be the broken one.**',
-    '- **You may call `probe` at most ten times in total**, whatever you point it at. Nothing',
-    '  else reports continuity.',
   ].join('\n'),
+  facts: [
+    {
+      label: 'The run',
+      value: '`relay-0` through `relay-199`, in order, from the reactor outward.',
+    },
+    {
+      label: 'A reading',
+      value:
+        '`probe(id).vars.live` is `1` while the run is still whole that far and `0` once it is not. The first `0` is the break.',
+    },
+    {
+      label: 'The patch',
+      value:
+        '`power(id, "patched")`, 2 ticks. **Exactly one relay may end up patched, and it must be the broken one.**',
+    },
+    {
+      label: 'Readings',
+      value:
+        'Ten `probe` calls for the whole shift, whatever you point them at. Nothing else reports continuity.',
+    },
+  ],
   seeds: [1, 2, 3, 4, 5],
   par: { ticks: 2, chars: 260 },
   build(seed: number): World {

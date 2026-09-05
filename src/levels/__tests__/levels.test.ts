@@ -190,6 +190,17 @@ describe('registry', () => {
     }
   });
 
+  test('briefs stay short enough that a second-language reader finishes them', () => {
+    const words = (text: string): number => text.trim().split(/\s+/).filter(Boolean).length;
+    let total = 0;
+    for (const level of LEVELS) {
+      const count = words(level.brief);
+      total += count;
+      expect(count, level.id).toBeLessThanOrEqual(110);
+    }
+    expect(total / LEVELS.length).toBeLessThanOrEqual(60);
+  });
+
   test('no hint is written in code', () => {
     for (const level of LEVELS) {
       for (const hint of level.hints) {
@@ -355,41 +366,38 @@ describe('bonus objectives', () => {
 });
 
 /**
- * The Repository is never a gate (src/meta/unlock.ts). A brief may say a routine is expected to
- * be in `lib.ts`, and must say in the same breath that writing it in the work order is fine.
+ * The Repository is never a gate (src/meta/unlock.ts). The requisition card on the brief panel
+ * lists every routine a work order assumes — signature, one line of what it does, and the import —
+ * and says in the same breath that writing it in the work order is fine. The brief carries none of
+ * it, because a signature is a fact to look up rather than a sentence to read.
  */
 describe('library requirements', () => {
-  /** Briefs are authored as wrapped lines, so read them as prose rather than as source. */
-  const prose = (text: string): string => text.replace(/\s+/g, ' ');
-  const namesLib = LEVELS.filter((level) => prose(level.brief).includes("from 'lib'"));
+  const namesLib = LEVELS.filter((level) => requirementsFor(level.id).length > 0);
 
   test('enough of the campaign leans on the Repository for the arithmetic to mean anything', () => {
     expect(namesLib.length).toBeGreaterThanOrEqual(5);
   });
 
-  test('no brief asks for the Repository before it exists', () => {
+  test('no work order asks for the Repository before it exists', () => {
     for (const level of namesLib) {
       expect(level.world, level.id).toBeGreaterThanOrEqual(LIBRARY_FIRST_WORLD);
     }
   });
 
-  test('a brief that names a routine also says it can be written in the work order', () => {
+  test('every listed routine carries a signature and a line saying what it does', () => {
     for (const level of namesLib) {
-      expect(prose(level.brief), level.id).toMatch(/write it in this file/);
+      for (const routine of requirementsFor(level.id)) {
+        const where = `${level.id}/${routine.name}`;
+        expect(routine.signature, where).toContain(routine.name);
+        expect(routine.assumes.trim().length, where).toBeGreaterThan(0);
+      }
     }
   });
 
-  test('the briefs and the requirement table name the same routines', () => {
+  test('the requisition card is the only place the routines are spelled out', () => {
+    const prose = (text: string): string => text.replace(/\s+/g, ' ');
     for (const level of LEVELS) {
-      const declared = requirementsFor(level.id).map((requirement) => requirement.name).sort();
-      const mentioned = declared.filter((name) =>
-        prose(level.brief).includes(`import { ${name} } from 'lib'`),
-      );
-      expect(mentioned, level.id).toEqual(declared);
-      if (declared.length > 0) expect(namesLib, level.id).toContain(level);
-    }
-    for (const level of namesLib) {
-      expect(requirementsFor(level.id).length, level.id).toBeGreaterThan(0);
+      expect(prose(level.brief), level.id).not.toContain("from 'lib'");
     }
   });
 });

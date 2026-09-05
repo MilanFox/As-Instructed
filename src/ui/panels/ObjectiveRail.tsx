@@ -7,6 +7,8 @@ import { currentLevel, levelUsesFuel, useGame } from '../../game/store.ts';
 import { BudgetBar } from '../components/BudgetBar.tsx';
 import { FuelGauge } from '../components/FuelGauge.tsx';
 
+const TICK_OBJECTIVE = /\bticks?\b/i;
+
 interface ObjectiveRow {
   id: string;
   label: string;
@@ -101,6 +103,9 @@ export function ObjectiveRail(): React.JSX.Element {
   const met = rows.filter((row) => !row.bonus && row.met).length;
   const total = rows.filter((row) => !row.bonus).length;
 
+  const gradesTicks = level.objectives.some((objective) => TICK_OBJECTIVE.test(objective.label));
+  const hardStop = gradesTicks ? undefined : level.budget?.maxTicks;
+
   return (
     <section className="panel rail" aria-label="Objectives and targets">
       <header className="panel__head">
@@ -146,6 +151,18 @@ export function ObjectiveRail(): React.JSX.Element {
             {ticks ?? '—'} / {level.par.ticks}
           </span>
         </div>
+        {hardStop !== undefined ? (
+          <div className="par-row">
+            <span className="par-row__label">shift ends at</span>
+            <span
+              className={
+                ticks !== undefined && ticks > hardStop ? 'par-row__value--over' : undefined
+              }
+            >
+              {hardStop}
+            </span>
+          </div>
+        ) : null}
         <div className="par-row">
           <span className="par-row__label">seeds</span>
           <span>{level.seeds.length}</span>

@@ -223,6 +223,60 @@
   color: var(--ink-dim);
 }
 
+/* -------------------------------------------------------------- site data */
+
+.fact-list {
+  margin: 0;
+  display: grid;
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.fact {
+  display: grid;
+  grid-template-columns: minmax(9rem, 34%) 1fr;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-raised);
+}
+
+.fact__label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  align-self: center;
+}
+
+.fact__label .md-code {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: inherit;
+  letter-spacing: inherit;
+  text-transform: none;
+  color: var(--ink);
+}
+
+.fact__value {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (width < 640px) {
+  .fact {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}
+
 /* --------------------------------------------------------------- hardware */
 
 .hw-group + .hw-group {
@@ -277,6 +331,43 @@
 .hw-group--quiet .hw-chip:hover {
   border-color: var(--border-strong);
   color: var(--ink);
+}
+
+/* -------------------------------------------------------------- routines */
+
+.routine-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.routine {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+}
+
+.routine__sig {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.routine__note {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-dim);
+}
+
+.routine__import {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: color-mix(in srgb, var(--ink-dim) 80%, var(--accent));
 }
 
 /* ------------------------------------------------------------------ hints */
