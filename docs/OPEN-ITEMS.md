@@ -152,3 +152,41 @@ A language toggle belongs in Settings next to the layout controls, persisted in 
   mid-`installTypes`.
 - `aggregate.ts` scoring the bonus on seed 1 alone — already fixed by the finale work's
   `worstPerObjective`; verified, no action needed.
+
+### Backlog — incentive audit (a different instrument from a playtest)
+
+Requested 2026-09-05, prompted by the streak: it survived two full playtests and was
+caught by the user reading a screenshot. That is the point. A playtest surfaces what
+blocks or bores a player; it does not surface what quietly shapes their behaviour,
+because an agent playing a level is not actually afraid to experiment and so never feels
+the tax. Different failure mode, different instrument.
+
+**Method.** Do not play. Read the systems — scoring, medals, bonuses, commendations,
+save, unlock gating, hint economy, the Library ladder, failure copy — and audit them as
+an incentive structure against known design anti-patterns. Cross-reference the findings
+against `docs/PLAYTEST-BEGINNER.md` and `docs/PLAYTEST-VETERAN.md` afterwards, not
+before, so the two instruments stay independent.
+
+**What it is hunting**, with the streak as the worked example:
+
+- A reward that punishes the core loop. This game's loop is run → fail → read → revise;
+  anything that makes failing cost something is attacking the game itself.
+- Two systems rewarding opposite behaviour. The streak reset on a failed run while
+  RAISED, AND RAISED AGAIN paid out for closing on the tenth — on the same screen.
+- Patterns imported reflexively from other genres because they are familiar: streaks,
+  dailies, completion percentages, FOMO timers, anything that measures attendance.
+- A displayed number the player cannot meaningfully influence, or that only rewards the
+  easy stretch of the game (the streak only ever congratulated first-try solves).
+- Feedback that is an oracle rather than a diff, and its inverse: a fail state that
+  reports a bit where it could report a divergence.
+- Difficulty that is noise rather than depth — more seeds, more objectives, wider
+  surface, no new idea. The finale's 5 x 7 pass/fail grid was this.
+- Anything that makes asking for help feel like a confession.
+
+**Deliverable.** A ranked list. Each finding states the behaviour the system provokes and
+why that behaviour is bad for *this* game — "the code does X" is not a finding. Every
+finding gets a proposed cut or replacement, because the fix for an incentive is usually
+deletion. A report concluding the systems are well designed is a failed report.
+
+Worth re-running after the compression and par work lands, since both change the
+incentive surface.
