@@ -271,6 +271,7 @@ From here on, `seeds.length >= 3` is mandatory (DESIGN.md §5).
 - `seeds` `[1,2,8,13]`
 - `size` ~8 lines · `difficulty` **2/10**
 - `bonus` Exactly as many `harvest` calls as there are ripe tiles.
+- `par` 16, from the survey that stops at the top of the scale (at most 9). Reading the whole row and driving back to the best tile is correct and takes silver at 18. `docs/FIX-PAR.md` §3.
 
 ### w2-02 — Rotation
 - `premise` Work every tile of the field: take what is ready, put a seed in every hole. The mule drops you at a different corner each quarter.
@@ -318,6 +319,7 @@ From here on, `seeds.length >= 3` is mandatory (DESIGN.md §5).
 - `seeds` `[1,2,3,4,5]`
 - `size` ~40 lines · `difficulty` **7/10**
 - `bonus` Hit quota with 15% of the tick budget unspent.
+- `par` 60, from the two-lane survey the *Sensor reach* fact describes (at most 55). The six-row serpentine is correct and takes silver at 68. `docs/FIX-PAR.md` §3.
 
 ---
 
