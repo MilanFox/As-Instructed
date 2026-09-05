@@ -307,5 +307,6 @@ Three agents live, disjoint file ownership, none merged:
 Verified at the reset: main green at **1398 tests, tsc clean**. All four earlier agents'
 worktrees clean and fully merged — nothing was lost to the window, nothing to salvage.
 
-Housekeeping still open: four merged worktrees and their branches remain on disk, plus
-`wip/wave1-interrupted`. Pruning them was blocked by the permission classifier.
+Housekeeping done: the five merged agent worktrees and their branches are pruned, leaving
+only the three live ones. `wip/wave1-interrupted` was already gone — the earlier note listing
+it as outstanding was wrong.
