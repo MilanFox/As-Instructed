@@ -797,13 +797,48 @@ describe('use', () => {
     expect(eventsOfKind(sim.finish().events, 'tileChange')).toHaveLength(2);
   });
 
-  test('a machine with no cycle is a no-op that still costs ticks', () => {
+  /*
+   * This used to return true and do nothing. A mute failure is at least a value to branch on; a
+   * mute success asserts the machine was operated, so the player goes looking at the objective.
+   * It stays a false rather than a throw because `use` names a direction, never a machine: the
+   * identical call one tile over works.
+   */
+  test('a machine with no cycle is refused, not silently agreed to', () => {
     const world = openWorld(3, 1, 1);
     placeMachine(world, { id: 'sink', kind: MachineKind.Sink, at: vec(0, 0), state: 'idle' });
     const sim = new Sim(world);
-    expect(sim.use(0)).toBe(true);
+
+    expect(sim.use(0)).toBe(false);
     expect(must(machineById(world, 'sink')).state).toBe('idle');
     expect(bot(world).clock).toBe(DEFAULT_COSTS.use);
+
+    const trace = sim.finish();
+    const uses = eventsOfKind(trace.events, 'use') as UseEvent[];
+    expect(must(uses[0]).ok).toBe(false);
+    // The machine is still named, so the trace says which one refused rather than "nothing here".
+    expect(must(uses[0]).machineId).toBe('sink');
+    // Nothing changed, so nothing claims it did.
+    expect(eventsOfKind(trace.events, 'machineChange')).toHaveLength(0);
+    expect(eventsOfKind(trace.events, 'fx')).toHaveLength(0);
+  });
+
+  test('the refusal is positional, so the identical call succeeds one tile over', () => {
+    const world = openWorld(3, 1, 1);
+    placeMachine(world, { id: 'sink', kind: MachineKind.Sink, at: vec(0, 0), state: 'idle' });
+    placeMachine(world, {
+      id: 'lever',
+      kind: MachineKind.Lever,
+      at: vec(1, 0),
+      state: 'off',
+      cycle: ['off', 'on'],
+    });
+    const sim = new Sim(world);
+
+    expect(sim.use(0)).toBe(false);
+    expect(sim.probe(0, 'sink')?.state).toBe('idle');
+    sim.move(0, Dir.East);
+    expect(sim.use(0)).toBe(true);
+    expect(sim.probe(0, 'lever')?.state).toBe('on');
   });
 
   test('returns false with no machine present, and still charges', () => {

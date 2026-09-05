@@ -604,6 +604,19 @@ export class Sim {
   /**
    * Operates the machine on the bot's tile, or the adjacent one in `dir`. Advances the machine
    * through its `cycle`; a Door with `links` flips those tiles between Floor and Wall.
+   *
+   * Returns false when the tile carries no machine, and — since this change — when it carries one
+   * with no `cycle` to advance. That second case used to return **true** and do nothing, which is
+   * worse than a mute failure: a mute `false` is at least a value the program can branch on, while
+   * a mute success asserts the machine was operated when it was not, and leaves the player
+   * debugging the objective instead of the call.
+   *
+   * It is a `false` rather than a throw because `use` is the one verb that never names its target.
+   * `power("sub-3")` is permanently wrong for as long as that id is manual, but `use(dir)` names a
+   * *direction*: the same call one tile over works, so by the succeed-later test (docs/ENGINE.md
+   * §2) it is transient. A cycle-less machine belongs in the bucket `use` already had for a tile
+   * with nothing on it — there is nothing here that `use` can work — and it is reached by standing
+   * somewhere, which is the most transient state in the game.
    */
   use(botId: number, dir?: Dir): boolean {
     const bot = this.requireActiveBot(botId);
@@ -612,18 +625,26 @@ export class Sim {
     this.requireFuel(bot, dt, 'use');
     const at = dir === undefined ? { x: bot.at.x, y: bot.at.y } : step(bot.at, dir);
     const machine = machineAt(this.world, at);
+    const cycle = machine?.cycle;
 
-    if (!machine) {
-      this.builder.push({ t, botId, dt, kind: 'use', at, machineId: null, ok: false });
+    if (!machine || !cycle || cycle.length === 0) {
+      this.builder.push({
+        t,
+        botId,
+        dt,
+        kind: 'use',
+        at,
+        machineId: machine?.id ?? null,
+        ok: false,
+      });
       this.charge(bot, dt);
       return false;
     }
 
     this.builder.push({ t, botId, dt, kind: 'use', at, machineId: machine.id, ok: true });
     this.mutate(machine, t, (m) => {
-      if (!m.cycle || m.cycle.length === 0) return;
-      const i = m.cycle.indexOf(m.state);
-      m.state = m.cycle[(i + 1) % m.cycle.length] as string;
+      const i = cycle.indexOf(m.state);
+      m.state = cycle[(i + 1) % cycle.length] as string;
     });
     this.builder.push({ t, kind: 'fx', at, fx: 'use', botId });
     this.charge(bot, dt);

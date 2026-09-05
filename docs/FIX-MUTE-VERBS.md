@@ -307,3 +307,106 @@ reads `drop()`'s return at all. No par, budget, cost or objective moved.
 
 Full suite: **1631 passing across 64 files.** `npx eslint src` reports exactly the one known
 pre-existing error.
+
+---
+
+## The `use()` ruling — a mute success becomes an honest `false`
+
+**The ruling: `use()` on a machine with an absent or empty `cycle` now returns `false`, records
+`ok: false`, and emits no `machineChange` and no `fx`. It does not throw.**
+
+### Why the old behaviour was the worst case in the sweep
+
+Every other verb here failed and said nothing. `use()` *succeeded* and said nothing. It returned
+`true`, wrote `ok: true` to the trace, emitted a `machineChange` whose `before` and `after` were
+identical, and emitted a `use` sound-and-animation cue — four separate assertions that the machine
+had been operated, none of them true.
+
+A mute `false` is at least a value: `if (!use()) …` is a real program, and the player who writes it
+learns something. A mute `true` is undetectable by construction. The player's program cannot see
+it, the objective cannot see it — the machine simply never changed state — and so the *only*
+symptom is an objective that stays open while the console shows a run that did everything it was
+asked. The player then debugs the objective, the level, or their understanding of the machine,
+because the one thing the game told them plainly is that the `use()` worked. That is
+`docs/AUDIT-INCENTIVES.md` finding 1 in its most expensive form.
+
+### Why `false` and not a throw — the succeed-later test, applied properly
+
+The deciding test points at a throw only if you ask it carelessly. "Can `use()` on the `silo`
+succeed later?" — no, the `silo` will never have a cycle. But that is not the test. The test is
+**can the identical call succeed later in the same run**, and the identical call here is not
+`use("silo")`. It is `use()`, or `use(Dir.North)`.
+
+**`use` is the only verb in the API that never names its target.** `power("sub-3", "on")` carries
+its target in the argument, so a permanently-manual `sub-3` makes *that exact call* permanently
+wrong — which is precisely why it throws. `use(dir)` carries a *direction*. The bot walks one tile
+east and the identical expression succeeds. The refusal is positional, and position is the most
+transient state in the game.
+
+So a cycle-less machine belongs in the bucket `use()` already had, and had for the right reason:
+**there is nothing here that `use` can work.** That bucket is the tile with no machine on it at
+all, which has always returned `false`, is already positional, and is already pre-checkable with
+`probe()` and `scan()`. Nothing new was invented; a case was moved into the bucket it always
+belonged in, and the branch that can never flip never existed here.
+
+The test asserting exactly this ships with the change: refuse on the cycle-less machine, step one
+tile east, and the identical `use()` returns `true`.
+
+### Why a throw would have been actively wrong at `w8-05`
+
+`use()` is the only way to work a manual station in the finale, so the cost of over-firing is paid
+there. Every machine in the campaign was enumerated before the ruling. **19 authoring sites produce
+machines with no `cycle`**, and they are not obscure: `silo`, `locker`, every `depot-*` bay,
+`slot-charter`, `slot-renewals`, `desk`, `board`, `muster`, `mast`, `antenna`, `reactor`,
+`relay-*`, `feeder-*`, `consumer-*`. On `w8-05` alone there are seven, and the reference solution
+**stands bots on `depot-*`, `slot-charter` and `slot-renewals`** in the ordinary course of the
+level, because that is where you `drop()`.
+
+Under a throwing ruling, a player who stands on a delivery bay and presses the button — the single
+most natural exploratory act in the game, on tiles the level *requires* them to stand on — loses
+the run. That punishes exploration on exactly the levels built to reward it, and it would have
+converted `w8-03`'s reference walker into a coin flip: its `walkTo` is a 600-iteration best-effort
+that returns a tick count rather than a success, so a stalled bot sitting on the cycle-less `desk`
+would have thrown. Under this ruling that same stall returns `false`, changes nothing, and charges
+the same ticks it charges today.
+
+There is also a doctrinal reason not to throw. `types.ts` documented the no-op as deliberate
+(*"Empty means `use()` is a no-op that still costs ticks"*), and `power()` had already ruled that an
+unknown **machine** id is *"a state of the world"* and takes the `false`. A cycle-less machine is
+the same kind of thing: a fact about the tile, not an incoherent program.
+
+### What the player now reads
+
+Nothing appears in the console, because the run does not stop — correctly, since it should not.
+What changes is that the program can now see it, the trace stops lying, and the reference page
+names the case:
+
+> Operates a machine on the bot's tile, or the adjacent one in `dir`, advancing it one step
+> through its state cycle. Returns true only when a machine actually moved: false means there is
+> no machine on that tile, or the one there has no cycle for `use` to advance — a delivery bay or
+> a mast, which are worked by `drop()` or by other hardware. `probe()` reads a machine's id and
+> state for free, and it costs the full price either way.
+
+The trace still names the machine (`machineId: 'sink'`, not `null`), so a refusal on a real machine
+is distinguishable from a swing at an empty tile. And the renderer no longer plays a `use` cue for
+a machine that did not move, which is the RENDER half of DESIGN.md §11 A5 — a blocked action must
+not draw like a successful one.
+
+### Difficulty is unmoved
+
+Every `use()` call site in the campaign was traced first. **No reference solution calls `use()` on
+a cycle-less machine**, and **no reference solution reads `use()`'s return value at all** — all six
+live calls are bare statements onto machines with cycles (`sub-*`, `job-*`, `site-*`, `airlock`).
+The world state and the tick cost of a cycle-less `use()` are byte-identical before and after: it
+did nothing then and does nothing now. All 86 reference-solution tests pass **unedited**.
+
+### What changed
+
+| File | Change |
+|---|---|
+| `src/engine/sim.ts` | `use()` folds the cycle-less machine into the existing no-machine refusal, keeping `machineId` populated so the two stay distinguishable. Doc comment rewritten with the ruling and its reasoning. |
+| `src/engine/types.ts` | `Machine.cycle`'s comment *stated the old behaviour outright* — "Empty means `use()` is a no-op that still costs ticks" — and is the sentence FIX-POWER quoted when it flagged this. Rewritten. |
+| `src/runtime/api-spec.ts` | The `use` reference page mentioned only the no-machine case. |
+| `src/engine/__tests__/sim.test.ts` | `'a machine with no cycle is a no-op that still costs ticks'` was a test asserting the defect; rewritten to assert the refusal, that the machine is still named, and that **no** `machineChange` and **no** `fx` are emitted. +1 further test proving the refusal is positional by succeeding one tile over. |
+
+Net **+1 test** (1632 from 1631).

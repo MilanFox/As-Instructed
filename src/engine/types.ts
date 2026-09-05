@@ -141,7 +141,12 @@ export interface Machine {
   inventory: ItemStack[];
   vars: Record<string, number>;
   facing?: Dir;
-  /** States `use()` cycles through, in order. Empty means `use()` is a no-op that still costs ticks. */
+  /**
+   * States `use()` cycles through, in order. Absent or empty means there is nothing for `use()` to
+   * advance, so it returns false and still costs ticks — the same answer it gives for a tile with
+   * no machine on it at all. It used to return true and do nothing, which told the player the
+   * machine had been operated.
+   */
   cycle?: string[];
   /** Tiles whose terrain flips when this machine changes state (e.g. a door opening). */
   links?: Vec[];

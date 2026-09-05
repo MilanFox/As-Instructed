@@ -408,7 +408,7 @@ print(\`loaded \${taken} ore\`);`,
       },
     ],
     returns: 'boolean',
-    doc: "Operates a machine on the bot's tile, or the adjacent one in `dir`, advancing it one step through its state cycle. Returns false when there is no machine there, and costs the full price regardless.",
+    doc: "Operates a machine on the bot's tile, or the adjacent one in `dir`, advancing it one step through its state cycle. Returns true only when a machine actually moved: false means there is no machine on that tile, or the one there has no cycle for `use` to advance — a delivery bay or a mast, which are worked by `drop()` or by other hardware. `probe()` reads a machine's id and state for free, and it costs the full price either way.",
     example: `if (!canMove(Dir.North)) {
   use(Dir.North);
   move(Dir.North);
