@@ -7,6 +7,7 @@ import { DiscrepancyList } from './DiscrepancyList.tsx';
 import { LibraryEditor } from './LibraryEditor.tsx';
 import { RefactorScreen } from './RefactorScreen.tsx';
 import { RegressionReport } from './RegressionReport.tsx';
+import { StructureScreen } from './StructureScreen.tsx';
 import './library.css';
 
 /**
@@ -20,6 +21,7 @@ import './library.css';
 const TABS: { id: MetaPanel; label: string }[] = [
   { id: 'library', label: 'lib.ts' },
   { id: 'refactor', label: 'Cost' },
+  { id: 'structure', label: 'Structure' },
   { id: 'regression', label: 'Regression' },
   { id: 'discrepancies', label: 'Discrepancies' },
 ];
@@ -101,6 +103,7 @@ export function LibraryPanel(): React.JSX.Element | null {
       <div className={flush ? 'lib__body lib__body--flush' : 'lib__body'}>
         {panel === 'library' ? <LibraryEditor /> : null}
         {panel === 'refactor' ? <RefactorScreen /> : null}
+        {panel === 'structure' ? <StructureScreen /> : null}
         {panel === 'regression' ? <RegressionReport /> : null}
         {panel === 'discrepancies' ? <DiscrepancyList /> : null}
       </div>

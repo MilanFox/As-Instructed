@@ -52,6 +52,19 @@ describe('finding publishable declarations', () => {
     expect(go?.uses).toEqual(['STEP']);
   });
 
+  test('a parameter that shadows a top-level name is not a dependency', () => {
+    const source =
+      "const back = 'south';\nfunction retreat(back: string): void {\n  move(back);\n}";
+    const retreat = publishableDeclarations(source).find((each) => each.name === 'retreat');
+    expect(retreat?.uses).toEqual([]);
+  });
+
+  test('a default value that reaches outwards is still a dependency', () => {
+    const source = 'const STEP = 2;\nfunction go(n: number = STEP): void { move(n); }';
+    const go = publishableDeclarations(source).find((each) => each.name === 'go');
+    expect(go?.uses).toEqual(['STEP']);
+  });
+
   test('bot hardware the declaration calls is reported', () => {
     const source = 'function dig(): void { mine(); move(); }';
     const [dig] = publishableDeclarations(source, ['mine', 'move', 'scan']);
@@ -121,8 +134,8 @@ describe('planning a publication', () => {
       selection: [{ name: 'walk' }],
       levelId: 'w4-01',
     });
-    expect(plan.librarySource).toContain('export /** Walks the bot');
-    expect(plan.librarySource).toContain('function walk(n: number): void');
+    expect(plan.librarySource).toContain('/** Walks the bot');
+    expect(plan.librarySource).toContain('export function walk(n: number): void');
     expect(plan.levelSource).not.toContain('function walk(n: number)');
     expect(plan.levelSource).toContain("import { walk } from 'lib';");
     expect(plan.levelSource).toContain('walk(START);');

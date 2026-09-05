@@ -13,6 +13,8 @@ import {
 } from './discrepancy.ts';
 import { buildReports } from './profile.ts';
 import type { FunctionReport } from './profile.ts';
+import { buildStructure } from './structure.ts';
+import type { LibraryStructure } from './structure.ts';
 import type { MetaRunner, RegressionSummary, RegressionTarget, SuiteResult } from './regression.ts';
 import { applySuite, runSuite, summarise } from './regression.ts';
 import { emptyLibrary, loadLibrary, recordRevision, revisionOf, writeLibrary } from './save.ts';
@@ -67,7 +69,7 @@ export interface PublishOffer {
   selection: PublishSelection[];
 }
 
-export type MetaPanel = 'library' | 'refactor' | 'regression' | 'discrepancies';
+export type MetaPanel = 'library' | 'refactor' | 'structure' | 'regression' | 'discrepancies';
 
 export interface MetaState {
   save: LibrarySave;
@@ -113,6 +115,17 @@ export interface MetaState {
   setMuted(patch: { publish?: boolean; discrepancies?: boolean }): void;
 
   reports(): FunctionReport[];
+  /** The call tree the Repository has grown. Same stability contract as `reports`. */
+  structure(): LibraryStructure;
+}
+
+/** Cache keys measured against the library as it now stands. See `buildReports`. */
+function freshKeysOf(save: LibrarySave): Set<string> {
+  return new Set(
+    Object.values(save.profiles)
+      .filter((profile) => profile.key !== '')
+      .map((profile) => profile.key),
+  );
 }
 
 function persist(save: LibrarySave, storage: LibraryStorage | null | undefined): LibrarySave {
@@ -124,6 +137,17 @@ export const useLibrary = create<MetaState>((set, get) => {
   let host: MetaHost | null = null;
   let storage: LibraryStorage | null | undefined;
   let cancelled = false;
+  /**
+   * `reports()` is read straight out of a selector, so it has to hand back the *same* array until
+   * something it was derived from changes. A fresh array every call is a snapshot that never
+   * compares equal, which React answers by re-rendering until it gives up.
+   */
+  let derivedReports: {
+    save: LibrarySave;
+    host: MetaHost | null;
+    reports: FunctionReport[];
+  } | null = null;
+  let derivedStructure: { save: LibrarySave; structure: LibraryStructure } | null = null;
 
   const requireHost = (): MetaHost | null => host;
 
@@ -418,23 +442,42 @@ export const useLibrary = create<MetaState>((set, get) => {
     reports(): FunctionReport[] {
       const { save } = get();
       const active = requireHost();
+      if (derivedReports && derivedReports.save === save && derivedReports.host === active) {
+        return derivedReports.reports;
+      }
       const facts = new Map((active?.facts() ?? []).map((each) => [each.id, each]));
-      const freshKeys = new Set(
-        Object.values(save.profiles)
-          .filter((profile) => profile.key !== '')
-          .map((profile) => profile.key),
-      );
-      return buildReports({
+      const reports = buildReports({
         save,
         exports: save.published.map((each) => each.name),
         facts,
-        freshKeys,
+        freshKeys: freshKeysOf(save),
       });
+      derivedReports = { save, host: active, reports };
+      return reports;
+    },
+
+    structure(): LibraryStructure {
+      const { save } = get();
+      if (derivedStructure?.save === save) return derivedStructure.structure;
+      const structure = buildStructure({ save, freshKeys: freshKeysOf(save) });
+      derivedStructure = { save, structure };
+      return structure;
     },
   };
 });
 
-/** Progress line for the regression panel, or `undefined` when nothing is running. */
+/**
+ * Progress line for the regression panel, or `undefined` when nothing is running.
+ *
+ * Shaped to be handed straight to `useLibrary(suiteSummary)`, so — like `reports()` — it holds on
+ * to its last answer rather than allocating a new one on every store read.
+ */
+let derivedSummary: { suite: SuiteResult; summary: RegressionSummary } | null = null;
+
 export function suiteSummary(state: MetaState): RegressionSummary | undefined {
-  return state.suite ? summarise(state.suite.run) : undefined;
+  if (!state.suite) return undefined;
+  if (derivedSummary?.suite !== state.suite) {
+    derivedSummary = { suite: state.suite, summary: summarise(state.suite.run) };
+  }
+  return derivedSummary.summary;
 }

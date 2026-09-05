@@ -50,6 +50,7 @@ export {
   REFACTOR,
   REGRESSION,
   REPOSITORY_NAME,
+  STRUCTURE,
   UNLOCK_MEMO,
   UNLOCK_NOTE,
 } from './copy.ts';
@@ -82,6 +83,9 @@ export {
   projectedTicks,
   upgradeSummary,
 } from './profile.ts';
+
+export type { LibraryFunction, LibraryStructure, StructureRow } from './structure.ts';
+export { buildStructure } from './structure.ts';
 
 export type {
   MetaRunOutcome,

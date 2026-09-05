@@ -325,6 +325,86 @@ function commentAbove(lines: readonly string[], line: number): number {
 }
 
 /**
+ * Offset of the declaration keyword, past any doc comment that travelled with the text.
+ *
+ * `export` has to go here rather than at offset zero: `export /** … *\/ function f` is not a
+ * declaration head that `stripLibraryExports` recognises, so a commented publication would link
+ * as an unpublishable file.
+ */
+function declarationHead(text: string): number {
+  let i = 0;
+  while (i < text.length) {
+    const ch = text[i] as string;
+    if (/\s/.test(ch)) {
+      i += 1;
+      continue;
+    }
+    if (ch === '/' && text[i + 1] === '/') {
+      while (i < text.length && text[i] !== '\n') i++;
+      continue;
+    }
+    if (ch === '/' && text[i + 1] === '*') {
+      i += 2;
+      while (i < text.length && !(text[i] === '*' && text[i + 1] === '/')) i++;
+      i += 2;
+      continue;
+    }
+    break;
+  }
+  return Math.min(i, text.length);
+}
+
+const FUNCTION_HEAD =
+  /^(?:export\s+)?(?:async\s+)?function\s*\*?\s*[A-Za-z_$][\w$]*\s*(?:<[^>]*>\s*)?\(/;
+const ARROW_HEAD =
+  /^(?:export\s+)?(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*=\s*(?:async\s+)?(?:function\s*\*?\s*(?:[A-Za-z_$][\w$]*)?\s*)?(?:<[^>]*>\s*)?\(/;
+
+/**
+ * Parameter names of a function-shaped declaration.
+ *
+ * A parameter shadows whatever the work order called the same thing, so it is not a dependency
+ * left behind. Binding positions only — an identifier directly after `(`, `,`, `{` or `[` that is
+ * followed by `:`, `,`, `)`, `}`, `]` or `=` — which leaves type arguments and default values,
+ * both of which really can reach outwards, where they were.
+ */
+function parameterNames(text: string): Set<string> {
+  const head = declarationHead(text);
+  const body = text.slice(head);
+  const match = FUNCTION_HEAD.exec(body) ?? ARROW_HEAD.exec(body);
+  if (!match) return new Set();
+
+  const open = head + match[0].length - 1;
+  let depth = 0;
+  let close = -1;
+  for (let i = open; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '(' || ch === '[' || ch === '{') depth++;
+    else if (ch === ')' || ch === ']' || ch === '}') {
+      depth--;
+      if (depth === 0) {
+        close = i;
+        break;
+      }
+    }
+  }
+  if (close === -1) return new Set();
+  /* A parenthesis that is not a parameter list — `const x = (a + b) * 2` — is not one of these. */
+  if (!/^\s*(?:=>|:|\{)/.test(text.slice(close + 1))) return new Set();
+
+  const params = text.slice(open, close + 1);
+  const names = new Set<string>();
+  for (const token of scanIdentifiers(params)) {
+    if (token.member) continue;
+    const before = params.slice(0, token.start).replace(/\s+$/, '');
+    const after = params.slice(token.end).replace(/^\s+/, '');
+    if (!/[(,{[]$/.test(before)) continue;
+    if (!/^[:,)}\]=]/.test(after) || after.startsWith('=>')) continue;
+    names.add(token.name);
+  }
+  return names;
+}
+
+/**
  * Top-level declarations in the player's source, in order.
  *
  * Only the ones a work order could plausibly publish: something with a name, declared at column
@@ -391,6 +471,7 @@ export function publishableDeclarations(
   /* `uses` is filled in a second pass: a declaration can reference one that appears below it. */
   const names = new Set(found.map((declaration) => declaration.name));
   for (const declaration of found) {
+    const shadowed = parameterNames(declaration.text);
     const body = tokens.filter(
       (token) =>
         token.start >= declaration.start &&
@@ -402,7 +483,7 @@ export function publishableDeclarations(
       ...new Set(
         body
           .map((token) => token.name)
-          .filter((each) => each !== declaration.name && names.has(each)),
+          .filter((each) => each !== declaration.name && names.has(each) && !shadowed.has(each)),
       ),
     ].sort();
   }
@@ -520,9 +601,14 @@ export function planPublication(options: {
   /* Library first. Each declaration keeps its own text; a rename is applied inside that text only,
      which is safe because the declaration is self-contained by the time it is published. */
   const additions = chosen.map((each) => {
-    const renamed = renameIdentifier(each.declaration.text, each.declaration.name, each.publishAs);
-    const already = /^\s*export\b/.test(renamed);
-    return `${already ? '' : 'export '}${renamed.trimEnd()}`;
+    const renamed = renameIdentifier(
+      each.declaration.text,
+      each.declaration.name,
+      each.publishAs,
+    ).trimEnd();
+    const head = declarationHead(renamed);
+    if (/^export\b/.test(renamed.slice(head))) return renamed;
+    return `${renamed.slice(0, head)}export ${renamed.slice(head)}`;
   });
 
   const trimmedLibrary = options.librarySource.replace(PLACEHOLDER_EXPORT, '').trimEnd();

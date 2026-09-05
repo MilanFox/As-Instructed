@@ -242,6 +242,34 @@
   font-size: 12px;
 }
 
+/* --- structure -------------------------------------------------------- */
+
+.lib-tree {
+  margin: var(--space-4) 0 var(--space-5);
+}
+
+.lib-tree__root td {
+  border-top: 1px solid var(--border);
+}
+
+.lib-tree__rail {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.lib-tree__elbow {
+  font-family: var(--font-mono);
+  color: var(--ink-dim);
+  font-size: 11px;
+}
+
+.lib-tree__consumers {
+  margin: var(--space-2) 0 0;
+  color: var(--ink-dim);
+  font-size: 12px;
+}
+
 /* --- regression ------------------------------------------------------- */
 
 .lib-entry {

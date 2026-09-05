@@ -21,6 +21,8 @@ by writing the same function inside the level.
 5. Editing the library re-runs every closed work order that imports from it. That is the
    **Regression** tab. A worse result is reported; a medal never moves without an explicit accept.
 6. Rarely, a closed work order is re-run on a seed it never saw. That is the **Discrepancies** tab.
+7. Subroutines built out of other subroutines are drawn as an indented call tree, with the ticks
+   attributed down it. That is the **Structure** tab.
 
 ---
 
@@ -170,6 +172,9 @@ Everything below is re-exported from `src/meta/index.ts`. UI components come fro
 `Declaration`, `PublishPlan`, `PublishSelection` · `publishableDeclarations(source, hardware)`,
 `planPublication`, `libraryExportNames`, `withLibraryImport`, `renameIdentifier`, `isValidName`
 
+### Structure — `structure.ts`
+`LibraryFunction`, `StructureRow`, `LibraryStructure` · `buildStructure`
+
 ### Cost analysis — `profile.ts`
 `FunctionReport`, `CallerFact`, `Projection`, `MedalUpgrade` · `buildReports`, `projectSavings`,
 `bestProjection`, `projectedTicks`, `medalThresholds`, `upgradeSummary`
@@ -210,13 +215,13 @@ Everything below is re-exported from `src/meta/index.ts`. UI components come fro
 
 | Component | Where it goes | Notes |
 |---|---|---|
-| `<LibraryPanel />` | Workspace, as a sibling of `EditorPanel` — a second editor column or a slide-over drawer | Renders `null` until `save.unlocked`. Renders the unlock memo until `save.briefed`. Owns its own four tabs. |
+| `<LibraryPanel />` | Workspace, as a sibling of `EditorPanel` — a second editor column or a slide-over drawer | Renders `null` until `save.unlocked`. Renders the unlock memo until `save.briefed`. Owns its own five tabs. |
 | `<PublishDialog />` | Top level, next to `<Results />` in `App.tsx` | A modal. Renders `null` unless `useLibrary.getState().offer` is set. |
 | `<UnlockMemo />` | Also exported standalone, if the integrator prefers to show it in the Results screen after `w3-05` | Calls `markBriefed()` on acknowledge. |
 | `libraryStatusLine(state)` | Workspace status bar | One line: suite progress, or how many subroutines are published. |
 
-`RefactorScreen`, `RegressionReport`, `DiscrepancyList` and `LibraryEditor` are exported too, if the
-integrator wants them somewhere other than inside `LibraryPanel`.
+`RefactorScreen`, `StructureScreen`, `RegressionReport`, `DiscrepancyList` and `LibraryEditor` are
+exported too, if the integrator wants them somewhere other than inside `LibraryPanel`.
 
 ### Wiring, in order
 
@@ -274,6 +279,16 @@ throws `MissingLibraryError` — which is a correct, in-voice failure, but it is
 - **`buildReports` needs `freshKeys`.** Only the caller knows which cache keys are current. Any
   profile outside that set is listed in `report.stale` and excluded from every number, including
   the projection. That is deliberate: a stale figure in the Cost tab is worse than no figure.
+- **Anything a selector reads has to be referentially stable.** `reports()`, `structure()` and
+  `suiteSummary` are all read as `useLibrary((state) => state.reports())`, so each caches its last
+  answer against the `save` it was derived from. A derivation that allocates on every call is a
+  `getSnapshot` that never compares equal, and React answers that by re-rendering until it unmounts
+  the tree — which is a white page, not a broken panel.
+- **The Structure tab's edges are static, its numbers are not.** Who calls whom is read out of the
+  player's own `lib.ts` text, so it is known before anything has run. Ticks and call counts come
+  only from measured profiles under the current library; an unmeasured subroutine shows a dash.
+  `selfTicks` is `ticks` minus what its children carry, floored at zero and marked `≤` when the
+  floor was needed, because a child called from two parents carries the same ticks under both.
 - **The projection is arithmetic on measured call counts**, not a simulation. `delta × calls`,
   against the real medal thresholds. A faster `pathTo` that still walks the same tiles is not
   something the simulator can be asked to imagine, so the alternative is not a better estimate — it
@@ -285,13 +300,15 @@ throws `MissingLibraryError` — which is a correct, in-voice failure, but it is
 
 ## 8. Tests
 
-`src/meta/__tests__/` — 109 tests.
+`src/meta/__tests__/` — 127 tests.
 
 | File | Covers |
 |---|---|
 | `modules.test.ts` (40) | Statement scanning, import rewriting, export stripping, linking, **line-number correctness across both files**, tick attribution including nesting, cache-key behaviour, aliased exports, published classes, metering not moving a line |
 | `publish.test.ts` (22) | Declaration discovery, doc comments travelling with their declaration, dependency and hardware warnings, identifier scanning, renaming without touching strings, the two-file rewrite, import merging |
 | `regression.test.ts` (13) | Broken / degraded / improved / nominal classification, **no silent medal downgrade**, revert target never advancing past a bad revision, cache hits returning identical results and running nothing, independent work orders staying cached, cache cap, cancellation |
+| `structure.test.ts` (9) | Call edges read out of `lib.ts`, cost attributed down the tree, roots, recursion and cycles, unrelated functions degrading to a parts list, stale profiles contributing no numbers |
+| `store.test.ts` (5) | Referential stability of every derived selector (`reports`, `structure`, `suiteSummary`) |
 | `profile.test.ts` (9) | Attribution roll-up, stale exclusion, medal-upgrade projection, cheapest useful saving, no-projection case |
 | `save.test.ts` (21) | Migration from every shape that has ever plausibly been written, source never discarded, revision cap, merge, storage failure, discrepancy pacing and candidate selection |
 | `pipeline.test.ts` (4) | The whole loop end to end: publish a declaration, import it from the next work order, run it, be charged for it, and get the right `lib.ts` line when it throws |

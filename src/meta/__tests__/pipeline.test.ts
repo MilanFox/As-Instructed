@@ -96,6 +96,78 @@ describe('publish, import, run', () => {
     }
   });
 
+  test('a commented declaration still links once published', () => {
+    const source = [
+      '// the long way round, but it never clips a wall',
+      'function walk(n) {',
+      '  for (let i = 0; i < n; i++) move();',
+      '}',
+      '',
+      'walk(2);',
+      '',
+    ].join('\n');
+    const { library, level } = publish(source, 'walk');
+
+    expect(library).toContain('// the long way round');
+    expect(library).toMatch(/^export function walk\(n\) \{$/m);
+
+    let clock = 0;
+    const linked = linkProgram({
+      programJs: level,
+      libraryJs: library,
+      scope: {
+        api: {
+          move: () => {
+            clock += 1;
+          },
+        },
+        values: {},
+      },
+      meter: { now: () => clock },
+    });
+    linked.run();
+
+    expect(linked.exports).toEqual(['walk']);
+    expect(clock).toBe(2);
+  });
+
+  test('a doc comment travels with the declaration and does not break the export', () => {
+    const source = [
+      '/**',
+      ' * Walks the bot forward.',
+      ' */',
+      'const stride = (n) => {',
+      '  for (let i = 0; i < n; i++) move();',
+      '};',
+      '',
+      'stride(3);',
+      '',
+    ].join('\n');
+    const { library, level } = publish(source, 'stride');
+
+    expect(library).toContain(' * Walks the bot forward.');
+    expect(library).toMatch(/^export const stride = \(n\) => \{$/m);
+
+    let clock = 0;
+    const linked = linkProgram({
+      programJs: level,
+      libraryJs: library,
+      scope: {
+        api: {
+          move: () => {
+            clock += 1;
+          },
+        },
+        values: {},
+      },
+      meter: { now: () => clock },
+    });
+    linked.run();
+
+    expect(linked.exports).toEqual(['stride']);
+    expect(clock).toBe(3);
+  });
+
   test('a second publish leaves the first one alone', () => {
     const first = publish(SOLVED, 'walk');
     const source = 'function turn() {\n  move();\n}\n\nturn();\n';

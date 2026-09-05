@@ -114,15 +114,52 @@ export const REFACTOR = {
     `${ticks} ticks per call, across ${calls} ${calls === 1 ? 'call' : 'calls'}.`,
   /** The hook line. Only ever built from measured call counts. */
   projection: (delta: number, name: string, levels: number, upgrades: number): string => {
+    const saving = `${delta} ${delta === 1 ? 'tick' : 'ticks'} off \`${name}\``;
     const orders = `${levels} work ${levels === 1 ? 'order' : 'orders'}`;
-    if (upgrades === 0) return `${delta} ticks off \`${name}\` improves ${orders}.`;
-    return `${delta} ticks off \`${name}\` improves ${orders}, ${upgrades} of them to a better medal.`;
+    if (upgrades === 0) return `${saving} improves ${orders}.`;
+    if (levels === 1) return `${saving} improves ${orders}, and moves it to a better medal.`;
+    return `${saving} improves ${orders}, ${upgrades} of them to a better medal.`;
   },
   projectionMedals: (from: Medal, to: Medal, count: number): string =>
     `${count} ${count === 1 ? 'work order goes' : 'work orders go'} from ${from} to ${to}.`,
   noProjection: (name: string): string =>
     `Nothing changes bracket, however cheap \`${name}\` gets. The cost is somewhere else.`,
   footnote: 'par is a planning figure. it goes down when someone beats it. that is not a warning',
+} as const;
+
+// ---------------------------------------------------------------------------
+// What the Repository is made of
+// ---------------------------------------------------------------------------
+
+export const STRUCTURE = {
+  title: 'REPOSITORY — STRUCTURE',
+  lede:
+    'What each subroutine is built out of. An indented line is called by the line above it, and ' +
+    'carries its ticks with it.',
+  empty:
+    'Nothing is published yet, so there is nothing to draw. The Repository is filed as empty ' +
+    'rather than as missing.',
+  flat:
+    'Nothing in the Repository calls anything else in it. Filed as a parts list rather than an ' +
+    'assembly.',
+  columns: {
+    name: 'Subroutine',
+    calls: 'Calls',
+    ticks: 'Ticks',
+    self: 'Its own',
+    share: 'Share',
+  },
+  usedBy: (levels: readonly string[]): string =>
+    `Imported by ${levels.length} work ${levels.length === 1 ? 'order' : 'orders'}: ${levels.join(', ')}.`,
+  unused: 'Imported by no work order yet.',
+  internalOnly: 'Imported by no work order. It exists for the subroutines that call it.',
+  unmeasured: 'No run has been through it yet, so it carries no numbers.',
+  recursive: 'calls itself — the branch stops here',
+  shared: 'called from more than one place; these ticks are not this branch’s alone',
+  depth: (levels: number): string => (levels <= 1 ? 'One level deep.' : `${levels} levels deep.`),
+  footnote:
+    'ticks include everything a subroutine calls. "its own" is what is left when the ones under ' +
+    'it are taken out',
 } as const;
 
 // ---------------------------------------------------------------------------
