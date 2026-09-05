@@ -12,13 +12,20 @@ import { solution as w2_01Solution } from '../__solutions__/w2-01.ts';
 import { solution as w2_02Solution } from '../__solutions__/w2-02.ts';
 import { solution as w2_04Solution } from '../__solutions__/w2-04.ts';
 import { solution as w2_05Solution } from '../__solutions__/w2-05.ts';
+import { rowSweep, serpentineHarvest } from '../../__tests__/naive.ts';
 
 /**
  * The Regolith Fields, and specifically its three reworked bonus objectives.
  *
  * Every bonus here is proved in both directions: a driver that earns the star on every declared
- * seed, and the obvious correct answer — the level's own reference solution — missing it. A bonus
- * only one of those is true of is either confetti or impossible, and both have shipped before.
+ * seed, and the obvious correct answer missing it. A bonus only one of those is true of is either
+ * confetti or impossible, and both have shipped before.
+ *
+ * That obvious answer used to be the level's own reference solution. Since docs/FIX-PAR.md it is
+ * not: on w2-01 and w2-05 par moved onto the route that uses the level's hardware, so the
+ * reference had to move with it, and the lazier route lives in `src/levels/__tests__/naive.ts` as
+ * `rowSweep` and `serpentineHarvest`. It is still correct, still passes every seed, and now takes
+ * silver rather than gold.
  *
  * The readouts are proved too. `src/game/budgets.ts` decides what number the player sees by
  * matching words in the label against the meters a run actually produced, so a label is a piece of
@@ -336,7 +343,7 @@ describe('w2-01 bonus — the survey that stops early', () => {
 
   test('reading the whole row and walking back solves it and misses the star', () => {
     const missed = w2_01.seeds.filter((seed) => {
-      const run = runReference(w2_01, seed, w2_01Solution);
+      const run = runReference(w2_01, seed, rowSweep);
       expect(run.verdict.passed, `seed ${String(seed)}`).toBe(true);
       return !starred(w2_01, run);
     });
@@ -345,7 +352,7 @@ describe('w2-01 bonus — the survey that stops early', () => {
   });
 
   test('a seed whose target is the far tile is the one the old bonus was free on', () => {
-    const run = runReference(w2_01, 2, w2_01Solution);
+    const run = runReference(w2_01, 2, rowSweep);
     expect(run.ticks).toBe(9);
     expect(starred(w2_01, run)).toBe(true);
   });
@@ -356,7 +363,7 @@ describe('w2-01 bonus — the survey that stops early', () => {
   });
 
   test('the overshoot reads back in moves, unclamped', () => {
-    const over = runReference(w2_01, 1, w2_01Solution);
+    const over = runReference(w2_01, 1, rowSweep);
     expect(scoreBonus(w2_01, over).progress).toEqual([15, 3]);
     const budget = readout(w2_01, over);
     expect(budget?.meter).toEqual({ kind: 'events', event: 'move' });
@@ -439,7 +446,7 @@ describe('w2-05 bonus — footprint', () => {
 
   test('the serpentine sweep solves it and misses the star on every seed', () => {
     for (const seed of w2_05.seeds) {
-      const run = runReference(w2_05, seed, w2_05Solution);
+      const run = runReference(w2_05, seed, serpentineHarvest);
       expect(run.verdict.passed, `seed ${String(seed)}`).toBe(true);
       expect(footprintOf(run), `seed ${String(seed)}`).toBeGreaterThan(32);
       expect(starred(w2_05, run), `seed ${String(seed)}`).toBe(false);
@@ -453,7 +460,7 @@ describe('w2-05 bonus — footprint', () => {
   });
 
   test('the footprint reads back in tiles, unclamped', () => {
-    const over = runReference(w2_05, 1, w2_05Solution);
+    const over = runReference(w2_05, 1, serpentineHarvest);
     expect(scoreBonus(w2_05, over).progress).toEqual([41, 32]);
     expect(readout(w2_05, over)).toBeNull();
 

@@ -1,93 +1,22 @@
 import { describe, expect, test } from 'vitest';
 import { Dir, evaluateObjectives, medalFor } from '../../engine/index.ts';
+import { SILVER_FACTOR } from '../../game/score.ts';
 import { apiUnlockedAt } from '../../runtime/api-spec.ts';
 import { LIBRARY_FIRST_WORLD, requirementsFor } from '../../meta/unlock.ts';
 import { LEVELS, campaignOrder, getLevel, hardwareUnlockedBy, levelsByWorld } from '../index.ts';
 import { runLevel, runReference } from '../harness.ts';
+import { SOLUTIONS } from './solutions.ts';
 import type { ReferenceSolution } from '../types.ts';
 import {
+  corridorPoll,
   fieldSweep,
   flatReader,
   literalPlanFollower,
   rawRelay,
   roundRobinDispatch,
+  rowSweep,
+  serpentineHarvest,
 } from './naive.ts';
-
-import { solution as w1_01 } from '../world-1/__solutions__/w1-01.ts';
-import { solution as w1_03 } from '../world-1/__solutions__/w1-03.ts';
-import { solution as w1_05 } from '../world-1/__solutions__/w1-05.ts';
-import { solution as w2_01 } from '../world-2/__solutions__/w2-01.ts';
-import { solution as w2_02 } from '../world-2/__solutions__/w2-02.ts';
-import { solution as w2_04 } from '../world-2/__solutions__/w2-04.ts';
-import { solution as w2_05 } from '../world-2/__solutions__/w2-05.ts';
-import { solution as w3_01 } from '../world-3/__solutions__/w3-01.ts';
-import { solution as w3_02 } from '../world-3/__solutions__/w3-02.ts';
-import { solution as w3_04 } from '../world-3/__solutions__/w3-04.ts';
-import { solution as w4_01 } from '../world-4/__solutions__/w4-01.ts';
-import { solution as w4_02 } from '../world-4/__solutions__/w4-02.ts';
-import { solution as w4_04 } from '../world-4/__solutions__/w4-04.ts';
-import { solution as w4_05 } from '../world-4/__solutions__/w4-05.ts';
-import { solution as w5_01 } from '../world-5/__solutions__/w5-01.ts';
-import { solution as w5_02 } from '../world-5/__solutions__/w5-02.ts';
-import { solution as w5_03 } from '../world-5/__solutions__/w5-03.ts';
-import { solution as w5_04 } from '../world-5/__solutions__/w5-04.ts';
-import { solution as w5_05 } from '../world-5/__solutions__/w5-05.ts';
-import { solution as w6_01 } from '../world-6/__solutions__/w6-01.ts';
-import { solution as w6_02 } from '../world-6/__solutions__/w6-02.ts';
-import { solution as w6_03 } from '../world-6/__solutions__/w6-03.ts';
-import { solution as w6_04 } from '../world-6/__solutions__/w6-04.ts';
-import { solution as w6_05 } from '../world-6/__solutions__/w6-05.ts';
-import { solution as w7_01 } from '../world-7/__solutions__/w7-01.ts';
-import { solution as w7_02 } from '../world-7/__solutions__/w7-02.ts';
-import { solution as w7_03 } from '../world-7/__solutions__/w7-03.ts';
-import { solution as w7_04 } from '../world-7/__solutions__/w7-04.ts';
-import { solution as w7_05 } from '../world-7/__solutions__/w7-05.ts';
-import { solution as w8_01 } from '../world-8/__solutions__/w8-01.ts';
-import { solution as w8_02 } from '../world-8/__solutions__/w8-02.ts';
-import { solution as w8_03 } from '../world-8/__solutions__/w8-03.ts';
-import { solution as w8_04 } from '../world-8/__solutions__/w8-04.ts';
-import { solution as w8_05 } from '../world-8/__solutions__/w8-05.ts';
-
-/**
- * Every level ships a reference solution (DESIGN.md §5). Registered here; the suite below proves
- * solvability on every seed and that par is actually achievable.
- */
-const SOLUTIONS: Record<string, ReferenceSolution> = {
-  'w1-01': w1_01,
-  'w1-03': w1_03,
-  'w1-05': w1_05,
-  'w2-01': w2_01,
-  'w2-02': w2_02,
-  'w2-04': w2_04,
-  'w2-05': w2_05,
-  'w3-01': w3_01,
-  'w3-02': w3_02,
-  'w3-04': w3_04,
-  'w4-01': w4_01,
-  'w4-02': w4_02,
-  'w4-04': w4_04,
-  'w4-05': w4_05,
-  'w5-01': w5_01,
-  'w5-02': w5_02,
-  'w5-03': w5_03,
-  'w5-04': w5_04,
-  'w5-05': w5_05,
-  'w6-01': w6_01,
-  'w6-02': w6_02,
-  'w6-03': w6_03,
-  'w6-04': w6_04,
-  'w6-05': w6_05,
-  'w7-01': w7_01,
-  'w7-02': w7_02,
-  'w7-03': w7_03,
-  'w7-04': w7_04,
-  'w7-05': w7_05,
-  'w8-01': w8_01,
-  'w8-02': w8_02,
-  'w8-03': w8_03,
-  'w8-04': w8_04,
-  'w8-05': w8_05,
-};
 
 /**
  * Reference runs are deterministic, and the finale's is not cheap, so each (level, seed) pair is
@@ -317,6 +246,88 @@ describe('randomization defeats hardcoding', () => {
     const outcomes = level.seeds.map((seed) => survives('w8-04', seed, literalPlanFollower));
     expect(outcomes[0]).toBe(true);
     expect(outcomes.slice(1).some((passed) => !passed)).toBe(true);
+  });
+});
+
+/**
+ * docs/FIX-PAR.md. Par is a medal threshold, so the thing to assert about one is a medal — a test
+ * that repeats `expect(level.par.ticks).toBe(16)` proves only that a constant was copied twice.
+ *
+ * Every case here drives a *second* correct program through the level and states what its medal is
+ * worth, so each par is pinned from both sides: the reference takes gold (proved on every seed
+ * above) and, where the level has a better and a lazier answer, the lazier one does not. The medal
+ * is taken from the worst seed, which is how `src/runtime/aggregate.ts` scores a run.
+ */
+describe('par calibration', () => {
+  function scored(levelId: string, solution: ReferenceSolution) {
+    const level = getLevel(levelId) as NonNullable<ReturnType<typeof getLevel>>;
+    const runs = level.seeds.map((seed) => runReference(level, seed, solution));
+    const passed = runs.every((run) => run.verdict.passed);
+    const worst = Math.max(...runs.map((run) => run.ticks));
+    return { passed, worst, medal: medalFor(passed, worst, level.par.ticks) };
+  }
+
+  function reference(levelId: string) {
+    return scored(levelId, SOLUTIONS[levelId] as ReferenceSolution);
+  }
+
+  test('w1-03: par is at the floor, because the answer with no idea in it is tick-optimal', () => {
+    const polled = scored('w1-03', corridorPoll);
+    expect(polled.passed).toBe(true);
+    expect(polled.worst).toBe(reference('w1-03').worst);
+    expect(polled.medal).toBe('gold');
+  });
+
+  test('w2-01: reading the whole row and driving back is correct, and is not gold', () => {
+    const swept = scored('w2-01', rowSweep);
+    expect(swept.passed).toBe(true);
+    expect(swept.medal).toBe('silver');
+    expect(reference('w2-01').worst).toBeLessThan(swept.worst);
+  });
+
+  test('w2-05: serpentining all six rows is correct, and is not gold', () => {
+    const swept = scored('w2-05', serpentineHarvest);
+    expect(swept.passed).toBe(true);
+    expect(swept.medal).toBe('silver');
+    expect(reference('w2-05').worst).toBeLessThan(swept.worst);
+  });
+
+  /**
+   * Ticks are integers and silver is `(par, par * 1.25]`, so the band holds no integer at all
+   * below a par of four: `floor(3 * 1.25)` is 3. On those levels the shell draws a three-tier
+   * ladder with two reachable rungs — gold, or a bronze cliff one tick wide.
+   *
+   * Two levels are there, and neither par is a design figure. `w6-01`'s own comment says it is 1
+   * "because the registry test requires a positive par" (the reference costs 0), and `w5-02`'s is
+   * the cost of the single `power` call the level is about. They are placeholders standing where a
+   * medal axis is displayed, which is `docs/AUDIT-INCENTIVES.md` §8 and is not fixable by moving a
+   * number — see `docs/FIX-PAR.md` §6. Listed rather than left implicit so a third cannot appear
+   * without this test saying so.
+   */
+  const SILVER_IS_UNREACHABLE = ['w5-02', 'w6-01'];
+
+  test('the silver band holds an integer everywhere except the two known placeholders', () => {
+    const degenerate = LEVELS.filter(
+      (level) => Math.floor(level.par.ticks * SILVER_FACTOR) <= level.par.ticks,
+    );
+    expect(degenerate.map((level) => level.id).sort()).toEqual(SILVER_IS_UNREACHABLE);
+  });
+
+  /**
+   * The criterion for "a tick budget cannot grade this level", measured rather than inferred from
+   * how small the par is: the reference costs the *same* number of ticks on every seed, so the
+   * clock is reporting the work rather than the route. `docs/FIX-PAR.md` §6 argues this is the set
+   * an `ungraded` flag should be scoped by, and it is not the set par magnitude picks out.
+   */
+  const CLOCK_CANNOT_VARY = ['w1-01', 'w5-02', 'w6-01', 'w6-03', 'w6-05'];
+
+  test('the levels whose reference costs the same on every seed are the ones on record', () => {
+    const fixed = LEVELS.filter((level) => {
+      const solution = SOLUTIONS[level.id] as ReferenceSolution;
+      const ticks = level.seeds.map((seed) => runReference(level, seed, solution).ticks);
+      return new Set(ticks).size === 1;
+    });
+    expect(fixed.map((level) => level.id).sort()).toEqual(CLOCK_CANNOT_VARY);
   });
 });
 

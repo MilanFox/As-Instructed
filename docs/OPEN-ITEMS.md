@@ -104,8 +104,32 @@ testers would have quit in. Gold on nine of the first ten levels, first honest r
   *not* too late in the campaign; it was too early to hold anything. See §1 of that file.
 - Viewport aspect: 891×393, 56% of width wasted on square grids.
 - Refill the achievement set further if it reads thin once the cut lands.
-- Par is default-gold through World 2. Deliberately frozen until the above lands, because
-  the fix is either "raise par" or "par is not the axis" and that depends on the new bonuses.
+- ~~**Par is default-gold through World 2.**~~ Done, in an isolated worktree — see
+  `docs/FIX-PAR.md`. The recorded framing was wrong in a way the measurement settles: par was
+  never *loose*. On 21 of 34 levels it is set to exactly the reference solution's worst seed, so
+  there was nothing to tighten. The answer splits by world. **World 1: par is not the axis** —
+  the tick-optimal route is the first route a player writes (measured: on `w1-03` the answer with
+  no idea in it ties the reference, and the star-earning stride costs *more*), so nothing moved.
+  **World 2: raise par, on the two levels where par paid gold for ignoring the level's own
+  hardware** — `w2-01` 18 → 16 and `w2-05` 74 → 60, with both reference solutions rewritten to the
+  route par now rewards. The lazier route still passes every seed and now takes silver. `w2-02`
+  and `w2-04` were measured and left alone. Note for whoever reads this next: **the bonus rework
+  did its job** — the reference now fails five of the six World 1–2 bonuses — but the playtest
+  measured which instrument a player acts on, and it is the medal, not the star. See §2 of that
+  file.
+- **Silver is arithmetically unreachable on `w5-02` and `w6-01`.** Found by the incentive audit
+  (`docs/AUDIT-INCENTIVES.md` §8), confirmed and pinned by a test. Ticks are integers and silver is
+  `(par, par × 1.25]`, so the band holds no integer below a par of four. Both pars are placeholders
+  rather than design figures — `w6-01`'s own comment says it is 1 "because the registry test
+  requires a positive par". Not fixable by moving a number. Two exit routes, both written out in
+  `docs/FIX-PAR.md` §6–7: the `graded: false` schema change, which covers both levels as a side
+  effect, or a one-line widening of the band in `src/engine/verdict.ts` that is behaviour-preserving
+  on the other 32 levels. **Left for the orchestrator: it is a DESIGN §7 amendment and it reaches
+  `src/ui/panels/**`.**
+- The audit's `graded: false` proposal is sound in principle and **wrong in scope** — measured
+  against the reference solutions it is 4 right and 7 wrong out of eleven, and it misses `w6-03`
+  and `w6-05`. The measured set is `w1-01, w1-03, w5-02, w6-01, w6-03, w6-05`, and it leaves World
+  2 graded in full. Table in `docs/FIX-PAR.md` §6.
 - Housekeeping: 2 pre-existing eslint false positives; delete branch `wip/wave1-interrupted`.
 
 ### Backlog — i18n, German toggle

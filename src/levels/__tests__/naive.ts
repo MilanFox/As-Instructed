@@ -1,14 +1,19 @@
-import type { Sim, Vec } from '../../engine/index.ts';
+import type { Dir as DirType, Sim, Vec } from '../../engine/index.ts';
 import { Dir, ItemKind, step } from '../../engine/index.ts';
 import type { ReferenceSolution } from '../types.ts';
 import { KEY_SPACE, drainAntenna, readPacket } from '../world-8/shared.ts';
 
 /**
  * TEST FIXTURES. The first honest idea a player has on each of these levels, written out so the
- * suite can prove CURRICULUM.md §14's claim: that the randomization actually kills it.
+ * suite can measure what the level does to it.
  *
- * None of these are solutions. They are the *wrong* answers the level blocks say a player will
- * reach for first, and each one is expected to fail on at least one shipped seed.
+ * None of these are the reference solution. Most are the *wrong* answers the level blocks say a
+ * player will reach for first, and prove CURRICULUM.md §14's claim that the randomization kills
+ * them: each is expected to fail on at least one shipped seed.
+ *
+ * The last two are a different instrument and are marked as such. They are *correct* — they pass
+ * every seed — and they exist so the suite can prove what medal a level hands to a program that
+ * solved it without using the hardware it was issued for. See `docs/FIX-PAR.md` §3.
  */
 
 const HEADING: Record<string, Dir> = {
@@ -234,6 +239,90 @@ export const fieldSweep: ReferenceSolution = {
     if (held > 0) {
       go(silo);
       sim.drop(botId, ItemKind.Crop, held);
+    }
+  },
+  source: '',
+};
+
+// ---------------------------------------------------------------------------
+// Correct, and issued the hardware anyway. docs/FIX-PAR.md §3.
+// ---------------------------------------------------------------------------
+
+/**
+ * w1-03: ask before every single step.
+ *
+ * The answer with no idea in it, and it is *tick-optimal* — sensing is free, so polling the wall
+ * before each tile costs exactly the tiles. Kept so the suite can say why w1-03's par cannot be
+ * lowered: there is nothing below it. The stride the bonus asks for is strictly more expensive,
+ * because it pays for the tiles the corridor turned out not to have.
+ */
+export const corridorPoll: ReferenceSolution = {
+  levelId: 'w1-03',
+  run(sim: Sim, botId: number): void {
+    while (sim.canMove(botId, Dir.East)) sim.move(botId, Dir.East);
+  },
+  source: '',
+};
+
+/**
+ * w2-01: read every tile in the row, then drive back to the highest reading.
+ *
+ * Correct on every seed, and the answer the level's own hints walk a player to. It costs the trip
+ * out plus most of the trip back — 18 on the worst seed — because it never uses the one thing the
+ * facts table states outright: exactly one tile sits at `maxGrowth`, so a reading that hits the
+ * ceiling has nothing left to be compared against.
+ */
+export const rowSweep: ReferenceSolution = {
+  levelId: 'w2-01',
+  run(sim: Sim, botId: number): void {
+    let bestGrowth = -1;
+    let bestX = sim.pos(botId).x;
+    for (;;) {
+      const here = sim.scan(botId);
+      if (here.crop !== null && here.growth > bestGrowth) {
+        bestGrowth = here.growth;
+        bestX = sim.pos(botId).x;
+      }
+      if (!sim.canMove(botId, Dir.East)) break;
+      sim.move(botId, Dir.East);
+    }
+    while (sim.pos(botId).x > bestX) sim.move(botId, Dir.West);
+  },
+  source: '',
+};
+
+/**
+ * w2-05: serpentine the field reading only the tile under the wheels, and stop when the hopper
+ * refuses a crop.
+ *
+ * Correct on every seed, and it filters ice properly, which is the level's stated ask. It costs
+ * 58-68 because it drives all six rows of a field the sensor can survey from two of them.
+ */
+export const serpentineHarvest: ReferenceSolution = {
+  levelId: 'w2-05',
+  run(sim: Sim, botId: number): void {
+    let full = false;
+    const service = (): void => {
+      if (full) return;
+      const here = sim.scan(botId);
+      if (here.crop !== ItemKind.Crop || here.growth < here.maxGrowth) return;
+      if (sim.harvest(botId) === null) full = true;
+    };
+    const sweep = (dir: DirType): void => {
+      while (!full && sim.canMove(botId, dir)) {
+        sim.move(botId, dir);
+        service();
+      }
+    };
+
+    let dir: DirType = Dir.East;
+    service();
+    sweep(dir);
+    while (!full && sim.canMove(botId, Dir.South)) {
+      sim.move(botId, Dir.South);
+      service();
+      dir = dir === Dir.East ? Dir.West : Dir.East;
+      sweep(dir);
     }
   },
   source: '',
