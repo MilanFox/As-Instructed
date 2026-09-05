@@ -17,11 +17,11 @@ import type { SaveFile } from '../save.ts';
 describe('migrate', () => {
   it('reads a current-version save unchanged', () => {
     const save = emptySave();
-    save.levels['w1-01'] = { ...emptyProgress(), code: 'move(Dir.East);', medal: 'silver' };
+    save.levels['w1-05'] = { ...emptyProgress(), code: 'move(Dir.East);', medal: 'silver' };
     const migrated = migrate(JSON.parse(JSON.stringify(save)) as unknown);
     expect(migrated.version).toBe(SAVE_VERSION);
-    expect(migrated.levels['w1-01']?.code).toBe('move(Dir.East);');
-    expect(migrated.levels['w1-01']?.medal).toBe('silver');
+    expect(migrated.levels['w1-05']?.code).toBe('move(Dir.East);');
+    expect(migrated.levels['w1-05']?.medal).toBe('silver');
   });
 
   it('migrates the unversioned v0 shape without losing code', () => {
@@ -35,10 +35,10 @@ describe('migrate', () => {
 
   it('migrates a v0 object shape with partial fields', () => {
     const legacy = {
-      levels: { 'w1-01': { code: 'x', completed: true, medal: 'gold', bestTicks: 6 } },
+      levels: { 'w1-05': { code: 'x', completed: true, medal: 'gold', bestTicks: 6 } },
     };
     const migrated = migrate(legacy);
-    expect(migrated.levels['w1-01']).toMatchObject({
+    expect(migrated.levels['w1-05']).toMatchObject({
       code: 'x',
       completed: true,
       medal: 'gold',
@@ -50,13 +50,13 @@ describe('migrate', () => {
   it('keeps code when the stored version is from a future build', () => {
     const future = {
       version: SAVE_VERSION + 40,
-      levels: { 'w1-01': { code: 'precious', medal: 'gold', completed: true } },
+      levels: { 'w1-05': { code: 'precious', medal: 'gold', completed: true } },
       settings: { theyAddedThis: true },
     };
     const migrated = migrate(future);
     expect(migrated.version).toBe(SAVE_VERSION);
-    expect(migrated.levels['w1-01']?.code).toBe('precious');
-    expect(migrated.levels['w1-01']?.medal).toBe('gold');
+    expect(migrated.levels['w1-05']?.code).toBe('precious');
+    expect(migrated.levels['w1-05']?.medal).toBe('gold');
   });
 
   it('drops nonsense fields instead of trusting them', () => {
@@ -101,7 +101,7 @@ describe('migrate', () => {
       version: SAVE_VERSION,
       updatedAt: 1_700_000_000_000,
       levels: {
-        'w1-01': {
+        'w1-05': {
           code: 'move(Dir.East);',
           completed: true,
           medal: 'gold',
@@ -120,7 +120,7 @@ describe('migrate', () => {
     };
 
     const restored = migrate(legacy);
-    const progress = restored.levels['w1-01'];
+    const progress = restored.levels['w1-05'];
 
     expect(progress).toEqual({
       code: 'move(Dir.East);',
@@ -156,14 +156,14 @@ describe('mergeProgress', () => {
 
   it('never drops code on import', () => {
     const current = emptySave();
-    current.levels['w1-01'] = { ...emptyProgress(), code: 'mine', medal: 'gold' };
+    current.levels['w1-05'] = { ...emptyProgress(), code: 'mine', medal: 'gold' };
     const incoming = exportSave({
       ...emptySave(),
       levels: { 'w1-03': { ...emptyProgress(), code: 'theirs' } },
     });
     const merged = importSave(current, incoming);
-    expect(merged.levels['w1-01']?.code).toBe('mine');
-    expect(merged.levels['w1-01']?.medal).toBe('gold');
+    expect(merged.levels['w1-05']?.code).toBe('mine');
+    expect(merged.levels['w1-05']?.medal).toBe('gold');
     expect(merged.levels['w1-03']?.code).toBe('theirs');
   });
 });
@@ -208,8 +208,8 @@ describe('migrate to the reward fields', () => {
       version: 1,
       updatedAt: 1,
       levels: {
-        'w1-01': { completed: true, medal: 'gold', stars: [], attempts: 3, clearedAt: 1000 },
-        'w1-03': { completed: true, medal: 'bronze', stars: [], attempts: 1, clearedAt: 2000 },
+        'w1-05': { completed: true, medal: 'gold', stars: [], attempts: 3, clearedAt: 1000 },
+        'w2-01': { completed: true, medal: 'bronze', stars: [], attempts: 1, clearedAt: 2000 },
       },
       settings: {},
     };
@@ -255,7 +255,7 @@ describe('migrate to the reward fields', () => {
     const before = {
       version: SAVE_VERSION,
       updatedAt: 1,
-      levels: { 'w1-01': { completed: true, medal: 'gold', stars: [], attempts: 2 } },
+      levels: { 'w1-05': { completed: true, medal: 'gold', stars: [], attempts: 2 } },
       settings: {},
       achievements: {},
       stats: { runs: 2, passes: 1, fails: 1 },
@@ -264,7 +264,7 @@ describe('migrate to the reward fields', () => {
     const migrated = migrate(before);
 
     expect(migrated.reviewedRanks).toEqual([]);
-    expect(migrated.levels['w1-01']?.medal).toBe('gold');
+    expect(migrated.levels['w1-05']?.medal).toBe('gold');
     expect(migrated.seenRequisitions).toEqual(['move']);
   });
 
@@ -364,7 +364,7 @@ describe('a save that names a withdrawn work order', () => {
 
   const beforeTheCut = (): SaveFile => {
     const save = emptySave();
-    save.levels['w1-01'] = { ...emptyProgress(), code: 'kept();', completed: true, medal: 'gold' };
+    save.levels['w1-05'] = { ...emptyProgress(), code: 'kept();', completed: true, medal: 'gold' };
     save.levels['w1-03'] = { ...emptyProgress(), code: 'also kept();', bestTicks: 24 };
     for (const id of WITHDRAWN) {
       save.levels[id] = {
@@ -385,8 +385,8 @@ describe('a save that names a withdrawn work order', () => {
 
   it('loads without throwing and keeps every surviving record', () => {
     const migrated = reloaded();
-    expect(migrated.levels['w1-01']?.code).toBe('kept();');
-    expect(migrated.levels['w1-01']?.medal).toBe('gold');
+    expect(migrated.levels['w1-05']?.code).toBe('kept();');
+    expect(migrated.levels['w1-05']?.medal).toBe('gold');
     expect(migrated.levels['w1-03']?.bestTicks).toBe(24);
   });
 
@@ -397,11 +397,11 @@ describe('a save that names a withdrawn work order', () => {
 
   it('imports over another save without losing either side', () => {
     const current = emptySave();
-    current.levels['w1-05'] = { ...emptyProgress(), code: 'ours();' };
+    current.levels['w2-01'] = { ...emptyProgress(), code: 'ours();' };
     const merged = importSave(current, exportSave(beforeTheCut()));
 
-    expect(merged.levels['w1-05']?.code).toBe('ours();');
-    expect(merged.levels['w1-01']?.medal).toBe('gold');
+    expect(merged.levels['w2-01']?.code).toBe('ours();');
+    expect(merged.levels['w1-05']?.medal).toBe('gold');
     expect(merged.levels['w2-03']?.code).toBe('w2-03 code');
   });
 
@@ -415,6 +415,6 @@ describe('a save that names a withdrawn work order', () => {
   it('counts only issued work orders towards the campaign', () => {
     const migrated = reloaded();
     const closed = campaignOrder().filter((level) => migrated.levels[level.id]?.completed);
-    expect(closed.map((level) => level.id)).toEqual(['w1-01']);
+    expect(closed.map((level) => level.id)).toEqual(['w1-05']);
   });
 });

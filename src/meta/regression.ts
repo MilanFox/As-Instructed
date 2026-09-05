@@ -1,5 +1,4 @@
-import type { Medal } from '../engine/index.ts';
-import { medalFor } from '../engine/index.ts';
+import { Medal, medalFor } from '../engine/index.ts';
 import type { LibraryUsage } from '../runtime/index.ts';
 import { importedLibraryNames } from '../runtime/index.ts';
 import { REGRESSION } from './copy.ts';
@@ -60,8 +59,21 @@ export interface RegressionTarget {
   parTicks: number;
   /** The medal on record. Never written by the suite. */
   medal: Medal;
+  /** Whether this work order carries a medal at all. Defaults to `true`. DESIGN.md §11 A7. */
+  graded?: boolean;
   /** The ticks on record, when there are any. */
   ticks?: number;
+}
+
+/**
+ * The medal a re-run would land on, or `Medal.None` where the level has no ladder.
+ *
+ * An ungraded work order can still break, still degrade and still improve — the suite reports all
+ * three from the ticks — but it cannot change medal, because it has never had one to change.
+ */
+function medalAfter(target: RegressionTarget, passed: boolean, ticks: number): Medal {
+  if (target.graded === false) return Medal.None;
+  return medalFor(passed, ticks, target.parTicks);
 }
 
 export interface RegressionSummary {
@@ -127,7 +139,7 @@ function classify(
   outcome: MetaRunOutcome,
   before: number | undefined,
 ): RegressionEntry {
-  const afterMedal = medalFor(outcome.passed, outcome.ticks, target.parTicks);
+  const afterMedal = medalAfter(target, outcome.passed, outcome.ticks);
   const base: RegressionEntry = {
     levelId: target.levelId,
     state: 'nominal',
@@ -241,7 +253,7 @@ export async function runSuite(
         levelId: target.levelId,
         passed: outcome.passed,
         ticks: outcome.ticks,
-        medal: medalFor(outcome.passed, outcome.ticks, target.parTicks),
+        medal: medalAfter(target, outcome.passed, outcome.ticks),
         usage: outcome.usage ?? EMPTY_USAGE,
         at: Date.now(),
         ...(outcome.failure ? { failure: outcome.failure } : {}),
@@ -260,7 +272,7 @@ export async function runSuite(
       key,
       passed: outcome.passed,
       ticks: outcome.ticks,
-      medal: medalFor(outcome.passed, outcome.ticks, target.parTicks),
+      medal: medalAfter(target, outcome.passed, outcome.ticks),
       parTicks: target.parTicks,
       usage: outcome.usage ?? EMPTY_USAGE,
       imports: importedLibraryNames(target.code),

@@ -73,6 +73,7 @@ export const w1_01: LevelDef = {
   ],
   seeds: [1],
   par: { ticks: PAR_TICKS },
+  graded: false,
   build(seed: number): World {
     const world = createWorld({ w: 25, h: 14, seed, fill: Terrain.Wall });
     carveRoute(world);

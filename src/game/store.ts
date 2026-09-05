@@ -8,19 +8,19 @@
  * makes a wedged worker survivable (DESIGN.md §10.6).
  */
 import { create } from 'zustand';
-import type { PrintEvent, Trace, Verdict, Medal } from '../engine/index.ts';
-import { evaluateObjectives, replayTo, reviveTrace, usesFuel } from '../engine/index.ts';
+import type { PrintEvent, Trace, Verdict } from '../engine/index.ts';
+import { Medal, evaluateObjectives, replayTo, reviveTrace, usesFuel } from '../engine/index.ts';
 import type { PerSeedResult, RuntimeFailure } from '../runtime/protocol.ts';
 import { WORKER_TIMEOUT_MS } from '../runtime/protocol.ts';
 import type { LevelDef } from '../levels/index.ts';
 import { campaignOrder, getLevel, hardwareUnlockedBy, nextLevel } from '../levels/index.ts';
 import type { RendererPort, RunnerPort } from './ports.ts';
 import { FakeRenderer, FakeRunner } from './ports.ts';
-import type { RunFacts } from './achievements.ts';
+import type { RunFacts, WorldResult } from './achievements.ts';
 import { earnedBy, isSenseBudget } from './achievements.ts';
 import type { LevelProgress, SaveFile } from './save.ts';
 import { emptyProgress, importSave, loadSave, mergeProgress, writeSave } from './save.ts';
-import { medalFor, objectivesOnEverySeed } from './score.ts';
+import { medalForLevel, medalOf, objectivesOnEverySeed } from './score.ts';
 
 export type Screen = 'levels' | 'workspace';
 export type RunState = 'idle' | 'running';
@@ -461,7 +461,7 @@ export const useGame = create<GameState>((set, get) => {
           })),
         );
 
-        const medal = medalFor(verdict.passed, verdict.stats.ticks, levelDef.par.ticks);
+        const medal = medalForLevel(levelDef, verdict.passed, verdict.stats.ticks);
         pushLines([
           {
             t: trace.endTick,
@@ -500,7 +500,7 @@ export const useGame = create<GameState>((set, get) => {
       function recordResult(
         levelDef: LevelDef,
         verdict: Verdict,
-        medal: Medal,
+        medal: Medal | null,
         trace: Trace,
         results: PerSeedResult[],
       ): void {
@@ -524,7 +524,10 @@ export const useGame = create<GameState>((set, get) => {
           ...previous,
           attempts: attempt,
           completed: previous.completed || verdict.passed,
-          medal: verdict.passed ? medal : previous.medal,
+          /* An ungraded work order stores no medal, ever. The save is where the site map, the
+             Performance Review and the sector commendations all read from, so keeping `none`
+             there is what makes every one of them ignore the level without knowing why. */
+          medal: verdict.passed ? (medal ?? Medal.None) : previous.medal,
           stars: verdict.passed ? [...previous.stars, ...earned] : previous.stars,
           objectives: [...(previous.objectives ?? []), ...closed],
           ...(verdict.passed ? { bestTicks: verdict.stats.ticks } : {}),
@@ -546,9 +549,12 @@ export const useGame = create<GameState>((set, get) => {
           stats.fails += 1;
         }
 
-        const worldMedals = campaignOrder()
+        const worldResults: WorldResult[] = campaignOrder()
           .filter((candidate) => candidate.world === levelDef.world)
-          .map((candidate) => (levels[candidate.id] ?? emptyProgress()).medal);
+          .map((candidate) => {
+            const record = levels[candidate.id] ?? emptyProgress();
+            return { medal: medalOf(candidate, record), closed: record.completed };
+          });
 
         const facts: RunFacts = {
           passed: verdict.passed,
@@ -563,7 +569,7 @@ export const useGame = create<GameState>((set, get) => {
           ),
           returnedForStar: previous.completed && previous.stars.length === 0 && earned.length > 0,
           ...(previous.bestTicks !== undefined ? { previousBestTicks: previous.bestTicks } : {}),
-          worldMedals,
+          worldResults,
         };
 
         const achievements = { ...state.save.achievements };

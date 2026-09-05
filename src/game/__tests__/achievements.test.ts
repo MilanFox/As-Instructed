@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { Medal } from '../../engine/index.ts';
-import type { RunFacts } from '../achievements.ts';
+import type { RunFacts, WorldResult } from '../achievements.ts';
 import { ACHIEVEMENTS, earnedBy, getAchievement, isSenseBudget } from '../achievements.ts';
+
+const closed = (medal: Medal | null): WorldResult => ({ medal, closed: true });
+const open: WorldResult = { medal: Medal.None, closed: false };
+/** A closed work order on an ungraded level: no medal, and none missing either. §11 A7. */
+const ungraded: WorldResult = { medal: null, closed: true };
 
 function facts(patch: Partial<RunFacts> = {}): RunFacts {
   return {
@@ -14,7 +19,7 @@ function facts(patch: Partial<RunFacts> = {}): RunFacts {
     stars: 0,
     senseBudgetMet: false,
     returnedForStar: false,
-    worldMedals: [Medal.Bronze, Medal.None],
+    worldResults: [closed(Medal.Bronze), open],
     ...patch,
   };
 }
@@ -43,7 +48,7 @@ describe('the commendation list', () => {
         stars: 2,
         senseBudgetMet: true,
         previousBestTicks: 9,
-        worldMedals: [Medal.Gold, Medal.Gold],
+        worldResults: [closed(Medal.Gold), closed(Medal.Gold)],
       }),
     );
     for (const id of everything) expect(getAchievement(id), id).toBeDefined();
@@ -104,24 +109,54 @@ describe('earnedBy', () => {
     expect(earnedBy(facts({ attempt: 10 }))).toContain('raised-again');
   });
 
-  it('closes a sector only when every issued order in it has a medal', () => {
-    expect(earnedBy(facts({ worldMedals: [Medal.Bronze, Medal.None] }))).not.toContain(
+  it('closes a sector only when every issued order in it is closed', () => {
+    expect(earnedBy(facts({ worldResults: [closed(Medal.Bronze), open] }))).not.toContain(
       'sector-nominal',
     );
-    expect(earnedBy(facts({ worldMedals: [Medal.Bronze, Medal.Silver] }))).toContain(
-      'sector-nominal',
-    );
+    expect(
+      earnedBy(facts({ worldResults: [closed(Medal.Bronze), closed(Medal.Silver)] })),
+    ).toContain('sector-nominal');
   });
 
   it('awards a perfect sector only on all gold', () => {
-    expect(earnedBy(facts({ worldMedals: [Medal.Gold, Medal.Silver] }))).not.toContain(
+    expect(earnedBy(facts({ worldResults: [closed(Medal.Gold), closed(Medal.Silver)] }))).not
+      .toContain('sector-gold');
+    expect(earnedBy(facts({ worldResults: [closed(Medal.Gold), closed(Medal.Gold)] }))).toContain(
       'sector-gold',
     );
-    expect(earnedBy(facts({ worldMedals: [Medal.Gold, Medal.Gold] }))).toContain('sector-gold');
   });
 
   it('never awards a sector from an empty world', () => {
-    expect(earnedBy(facts({ worldMedals: [] }))).not.toContain('sector-nominal');
+    expect(earnedBy(facts({ worldResults: [] }))).not.toContain('sector-nominal');
+  });
+
+  it('counts an ungraded order as closed and as gold, so a sector stays winnable', () => {
+    expect(earnedBy(facts({ worldResults: [closed(Medal.Gold), ungraded] }))).toContain(
+      'sector-nominal',
+    );
+    expect(earnedBy(facts({ worldResults: [closed(Medal.Gold), ungraded] }))).toContain(
+      'sector-gold',
+    );
+  });
+
+  it('does not close a sector on an ungraded order still on the bench', () => {
+    expect(
+      earnedBy(facts({ worldResults: [closed(Medal.Gold), { medal: null, closed: false }] })),
+    ).not.toContain('sector-nominal');
+  });
+
+  it('pays no gold and no half-budget commendation on an ungraded order', () => {
+    /* `w6-01` is the live case: par 1, and the only solution costs 0 ticks. */
+    const earned = earnedBy(facts({ medal: null, ticks: 0, parTicks: 1 }));
+    expect(earned).not.toContain('within-budget');
+    expect(earned).not.toContain('outside-tolerance');
+    expect(earned).toContain('filed');
+  });
+
+  it('still lowers a personal best on an ungraded order', () => {
+    expect(earnedBy(facts({ medal: null, ticks: 20, previousBestTicks: 24 }))).toContain(
+      'revised-downward',
+    );
   });
 
   it('awards the bonus star commendation from stars, not from the medal', () => {

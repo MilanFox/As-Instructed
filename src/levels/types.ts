@@ -34,6 +34,16 @@ export interface LevelDef {
   /** ALL must pass. `length > 1` demands a general solution. `>= 3` from World 2 on. */
   seeds: number[];
   par: { ticks: number };
+  /**
+   * Whether this work order carries a medal at all. Defaults to `true`. DESIGN.md §11 A7.
+   *
+   * `false` where no correct program can cost fewer ticks than another correct program: par is
+   * then not a budget, it is the price of the only solution the level admits, and a ladder built
+   * on it grades noise. An ungraded level still closes, still runs its objectives and bonuses
+   * unchanged, and is still worth a gold's three points — `par` stays exactly where it is, and
+   * `graded` changes only how the result is presented and counted.
+   */
+  graded?: boolean;
   /** Pre-filled editor content. */
   starter: string;
   /** Progressive nudges. Never code, never a full solution. */

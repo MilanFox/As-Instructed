@@ -8,6 +8,7 @@
  *     `MIGRATIONS`, one step per version, so a save written by any past build still loads.
  */
 import { Medal } from '../engine/index.ts';
+import { levelIsGraded } from '../levels/index.ts';
 
 export const SAVE_KEY = 'bootstrap.save';
 export const SAVE_VERSION = 2;
@@ -184,7 +185,17 @@ function reconstructStats(levels: Record<string, LevelProgress>): CampaignStats 
   return stats;
 }
 
-/** Pulls every recoverable level record out of an unknown blob. Never throws. */
+/**
+ * Pulls every recoverable level record out of an unknown blob. Never throws.
+ *
+ * Medals are whitelisted against the level list on the way in, which is how a save written before
+ * DESIGN.md §11 A7 keeps loading: a build that graded `w1-01` recorded a gold there, the level no
+ * longer carries a medal, and the stored string is dropped exactly as the retired char-count field
+ * is. Everything beside it — the code, the close, the best ticks, the stars, the banked objectives
+ * — survives untouched, so the work orders stay closed and the ticks stay on the board. Dropping
+ * it here rather than at each reader is what keeps the Performance Review's denominator, the site
+ * map's counts and the sector commendations agreeing without any of them knowing about A7.
+ */
 function rescueLevels(raw: unknown): Record<string, LevelProgress> {
   const levels: Record<string, LevelProgress> = {};
   const source = isRecord(raw) && isRecord(raw['levels']) ? raw['levels'] : raw;
@@ -199,7 +210,7 @@ function rescueLevels(raw: unknown): Record<string, LevelProgress> {
     const progress = emptyProgress();
     if (typeof value['code'] === 'string') progress.code = value['code'];
     if (value['completed'] === true) progress.completed = true;
-    if (isMedal(value['medal'])) progress.medal = value['medal'];
+    if (isMedal(value['medal']) && levelIsGraded(id)) progress.medal = value['medal'];
     if (Array.isArray(value['stars'])) {
       progress.stars = value['stars'].filter((s): s is string => typeof s === 'string');
     }

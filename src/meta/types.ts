@@ -154,6 +154,14 @@ export interface LevelFacts {
   world: number;
   parTicks: number;
   seeds: number[];
+  /**
+   * Whether this work order carries a medal. Defaults to `true`. DESIGN.md §11 A7.
+   *
+   * `false` makes `parTicks` a price rather than a budget, so the Refactor screen must not offer
+   * "save two ticks and this goes silver to gold" against it — there is no silver and no gold, and
+   * the saving is not available to any correct program anyway.
+   */
+  graded?: boolean;
 }
 
 /** What the metagame needs to know about the player's progress. Supplied by the host. */
