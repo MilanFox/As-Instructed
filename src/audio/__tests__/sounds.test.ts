@@ -195,7 +195,7 @@ describe('commendations land as one ascending phrase', () => {
   });
 
   it('holds at the top rather than climbing out of the audible range', () => {
-    // Fifteen commendations exist. The fifteenth must not be a dog whistle.
+    // The ladder must stay audible however many rungs a build issues.
     expect(pitch(14)).toBeCloseTo(pitch(4) as number, -2);
     expect(pitch(14)).toBeLessThan(4000);
   });

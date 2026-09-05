@@ -1432,3 +1432,66 @@ owed and still worth having with the loop gone.
 and the invariant guards. Reveille armed for the window reset at 04:42 with a full brief; the
 Mac is caffeinated. The art comparison shots go **to the user to pick from** — that call is
 taste, so it is theirs. Every other call is mine.
+
+---
+
+## 2026-09-06 — the reward layer merged; two agents spawned on the files it freed
+
+**Merged: fifteen commendations cut to five** (fast-forward to `3c96853`). Main green at
+**1698 tests / 69 files**. The test applied to each was *"does it name a specific thing the player
+did, that they would be pleased to have noticed?"* — attendance, completion, and restatements of a
+medal the player is already looking at all fail it.
+
+**Survivors:** `second-look`, `raised-again`, `came-back-for-it`, `minimal-observation`,
+`repository`. The consequence worth keeping is structural rather than cosmetic: **no surviving
+commendation reads a medal.** `RunFacts` lost `medal`, `ticks`, `parTicks`, `blockedMoves`, `stars`,
+`previousBestTicks` and `worldResults`, so the A7 hazard — a commendation keyed to a medal on a
+level that has none — is now *absent* rather than *handled*. `WorldResult` and `ELEGANT_FACTOR` are
+gone entirely.
+
+The agent **corrected the audit on finding 6** and I accept the correction. The audit counted six
+systems paying for not bumping; `w3-01`'s `clean-run` counts failed *pickups*, a different family,
+so the live count was five. But the count was never the defect: **a tick cost is proportional and a
+bonus gate is binary, and only one of the two can be traded against.** Beside an information budget
+the pair is jointly satisfiable only by a hardcoded route — precisely what the multi-seed
+conjunction exists to defeat. Recorded as **A10** so it cannot regrow. Its defence of `w7-03`'s
+`no-bumps` also stands: on a one-lane tunnel that bonus asks *"did you schedule?"*, not *"did you
+plan a route"*, and it is the level's only one.
+
+**Finding 3 fixed with a consequence I would not have predicted:** `isLevelUnlocked` now opens the
+next two on a close and a whole world on a sweep — the beginner spent 55 minutes and 11 runs stuck
+on `w3-03` and then quit. It required a companion fix, because a player who skips ahead would
+otherwise arrive holding `scan()` with no requisition card: `openLevel` now delivers every unsigned
+command in the order's API surface.
+
+Save compatibility is `rescueLevels`' whitelist applied to a second field — retired ids dropped on
+read, unrecognised ids kept, because a save written by a build that is not this one must not be
+eaten by this one. Proven on a seeded save in the browser, not just in tests.
+
+### Spawned on the freed files
+
+**Discrepancy agent** (`src/meta/**`, `src/game/store.ts`) — finding 10. The game tells the player a
+published routine failed on a seed and gives them **no way to run that seed**, while the card itself
+offers `Stop raising these`. An accusation with no instrument trains the player to mute the one
+mechanism that challenges overfitting, which is the most likely wrong mental model a player of this
+game can form. Decision made and handed down, not asked: **give them the seed.** The layering
+constraint is the hard part — `store.ts` must not import `src/meta`.
+
+**Bonus and par agent** (`src/levels/**`, `docs/DESIGN.md`) — told to **replace, not just delete**.
+Most bonuses restate the required solution with a tighter number, which is the first idea at a
+smaller tolerance rather than a second idea. The bar is `w6-02`'s `name-the-fault`, which asks the
+player to report *which byte was altered* — a question the objective does not ask. Granted licence
+to author new bonus objectives; refused licence to touch par, budgets, thresholds or required
+objectives. Also carrying the Worlds 3–8 par measurement, which it must split across sub-agents.
+
+### Held for the art direction, deliberately
+
+`docs/FIX-INCENTIVES.md` §A, §B, §C, §H, §I are all `src/ui/**` and wait for the direction to land:
+the shelf's `2/5` fraction, the dead `award('no-regressions')` call, `.screen-stat__streak` in
+`screens.css`, finding 8's *limit vs budget* naming (two different tick numbers on one screen need
+two different words), and findings 9.1/9.2 — `LibraryUsage` already computes `ticks` and `calls` on
+every meta run and throws them away.
+
+**Finding 11** (`src/runtime/**`, the bonus star graded on one seed) goes to the invariants agent
+when it lands; the exact three-file patch is in §E. Done tonight: the stale fifteen-commendation
+comment in `src/audio/__tests__/sounds.test.ts`.
