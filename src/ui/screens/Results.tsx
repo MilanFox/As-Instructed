@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { JSX } from 'react';
 import { getAchievement } from '../../game/achievements.ts';
+import type { Budget, BudgetSource, ObjectiveReading } from '../../game/budgets.ts';
+import { budgetFor, budgetReadout, failureCauses } from '../../game/budgets.ts';
+import { playbackFor } from '../../game/playback.ts';
 import type { Medal } from '../../game/score.ts';
 import { levelPoints, medalFor } from '../../game/score.ts';
 import { currentLevel, useGame } from '../../game/store.ts';
 import { nextLevel } from '../../levels/index.ts';
 import { MEDAL_BEAT } from '../../audio/index.ts';
 import { audio } from '../audio.ts';
+import { BudgetBar } from '../components/BudgetBar.tsx';
 import { MedalBadge } from '../components/MedalBadge.tsx';
 import { useReveal } from '../hooks/useReveal.ts';
 import {
@@ -65,6 +69,7 @@ function ResultsReport(): JSX.Element | null {
   const dismiss = useGame((state) => state.dismissResults);
   const advance = useGame((state) => state.advanceToNextLevel);
   const jumpToFailure = useGame((state) => state.jumpToFailure);
+  const trace = useGame((state) => state.trace);
   const progress = useGame((state) => (level ? state.save.levels[level.id] : undefined));
   const primaryRef = useRef<HTMLButtonElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
@@ -74,9 +79,27 @@ function ResultsReport(): JSX.Element | null {
   const medal = medalFor(passed, ticks, level?.par.ticks ?? 1);
   const bonusIds = new Set((level?.bonus ?? []).map((objective) => objective.id));
   const required = (verdict?.objectives ?? []).filter((objective) => !bonusIds.has(objective.id));
-  const stars = (verdict?.objectives ?? []).filter(
-    (objective) => objective.met && bonusIds.has(objective.id),
+  const reportedBonus = (verdict?.objectives ?? []).filter((objective) =>
+    bonusIds.has(objective.id),
   );
+  const stars = reportedBonus.filter((objective) => objective.met);
+  /*
+   * Budgets are read against the trace the verdict describes — the failing seed's, when a seed
+   * failed — so "21 / 16 beams" is the run in front of the player and not a per-seed maximum.
+   * The playback is the same memoized walk the rail already paid for, and it carries the progress
+   * history that lets a budget whose label names no unit still be attributed to one.
+   */
+  const playback = playbackFor(level, trace);
+  const historyFor = (id: string): readonly { t: number; done: number }[] | undefined =>
+    playback?.tracks.find((track) => track.id === id)?.progress;
+  const sourceFor = (id: string): BudgetSource => ({
+    trace,
+    ...(verdict ? { stats: verdict.stats } : {}),
+    ...(historyFor(id) ? { history: historyFor(id) } : {}),
+  });
+  const causes = passed
+    ? []
+    : failureCauses(required, { trace, ...(verdict ? { stats: verdict.stats } : {}) }, sourceFor);
   const commendations = freshCommendations
     .map((id) => getAchievement(id))
     .filter(
@@ -216,33 +239,48 @@ function ResultsReport(): JSX.Element | null {
         </header>
 
         <div className="modal__body">
+          {/*
+           * The report leads with the cause, not with the flavour.
+           *
+           * A red row in a list of five is a puzzle in itself; a player who overran a budget has
+           * to be told which budget and by how much before they are told anything else, or the
+           * next thing they do is guess. Ranked worst-first when several went wrong, because the
+           * biggest miss is the one worth opening the editor for.
+           */}
+          {causes.length > 0 ? (
+            <section className="cause" aria-label="Why this run failed">
+              <div className="cause__head">
+                {causes.length === 1 ? 'this is why' : `${causes.length} things went wrong`}
+              </div>
+              {causes.map((cause) => (
+                <div
+                  key={cause.id}
+                  className={`cause__row${cause.budget && cause.budget.over > 0 ? ' cause__row--over' : ''}`}
+                >
+                  <span className="cause__label">{cause.label}</span>
+                  <span className="cause__detail numeric">{cause.detail}</span>
+                  {cause.budget ? (
+                    <>
+                      <span className="cause__readout numeric">{budgetReadout(cause.budget)}</span>
+                      <BudgetBar budget={cause.budget} />
+                    </>
+                  ) : null}
+                </div>
+              ))}
+            </section>
+          ) : null}
+
           {required.length > 0 ? (
             <section className="report-section">
               <div className="rail__label">objectives</div>
-              {required.map((objective, index) => {
-                const shown = !passed || stage > index;
-                return (
-                  <div
-                    key={objective.id}
-                    className={[
-                      'objective',
-                      'objective--report',
-                      objective.met ? 'objective--met' : 'objective--pending',
-                      shown ? 'objective--landed' : 'objective--waiting',
-                    ].join(' ')}
-                  >
-                    <span className="objective__mark" aria-hidden="true">
-                      {shown && objective.met ? '✓' : ''}
-                    </span>
-                    <span className="objective__label">{objective.label}</span>
-                    {objective.progress ? (
-                      <span className="objective__progress">
-                        {objective.progress[0]}/{objective.progress[1]}
-                      </span>
-                    ) : null}
-                  </div>
-                );
-              })}
+              {required.map((objective, index) => (
+                <ReportObjective
+                  key={objective.id}
+                  objective={objective}
+                  source={sourceFor(objective.id)}
+                  shown={!passed || stage > index}
+                />
+              ))}
             </section>
           ) : null}
 
@@ -331,18 +369,25 @@ function ResultsReport(): JSX.Element | null {
             <section className="report-section">
               <div className="rail__label">bonus objectives</div>
               {(level.bonus ?? []).map((objective) => {
-                const met = stars.some((star) => star.id === objective.id);
+                // The verdict's copy carries the progress; the level's definition does not. A bonus
+                // missed by two ticks and one missed by two hundred are not the same near-miss.
+                const reading = reportedBonus.find((entry) => entry.id === objective.id) ?? {
+                  id: objective.id,
+                  label: objective.label,
+                  met: false,
+                };
                 return (
-                  <div
+                  <ReportObjective
                     key={objective.id}
-                    className={`objective objective--bonus ${met ? 'objective--met' : 'objective--pending'}`}
-                  >
-                    <span className="objective__mark" aria-hidden="true" />
-                    <span className="objective__label">{objective.label}</span>
-                  </div>
+                    objective={reading}
+                    source={sourceFor(objective.id)}
+                    shown
+                    bonus
+                  />
                 );
               })}
-              {stars.length > 0 ? <p className="modal__line">{BONUS_MET}</p> : null}
+              {/* No star is recorded for a failed run, so saying one was earned would be a lie. */}
+              {passed && stars.length > 0 ? <p className="modal__line">{BONUS_MET}</p> : null}
             </section>
           ) : null}
 
@@ -442,6 +487,57 @@ function ResultsReport(): JSX.Element | null {
           )}
         </footer>
       </div>
+    </div>
+  );
+}
+
+/**
+ * One objective in the report, in whichever shape it is.
+ *
+ * The rail and the report have to agree — a budget that read as a gauge while the run played and
+ * as a tick-box in the report is two different claims about the same number.
+ */
+function ReportObjective({
+  objective,
+  source,
+  shown,
+  bonus = false,
+}: {
+  objective: ObjectiveReading;
+  source: BudgetSource;
+  shown: boolean;
+  bonus?: boolean;
+}): JSX.Element {
+  const budget: Budget | null = budgetFor(objective, source);
+  const over = budget !== null && budget.over > 0;
+  return (
+    <div
+      className={[
+        'objective',
+        'objective--report',
+        bonus ? 'objective--bonus' : '',
+        objective.met ? 'objective--met' : 'objective--pending',
+        shown ? 'objective--landed' : 'objective--waiting',
+        budget ? 'objective--budget' : '',
+        over ? 'objective--over' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
+      <span className="objective__mark" aria-hidden="true">
+        {!shown ? '' : over ? '!' : objective.met && !budget ? '✓' : ''}
+      </span>
+      <span className="objective__label">{objective.label}</span>
+      {budget ? (
+        <span className={`objective__progress${over ? ' objective__progress--over' : ''}`}>
+          {budgetReadout(budget)}
+        </span>
+      ) : objective.progress ? (
+        <span className="objective__progress">
+          {objective.progress[0]}/{objective.progress[1]}
+        </span>
+      ) : null}
+      {budget ? <BudgetBar budget={budget} /> : null}
     </div>
   );
 }

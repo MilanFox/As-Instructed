@@ -1,7 +1,10 @@
 import { useMemo } from 'react';
 import { replayTo } from '../../engine/index.ts';
+import type { Budget } from '../../game/budgets.ts';
+import { budgetFor, budgetReadout, overBudgetLine } from '../../game/budgets.ts';
 import { activeTrack, metAt, playbackFor, progressAt } from '../../game/playback.ts';
 import { currentLevel, levelUsesFuel, useGame } from '../../game/store.ts';
+import { BudgetBar } from '../components/BudgetBar.tsx';
 import { FuelGauge } from '../components/FuelGauge.tsx';
 
 interface ObjectiveRow {
@@ -12,6 +15,8 @@ interface ObjectiveRow {
   /** The one the run is working towards at this tick. Exactly one row has it, or none. */
   active: boolean;
   progress?: [number, number];
+  /** Set when this objective is something the run spends rather than something it completes. */
+  budget?: Budget;
 }
 
 export function ObjectiveRail(): React.JSX.Element {
@@ -53,9 +58,21 @@ export function ObjectiveRail(): React.JSX.Element {
       const live = track ? progressAt(track, flooredTick) : undefined;
       const progress = atEnd ? result?.progress : (live ?? result?.progress);
       if (progress) row.progress = progress;
+      /*
+       * The clamp in `progress()` is what makes an overrun invisible — 21 beams against a rating
+       * of 16 reports 16/16 — so the real spend is recovered from the trace at this tick. Live and
+       * at the end it is the same call, because the trace is the same evidence either way.
+       */
+      const budget = budgetFor(row, {
+        trace,
+        tick: flooredTick,
+        ...(verdict ? { stats: verdict.stats } : {}),
+        ...(track ? { history: track.progress } : {}),
+      });
+      if (budget) row.budget = budget;
       return row;
     });
-  }, [level, verdict, playback, atEnd, active, flooredTick]);
+  }, [level, verdict, playback, atEnd, active, flooredTick, trace]);
 
   const showFuel = useMemo(() => (level ? levelUsesFuel(level) : false), [level]);
   const fuel = useMemo(() => {
@@ -132,28 +149,50 @@ export function ObjectiveRail(): React.JSX.Element {
   );
 }
 
+/**
+ * One objective, as a tick-box or as a gauge.
+ *
+ * A budget gets the bar and the unit-bearing readout; everything else keeps the box and the plain
+ * "7/12". The two are deliberately different shapes, because they mean opposite things: a full box
+ * is the goal and a full bar is the failure.
+ */
 function ObjectiveItem({ row }: { row: ObjectiveRow }): React.JSX.Element {
+  const budget = row.budget;
+  const over = budget !== undefined && budget.over > 0;
   const className = [
     'objective',
     row.met ? 'objective--met' : 'objective--pending',
     row.bonus ? 'objective--bonus' : '',
     row.active ? 'objective--active' : '',
+    budget ? 'objective--budget' : '',
+    over ? 'objective--over' : '',
   ]
     .filter(Boolean)
     .join(' ');
   return (
     <div className={className} aria-current={row.active ? 'step' : undefined}>
       <span className="objective__mark" aria-hidden="true">
-        {row.met ? '✓' : row.active ? '▸' : ''}
+        {over ? '!' : row.met && !budget ? '✓' : row.active ? '▸' : ''}
       </span>
       <span className="objective__label">{row.label}</span>
-      {row.progress ? (
+      {budget ? (
+        <span className={`objective__progress${over ? ' objective__progress--over' : ''}`}>
+          {budgetReadout(budget)}
+        </span>
+      ) : row.progress ? (
         <span className="objective__progress">
           {row.progress[0]}/{row.progress[1]}
         </span>
       ) : null}
+      {budget ? <BudgetBar budget={budget} /> : null}
       <span className="sr-only">
-        {row.met ? 'met' : row.active ? 'in progress' : 'outstanding'}
+        {over
+          ? `over budget — ${overBudgetLine(budget)}`
+          : row.met
+            ? 'met'
+            : row.active
+              ? 'in progress'
+              : 'outstanding'}
       </span>
     </div>
   );
