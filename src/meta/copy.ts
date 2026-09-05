@@ -147,6 +147,9 @@ export const REFACTOR = {
   empty:
     'The Repository is empty. This is a supported configuration and no memo will be raised ' +
     'about it.',
+  /** The tab's own empty state. `empty` is the status bar's line and stays there; see AUDIT-UI F12. */
+  nothingToCost:
+    'Publish a subroutine and this tab shows what it costs, per work order that calls it.',
   neverCalled:
     'Published, and called by nothing. It is being maintained for its own sake, which the site ' +
     'has a form for.',
@@ -289,10 +292,15 @@ export const LIBRARY_FAILURE = {
     'write it here instead; it will work exactly the same.',
 } as const;
 
-/** Shown in the Library panel when `lib.ts` publishes nothing. */
+/**
+ * Shown in the Library panel when `lib.ts` holds a declaration and exports none of it.
+ *
+ * Never on an empty file: `docs/AUDIT-UI.md` finding 13 caught this greeting the player in red,
+ * four seconds after the ceremony handed them the folder, about a state they had not caused. A
+ * line is worth printing when there is something to do about it.
+ */
 export const NO_EXPORTS_WARNING =
-  'lib.ts publishes nothing. Until something is exported, its declarations are visible to every ' +
-  'work order by accident rather than on purpose.';
+  'lib.ts exports nothing. Add `export` to a declaration and any work order can import it.';
 
 export const MEDAL_WORDS: Readonly<Record<Medal, string>> = {
   gold: 'gold',

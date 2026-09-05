@@ -4,6 +4,7 @@ import type * as React from 'react';
 import { LIB_FILE_PATH, compileLibrary, setLibraryTypes } from '../../runtime/index.ts';
 import { THEME, monaco, setupMonaco } from '../../ui/monaco-setup.ts';
 import { LIBRARY_PANEL_HINT, NO_EXPORTS_WARNING } from '../copy.ts';
+import { publishableDeclarations } from '../publish.ts';
 import { useLibrary } from '../store.ts';
 import './library.css';
 
@@ -47,7 +48,8 @@ export function LibraryEditor(): React.JSX.Element {
           setLibraryTypes(monaco, result.declaration);
           monaco.editor.setModelMarkers(model, MARKER_OWNER, []);
           if (warnRef.current) {
-            warnRef.current.textContent = result.exports.length === 0 ? NO_EXPORTS_WARNING : '';
+            const owed = result.exports.length === 0 && publishableDeclarations(source).length > 0;
+            warnRef.current.textContent = owed ? NO_EXPORTS_WARNING : '';
           }
           return;
         }
@@ -92,6 +94,9 @@ export function LibraryEditor(): React.JSX.Element {
           onChange={(next) => setSource(next ?? '')}
           onMount={onMount}
           options={{
+            // The program's editor is still mounted behind this one; two "Editor content"
+            // textboxes in the tree are indistinguishable to anyone tabbing through it.
+            ariaLabel: 'lib.ts',
             fontSize: 13,
             fontFamily: 'var(--font-mono)',
             minimap: { enabled: false },
@@ -103,7 +108,7 @@ export function LibraryEditor(): React.JSX.Element {
         />
       </div>
       <div className="lib__bar">
-        <span className="lib__warn" ref={warnRef} />
+        <span className="lib__note" ref={warnRef} />
         <span className="lib__spacer" />
         <span className="lib__note">{dirty ? 'uncommitted' : 'committed'}</span>
         <button
