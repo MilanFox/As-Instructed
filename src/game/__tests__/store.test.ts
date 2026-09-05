@@ -262,27 +262,32 @@ describe('playback', () => {
 });
 
 describe('rewards', () => {
-  it('files the first close and reports it once', async () => {
+  /* Closing a work order is the game working, not an achievement. The list is five (§7.1). */
+  it('pays no commendation for an ordinary close', async () => {
     reset();
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
     await runOnce(W1_01_SOLUTION);
 
     const state = useGame.getState();
     expect(state.verdict?.passed).toBe(true);
-    expect(state.save.achievements['filed']).toBeGreaterThan(0);
-    expect(state.freshCommendations).toContain('filed');
-    expect(state.freshCommendations).toContain('first-run');
+    expect(state.freshCommendations).toEqual([]);
+    expect(state.save.achievements).toEqual({});
   });
 
-  it('never re-awards a commendation already in the save', async () => {
+  it('files a commendation once and never again', async () => {
     reset();
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
-    await runOnce(W1_01_SOLUTION);
-    const first = useGame.getState().save.achievements['filed'];
+    for (let attempt = 0; attempt < 3; attempt++) await runOnce(W1_01_SOLUTION);
+    expect(useGame.getState().save.achievements['second-look']).toBeUndefined();
 
     await runOnce(W1_01_SOLUTION);
-    expect(useGame.getState().save.achievements['filed']).toBe(first);
-    expect(useGame.getState().freshCommendations).not.toContain('filed');
+    const first = useGame.getState().save.achievements['second-look'];
+    expect(first).toBeGreaterThan(0);
+    expect(useGame.getState().freshCommendations).toContain('second-look');
+
+    await runOnce(W1_01_SOLUTION);
+    expect(useGame.getState().save.achievements['second-look']).toBe(first);
+    expect(useGame.getState().freshCommendations).not.toContain('second-look');
   });
 
   it('remembers revealed hints across a reload', async () => {
@@ -308,15 +313,17 @@ describe('rewards', () => {
   it('costs a failed run nothing but the attempt', async () => {
     reset();
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
-    await runOnce(W1_01_SOLUTION);
+    for (let attempt = 0; attempt < 4; attempt++) await runOnce(W1_01_SOLUTION);
     const won = useGame.getState().save.levels['w1-01'];
+    const earned = { ...useGame.getState().save.achievements };
+    expect(Object.keys(earned).length).toBeGreaterThan(0);
 
     await runOnce('move(Dir.South);');
     const after = useGame.getState().save.levels['w1-01'];
     expect(after?.completed).toBe(true);
     expect(after?.medal).toBe(won?.medal);
     expect(after?.bestTicks).toBe(won?.bestTicks);
-    expect(Object.keys(useGame.getState().save.achievements).length).toBeGreaterThan(0);
+    expect(useGame.getState().save.achievements).toEqual(earned);
   });
 
   it('calls out a personal best only when the record actually moved', async () => {
@@ -329,16 +336,14 @@ describe('rewards', () => {
     const best = useGame.getState().personalBest;
     expect(best).not.toBeNull();
     expect(best?.now).toBeLessThan(best?.previous ?? 0);
-    expect(useGame.getState().save.achievements['revised-downward']).toBeGreaterThan(0);
 
     /*
      * `w1-01` is ungraded (DESIGN.md §11 A7), and this is the test that proves ungrading removed
-     * the ladder without removing the mirror: no medal is recorded and no gold is awarded, while
-     * the personal best — the diff both playtesters named the best reward in the game — still
-     * fires and still pays its commendation.
+     * the ladder without removing the mirror: no medal is recorded, while the personal best — the
+     * diff both playtesters named the best reward in the game — still fires. It is not a
+     * commendation and never was, which is why the cut to five did not touch it.
      */
     expect(useGame.getState().save.levels['w1-01']?.medal).toBe('none');
-    expect(useGame.getState().save.achievements['within-budget']).toBeUndefined();
 
     await runOnce(W1_01_SOLUTION);
     expect(useGame.getState().personalBest).toBeNull();
@@ -391,5 +396,10 @@ describe('rewards', () => {
     expect(at).toBeGreaterThan(0);
     useGame.getState().award('repository');
     expect(useGame.getState().save.achievements['repository']).toBe(at);
+
+    /* `src/ui/library.ts` still raises the retired regression-pass award; it must not be stored. */
+    useGame.getState().award('no-regressions');
+    expect(useGame.getState().save.achievements['no-regressions']).toBeUndefined();
+    expect(useGame.getState().freshCommendations).not.toContain('no-regressions');
   });
 });

@@ -1,18 +1,21 @@
 /**
  * Commendations — the game's achievements, written as things Personnel would print.
  *
- * Three rules govern the list:
+ * Four rules govern the list:
  *  1. **Nothing is ever gated behind one.** A commendation is a note on a record. It does not
  *     unlock a level, a hint, a doc page, or a piece of hardware, and it never will.
  *  2. **The requirement is public before it is met.** A secret achievement is a thing you find out
  *     you failed at, which is the opposite of the point.
  *  3. **None of them can be lost.** Once earned, the timestamp is in the save forever, and no run
  *     — however bad — takes one back.
+ *  4. **Each one names something the player did that they would be pleased to have noticed.** Not
+ *     attendance, not completion, and never a restatement of the medal already on the screen. Both
+ *     playtesters reported that a list of fifteen changed their behaviour zero times, so the list
+ *     is five, and the bar for a sixth is that it survives this rule.
  *
  * Evaluation is pure: `earnedBy` takes a snapshot of what just happened and returns ids. The store
  * owns the save; this module owns the rules.
  */
-import { Medal } from '../engine/index.ts';
 
 export interface Achievement {
   id: string;
@@ -50,69 +53,12 @@ export function isSenseBudget(objectiveId: string): boolean {
   return match ? SENSING_COMMANDS.includes(match[1] as string) : false;
 }
 
-/** Half of par, the threshold the elegant-solve commendation hangs on. */
-export const ELEGANT_FACTOR = 0.5;
-
 /** Runs on one work order before a close still counts as persistence rather than as noise. */
 export const PERSISTENCE_ATTEMPTS = 10;
 
 export const SECOND_LOOK_ATTEMPTS = 4;
 
 export const ACHIEVEMENTS: readonly Achievement[] = [
-  {
-    id: 'filed',
-    title: 'FILED',
-    requirement: 'Close your first work order.',
-    note: 'One work order closed. A number moved, and the site considers that the whole of it.',
-  },
-  {
-    id: 'within-budget',
-    title: 'WITHIN BUDGET',
-    requirement: 'Take a gold result on any work order.',
-    note: 'Gold. Finance have asked whether the budget was set correctly. It was.',
-  },
-  {
-    id: 'first-run',
-    title: 'AS PER THE BRIEF',
-    requirement: 'Close a work order on the first Run.',
-    note: 'Closed on the first run. Dot has read the trace twice and found nothing to correct.',
-  },
-  {
-    id: 'revised-downward',
-    title: 'REVISED DOWNWARD',
-    requirement: 'Beat your own recorded tick count on a work order.',
-    note: 'Your own figure, lowered by you. The old figure has been retained, as they all are.',
-  },
-  {
-    id: 'outside-tolerance',
-    title: 'OUTSIDE OF TOLERANCE',
-    requirement: 'Close a work order in under half its tick budget.',
-    note: 'Half the budget, all of the work. Par has not been adjusted. Par will be adjusted.',
-  },
-  {
-    id: 'no-contact',
-    title: 'NO CONTACT REPORTED',
-    requirement: 'Close a work order without a single blocked move.',
-    note: 'Not one blocked move in the whole run. The walls have filed nothing.',
-  },
-  {
-    id: 'minimal-observation',
-    title: 'MINIMAL OBSERVATION',
-    requirement: 'Meet an information budget — sense no more than a work order allows.',
-    note: 'You looked less and knew more. Procurement have deprioritised the sensor upgrade.',
-  },
-  {
-    id: 'there-is-a-star',
-    title: 'THERE IS NO BONUS',
-    requirement: 'Meet a bonus objective.',
-    note: 'Bonus met. There is no bonus. There is a star.',
-  },
-  {
-    id: 'came-back-for-it',
-    title: 'REOPENED ON PURPOSE',
-    requirement: 'Meet a bonus objective on a work order you had already closed.',
-    note: 'The order was closed. You reopened it anyway. Scheduling has stopped asking why.',
-  },
   {
     id: 'second-look',
     title: 'A SECOND LOOK, AND A THIRD',
@@ -126,16 +72,16 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     note: 'Ten runs, then a closed work order. Attempts are not recorded against you.',
   },
   {
-    id: 'sector-nominal',
-    title: 'SECTOR NOMINAL',
-    requirement: 'Close every issued work order in one world.',
-    note: 'A whole sector closed. Facilities have been informed and have acknowledged receipt.',
+    id: 'came-back-for-it',
+    title: 'REOPENED ON PURPOSE',
+    requirement: 'Meet a bonus objective on a work order you had already closed.',
+    note: 'The order was closed. You reopened it anyway. Scheduling has stopped asking why.',
   },
   {
-    id: 'sector-gold',
-    title: 'THE BUDGETS WERE SET CORRECTLY',
-    requirement: 'Take gold on every issued work order in one world that carries a medal.',
-    note: 'Gold across a sector. The budgets are now under review, which is the thanks you get.',
+    id: 'minimal-observation',
+    title: 'MINIMAL OBSERVATION',
+    requirement: 'Meet an information budget — sense no more than a work order allows.',
+    note: 'You looked less and knew more. Procurement have deprioritised the sensor upgrade.',
   },
   {
     id: 'repository',
@@ -143,13 +89,30 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     requirement: 'Publish a function to the shared subroutine repository.',
     note: "One subroutine, published. It is now everybody's, which was always the intention.",
   },
-  {
-    id: 'no-regressions',
-    title: 'NO REGRESSIONS AT THIS TIME',
-    requirement: 'Finish a regression pass with nothing broken.',
-    note: 'Every closed order re-run, nothing broke. Legal have asked for that in writing.',
-  },
 ];
+
+/**
+ * Commendations this build has retired, so that a save written by a build that had them can be
+ * read without carrying a dead award forward.
+ *
+ * This is the whitelist-on-read pattern `save.ts` already uses for a medal on a level that no
+ * longer carries one, and it exists for the same reason: the drop belongs in one place, on read,
+ * rather than at every screen that counts. It is deliberately a *named* list rather than "anything
+ * not in `ACHIEVEMENTS`" — an id this build has never heard of belongs to a build that is not this
+ * one, and a player who downgrades must not have their record eaten by the older binary.
+ */
+export const RETIRED_ACHIEVEMENTS: ReadonlySet<string> = new Set([
+  'filed',
+  'within-budget',
+  'first-run',
+  'revised-downward',
+  'outside-tolerance',
+  'no-contact',
+  'there-is-a-star',
+  'sector-nominal',
+  'sector-gold',
+  'no-regressions',
+]);
 
 const BY_ID = new Map(ACHIEVEMENTS.map((achievement) => [achievement.id, achievement]));
 
@@ -158,84 +121,41 @@ export function getAchievement(id: string): Achievement | undefined {
 }
 
 /**
- * Everything a finished run knows about itself, flattened.
+ * Everything a finished run knows about itself that a commendation reads.
  *
- * Deliberately not a `Verdict`: the interesting facts are comparisons against the *save* (was this
- * a personal best, is the world now closed), and the verdict cannot see the save.
+ * Deliberately not a `Verdict`: two of these are comparisons against the *save* — how many times
+ * this order has been run, and whether it was already closed — and the verdict cannot see the save.
+ *
+ * There is no medal here, and that is the point rather than an omission. A level may be ungraded
+ * (DESIGN.md §11 A7) and carry no medal at all; the two commendations that read par as a ladder
+ * were the two that had to be taught about that, and both were cut. Nothing left needs to know.
  */
-export interface WorldResult {
-  /** `null` where the work order carries no medal at all. DESIGN.md §11 A7. */
-  medal: Medal | null;
-  closed: boolean;
-}
-
 export interface RunFacts {
   passed: boolean;
-  /**
-   * `null` on an ungraded work order (DESIGN.md §11 A7), which is also the flag for it: the two
-   * commendations that read par as a ladder — a gold, and half the budget — are the ones an
-   * ungraded level must not pay out, and `null` is precisely the condition under which par stopped
-   * being a ladder.
-   */
-  medal: Medal | null;
-  ticks: number;
-  parTicks: number;
   /** Runs on this work order including this one. */
   attempt: number;
-  /** `move` events in the trace that reported `ok: false`. */
-  blockedMoves: number;
-  /** Bonus objective ids met on this run. */
-  stars: number;
   /** A `withinSenses` objective was offered and met. */
   senseBudgetMet: boolean;
-  /** The recorded best before this run, when there was one. */
-  previousBestTicks?: number;
   /** A bonus met on a work order that was already closed, and had no star before. */
   returnedForStar: boolean;
-  /** Every issued work order in this world, with this result already folded in. */
-  worldResults: readonly WorldResult[];
 }
 
 /**
  * The commendation ids this run earns. Order is the order they will be shown in.
  *
  * Returns every id the run qualifies for, including ones already in the save — deduplication is
- * the store's job, because only the store knows what has been awarded before.
+ * the store's job, because only the store knows what has been awarded before. A passing run that
+ * earns nothing is the ordinary case and returns an empty list.
  */
 export function earnedBy(facts: RunFacts): string[] {
   if (!facts.passed) return [];
 
-  const earned: string[] = ['filed'];
+  const earned: string[] = [];
 
-  if (facts.medal === Medal.Gold) earned.push('within-budget');
-  if (facts.attempt === 1) earned.push('first-run');
-  if (facts.previousBestTicks !== undefined && facts.ticks < facts.previousBestTicks) {
-    earned.push('revised-downward');
-  }
-  if (facts.medal !== null && facts.parTicks > 0 && facts.ticks < facts.parTicks * ELEGANT_FACTOR) {
-    earned.push('outside-tolerance');
-  }
-  if (facts.blockedMoves === 0) earned.push('no-contact');
-  if (facts.senseBudgetMet) earned.push('minimal-observation');
-  if (facts.stars > 0) earned.push('there-is-a-star');
-  if (facts.returnedForStar) earned.push('came-back-for-it');
   if (facts.attempt >= SECOND_LOOK_ATTEMPTS) earned.push('second-look');
   if (facts.attempt >= PERSISTENCE_ATTEMPTS) earned.push('raised-again');
-
-  /*
-   * Both sector commendations used to read the medal alone, because on a graded level a closed
-   * work order and a medal are the same fact. They are not on an ungraded one, and reading the
-   * medal there would have taken both of these permanently off the board in worlds 1, 5 and 6 —
-   * a requirement made public in the list above and then quietly made impossible. So closure is
-   * read as closure, and an ungraded close satisfies the gold sweep because it is worth a gold.
-   */
-  const world = facts.worldResults;
-  if (world.length > 0 && world.every((result) => result.closed)) {
-    earned.push('sector-nominal');
-    if (world.every((result) => result.medal === null || result.medal === Medal.Gold)) {
-      earned.push('sector-gold');
-    }
-  }
+  if (facts.returnedForStar) earned.push('came-back-for-it');
+  if (facts.senseBudgetMet) earned.push('minimal-observation');
 
   return earned;
 }

@@ -16,11 +16,11 @@ import type { LevelDef } from '../levels/index.ts';
 import { campaignOrder, getLevel, hardwareUnlockedBy, nextLevel } from '../levels/index.ts';
 import type { RendererPort, RunnerPort } from './ports.ts';
 import { FakeRenderer, FakeRunner } from './ports.ts';
-import type { RunFacts, WorldResult } from './achievements.ts';
-import { earnedBy, isSenseBudget } from './achievements.ts';
+import type { RunFacts } from './achievements.ts';
+import { earnedBy, getAchievement, isSenseBudget } from './achievements.ts';
 import type { LevelProgress, SaveFile } from './save.ts';
 import { emptyProgress, importSave, loadSave, mergeProgress, writeSave } from './save.ts';
-import { medalForLevel, medalOf, objectivesOnEverySeed } from './score.ts';
+import { medalForLevel, objectivesOnEverySeed } from './score.ts';
 
 export type Screen = 'levels' | 'workspace';
 export type RunState = 'idle' | 'running';
@@ -164,11 +164,6 @@ function withBonus(level: LevelDef, verdict: Verdict, trace: Trace): Verdict {
 
 let lineId = 0;
 let watchdog: ReturnType<typeof setTimeout> | null = null;
-
-/** Moves the bot attempted and did not get. The elegant-solve commendation hangs on this being 0. */
-function blockedMoveCount(trace: Trace): number {
-  return trace.events.filter((event) => event.kind === 'move' && !event.ok).length;
-}
 
 function firstLevelId(): string | null {
   return campaignOrder()[0]?.id ?? null;
@@ -487,7 +482,7 @@ export const useGame = create<GameState>((set, get) => {
           resultId: get().resultId + 1,
           ...(verdict.passed ? {} : { failureCursor: get().failureCursor + 1 }),
         });
-        recordResult(levelDef, verdict, medal, trace, results);
+        recordResult(levelDef, verdict, medal, results);
       }
 
       /**
@@ -501,7 +496,6 @@ export const useGame = create<GameState>((set, get) => {
         levelDef: LevelDef,
         verdict: Verdict,
         medal: Medal | null,
-        trace: Trace,
         results: PerSeedResult[],
       ): void {
         const state = get();
@@ -549,27 +543,13 @@ export const useGame = create<GameState>((set, get) => {
           stats.fails += 1;
         }
 
-        const worldResults: WorldResult[] = campaignOrder()
-          .filter((candidate) => candidate.world === levelDef.world)
-          .map((candidate) => {
-            const record = levels[candidate.id] ?? emptyProgress();
-            return { medal: medalOf(candidate, record), closed: record.completed };
-          });
-
         const facts: RunFacts = {
           passed: verdict.passed,
-          medal,
-          ticks: verdict.stats.ticks,
-          parTicks: levelDef.par.ticks,
           attempt,
-          blockedMoves: blockedMoveCount(trace),
-          stars: earned.length,
           senseBudgetMet: verdict.objectives.some(
             (objective) => objective.met && isSenseBudget(objective.id),
           ),
           returnedForStar: previous.completed && previous.stars.length === 0 && earned.length > 0,
-          ...(previous.bestTicks !== undefined ? { previousBestTicks: previous.bestTicks } : {}),
-          worldResults,
         };
 
         const achievements = { ...state.save.achievements };
@@ -644,6 +624,10 @@ export const useGame = create<GameState>((set, get) => {
 
     award(id) {
       const save = get().save;
+      /* A commendation this build does not issue is not recorded. The call sites live outside this
+         module, so a retired id raised by one of them must stop here rather than be written and
+         then dropped by the next load. */
+      if (getAchievement(id) === undefined) return;
       if (save.achievements[id] !== undefined) return;
       persist({ ...save, achievements: { ...save.achievements, [id]: Date.now() } });
       set({ freshCommendations: [...get().freshCommendations, id] });

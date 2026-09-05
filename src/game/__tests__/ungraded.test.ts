@@ -228,7 +228,7 @@ describe('a save written by a build that graded these levels', () => {
     expect(progressPoints(level, save.levels['w1-01'] as LevelProgress)).toBe(3);
   });
 
-  it('reconstructs no gold commendation from a version 1 save of an ungraded level', () => {
+  it('carries no commendation forward from a gold recorded on an ungraded level', () => {
     const v1 = {
       version: 1,
       updatedAt: 1,
@@ -238,8 +238,8 @@ describe('a save written by a build that graded these levels', () => {
       settings: {},
     };
     const migrated = migrate(v1);
-    expect(migrated.achievements['filed']).toBe(500);
-    expect(migrated.achievements['within-budget']).toBeUndefined();
+    /* No commendation reads a medal any more, so a medal the level no longer has pays nothing. */
+    expect(migrated.achievements).toEqual({});
   });
 
   it('keeps a medal recorded against an id this build has never heard of', () => {
