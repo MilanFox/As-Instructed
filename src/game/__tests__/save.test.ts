@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { campaignOrder, getLevel } from '../../levels/index.ts';
+import { isLevelUnlocked } from '../store.ts';
 import {
   DEFAULT_LAYOUT,
   SAVE_VERSION,
@@ -10,6 +12,7 @@ import {
   migrate,
   parseSave,
 } from '../save.ts';
+import type { SaveFile } from '../save.ts';
 
 describe('migrate', () => {
   it('reads a current-version save unchanged', () => {
@@ -22,11 +25,11 @@ describe('migrate', () => {
   });
 
   it('migrates the unversioned v0 shape without losing code', () => {
-    const legacy = { 'w1-01': 'move(Dir.East);', 'w1-02': 'print("hi");' };
+    const legacy = { 'w1-01': 'move(Dir.East);', 'w1-03': 'print("hi");' };
     const migrated = migrate(legacy);
     expect(migrated.version).toBe(SAVE_VERSION);
     expect(migrated.levels['w1-01']?.code).toBe('move(Dir.East);');
-    expect(migrated.levels['w1-02']?.code).toBe('print("hi");');
+    expect(migrated.levels['w1-03']?.code).toBe('print("hi");');
     expect(migrated.levels['w1-01']?.completed).toBe(false);
   });
 
@@ -106,12 +109,12 @@ describe('mergeProgress', () => {
     current.levels['w1-01'] = { ...emptyProgress(), code: 'mine', medal: 'gold' };
     const incoming = exportSave({
       ...emptySave(),
-      levels: { 'w1-02': { ...emptyProgress(), code: 'theirs' } },
+      levels: { 'w1-03': { ...emptyProgress(), code: 'theirs' } },
     });
     const merged = importSave(current, incoming);
     expect(merged.levels['w1-01']?.code).toBe('mine');
     expect(merged.levels['w1-01']?.medal).toBe('gold');
-    expect(merged.levels['w1-02']?.code).toBe('theirs');
+    expect(merged.levels['w1-03']?.code).toBe('theirs');
   });
 });
 
@@ -138,7 +141,7 @@ describe('migrate to the reward fields', () => {
           attempts: 4,
           clearedAt: 1000,
         },
-        'w1-02': { code: 'print("x");', completed: false, medal: 'none', stars: [], attempts: 2 },
+        'w1-03': { code: 'print("x");', completed: false, medal: 'none', stars: [], attempts: 2 },
       },
       settings: { layout: DEFAULT_LAYOUT, speed: 2, consoleCap: 500 },
     };
@@ -146,7 +149,7 @@ describe('migrate to the reward fields', () => {
 
     expect(migrated.version).toBe(SAVE_VERSION);
     expect(migrated.levels['w1-01']?.code).toBe('move(Dir.East);');
-    expect(migrated.levels['w1-02']?.code).toBe('print("x");');
+    expect(migrated.levels['w1-03']?.code).toBe('print("x");');
     expect(migrated.settings.speed).toBe(2);
   });
 
@@ -156,7 +159,7 @@ describe('migrate to the reward fields', () => {
       updatedAt: 1,
       levels: {
         'w1-01': { completed: true, medal: 'gold', stars: [], attempts: 3, clearedAt: 1000 },
-        'w1-02': { completed: true, medal: 'bronze', stars: [], attempts: 1, clearedAt: 2000 },
+        'w1-03': { completed: true, medal: 'bronze', stars: [], attempts: 1, clearedAt: 2000 },
       },
       settings: {},
     };
@@ -261,5 +264,70 @@ describe('importSave and the reward fields', () => {
 
     const merged = importSave(current, JSON.stringify(incoming));
     expect(merged.levels['w1-01']?.code).toBe('mine();');
+  });
+});
+
+/**
+ * Six work orders were withdrawn (docs/FIX-COMPRESSION.md) and their ids will never be reissued.
+ * A save written before the cut still names them, and the rule that player code is never lost has
+ * no exception for a work order that no longer exists.
+ */
+describe('a save that names a withdrawn work order', () => {
+  const WITHDRAWN = ['w1-02', 'w1-04', 'w2-03', 'w3-03', 'w3-05', 'w4-03'];
+
+  const beforeTheCut = (): SaveFile => {
+    const save = emptySave();
+    save.levels['w1-01'] = { ...emptyProgress(), code: 'kept();', completed: true, medal: 'gold' };
+    save.levels['w1-03'] = { ...emptyProgress(), code: 'also kept();', bestTicks: 24 };
+    for (const id of WITHDRAWN) {
+      save.levels[id] = {
+        ...emptyProgress(),
+        code: `${id} code`,
+        completed: true,
+        medal: 'silver',
+      };
+    }
+    return save;
+  };
+
+  const reloaded = (): SaveFile => migrate(JSON.parse(exportSave(beforeTheCut())) as unknown);
+
+  it('names nothing the campaign will offer', () => {
+    for (const id of WITHDRAWN) expect(getLevel(id), id).toBeUndefined();
+  });
+
+  it('loads without throwing and keeps every surviving record', () => {
+    const migrated = reloaded();
+    expect(migrated.levels['w1-01']?.code).toBe('kept();');
+    expect(migrated.levels['w1-01']?.medal).toBe('gold');
+    expect(migrated.levels['w1-03']?.bestTicks).toBe(24);
+  });
+
+  it('keeps the withdrawn records too, because code is never thrown away', () => {
+    const migrated = reloaded();
+    for (const id of WITHDRAWN) expect(migrated.levels[id]?.code, id).toBe(`${id} code`);
+  });
+
+  it('imports over another save without losing either side', () => {
+    const current = emptySave();
+    current.levels['w1-05'] = { ...emptyProgress(), code: 'ours();' };
+    const merged = importSave(current, exportSave(beforeTheCut()));
+
+    expect(merged.levels['w1-05']?.code).toBe('ours();');
+    expect(merged.levels['w1-01']?.medal).toBe('gold');
+    expect(merged.levels['w2-03']?.code).toBe('w2-03 code');
+  });
+
+  it('does not gate the order that followed it', () => {
+    const save = emptySave();
+    save.levels['w1-01'] = { ...emptyProgress(), completed: true };
+    expect(isLevelUnlocked(save, 'w1-03')).toBe(true);
+    expect(isLevelUnlocked(save, 'w1-05')).toBe(false);
+  });
+
+  it('counts only issued work orders towards the campaign', () => {
+    const migrated = reloaded();
+    const closed = campaignOrder().filter((level) => migrated.levels[level.id]?.completed);
+    expect(closed.map((level) => level.id)).toEqual(['w1-01']);
   });
 });

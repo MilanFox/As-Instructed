@@ -115,7 +115,7 @@ export const w3_04: LevelDef = {
   world: 3,
   index: 4,
   title: 'First In, First Out',
-  hardware: [],
+  hardware: ['use'],
   brief: [
     '```',
     'MEMO KD-2318',

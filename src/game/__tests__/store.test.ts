@@ -60,9 +60,24 @@ function reset(): void {
   });
 }
 
-/** Six moves onto the pad. The reference solution for w1-01, as the player would type it. */
-const W1_01_SOLUTION =
-  'move(Dir.North);\nfor (let i = 0; i < 4; i++) move(Dir.East);\nmove(Dir.South);';
+/** Round the pillar, then a loop per leg. The reference solution for w1-01, as a player types it. */
+const W1_01_ROUTE = [
+  'move(Dir.East);',
+  'move(Dir.North);',
+  'move(Dir.East);',
+  'move(Dir.East);',
+  'move(Dir.South);',
+  'for (let i = 0; i < 19; i++) move(Dir.East);',
+  'for (let i = 0; i < 5; i++) move(Dir.South);',
+  'for (let i = 0; i < 22; i++) move(Dir.West);',
+  'for (let i = 0; i < 5; i++) move(Dir.South);',
+  'for (let i = 0; i < 22; i++) move(Dir.East);',
+];
+
+const W1_01_SOLUTION = W1_01_ROUTE.join('\n');
+
+/** The same route with three ticks burned in the middle: still inside the booking, still worse. */
+const W1_01_SLOWER = [...W1_01_ROUTE.slice(0, 5), 'wait(3);', ...W1_01_ROUTE.slice(5)].join('\n');
 
 async function runOnce(code: string): Promise<void> {
   useGame.getState().setCode(code);
@@ -307,9 +322,7 @@ describe('rewards', () => {
   it('calls out a personal best only when the record actually moved', async () => {
     reset();
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
-    await runOnce(
-      'move(Dir.North);\nfor (let i = 0; i < 4; i++) move(Dir.East);\nwait(3);\nmove(Dir.South);',
-    );
+    await runOnce(W1_01_SLOWER);
     expect(useGame.getState().personalBest).toBeNull();
 
     await runOnce(W1_01_SOLUTION);
@@ -334,11 +347,11 @@ describe('rewards', () => {
   it('raises a requisition for undelivered hardware, once', () => {
     reset();
     useGame.getState().openLevel('w1-01');
-    expect(useGame.getState().requisition?.hardware).toEqual(['move', 'pos']);
+    expect(useGame.getState().requisition?.hardware).toEqual(['move', 'pos', 'print', 'wait']);
 
     useGame.getState().signRequisition();
     expect(useGame.getState().requisition).toBeNull();
-    expect(useGame.getState().save.seenRequisitions).toEqual(['move', 'pos']);
+    expect(useGame.getState().save.seenRequisitions).toEqual(['move', 'pos', 'print', 'wait']);
 
     useGame.getState().openLevel('w1-01');
     expect(useGame.getState().requisition).toBeNull();

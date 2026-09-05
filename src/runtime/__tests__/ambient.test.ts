@@ -14,14 +14,14 @@ import { implementedApiNames } from '../api-bindings.ts';
  * "not declared" is what makes calling it a type error instead of a runtime surprise (DESIGN.md §6).
  */
 
-const W1_01 = ['move', 'pos'];
+const W1_01 = ['move', 'pos', 'print', 'wait'];
 const W2_01 = unlockedApiNames('w2-01');
 
 describe('unlockedApiNames', () => {
   test('grows with the campaign and never goes backwards', () => {
     expect(unlockedApiNames('w1-01')).toEqual(W1_01);
-    expect(unlockedApiNames('w1-04')).toEqual(['move', 'pos', 'print', 'canMove', 'wait']);
-    expect(W2_01).toEqual([...unlockedApiNames('w1-04'), 'scan']);
+    expect(unlockedApiNames('w1-03')).toEqual(['move', 'pos', 'print', 'wait', 'canMove']);
+    expect(W2_01).toEqual([...unlockedApiNames('w1-03'), 'scan']);
     expect(unlockedApiNames('w8-05')).toEqual(PLAYER_API.functions.map((fn) => fn.name));
   });
 
@@ -35,7 +35,8 @@ describe('buildAmbientDts', () => {
     const dts = buildAmbientDts(W1_01);
     expect(dts).toContain('declare function move(dir: Dir): boolean;');
     expect(dts).toContain('declare function pos(): Vec;');
-    expect(dts).not.toContain('declare function print(');
+    expect(dts).toContain('declare function print(');
+    expect(dts).not.toContain('declare function canMove(');
     expect(dts).not.toContain('declare function scan(');
   });
 

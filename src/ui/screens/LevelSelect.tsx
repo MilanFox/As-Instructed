@@ -1,9 +1,9 @@
 /**
  * The Site Map — the assignment board of Kessler & Daughters Terraforming Ltd.
  *
- * Eight worlds, five work orders each, strung along a route. CONTENT owns the level list, so any
- * slot that has not landed yet renders as a PENDING placeholder rather than being hidden: the
- * player is told what is coming, and never told a title that does not exist.
+ * Eight worlds, strung along a route. CONTENT owns the level list and a world does not have to
+ * hold five: six work orders were withdrawn and the survivors kept their ids, so the number on a
+ * disc is the order's position on the board rather than anything read out of its id.
  */
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, JSX, KeyboardEvent } from 'react';
@@ -16,19 +16,16 @@ import { CommendationShelf } from '../components/CommendationShelf.tsx';
 import type { LevelDef, WorldMeta } from '../../levels/index.ts';
 import '../styles/screens.css';
 
-/** DESIGN.md §6: five per world, forty in total. */
-const WORK_ORDERS_PER_WORLD = 5;
-
 type StyleVars = CSSProperties & Record<`--${string}`, string>;
 
-type WorkOrderStatus = 'CLOSED' | 'OPEN' | 'ON HOLD' | 'PENDING';
+type WorkOrderStatus = 'CLOSED' | 'OPEN' | 'ON HOLD';
 
 interface WorkOrderNode {
   id: string;
   world: number;
+  /** Position on the board, 1-based. Not `LevelDef.index`, which skips a withdrawn order. */
   index: number;
-  /** `null` while CONTENT has not written this slot yet. */
-  level: LevelDef | null;
+  level: LevelDef;
   progress: LevelProgress;
   status: WorkOrderStatus;
   playable: boolean;
@@ -60,10 +57,6 @@ interface Tally {
   closed: number;
 }
 
-function workOrderId(world: number, index: number): string {
-  return `w${world}-${String(index).padStart(2, '0')}`;
-}
-
 function progressOf(save: SaveFile, levelId: string): LevelProgress {
   return save.levels[levelId] ?? emptyProgress();
 }
@@ -78,33 +71,20 @@ function buildRows(save: SaveFile): WorldRow[] {
   );
 
   return levelsByWorld().map(({ world, levels }) => {
-    const byIndex = new Map(levels.map((level) => [level.index, level]));
-    const nodes: WorkOrderNode[] = [];
-
-    for (let index = 1; index <= WORK_ORDERS_PER_WORLD; index++) {
-      const level = byIndex.get(index) ?? null;
-      const id = level ? level.id : workOrderId(world.id, index);
-      const progress = progressOf(save, id);
-      const unlocked = level ? isLevelUnlocked(save, id) : false;
-      const status: WorkOrderStatus = !level
-        ? 'PENDING'
-        : progress.completed
-          ? 'CLOSED'
-          : unlocked
-            ? 'OPEN'
-            : 'ON HOLD';
-
-      nodes.push({
-        id,
+    const nodes: WorkOrderNode[] = levels.map((level, position) => {
+      const progress = progressOf(save, level.id);
+      const unlocked = isLevelUnlocked(save, level.id);
+      return {
+        id: level.id,
         world: world.id,
-        index,
+        index: position + 1,
         level,
         progress,
-        status,
-        playable: level !== null && unlocked,
-        isNext: level !== null && level.id === nextUp?.id,
-      });
-    }
+        status: progress.completed ? 'CLOSED' : unlocked ? 'OPEN' : 'ON HOLD',
+        playable: unlocked,
+        isNext: level.id === nextUp?.id,
+      };
+    });
 
     const issued = levels.length;
     const closed = nodes.filter((node) => node.status === 'CLOSED').length;
@@ -157,8 +137,7 @@ function campaignTally(rows: WorldRow[]): Tally {
     tally.issued += row.issued;
     tally.closed += row.closed;
     for (const node of row.nodes) {
-      if (!node.level) continue;
-      tally.stars += starsFor(node.level?.bonus, node.progress.stars);
+      tally.stars += starsFor(node.level.bonus, node.progress.stars);
       if (node.progress.medal === Medal.Gold) tally.gold++;
       else if (node.progress.medal === Medal.Silver) tally.silver++;
       else if (node.progress.medal === Medal.Bronze) tally.bronze++;
@@ -169,10 +148,9 @@ function campaignTally(rows: WorldRow[]): Tally {
 }
 
 function nodeLabel(node: WorkOrderNode): string {
-  const name = node.level ? `${node.id}, ${node.level.title}` : node.id;
-  if (!node.level) return `Work order ${name}. Pending. Not yet issued.`;
+  const name = `${node.id}, ${node.level.title}`;
   if (!node.playable) return `Work order ${name}. On hold. Locked.`;
-  const stars = starsFor(node.level?.bonus, node.progress.stars);
+  const stars = starsFor(node.level.bonus, node.progress.stars);
   const bonus = stars === 1 ? '1 bonus star.' : `${stars} bonus stars.`;
   const state = node.progress.completed ? 'Closed' : 'Open';
   return `Work order ${name}. ${state}. ${medalWord(node.progress.medal)}. ${bonus}`;
@@ -219,24 +197,44 @@ export function LevelSelect(): JSX.Element {
     else buttons.current.delete(id);
   }, []);
 
+  /** Where each node sits on the board. Rows are no longer all the same length. */
+  const seat = useMemo(() => {
+    const map = new Map<string, { row: number; column: number; flat: number }>();
+    let cursor = 0;
+    rows.forEach((row, index) => {
+      row.nodes.forEach((node, column) => {
+        map.set(node.id, { row: index, column, flat: cursor });
+        cursor++;
+      });
+    });
+    return map;
+  }, [rows]);
+
   const onKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
-      const deltas: Record<string, number> = {
-        ArrowRight: 1,
-        ArrowLeft: -1,
-        ArrowDown: WORK_ORDERS_PER_WORLD,
-        ArrowUp: -WORK_ORDERS_PER_WORLD,
-      };
+      const deltas: Record<string, number> = { ArrowRight: 1, ArrowLeft: -1 };
       const step = deltas[event.key];
+      const rowStep = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0;
       const home = event.key === 'Home';
       const end = event.key === 'End';
-      if (step === undefined && !home && !end) return;
+      if (step === undefined && rowStep === 0 && !home && !end) return;
 
       const from = flat.findIndex((node) => node.id === roving);
       if (from < 0) return;
 
-      const direction = home ? 1 : end ? -1 : (step as number) > 0 ? 1 : -1;
-      let cursor = home ? 0 : end ? flat.length - 1 : from + (step as number);
+      const direction = home ? 1 : end ? -1 : rowStep !== 0 ? rowStep : (step as number);
+      let cursor = home ? 0 : end ? flat.length - 1 : from + (step ?? 0);
+
+      if (rowStep !== 0) {
+        const here = seat.get(roving);
+        const target = here ? rows[here.row + rowStep] : undefined;
+        const landing = target?.nodes[Math.min(here?.column ?? 0, target.nodes.length - 1)];
+        if (!landing) {
+          event.preventDefault();
+          return;
+        }
+        cursor = seat.get(landing.id)?.flat ?? from;
+      }
 
       while (cursor >= 0 && cursor < flat.length) {
         const candidate = flat[cursor];
@@ -250,7 +248,7 @@ export function LevelSelect(): JSX.Element {
       }
       event.preventDefault();
     },
-    [flat, roving],
+    [flat, roving, rows, seat],
   );
 
   return (
@@ -396,7 +394,7 @@ export function LevelSelect(): JSX.Element {
 
                         <span className="node__pips" aria-hidden="true">
                           {Array.from(
-                            { length: starsFor(node.level?.bonus, node.progress.stars) },
+                            { length: starsFor(node.level.bonus, node.progress.stars) },
                             (_, pip) => (
                               <span className="node__pip" key={pip} />
                             ),
@@ -405,7 +403,7 @@ export function LevelSelect(): JSX.Element {
 
                         <span className="node__id numeric">{node.id}</span>
                         <span className="node__title">
-                          {node.level && node.playable ? node.level.title : ' '}
+                          {node.playable ? node.level.title : ' '}
                         </span>
                         <span
                           className={`node__status status--${node.status.replace(' ', '-').toLowerCase()}`}

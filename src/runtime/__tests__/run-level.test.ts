@@ -77,6 +77,7 @@ describe('running the reference solution', () => {
     const { result } = run(w1_01Solution.source);
     expect(result.objectives).toEqual([
       { id: 'reach-pad', label: 'Park the bot on the landing pad', met: true },
+      { id: 'bay-booking', label: 'Clear the bay within 90 ticks', met: true, progress: [78, 90] },
     ]);
   });
 });
@@ -141,7 +142,7 @@ describe('errors the player made', () => {
       'const missing: number[] = [];',
       'print(String(missing[0]!.toFixed(route.steps)));',
     ].join('\n');
-    const { result } = run(source, { hardware: unlockedApiNames('w1-02') });
+    const { result } = run(source, { hardware: unlockedApiNames('w1-01') });
     expect(result.failure?.kind).toBe('runtime');
     expect(result.failure?.line).toBe(6);
     expect(result.failure?.message).toContain('undefined');
@@ -165,7 +166,7 @@ describe('the sandbox', () => {
   });
 
   test('console.log is an alias for print, not an escape hatch', () => {
-    const { trace } = run('console.log("hello", 1);', { hardware: unlockedApiNames('w1-02') });
+    const { trace } = run('console.log("hello", 1);', { hardware: unlockedApiNames('w1-01') });
     const prints = trace.events.filter(
       (event: TraceEvent): event is PrintEvent => event.kind === 'print',
     );
@@ -182,7 +183,7 @@ describe('the sandbox', () => {
       '}',
       'print(String(log.size));',
     ].join('\n');
-    const { trace } = run(source, { hardware: unlockedApiNames('w1-02') });
+    const { trace } = run(source, { hardware: unlockedApiNames('w1-01') });
     const prints = trace.events.filter(
       (event: TraceEvent): event is PrintEvent => event.kind === 'print',
     );

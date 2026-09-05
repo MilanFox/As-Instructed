@@ -4,7 +4,7 @@
  * Two things here are load-bearing rather than decorative:
  *
  * - **Plant growth gauges.** DESIGN.md §11 A5 requires maturity to be readable at a glance;
- *   w2-03 is unsolvable otherwise. The six-sprite stage ladder in `tiles.ts` carries most of it,
+ *   w2-02 is unsolvable otherwise. The six-sprite stage ladder in `tiles.ts` carries most of it,
  *   and this adds an arc gauge plus a "ready" pip so the last stage is unmistakable.
  * - **`describeTile`.** The UI asks the renderer what is under the cursor. Keeping the query
  *   here means the UI never has to learn the World layout.

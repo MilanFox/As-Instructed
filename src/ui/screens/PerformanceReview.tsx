@@ -24,9 +24,6 @@ import { useGame } from '../../game/store.ts';
 import { WORLDS, campaignOrder } from '../../levels/index.ts';
 import type { LevelDef } from '../../levels/index.ts';
 
-/** DESIGN.md §6. Used only to report how much of the campaign has been issued. */
-const WORK_ORDERS_PER_WORLD = 5;
-
 type StyleVars = CSSProperties & Record<`--${string}`, string>;
 
 type Scope = 'all' | number;
@@ -204,7 +201,7 @@ export function PerformanceReview(): JSX.Element {
               <dt>REVIEWED</dt>
               <dd>
                 {report.rows.length} of{' '}
-                {scope === 'all' ? WORLDS.length * WORK_ORDERS_PER_WORLD : WORK_ORDERS_PER_WORLD}{' '}
+                {scope === 'all' ? campaignOrder().length : (issuedByWorld.get(scope) ?? 0)}{' '}
                 work orders
               </dd>
             </div>

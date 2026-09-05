@@ -10,7 +10,6 @@ import type { LevelDef, ReferenceSolution } from '../../types.ts';
 import { WORLD_2_LEVELS, w2_01, w2_04, w2_05 } from '../index.ts';
 import { solution as w2_01Solution } from '../__solutions__/w2-01.ts';
 import { solution as w2_02Solution } from '../__solutions__/w2-02.ts';
-import { solution as w2_03Solution } from '../__solutions__/w2-03.ts';
 import { solution as w2_04Solution } from '../__solutions__/w2-04.ts';
 import { solution as w2_05Solution } from '../__solutions__/w2-05.ts';
 
@@ -29,7 +28,6 @@ import { solution as w2_05Solution } from '../__solutions__/w2-05.ts';
 const SOLUTIONS: Record<string, ReferenceSolution> = {
   'w2-01': w2_01Solution,
   'w2-02': w2_02Solution,
-  'w2-03': w2_03Solution,
   'w2-04': w2_04Solution,
   'w2-05': w2_05Solution,
 };
@@ -289,11 +287,10 @@ function surveyTwoLanesThenStrike(sim: Sim, botId: number): void {
 // ---------------------------------------------------------------------------
 
 describe('world 2 shape', () => {
-  test('five levels, in order, each with exactly one bonus star', () => {
+  test('four levels, in order, each with exactly one bonus star', () => {
     expect(WORLD_2_LEVELS.map((level) => level.id)).toEqual([
       'w2-01',
       'w2-02',
-      'w2-03',
       'w2-04',
       'w2-05',
     ]);

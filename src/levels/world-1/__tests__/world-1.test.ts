@@ -6,9 +6,7 @@ import { runLevel, runReference } from '../../harness.ts';
 import type { LevelDef, ReferenceSolution } from '../../types.ts';
 import { WORLD_1_LEVELS } from '../index.ts';
 import { solution as w1_01Solution } from '../__solutions__/w1-01.ts';
-import { solution as w1_02Solution } from '../__solutions__/w1-02.ts';
 import { solution as w1_03Solution } from '../__solutions__/w1-03.ts';
-import { solution as w1_04Solution } from '../__solutions__/w1-04.ts';
 import { solution as w1_05Solution } from '../__solutions__/w1-05.ts';
 import { unlockedApiNames } from '../../../runtime/ambient.ts';
 import { compileErrors } from './ambient-check.ts';
@@ -23,9 +21,7 @@ import { compileErrors } from './ambient-check.ts';
 
 const SOLUTIONS: Record<string, ReferenceSolution> = {
   'w1-01': w1_01Solution,
-  'w1-02': w1_02Solution,
   'w1-03': w1_03Solution,
-  'w1-04': w1_04Solution,
   'w1-05': w1_05Solution,
 };
 
@@ -51,19 +47,15 @@ const byId = (id: string): LevelDef => {
 };
 
 describe('world 1 shape', () => {
-  test('five levels, in order, correctly identified', () => {
-    expect(WORLD_1_LEVELS.map((level) => level.id)).toEqual([
-      'w1-01',
-      'w1-02',
-      'w1-03',
-      'w1-04',
-      'w1-05',
-    ]);
-    WORLD_1_LEVELS.forEach((level, i) => {
+  test('three levels, in order, correctly identified', () => {
+    expect(WORLD_1_LEVELS.map((level) => level.id)).toEqual(['w1-01', 'w1-03', 'w1-05']);
+    let previous = 0;
+    for (const level of WORLD_1_LEVELS) {
       expect(level.world).toBe(1);
-      expect(level.index).toBe(i + 1);
-      expect(level.id).toBe(`w1-0${String(i + 1)}`);
-    });
+      expect(level.index).toBeGreaterThan(previous);
+      expect(level.id).toBe(`w1-0${String(level.index)}`);
+      previous = level.index;
+    }
   });
 
   test('every level carries a brief, hints, seeds and a par', () => {
@@ -89,7 +81,7 @@ describe('world 1 shape', () => {
 
   test('the levels that generalize declare more than one seed', () => {
     for (const level of WORLD_1_LEVELS) {
-      if (level.id === 'w1-01' || level.id === 'w1-02') continue;
+      if (level.id === 'w1-01') continue;
       expect(level.seeds.length).toBeGreaterThanOrEqual(3);
     }
   });
@@ -174,10 +166,15 @@ describe('starters do not solve their own level', () => {
     expect(result.verdict.passed).toBe(false);
   });
 
-  test('w1-02 needs all three legs, not just the first', () => {
-    const level = byId('w1-02');
+  test('w1-01 needs every leg, not just the first', () => {
+    const level = byId('w1-01');
     const result = runLevel(level, level.seeds[0] as number, (sim, botId) => {
-      for (let i = 0; i < 20; i++) sim.move(botId, Dir.East);
+      sim.move(botId, Dir.East);
+      sim.move(botId, Dir.North);
+      sim.move(botId, Dir.East);
+      sim.move(botId, Dir.East);
+      sim.move(botId, Dir.South);
+      for (let i = 0; i < 19; i++) sim.move(botId, Dir.East);
     });
     expect(result.verdict.passed).toBe(false);
   });
@@ -185,13 +182,18 @@ describe('starters do not solve their own level', () => {
 
 describe('hardcoded answers are rejected', () => {
   /**
-   * The one w1-02 answer that skips the counting. Nothing distinguishes three loops from
-   * forty-five typed-out moves in a trace, so the booking is what the level actually gates on.
+   * The one w1-01 answer that skips the counting. Nothing distinguishes five counted loops from
+   * seventy-eight typed-out moves in a trace, so the booking is what the level actually gates on.
    */
-  test('w1-02: firing moves at the wall until they stop working overruns the booking', () => {
-    const level = byId('w1-02');
+  test('w1-01: firing moves at the wall until they stop working overruns the booking', () => {
+    const level = byId('w1-01');
     const result = runLevel(level, level.seeds[0] as number, (sim, botId) => {
-      for (const dir of [Dir.East, Dir.South, Dir.West]) {
+      sim.move(botId, Dir.East);
+      sim.move(botId, Dir.North);
+      sim.move(botId, Dir.East);
+      sim.move(botId, Dir.East);
+      sim.move(botId, Dir.South);
+      for (const dir of [Dir.East, Dir.South, Dir.West, Dir.South, Dir.East]) {
         for (let i = 0; i < 30; i++) sim.move(botId, dir);
       }
     });
@@ -209,32 +211,6 @@ describe('hardcoded answers are rejected', () => {
         }).verdict.passed,
     );
     expect(outcomes[0]).toBe(true);
-    expect(outcomes.some((passed) => !passed)).toBe(true);
-  });
-
-  test('w1-04: a fixed direction sequence cannot cover both endpoints', () => {
-    const level = byId('w1-04');
-    const outcomes = level.seeds.map(
-      (seed) =>
-        runLevel(level, seed, (sim, botId) => {
-          for (let i = 0; i < 9; i++) sim.move(botId, Dir.East);
-          for (let i = 0; i < 9; i++) sim.move(botId, Dir.South);
-        }).verdict.passed,
-    );
-    expect(outcomes.some((passed) => !passed)).toBe(true);
-  });
-
-  test('w1-04: handling only positive deltas strands the bot on some seeds', () => {
-    const level = byId('w1-04');
-    const outcomes = level.seeds.map(
-      (seed) =>
-        runLevel(level, seed, (sim, botId) => {
-          const start = sim.pos(botId);
-          const pad = { x: 10 - start.x, y: 10 - start.y };
-          while (sim.pos(botId).x < pad.x) sim.move(botId, Dir.East);
-          while (sim.pos(botId).y < pad.y) sim.move(botId, Dir.South);
-        }).verdict.passed,
-    );
     expect(outcomes.some((passed) => !passed)).toBe(true);
   });
 
