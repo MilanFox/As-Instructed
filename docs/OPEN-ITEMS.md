@@ -464,3 +464,66 @@ cost the agent real time and looked like an app bug.
 - **Incentive audit** — read-only, writes only `docs/AUDIT-INCENTIVES.md`.
 - **`w4-02` visited-tile trail** — started now that `src/render/**` is free. Also checking
   whether DESIGN §11 A5's blocked-move and livelock visuals were ever implemented.
+
+### 2026-09-05, 16:10 — `power()` now speaks (`ebf533d`)
+
+Green at **1384 tests** (1369 + 6 new, none removed), tsc / build clean. The 86
+reference-solution tests and `finale.test.ts` pass unedited; no par, threshold, budget or
+tick cost moved.
+
+**Hard, explained failure, not a quiet `false`.** `Sim.power()` throws `IllegalActionError`
+on a `vars.manual: 1` machine; it still returns `false` for an unknown machine id, which
+had been conflated with it in a single branch. The deciding test — worth reusing for the
+sibling verbs below — is **"can the identical call succeed later in the same run?"** Every
+`false` case in this engine is transient (a wall opens, an inventory empties); every
+throwing case is permanent. Nothing clears `vars.manual`, so the call is wrong for the
+whole run, and a `false` that can only ever be `false` hands the player a branch that can
+never flip: a bug dressed as a control-flow option.
+
+The non-fatal-notice option was rejected on plumbing, not taste: the console carries only
+`print` events plus one closing line, so a notice would either corrupt
+`Objectives.printedSequence` or need a second parallel channel. The throw needed **zero new
+plumbing** — `runSeed` -> `toRuntimeFailure` -> `toVerdictFailure` already carries `code`,
+`at` and the player's line. Same mechanism as `LivelockError`.
+
+Confirmed in-browser on `w8-03`. The check caught a real error in the agent's own copy: the
+result panel shows the flavour line but *not* `failure.message`, so a first draft saying
+"the reason is the line above" was false and was rewritten to point at the console.
+
+### Mute verbs — ranked, none fixed, use the test above to rule on each
+
+1. **`plant()`** — worst. Three causes (not plantable / already cropped / no seed) collapse
+   to one bit. Correctly on the `false` side; wants a `reason` field, not a throw.
+2. **`send()`** — returns `false` for an unknown or dead bot id while every other verb
+   throws for exactly that. Both states are permanent, so it should throw. Strongest next
+   candidate.
+3. **`spawn()`** — calls `blockReason()` and discards it; `move()` makes the same call and
+   puts `reason` on its event. One field, already in hand.
+4. **`pickup()`/`drop()`** — mute in a different type, returning `0`.
+5. **`applyMachineChange()`** — consistent with the kept `false`, just terse.
+6. **`refuel()`** — arguably fine, `OutOfFuelError` explains it downstream.
+
+Flagged separately, needs a ruling: **`use()` on an empty or absent `cycle` returns `true`
+and does nothing.** A mute *success* is worse than a mute failure — the player's program
+cannot detect it at all.
+
+### The three World 8 findings, resolved
+
+1. **Dead `docs` ids on `w8-05` — dismissed.** All six resolve. FIX-PROSE's open gap is
+   also closed: all 34 levels audited, every `docs` id resolves campaign-wide.
+2. **`costs` overrides — confirmed, and there are three, not two.** `DocsPanel.tsx:230`
+   renders the flat `api-spec` cost and ignores per-level overrides: `w7-02` (`spawn` 2 vs
+   5), `w7-04` (`use` 1 vs 2) and **`w8-05` (`use` 1 vs 2)**, the last unlisted and the one
+   that matters, since `use` is the only way to work a manual station in the finale. The
+   player is shown a wrong number. Handed to the trail agent, which owns that file.
+3. **16000-vs-3000 — confirmed, but dead config rather than a visible contradiction.**
+   `deadlineFor()` returns exactly 3000 on all three seeds; the floor always binds, par is
+   1050, and `maxTicks: 16000` can never bite first. It only makes a doomed run 5x longer.
+
+### Queued, blocked only by the par agent holding `src/levels/**`
+
+`docs/FIX-POWER.md` carries exact diffs for two fact rows (`w8-03.ts:265`, `w8-05.ts:636`)
+that still promise the old silent `false`. **Ruling: delete them rather than correct them.**
+The prose pass kept those rows *because* the failure was mute; that condition is gone, and a
+row explaining what an error message now says out loud is the "told me" half of
+PLAYTEST-BEGINNER §9. Apply once par merges.
