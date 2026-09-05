@@ -47,12 +47,27 @@ function reset(): void {
     seedResults: [],
     failure: null,
     showResults: false,
+    resultId: 0,
+    failureCursor: 0,
+    freshCommendations: [],
+    personalBest: null,
+    requisition: null,
     tick: 0,
     endTick: 0,
     playing: false,
     console: [],
     suppressed: 0,
   });
+}
+
+/** Six moves onto the pad. The reference solution for w1-01, as the player would type it. */
+const W1_01_SOLUTION =
+  'move(Dir.North);\nfor (let i = 0; i < 4; i++) move(Dir.East);\nmove(Dir.South);';
+
+async function runOnce(code: string): Promise<void> {
+  useGame.getState().setCode(code);
+  useGame.getState().run();
+  await vi.waitFor(() => expect(useGame.getState().runState).toBe('idle'));
 }
 
 afterEach(() => {
@@ -182,7 +197,11 @@ describe('progress', () => {
   it('records a pass, its medal and its records', async () => {
     reset();
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
-    useGame.getState().setCode('move(Dir.East);move(Dir.East);move(Dir.North);move(Dir.East);move(Dir.East);move(Dir.South);');
+    useGame
+      .getState()
+      .setCode(
+        'move(Dir.East);move(Dir.East);move(Dir.North);move(Dir.East);move(Dir.East);move(Dir.South);',
+      );
     useGame.getState().run();
     await vi.waitFor(() => expect(useGame.getState().runState).toBe('idle'));
 
@@ -224,5 +243,135 @@ describe('playback', () => {
     expect(useGame.getState().tick).toBe(end);
     useGame.getState().step(-1);
     expect(useGame.getState().tick).toBe(end - 1);
+  });
+});
+
+describe('rewards', () => {
+  it('files the first close and reports it once', async () => {
+    reset();
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+    await runOnce(W1_01_SOLUTION);
+
+    const state = useGame.getState();
+    expect(state.verdict?.passed).toBe(true);
+    expect(state.save.achievements['filed']).toBeGreaterThan(0);
+    expect(state.freshCommendations).toContain('filed');
+    expect(state.freshCommendations).toContain('first-run');
+  });
+
+  it('never re-awards a commendation already in the save', async () => {
+    reset();
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+    await runOnce(W1_01_SOLUTION);
+    const first = useGame.getState().save.achievements['filed'];
+
+    await runOnce(W1_01_SOLUTION);
+    expect(useGame.getState().save.achievements['filed']).toBe(first);
+    expect(useGame.getState().freshCommendations).not.toContain('filed');
+  });
+
+  it('counts a streak of closes and drops it on the first failed run', async () => {
+    reset();
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+    await runOnce(W1_01_SOLUTION);
+    expect(useGame.getState().save.stats.streak).toBe(1);
+    expect(useGame.getState().save.stats.bestStreak).toBe(1);
+
+    await runOnce('move(Dir.South);');
+    expect(useGame.getState().save.stats.streak).toBe(0);
+    expect(useGame.getState().save.stats.bestStreak).toBe(1);
+    expect(useGame.getState().save.stats.fails).toBe(1);
+  });
+
+  it('does not break a streak on a program that never compiled', async () => {
+    reset();
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+    await runOnce(W1_01_SOLUTION);
+    expect(useGame.getState().save.stats.streak).toBe(1);
+
+    await runOnce('this is not valid javascript at all !!!');
+    expect(useGame.getState().failure?.kind).toBe('compile');
+    expect(useGame.getState().save.stats.streak).toBe(1);
+    expect(useGame.getState().save.stats.fails).toBe(1);
+  });
+
+  it('does not inflate the streak by re-closing the same work order', async () => {
+    reset();
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+    await runOnce(W1_01_SOLUTION);
+    await runOnce(W1_01_SOLUTION);
+    expect(useGame.getState().save.stats.streak).toBe(1);
+  });
+
+  it('costs a failed run nothing but the attempt', async () => {
+    reset();
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+    await runOnce(W1_01_SOLUTION);
+    const won = useGame.getState().save.levels['w1-01'];
+
+    await runOnce('move(Dir.South);');
+    const after = useGame.getState().save.levels['w1-01'];
+    expect(after?.completed).toBe(true);
+    expect(after?.medal).toBe(won?.medal);
+    expect(after?.bestTicks).toBe(won?.bestTicks);
+    expect(Object.keys(useGame.getState().save.achievements).length).toBeGreaterThan(0);
+  });
+
+  it('calls out a personal best only when the record actually moved', async () => {
+    reset();
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+    await runOnce(
+      'move(Dir.North);\nfor (let i = 0; i < 4; i++) move(Dir.East);\nwait(3);\nmove(Dir.South);',
+    );
+    expect(useGame.getState().personalBest).toBeNull();
+
+    await runOnce(W1_01_SOLUTION);
+    const best = useGame.getState().personalBest;
+    expect(best).not.toBeNull();
+    expect(best?.now).toBeLessThan(best?.previous ?? 0);
+    expect(useGame.getState().save.achievements['revised-downward']).toBeGreaterThan(0);
+
+    await runOnce(W1_01_SOLUTION);
+    expect(useGame.getState().personalBest).toBeNull();
+  });
+
+  it('rotates the failure line rather than repeating it', async () => {
+    reset();
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+    await runOnce('move(Dir.South);');
+    const first = useGame.getState().failureCursor;
+    await runOnce('move(Dir.South);');
+    expect(useGame.getState().failureCursor).toBe(first + 1);
+  });
+
+  it('raises a requisition for undelivered hardware, once', () => {
+    reset();
+    useGame.getState().openLevel('w1-01');
+    expect(useGame.getState().requisition?.hardware).toEqual(['move', 'pos']);
+
+    useGame.getState().signRequisition();
+    expect(useGame.getState().requisition).toBeNull();
+    expect(useGame.getState().save.seenRequisitions).toEqual(['move', 'pos']);
+
+    useGame.getState().openLevel('w1-01');
+    expect(useGame.getState().requisition).toBeNull();
+  });
+
+  it('lets the player turn the ceremony off and have it stay off', () => {
+    reset();
+    expect(useGame.getState().save.settings.celebrations).toBe(true);
+    useGame.getState().setCelebrations(false);
+    expect(useGame.getState().save.settings.celebrations).toBe(false);
+    useGame.getState().openLevel('w1-01');
+    expect(useGame.getState().save.settings.celebrations).toBe(false);
+  });
+
+  it('awards a commendation raised outside a run, idempotently', () => {
+    reset();
+    useGame.getState().award('repository');
+    const at = useGame.getState().save.achievements['repository'];
+    expect(at).toBeGreaterThan(0);
+    useGame.getState().award('repository');
+    expect(useGame.getState().save.achievements['repository']).toBe(at);
   });
 });

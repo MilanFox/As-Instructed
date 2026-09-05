@@ -7,7 +7,13 @@
  * three "after a work order closes" hooks fire (docs/LIBRARY.md §6).
  */
 import type { Medal } from '../engine/index.ts';
-import type { LevelFacts, MetaHost, MetaRunner, RegressionTarget, RunnerLike } from '../meta/index.ts';
+import type {
+  LevelFacts,
+  MetaHost,
+  MetaRunner,
+  RegressionTarget,
+  RunnerLike,
+} from '../meta/index.ts';
 import { createMetaRunner, prepareLibrary, useLibrary } from '../meta/index.ts';
 import { emptyProgress } from '../game/save.ts';
 import { unlockedHardware, useGame } from '../game/store.ts';
@@ -160,6 +166,28 @@ export function mountLibrary(runner: RuntimeRunner): () => void {
 
   const unsubscribeLibrary = useLibrary.subscribe((state, previous) => {
     if (state.save.source !== previous.save.source) void installTypes();
+
+    /*
+     * Two commendations the campaign cannot see for itself.
+     *
+     * Publishing the first shared subroutine and getting a whole regression pass back clean are
+     * both real moments, and both happen entirely inside `src/meta`. They are recognised here
+     * rather than there, because the metagame does not know the campaign exists and should not
+     * start now.
+     */
+    if (state.save.published.length > previous.save.published.length) {
+      useGame.getState().award('repository');
+    }
+    const summary = state.suite?.summary;
+    if (
+      summary &&
+      state.suite !== previous.suite &&
+      summary.total > 0 &&
+      summary.broken === 0 &&
+      !state.suite?.run.cancelled
+    ) {
+      useGame.getState().award('no-regressions');
+    }
   });
 
   // The offer waits for the report to be dismissed: two modals at once is one modal too many.
@@ -182,7 +210,9 @@ export function mountLibrary(runner: RuntimeRunner): () => void {
     if (!state.showResults && previous.showResults && pending) {
       const offer = pending;
       pending = null;
-      useLibrary.getState().offerPublish(offer.levelId, offer.code, unlockedHardware(offer.levelId));
+      useLibrary
+        .getState()
+        .offerPublish(offer.levelId, offer.code, unlockedHardware(offer.levelId));
     }
   });
 

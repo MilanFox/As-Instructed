@@ -30,6 +30,26 @@ describe('medalFor', () => {
   it('is none when the run did not pass, however fast', () => {
     expect(medalFor(false, 1, 6)).toBe(Medal.None);
   });
+
+  it('lands exactly on the silver bound when par * 1.25 is not an integer', () => {
+    // par 10 -> silver up to 12.5, so 12 is silver and 13 is bronze.
+    expect(medalFor(true, 12, 10)).toBe(Medal.Silver);
+    expect(medalFor(true, 13, 10)).toBe(Medal.Bronze);
+    // par 7 -> silver up to 8.75.
+    expect(medalFor(true, 8, 7)).toBe(Medal.Silver);
+    expect(medalFor(true, 9, 7)).toBe(Medal.Bronze);
+  });
+
+  /**
+   * DESIGN.md §7: the medal is ticks and nothing else. Character count is not an axis, has no par
+   * to clear, and cannot move a medal in either direction. This test is the guard on that.
+   */
+  it('takes only ticks, par and the pass — there is no third argument', () => {
+    expect(medalFor.length).toBe(3);
+    const golfed = medalFor(true, 6, 6);
+    const verbose = medalFor(true, 6, 6);
+    expect(golfed).toBe(verbose);
+  });
 });
 
 describe('points', () => {

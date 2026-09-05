@@ -10,7 +10,7 @@
 import { Medal } from '../engine/index.ts';
 
 export const SAVE_KEY = 'bootstrap.save';
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 export interface LevelProgress {
   /** The player's source, exactly as last typed. Sacred. */
@@ -20,6 +20,10 @@ export interface LevelProgress {
   /** Bonus objective ids ever met on this level. */
   stars: string[];
   bestTicks?: number;
+  /**
+   * Shortest source ever submitted for this order. Kept because a save must never lose a number a
+   * past build wrote — but it is **not** scored, ranked, or compared to anything. DESIGN.md §7.
+   */
   bestChars?: number;
   attempts: number;
   /** Epoch ms of the first passing run. */
@@ -39,6 +43,29 @@ export interface Settings {
   speed: number;
   /** Console line cap. */
   consoleCap: number;
+  /**
+   * Whether the run report escalates or arrives all at once.
+   *
+   * Off is a first-class choice, not a degraded one: a player on their fortieth work order has
+   * seen the objectives tick off and does not need to see it again. `prefers-reduced-motion`
+   * forces the same behaviour without touching this flag, so the OS setting and the player's
+   * setting never fight over which one wins.
+   */
+  celebrations: boolean;
+}
+
+/**
+ * Campaign-wide counters. Nothing here is ever spent, deducted, or shown as a penalty — a failed
+ * run costs the player time and nothing else (`fails` exists to celebrate persistence, not to
+ * scold), which is the whole reason it is safe to count them.
+ */
+export interface CampaignStats {
+  runs: number;
+  passes: number;
+  fails: number;
+  /** Work orders closed in a row with no failed run in between. Reset by a failure, never by time. */
+  streak: number;
+  bestStreak: number;
 }
 
 export interface SaveFile {
@@ -46,16 +73,33 @@ export interface SaveFile {
   updatedAt: number;
   levels: Record<string, LevelProgress>;
   settings: Settings;
+  /** Commendation id to the epoch ms it was earned. Append-only; nothing here is ever removed. */
+  achievements: Record<string, number>;
+  stats: CampaignStats;
+  /** Hardware names whose requisition note has already been signed for. */
+  seenRequisitions: string[];
 }
 
 export const DEFAULT_LAYOUT: Layout = { editorFraction: 0.44, viewportFraction: 0.58 };
+
+export function emptyStats(): CampaignStats {
+  return { runs: 0, passes: 0, fails: 0, streak: 0, bestStreak: 0 };
+}
 
 export function emptySave(): SaveFile {
   return {
     version: SAVE_VERSION,
     updatedAt: Date.now(),
     levels: {},
-    settings: { layout: { ...DEFAULT_LAYOUT }, speed: 1, consoleCap: 2000 },
+    settings: {
+      layout: { ...DEFAULT_LAYOUT },
+      speed: 1,
+      consoleCap: 2000,
+      celebrations: true,
+    },
+    achievements: {},
+    stats: emptyStats(),
+    seenRequisitions: [],
   };
 }
 
@@ -83,7 +127,49 @@ const MIGRATIONS: Record<number, Migration> = {
     levels: rescueLevels(raw),
     settings: emptySave().settings,
   }),
+  /*
+   * Commendations, streaks and requisition history arrive in version 2.
+   *
+   * A version 1 save has closed work orders but no record of *how* they were closed, so the
+   * commendations that can be reconstructed honestly are reconstructed and the rest are simply not
+   * awarded. Handing a returning player fifteen commendations for runs nobody watched would be
+   * worth less than earning one, and pretending we know their streak would be a lie.
+   */
+  1: (raw) => ({
+    ...raw,
+    version: 2,
+    achievements: reconstructAchievements(rescueLevels(raw)),
+    stats: reconstructStats(rescueLevels(raw)),
+    seenRequisitions: [],
+  }),
 };
+
+/**
+ * The commendations a version 1 save can prove. `medal` and `clearedAt` are the only two fields
+ * that survived, so this awards exactly the two that follow from them and nothing else.
+ */
+function reconstructAchievements(levels: Record<string, LevelProgress>): Record<string, number> {
+  const earned: Record<string, number> = {};
+  for (const progress of Object.values(levels)) {
+    if (!progress.completed) continue;
+    const at = progress.clearedAt ?? Date.now();
+    earned['filed'] = Math.min(earned['filed'] ?? at, at);
+    if (progress.medal === Medal.Gold) {
+      earned['within-budget'] = Math.min(earned['within-budget'] ?? at, at);
+    }
+  }
+  return earned;
+}
+
+function reconstructStats(levels: Record<string, LevelProgress>): CampaignStats {
+  const stats = emptyStats();
+  for (const progress of Object.values(levels)) {
+    stats.runs += progress.attempts;
+    if (progress.completed) stats.passes++;
+  }
+  stats.fails = Math.max(0, stats.runs - stats.passes);
+  return stats;
+}
 
 /** Pulls every recoverable level record out of an unknown blob. Never throws. */
 function rescueLevels(raw: unknown): Record<string, LevelProgress> {
@@ -143,14 +229,49 @@ export function migrate(raw: unknown): SaveFile {
     settings: {
       layout: {
         editorFraction: clampFraction(layout['editorFraction'], DEFAULT_LAYOUT.editorFraction),
-        viewportFraction: clampFraction(layout['viewportFraction'], DEFAULT_LAYOUT.viewportFraction),
+        viewportFraction: clampFraction(
+          layout['viewportFraction'],
+          DEFAULT_LAYOUT.viewportFraction,
+        ),
       },
       speed: isPositive(settings['speed']) ? settings['speed'] : base.settings.speed,
       consoleCap: isPositive(settings['consoleCap'])
         ? settings['consoleCap']
         : base.settings.consoleCap,
+      celebrations: settings['celebrations'] !== false,
     },
+    achievements: rescueAchievements(working['achievements']),
+    stats: rescueStats(working['stats']),
+    seenRequisitions: rescueStrings(working['seenRequisitions']),
   };
+}
+
+/** Commendations are timestamps. A junk value still counts as earned, dated now. */
+function rescueAchievements(raw: unknown): Record<string, number> {
+  if (!isRecord(raw)) return {};
+  const earned: Record<string, number> = {};
+  for (const [id, at] of Object.entries(raw)) {
+    if (typeof id !== 'string' || id.length === 0) continue;
+    earned[id] = isPositive(at) ? at : Date.now();
+  }
+  return earned;
+}
+
+function rescueStats(raw: unknown): CampaignStats {
+  const stats = emptyStats();
+  if (!isRecord(raw)) return stats;
+  if (isPositive(raw['runs'])) stats.runs = raw['runs'];
+  if (isPositive(raw['passes'])) stats.passes = raw['passes'];
+  if (isPositive(raw['fails'])) stats.fails = raw['fails'];
+  if (isPositive(raw['streak'])) stats.streak = raw['streak'];
+  if (isPositive(raw['bestStreak'])) stats.bestStreak = raw['bestStreak'];
+  stats.bestStreak = Math.max(stats.bestStreak, stats.streak);
+  return stats;
+}
+
+function rescueStrings(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return [...new Set(raw.filter((value): value is string => typeof value === 'string'))];
 }
 
 // ---------------------------------------------------------------------------
@@ -204,14 +325,46 @@ export function exportSave(save: SaveFile): string {
   return JSON.stringify({ ...save, version: SAVE_VERSION }, null, 2);
 }
 
-/** Import replaces settings but merges levels, keeping the better result on each side. */
+/**
+ * Import replaces settings but merges levels, keeping the better result on each side.
+ *
+ * Commendations, counters and requisition history merge the same way progress does: a
+ * commendation earned on either side is earned, dated from whichever side earned it first. An
+ * import can raise a total. It can never lower one.
+ */
 export function importSave(current: SaveFile, text: string): SaveFile {
   const incoming = parseSave(text);
   const levels: Record<string, LevelProgress> = { ...current.levels };
   for (const [id, next] of Object.entries(incoming.levels)) {
     levels[id] = mergeProgress(current.levels[id], next);
   }
-  return { ...incoming, levels, version: SAVE_VERSION, updatedAt: Date.now() };
+
+  const achievements: Record<string, number> = { ...current.achievements };
+  for (const [id, at] of Object.entries(incoming.achievements)) {
+    const existing = achievements[id];
+    achievements[id] = existing === undefined ? at : Math.min(existing, at);
+  }
+
+  return {
+    ...incoming,
+    levels,
+    achievements,
+    stats: mergeStats(current.stats, incoming.stats),
+    seenRequisitions: [...new Set([...current.seenRequisitions, ...incoming.seenRequisitions])],
+    version: SAVE_VERSION,
+    updatedAt: Date.now(),
+  };
+}
+
+/** The live streak comes from the incoming save — it is the one describing the more recent play. */
+export function mergeStats(current: CampaignStats, next: CampaignStats): CampaignStats {
+  return {
+    runs: Math.max(current.runs, next.runs),
+    passes: Math.max(current.passes, next.passes),
+    fails: Math.max(current.fails, next.fails),
+    streak: next.streak,
+    bestStreak: Math.max(current.bestStreak, next.bestStreak, next.streak),
+  };
 }
 
 /** Keeps the better of two records. Incoming code wins, because import is an explicit act. */

@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import type { Trace } from '../../engine/index.ts';
 import { replayTo } from '../../engine/index.ts';
 import { currentLevel, levelUsesFuel, useGame } from '../../game/store.ts';
-import { countChars } from '../../game/score.ts';
 import { FuelGauge } from '../components/FuelGauge.tsx';
 
 interface ObjectiveRow {
@@ -32,7 +31,6 @@ export function ObjectiveRail(): React.JSX.Element {
   const verdict = useGame((state) => state.verdict);
   const trace = useGame((state) => state.trace);
   const tick = useGame((state) => state.tick);
-  const code = useGame((state) => state.code);
 
   const flooredTick = Math.floor(tick);
   const live = useMemo(() => stateAtTick(trace, flooredTick), [trace, flooredTick]);
@@ -69,7 +67,6 @@ export function ObjectiveRail(): React.JSX.Element {
 
   if (!level) return <div className="panel rail" />;
 
-  const chars = countChars(code);
   const ticks = verdict?.stats.ticks;
   const met = rows.filter((row) => !row.bonus && row.met).length;
   const total = rows.filter((row) => !row.bonus).length;
@@ -117,12 +114,6 @@ export function ObjectiveRail(): React.JSX.Element {
             }
           >
             {ticks ?? '—'} / {level.par.ticks}
-          </span>
-        </div>
-        <div className="par-row">
-          <span className="par-row__label">chars</span>
-          <span className={chars <= level.par.chars ? 'par-row__value--good' : 'par-row__value--over'}>
-            {chars} / {level.par.chars}
           </span>
         </div>
         <div className="par-row">

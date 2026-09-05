@@ -8,7 +8,7 @@
  * makes a wedged worker survivable (DESIGN.md §10.6).
  */
 import { create } from 'zustand';
-import type { PrintEvent, Trace, Verdict , Medal} from '../engine/index.ts';
+import type { PrintEvent, Trace, Verdict, Medal } from '../engine/index.ts';
 import { evaluateObjectives, replayTo, reviveTrace, usesFuel } from '../engine/index.ts';
 import type { PerSeedResult, RuntimeFailure } from '../runtime/protocol.ts';
 import { WORKER_TIMEOUT_MS } from '../runtime/protocol.ts';
@@ -16,6 +16,8 @@ import type { LevelDef } from '../levels/index.ts';
 import { campaignOrder, getLevel, hardwareUnlockedBy, nextLevel } from '../levels/index.ts';
 import type { RendererPort, RunnerPort } from './ports.ts';
 import { FakeRenderer, FakeRunner } from './ports.ts';
+import type { RunFacts } from './achievements.ts';
+import { earnedBy, isSenseBudget } from './achievements.ts';
 import type { LevelProgress, SaveFile } from './save.ts';
 import { emptyProgress, importSave, loadSave, mergeProgress, writeSave } from './save.ts';
 import { countChars, medalFor } from './score.ts';
@@ -61,6 +63,24 @@ export interface GameState {
   failure: RuntimeFailure | null;
   /** Result of the most recent completed run, gating the results overlay. */
   showResults: boolean;
+  /**
+   * Bumped every time a report is raised. The report's flavour line is picked from this rather
+   * than re-picked on render, so the wording holds still while it is being read.
+   */
+  resultId: number;
+  /** How many runs have failed this session. Rotates the failure copy so it never repeats. */
+  failureCursor: number;
+  /** Commendations this run earned for the first time. Shown once, in the report. */
+  freshCommendations: string[];
+  /** Set when the run beat the player's own recorded tick count on this work order. */
+  personalBest: { previous: number; now: number } | null;
+  /**
+   * Hardware delivered with the open work order that the player has not signed for yet.
+   *
+   * Getting `scan()` is a bigger moment than closing the work order that grants it, and it used to
+   * be a line in a brief. It is now a delivery, and it waits until the workspace is actually open.
+   */
+  requisition: { levelId: string; hardware: string[] } | null;
 
   tick: number;
   endTick: number;
@@ -92,6 +112,10 @@ export interface GameState {
   cancel(): void;
   dismissResults(): void;
   advanceToNextLevel(): void;
+  signRequisition(): void;
+  setCelebrations(on: boolean): void;
+  /** Records a commendation raised outside a run — the Repository's, mostly. Idempotent. */
+  award(id: string): void;
 
   seek(tick: number): void;
   step(delta: number): void;
@@ -126,7 +150,10 @@ function withBonus(level: LevelDef, verdict: Verdict, trace: Trace): Verdict {
       trace: revived,
       initialWorld: revived.initialWorld,
     };
-    return { ...verdict, objectives: [...verdict.objectives, ...evaluateObjectives(missing, context)] };
+    return {
+      ...verdict,
+      objectives: [...verdict.objectives, ...evaluateObjectives(missing, context)],
+    };
   } catch {
     return verdict;
   }
@@ -134,6 +161,11 @@ function withBonus(level: LevelDef, verdict: Verdict, trace: Trace): Verdict {
 
 let lineId = 0;
 let watchdog: ReturnType<typeof setTimeout> | null = null;
+
+/** Moves the bot attempted and did not get. The elegant-solve commendation hangs on this being 0. */
+function blockedMoveCount(trace: Trace): number {
+  return trace.events.filter((event) => event.kind === 'move' && !event.ok).length;
+}
 
 function firstLevelId(): string | null {
   return campaignOrder()[0]?.id ?? null;
@@ -169,6 +201,32 @@ export const useGame = create<GameState>((set, get) => {
     set({ runState: 'idle', ...patch });
   }
 
+  /**
+   * The state a report raised by a run that never produced a verdict carries.
+   *
+   * `failureCursor` advances on every failure and nothing else, which is what stops the flavour
+   * line repeating while somebody debugs the same loop for the ninth time.
+   *
+   * The streak survives this. A program that did not compile was never dispatched, and the copy
+   * says so in as many words — breaking a five-order streak on a missing semicolon would be a
+   * penalty, and this game does not have those. A run that reached the simulator and failed there
+   * does reset it, in `recordResult`.
+   */
+  function failedReport(): Partial<GameState> {
+    const save = get().save;
+    persist({
+      ...save,
+      stats: { ...save.stats, runs: save.stats.runs + 1, fails: save.stats.fails + 1 },
+    });
+    return {
+      showResults: true,
+      resultId: get().resultId + 1,
+      failureCursor: get().failureCursor + 1,
+      freshCommendations: [],
+      personalBest: null,
+    };
+  }
+
   return {
     screen: 'levels',
     currentLevelId: startLevel,
@@ -184,6 +242,11 @@ export const useGame = create<GameState>((set, get) => {
     failedSeed: null,
     failure: null,
     showResults: false,
+    resultId: 0,
+    failureCursor: 0,
+    freshCommendations: [],
+    personalBest: null,
+    requisition: null,
 
     tick: 0,
     endTick: 0,
@@ -239,6 +302,9 @@ export const useGame = create<GameState>((set, get) => {
       get().renderer().setTrace(null);
       get().runner().prepare(levelId);
       clearWatchdog();
+      const undelivered = level.hardware.filter(
+        (name) => !get().save.seenRequisitions.includes(name),
+      );
       set({
         screen: 'workspace',
         currentLevelId: levelId,
@@ -252,6 +318,9 @@ export const useGame = create<GameState>((set, get) => {
         failedSeed: null,
         failure: null,
         showResults: false,
+        freshCommendations: [],
+        personalBest: null,
+        requisition: undelivered.length > 0 ? { levelId, hardware: undelivered } : null,
         tick: 0,
         endTick: 0,
         console: [],
@@ -282,7 +351,10 @@ export const useGame = create<GameState>((set, get) => {
       set({ docsOpen: open });
     },
     setLayout(patch) {
-      const settings = { ...get().save.settings, layout: { ...get().save.settings.layout, ...patch } };
+      const settings = {
+        ...get().save.settings,
+        layout: { ...get().save.settings.layout, ...patch },
+      };
       persist({ ...get().save, settings });
     },
 
@@ -306,11 +378,17 @@ export const useGame = create<GameState>((set, get) => {
         traceSeed: null,
         failedSeed: null,
         showResults: false,
+        freshCommendations: [],
+        personalBest: null,
         console: [],
         suppressed: 0,
       });
       pushLines([
-        { t: 0, kind: 'system', text: `run ${level.id} — ${level.seeds.length} seed${level.seeds.length === 1 ? '' : 's'}` },
+        {
+          t: 0,
+          kind: 'system',
+          text: `run ${level.id} — ${level.seeds.length} seed${level.seeds.length === 1 ? '' : 's'}`,
+        },
       ]);
 
       clearWatchdog();
@@ -318,9 +396,10 @@ export const useGame = create<GameState>((set, get) => {
         finishRun(token, {
           failure: {
             kind: 'timeout',
-            message: 'Your program did not halt. We stopped it. We would like this noted on the record.',
+            message:
+              'Your program did not halt. We stopped it. We would like this noted on the record.',
           },
-          showResults: true,
+          ...failedReport(),
         });
         pushLines([
           { t: 0, kind: 'error', text: 'HALT notice filed. The host did not answer in time.' },
@@ -338,7 +417,7 @@ export const useGame = create<GameState>((set, get) => {
               finishRun(token, {});
               return;
             }
-            finishRun(token, { failure: response.error, showResults: true });
+            finishRun(token, { failure: response.error, ...failedReport() });
             pushLines([{ t: 0, kind: 'error', text: response.error.message }]);
             return;
           }
@@ -351,7 +430,7 @@ export const useGame = create<GameState>((set, get) => {
         })
         .catch((error: unknown) => {
           const message = error instanceof Error ? error.message : String(error);
-          finishRun(token, { failure: { kind: 'runtime', message }, showResults: true });
+          finishRun(token, { failure: { kind: 'runtime', message }, ...failedReport() });
           pushLines([{ t: 0, kind: 'error', text: message }]);
         });
 
@@ -398,26 +477,38 @@ export const useGame = create<GameState>((set, get) => {
           tick: trace.endTick,
           endTick: trace.endTick,
           showResults: true,
+          resultId: get().resultId + 1,
+          ...(verdict.passed ? {} : { failureCursor: get().failureCursor + 1 }),
         });
-        recordResult(levelDef, verdict, medal, chars);
+        recordResult(levelDef, verdict, medal, chars, trace);
       }
 
+      /**
+       * Folds the run into the save, and works out what the player should be told about it.
+       *
+       * Everything read from `previous` is read before the merge, because the personal-best
+       * callout and the commendations are comparisons against the record *as it was* — a merge
+       * that has already lowered `bestTicks` cannot tell you that you lowered it.
+       */
       function recordResult(
         levelDef: LevelDef,
         verdict: Verdict,
         medal: Medal,
         chars: number,
+        trace: Trace,
       ): void {
-        const levels = { ...get().save.levels };
+        const state = get();
+        const levels = { ...state.save.levels };
         const previous = levels[levelDef.id] ?? emptyProgress();
         const bonusIds = (levelDef.bonus ?? []).map((objective) => objective.id);
         const earned = verdict.objectives
           .filter((objective) => objective.met && bonusIds.includes(objective.id))
           .map((objective) => objective.id);
+        const attempt = previous.attempts + 1;
 
         const next: LevelProgress = mergeProgress(previous, {
           ...previous,
-          attempts: previous.attempts + 1,
+          attempts: attempt,
           completed: previous.completed || verdict.passed,
           medal: verdict.passed ? medal : previous.medal,
           stars: verdict.passed ? [...previous.stars, ...earned] : previous.stars,
@@ -425,9 +516,67 @@ export const useGame = create<GameState>((set, get) => {
           ...(verdict.passed && !previous.clearedAt ? { clearedAt: Date.now() } : {}),
           code: get().code,
         });
-        next.attempts = previous.attempts + 1;
+        next.attempts = attempt;
         levels[levelDef.id] = next;
-        persist({ ...get().save, levels });
+
+        /*
+         * A failed run resets the streak and costs nothing else. It does not touch the medal, the
+         * best time, the stars, or a single commendation already earned. That is the whole
+         * penalty model of this game and it is deliberate.
+         */
+        const stats = { ...state.save.stats, runs: state.save.stats.runs + 1 };
+        if (verdict.passed) {
+          stats.passes += 1;
+          if (!previous.completed) {
+            stats.streak += 1;
+            stats.bestStreak = Math.max(stats.bestStreak, stats.streak);
+          }
+        } else {
+          stats.fails += 1;
+          stats.streak = 0;
+        }
+
+        const worldMedals = campaignOrder()
+          .filter((candidate) => candidate.world === levelDef.world)
+          .map((candidate) => (levels[candidate.id] ?? emptyProgress()).medal);
+
+        const facts: RunFacts = {
+          passed: verdict.passed,
+          medal,
+          ticks: verdict.stats.ticks,
+          parTicks: levelDef.par.ticks,
+          attempt,
+          blockedMoves: blockedMoveCount(trace),
+          stars: earned.length,
+          senseBudgetMet: verdict.objectives.some(
+            (objective) => objective.met && isSenseBudget(objective.id),
+          ),
+          ...(previous.bestTicks !== undefined ? { previousBestTicks: previous.bestTicks } : {}),
+          streak: stats.streak,
+          worldMedals,
+        };
+
+        const achievements = { ...state.save.achievements };
+        const fresh: string[] = [];
+        const now = Date.now();
+        for (const id of earnedBy(facts)) {
+          if (achievements[id] !== undefined) continue;
+          achievements[id] = now;
+          fresh.push(id);
+        }
+
+        const beaten =
+          verdict.passed &&
+          previous.bestTicks !== undefined &&
+          verdict.stats.ticks < previous.bestTicks;
+
+        set({
+          freshCommendations: fresh,
+          personalBest: beaten
+            ? { previous: previous.bestTicks as number, now: verdict.stats.ticks }
+            : null,
+        });
+        persist({ ...get().save, levels, stats, achievements });
       }
     },
 
@@ -456,6 +605,28 @@ export const useGame = create<GameState>((set, get) => {
       else get().goto('levels');
     },
 
+    signRequisition() {
+      const pending = get().requisition;
+      set({ requisition: null });
+      if (!pending) return;
+      const seen = [...new Set([...get().save.seenRequisitions, ...pending.hardware])];
+      persist({ ...get().save, seenRequisitions: seen });
+    },
+
+    setCelebrations(on) {
+      persist({
+        ...get().save,
+        settings: { ...get().save.settings, celebrations: on },
+      });
+    },
+
+    award(id) {
+      const save = get().save;
+      if (save.achievements[id] !== undefined) return;
+      persist({ ...save, achievements: { ...save.achievements, [id]: Date.now() } });
+      set({ freshCommendations: [...get().freshCommendations, id] });
+    },
+
     seek(tick) {
       const clamped = Math.max(0, Math.min(get().endTick, tick));
       set({ tick: clamped });
@@ -475,7 +646,9 @@ export const useGame = create<GameState>((set, get) => {
       }
       if (get().tick >= get().endTick) get().seek(0);
       set({ playing: true });
-      get().renderer().play(get().speed * BASE_TICKS_PER_SECOND);
+      get()
+        .renderer()
+        .play(get().speed * BASE_TICKS_PER_SECOND);
     },
 
     pause() {
@@ -496,7 +669,10 @@ export const useGame = create<GameState>((set, get) => {
         get().seek(get().endTick);
         return;
       }
-      if (get().playing) get().renderer().play(speed * BASE_TICKS_PER_SECOND);
+      if (get().playing)
+        get()
+          .renderer()
+          .play(speed * BASE_TICKS_PER_SECOND);
     },
 
     jumpToFailure() {

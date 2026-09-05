@@ -1,7 +1,6 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { currentLevel, useGame } from '../game/store.ts';
 import { CanvasRenderer, RuntimeRunner } from './adapters.ts';
-import { countChars } from '../game/score.ts';
 import { exportSave } from '../game/save.ts';
 import { worldMeta } from '../levels/index.ts';
 // Deep import on purpose: `src/meta/ui/index.ts` also re-exports `LibraryPanel`, which pulls
@@ -14,6 +13,7 @@ import { useKeyboard } from './hooks/useKeyboard.ts';
 import { AudioSettings } from './screens/AudioSettings.tsx';
 import { LevelSelect } from './screens/LevelSelect.tsx';
 import { PerformanceReview } from './screens/PerformanceReview.tsx';
+import { Requisition } from './screens/Requisition.tsx';
 import { Results } from './screens/Results.tsx';
 import './styles/fonts.css';
 import './styles/app.css';
@@ -63,6 +63,8 @@ export function App(): React.JSX.Element {
       ) : null}
       <Results />
       <PublishDialog />
+      {/* Last, so the delivery note stacks above a publish offer raised by the same transition. */}
+      <Requisition />
     </div>
   );
 }
@@ -75,7 +77,6 @@ function TopBar(): React.JSX.Element {
   const goto = useGame((state) => state.goto);
   const setPanel = useGame((state) => state.setPanel);
   const panel = useGame((state) => state.brief);
-  const code = useGame((state) => state.code);
   const verdict = useGame((state) => state.verdict);
   const save = useGame((state) => state.save);
   const importSaveFile = useGame((state) => state.importSaveFile);
@@ -83,7 +84,6 @@ function TopBar(): React.JSX.Element {
   const [sound, setSound] = useState(false);
 
   const running = runState === 'running';
-  const chars = countChars(code);
   const ticks = verdict?.stats.ticks;
   const world = level ? worldMeta(level.world) : undefined;
 
@@ -136,13 +136,6 @@ function TopBar(): React.JSX.Element {
             >
               {ticks ?? '—'}
               <span className="stat__par"> / {level.par.ticks}</span>
-            </span>
-          </span>
-          <span className="stat">
-            <span className="stat__label">chars</span>
-            <span className={`stat__value${chars > level.par.chars ? ' stat__value--over' : ''}`}>
-              {chars}
-              <span className="stat__par"> / {level.par.chars}</span>
             </span>
           </span>
         </div>

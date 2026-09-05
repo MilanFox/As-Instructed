@@ -69,8 +69,8 @@ export function EditorPanel(): React.JSX.Element {
     editor.focus();
   };
 
+  // A count, not a target. Nothing scores, ranks, or nags about it. DESIGN.md §7.
   const chars = useMemo(() => countChars(code), [code]);
-  const overPar = level ? chars > level.par.chars : false;
 
   return (
     <section className="panel" aria-label="Program">
@@ -129,9 +129,7 @@ export function EditorPanel(): React.JSX.Element {
           {problems === 0 ? 'no problems' : `${problems} problem${problems === 1 ? '' : 's'}`}
         </span>
         <span>·</span>
-        <span style={overPar ? { color: 'var(--accent-2)' } : undefined}>
-          {chars} chars{level ? ` / par ${level.par.chars}` : ''}
-        </span>
+        <span>{chars} chars</span>
         <span className="panel__head-spacer" />
         <span>{runState === 'running' ? 'running…' : 'ctrl+enter to run'}</span>
       </footer>

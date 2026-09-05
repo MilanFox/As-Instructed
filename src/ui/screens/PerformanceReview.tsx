@@ -113,11 +113,6 @@ function ticksLine(row: ScopeRow): string {
   return best === undefined ? '—' : `${best} / ${row.level.par.ticks}`;
 }
 
-function charsLine(row: ScopeRow): string {
-  const best = row.progress.bestChars;
-  return best === undefined ? '—' : `${best} / ${row.level.par.chars}`;
-}
-
 export function PerformanceReview(): JSX.Element {
   const save = useGame((state) => state.save);
   const goto = useGame((state) => state.goto);
@@ -304,9 +299,6 @@ export function PerformanceReview(): JSX.Element {
                     TICKS / PAR
                   </th>
                   <th scope="col" className="wall__num">
-                    CHARS / PAR
-                  </th>
-                  <th scope="col" className="wall__num">
                     PTS
                   </th>
                 </tr>
@@ -338,7 +330,6 @@ export function PerformanceReview(): JSX.Element {
                       {starsFor(row.level.bonus, row.progress.stars)}/{row.level.bonus?.length ?? 0}
                     </td>
                     <td className="wall__num numeric">{ticksLine(row)}</td>
-                    <td className="wall__num numeric">{charsLine(row)}</td>
                     <td className="wall__num numeric">
                       {row.points}/{row.maxPoints}
                     </td>

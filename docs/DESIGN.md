@@ -162,7 +162,7 @@ interface Verdict {
   passed: boolean;
   objectives: { id: string; label: string; met: boolean; progress?: [number, number] }[];
   failure?: { code: FailureCode; message: string; at?: Vec; line?: number };
-  stats: { ticks: number; ops: number; chars: number; seeds: number };
+  stats: { ticks: number; ops: number; chars: number; seeds: number };  // chars: not scored, §7
 }
 ```
 
@@ -179,7 +179,7 @@ interface LevelDef {
   build(seed: number): World;    // must be pure & deterministic given seed
   objectives: Objective[];       // evaluated against final world + trace
   seeds: number[];               // ALL must pass. length > 1 => generalization required
-  par: { ticks: number; chars: number };
+  par: { ticks: number; chars: number };   // chars is retained but never scored — see §7
   starter: string;               // pre-filled editor content
   hints: string[];               // progressive, NEVER a full solution
   docs?: string[];               // extra doc page ids to surface
@@ -193,8 +193,9 @@ Rules for level authors:
   These are **test fixtures only**, excluded from the production bundle by
   `vite.config.ts` and never reachable from the UI. Vitest asserts every level is solvable
   on every seed and that the reference solution's tick count is `<= par.ticks`.
-- `par` must be *achievable but tight*: aim for reference solution ticks, then subtract ~10%
-  so that a clever player is rewarded.
+- `par.ticks` must be *achievable but tight*: aim for reference solution ticks, then subtract
+  ~10% so that a clever player is rewarded. `par.chars` is carried for historical reasons and is
+  not scored (§7); do not tune it and do not surface it.
 - `hints` are nudges ("What happens if the field is empty when you arrive?"), never code.
 
 ## 6. Progression — 8 Worlds
@@ -217,12 +218,40 @@ level where you install the sensor. Each world's finale is a bigger multi-object
 
 ## 7. Scoring
 
-- **Ticks** (primary): `max(bot.clock)`. Medal thresholds: `<= par` gold, `<= par*1.25` silver,
-  pass = bronze.
-- **Chars** (secondary): source length after stripping comments and leading whitespace.
-- **Bonus objectives**: extra star.
-- Per-level and per-world medal totals. A "Performance Review" screen from management summarizes
-  your medals with escalating passive aggression.
+**Medals are ticks-only.** `max(bot.clock)` against `par.ticks`: `<= par` gold, `<= par * 1.25`
+silver, a pass is bronze. Nothing else moves a medal.
+
+- **Ticks** (the medal axis): `max(bot.clock)`.
+- **The information budget**: `Objectives.withinSenses(name, n)`. Sensing stays free in ticks;
+  a level may make it *countable*. Rewards understanding, not typing.
+- **Bonus objectives**: extra star. Weights unchanged (§11 A4): gold 3, silver 2, bronze 1,
+  star +1, so the Performance Review tiers in `NARRATIVE.md` §7 are unaffected.
+
+**`par.chars` is not scored.** It stays in `LevelDef` so level data does not churn, but it must
+not appear in medal maths, in a ranking, in a target, or as anything the UI colours or compares.
+Character count may appear at most as a quiet neutral stat next to the editor. `LevelProgress`
+keeps `bestChars` so no past save loses a number, and nothing reads it.
+
+Code golf is not a skill this game rewards. A verbose readable solution and a terse one that take
+the same number of ticks get the same medal, deliberately.
+
+### 7.1 Rewards
+
+The reward systems are `src/game/achievements.ts` (commendations) and the `stats` block in
+`src/game/save.ts` (runs, passes, fails, streak, best streak).
+
+- **Nothing is gated behind a commendation**, ever. No level, hint, doc page, or hardware.
+- **Requirements are public before they are met.** No secret achievements.
+- **Failure costs nothing but time.** No penalty, no lost progress, no downgraded medal. A failed
+  run resets the streak and increments a counter that exists only to reward persistence. A
+  program that did not compile was never dispatched and does not even do that.
+- **Hardware unlocks are a ceremony.** `Requisition` shows each new command once, with what it
+  does and what it opens up. `seenRequisitions` in the save makes it once, ever.
+- **Everything that plays on completion is skippable**: `prefers-reduced-motion` collapses it,
+  `settings.celebrations` turns it off permanently, and a click finishes it immediately.
+
+Per-level and per-world medal totals feed a "Performance Review" screen from management, which
+summarizes your medals with escalating passive aggression.
 
 ## 8. Visual Language
 

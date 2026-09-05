@@ -860,8 +860,35 @@ popping. The company is impressed and slightly inconvenienced by that.
 ### Bonus objective
 11. Bonus met. There is no bonus. There is a star.
 
-### Character record
-12. Shortest program on record for this order. Legal asked. It is allowed.
+### Personal best (beat your own recorded tick count)
+12. Your own figure, lowered by [n]. The old figure has been retained.
+
+> **Retired.** There was a "character record" line here. Medals are ticks-only (DESIGN.md §7) and
+> nothing in the game scores, ranks, or remarks on how short a program is. Do not reinstate it.
+
+---
+
+## 6a. Commendations
+
+The commendation titles and notes live in `src/game/achievements.ts` and follow §1.2 exactly: a
+flat statement, then a flatter qualifier. They are read once each, in the run report, and then
+forever on the site map's shelf, so they are written to survive re-reading.
+
+Two rules on top of the voice guide:
+
+- **Never congratulate the player directly.** The company notices a number moved. That is all it
+  ever notices. "Gold. Finance have asked whether the budget was set correctly. It was."
+- **Never imply an unearned one is a failure.** Unearned commendations show their requirement in
+  plain language, in `--ink-dim`. They are an invitation, not a scoreboard.
+
+### Hardware requisitions
+
+Each new command arrives as a delivery note, once ever. The format is: Procurement header, a Vance
+intro (§1.2 cadence), one card per item, then Dot. The card has two lines and they are in
+different registers on purpose:
+
+- `spec` — **clean and factual, §0 applies.** It is documentation. No jokes.
+- `opens` — one sentence on what having it changes. Brief register. This is where the beat lands.
 
 ---
 
@@ -871,7 +898,9 @@ Shown per world and cumulatively (DESIGN.md §7). Tier is chosen by **medal poin
 percentage of medal points available** in the scope being reviewed, so the same five tiers work
 for one world or for all forty levels.
 
-Points: gold 3, silver 2, bronze 1, bonus star +1.
+Points: gold 3, silver 2, bronze 1, bonus star +1. **Unchanged by the removal of the character
+axis** (DESIGN.md §7) — the medal was always ticks-only in the maths, so every tier threshold
+below still means exactly what it meant.
 
 **The escalation runs upward.** The better you do, the more management feels the need to manage
 it. A weak review is gentle and a little sad; a perfect review is a barely-concealed threat

@@ -7,10 +7,7 @@
  * state machine that runs in Node under Vitest, and nothing in it has to know a speaker exists.
  */
 import { createAudio } from '../audio/index.ts';
-import type { Medal } from '../engine/index.ts';
 import { BASE_TICKS_PER_SECOND, useGame } from '../game/store.ts';
-import type { GameState } from '../game/store.ts';
-import { medalFor } from '../game/score.ts';
 import { getLevel } from '../levels/index.ts';
 import { useLibrary } from '../meta/index.ts';
 
@@ -18,12 +15,6 @@ export const audio = createAudio();
 
 /** Buttons that already have a sound of their own, or that are not really buttons. */
 const SILENT_BUTTONS = '.btn--run, .timeline__scrub, [aria-selected="true"]';
-
-function medalOf(state: GameState): Medal {
-  const level = state.currentLevelId ? getLevel(state.currentLevelId) : undefined;
-  if (!level || !state.verdict) return medalFor(false, 0, 1);
-  return medalFor(state.verdict.passed, state.verdict.stats.ticks, level.par.ticks);
-}
 
 /**
  * Subscribes the audio system to the two stores and to clicks, and returns the teardown.
@@ -36,9 +27,7 @@ export function mountAudio(): () => void {
   const initial = useGame.getState();
   const startLevel = initial.currentLevelId ? getLevel(initial.currentLevelId) : undefined;
   if (startLevel) audio.setWorld(startLevel.world);
-  audio.setSpeed(
-    initial.speed === Infinity ? null : initial.speed * BASE_TICKS_PER_SECOND,
-  );
+  audio.setSpeed(initial.speed === Infinity ? null : initial.speed * BASE_TICKS_PER_SECOND);
 
   const unsubscribeGame = useGame.subscribe((state, previous) => {
     if (state.currentLevelId !== previous.currentLevelId) {
@@ -62,10 +51,13 @@ export function mountAudio(): () => void {
       if (!state.showResults && !state.verdict) audio.ui('cancel');
     }
 
-    if (state.showResults && !previous.showResults) {
-      if (state.failure?.kind === 'compile') audio.ui('compileError');
-      else audio.outcome({ passed: state.verdict?.passed ?? false, medal: medalOf(state) });
-    }
+    /*
+     * The outcome sting is *not* fired here.
+     *
+     * `<Results/>` escalates — objectives tick off, then the medal lands — and the medal sound has
+     * to land with the medal rather than a second before it. The report owns that sequence and
+     * calls `audio.outcome` itself; firing it here as well would play the whole thing twice.
+     */
 
     if (state.brief !== previous.brief) audio.ui('panelOpen');
   });

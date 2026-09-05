@@ -12,6 +12,7 @@ import type { LevelProgress, SaveFile } from '../../game/save.ts';
 import { Medal, levelMaxPoints, levelPoints, starsFor } from '../../game/score.ts';
 import { isLevelUnlocked, useGame } from '../../game/store.ts';
 import { campaignOrder, levelsByWorld } from '../../levels/index.ts';
+import { CommendationShelf } from '../components/CommendationShelf.tsx';
 import type { LevelDef, WorldMeta } from '../../levels/index.ts';
 import '../styles/screens.css';
 
@@ -41,6 +42,11 @@ interface WorldRow {
   closed: number;
   points: number;
   maxPoints: number;
+  gold: number;
+  /** Every issued work order in this world is closed. The sector is done. */
+  complete: boolean;
+  /** Every issued work order in this world is gold. */
+  perfect: boolean;
 }
 
 interface Tally {
@@ -116,7 +122,20 @@ function buildRows(save: SaveFile): WorldRow[] {
       0,
     );
 
-    return { world, nodes, issued, closed, points, maxPoints };
+    const gold = levels.filter((level) => progressOf(save, level.id).medal === Medal.Gold).length;
+    const complete = issued > 0 && closed === issued;
+
+    return {
+      world,
+      nodes,
+      issued,
+      closed,
+      points,
+      maxPoints,
+      gold,
+      complete,
+      perfect: complete && gold === issued,
+    };
   });
 }
 
@@ -179,12 +198,17 @@ function LockGlyph(): JSX.Element {
 
 export function LevelSelect(): JSX.Element {
   const save = useGame((state) => state.save);
+  const stats = useGame((state) => state.save.stats);
   const openLevel = useGame((state) => state.openLevel);
   const goto = useGame((state) => state.goto);
+  const commendations = Object.keys(save.achievements).length;
 
   const rows = useMemo(() => buildRows(save), [save]);
   const tally = useMemo(() => campaignTally(rows), [rows]);
   const flat = useMemo(() => rows.flatMap((row) => row.nodes), [rows]);
+
+  const campaignPercent = tally.issued > 0 ? (tally.closed / tally.issued) * 100 : 0;
+  const campaignStyle: StyleVars = { '--campaign-fill': `${campaignPercent}%` };
 
   const firstStop =
     flat.find((node) => node.isNext) ?? flat.find((node) => node.playable) ?? flat[0];
@@ -249,6 +273,12 @@ export function LevelSelect(): JSX.Element {
             </dd>
           </div>
           <div className="screen-stat">
+            <dt>CLOSED</dt>
+            <dd>
+              {tally.closed}/{tally.issued}
+            </dd>
+          </div>
+          <div className="screen-stat">
             <dt>GOLD</dt>
             <dd className="screen-stat__gold">{tally.gold}</dd>
           </div>
@@ -265,26 +295,40 @@ export function LevelSelect(): JSX.Element {
             <dd>{tally.stars}</dd>
           </div>
           <div className="screen-stat">
-            <dt>ISSUED</dt>
-            <dd>
-              {tally.issued}/{rows.length * WORK_ORDERS_PER_WORLD}
+            <dt>COMMENDATIONS</dt>
+            <dd>{commendations}</dd>
+          </div>
+          <div className="screen-stat">
+            <dt>STREAK</dt>
+            <dd className={stats.streak > 1 ? 'screen-stat__streak' : undefined}>
+              {stats.streak}
+              <span className="screen-stat__best"> · best {stats.bestStreak}</span>
             </dd>
           </div>
         </dl>
 
-        <button
-          type="button"
-          className="screen-btn screen-btn--primary"
-          onClick={() => goto('review')}
-        >
-          PERFORMANCE REVIEW
-        </button>
+        <div className="sitemap__progress">
+          <div className="campaign-bar" style={campaignStyle}>
+            <span className="campaign-bar__fill" />
+          </div>
+          <p className="campaign-bar__caption numeric">
+            {Math.round(campaignPercent)}% of the site closed
+            <span className="campaign-bar__aside"> · {tally.gold} at par or under</span>
+          </p>
+          <button
+            type="button"
+            className="screen-btn screen-btn--primary"
+            onClick={() => goto('review')}
+          >
+            PERFORMANCE REVIEW
+          </button>
+        </div>
       </header>
 
       <div className="sitemap__scroll">
         <div className="sitemap__route" onKeyDown={onKeyDown}>
           {rows.map((row) => {
-            const fill = (row.closed / WORK_ORDERS_PER_WORLD) * 100;
+            const fill = row.issued > 0 ? (row.closed / row.issued) * 100 : 0;
             const style: StyleVars = {
               '--world-accent': row.world.accent,
               '--rail-fill': `${fill}%`,
@@ -293,7 +337,7 @@ export function LevelSelect(): JSX.Element {
             return (
               <section
                 key={row.world.id}
-                className="world"
+                className={row.complete ? 'world world--complete' : 'world'}
                 style={style}
                 aria-label={`World ${row.world.id}, ${row.world.name}`}
               >
@@ -312,9 +356,14 @@ export function LevelSelect(): JSX.Element {
                     {row.maxPoints > 0 ? `${row.points}/${row.maxPoints} pts` : '—/— pts'}
                     <span className="world__issued">
                       {' · '}
-                      {row.issued}/{WORK_ORDERS_PER_WORLD} issued
+                      {row.closed}/{row.issued} closed
                     </span>
                   </p>
+                  {row.complete ? (
+                    <p className={row.perfect ? 'world__stamp world__stamp--gold' : 'world__stamp'}>
+                      {row.perfect ? 'ALL AT PAR' : 'SECTOR NOMINAL'}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="world__track">
@@ -378,6 +427,8 @@ export function LevelSelect(): JSX.Element {
               </section>
             );
           })}
+
+          <CommendationShelf achievements={save.achievements} />
         </div>
       </div>
     </div>
