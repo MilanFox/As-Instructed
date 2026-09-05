@@ -617,3 +617,69 @@ no threshold. **Do not touch it.**
 Three problems the playtests found and the audit missed are in its §18. The largest: both
 testers say the commendation layer changed their behaviour **exactly zero times**, which
 makes deletions cheap and raises whether fifteen commendations should be five.
+
+### 2026-09-05, 16:25 — par recalibration merged (`c36e07f`)
+
+Green at **1389 tests**, tsc / build clean.
+
+**The recorded framing was wrong, and this is the headline: par was never loose.** Measured
+against every reference solution on every seed, **21 of 34 levels have par set to exactly
+the worst seed's cost**; median headroom across the campaign is **0.0%**. There was nothing
+to tighten. A par of 70 on `w1-01` would make gold unreachable by the only program the level
+admits. What the testers felt as generosity was the solution space being a single point.
+
+The decisive measurement was not headroom but a *lazy* versus a *smart* program per level,
+both driven through the harness. `w1-03` is the proof: the idea-free answer **ties** the
+reference exactly, because sensing is free — and the star-earning stride costs *more*.
+
+**World 1: par is not the axis. Nothing moved.** **World 2: raise par, on the two levels
+paying gold for ignoring the level's own hardware** — `w2-01` 18 → 16, `w2-05` 74 → 60, both
+reference solutions rewritten to the route par now rewards. The lazy route still passes every
+seed and now takes **silver with margin**. `w2-02` and `w2-04` measured and left alone.
+
+The evidence for fixing the medal rather than the star: the beginner finished ten ticks over
+par on `w1-05`, knew which ten, and *"did not go back. The reward for doing so is 4 points
+instead of 3."* The veteran's silver-to-gold rewrite on `w2-04` was *"the single best moment
+in my first ninety minutes."*
+
+### On the audit's `graded: false` proposal — principle agreed, scope rejected
+
+The audit picked its set by **par magnitude**; the measured criterion is **can any correct
+program cost fewer ticks than another**. It was right on 4 of 11 and wrong on 7, and it
+missed `w6-03` and `w6-05` entirely. Measured set: **`w1-01`, `w1-03`, `w5-02`, `w6-01`,
+`w6-03`, `w6-05`** — leaving **World 2 graded in full**, the opposite of both the original
+item and the audit's proposal.
+
+`w2-04` fixed the criterion's wording. Ticks cannot tell lapping from waiting there, so the
+clock cannot see the lesson — but it graded both testers at 63 against par 52, and ungrading
+it would delete the best medal event in two playtests. **"The clock cannot see the lesson"
+is not "the clock cannot grade."** Written up as **DESIGN §11 A7** (`958e96e`), my ruling.
+Implementation is blocked: it reaches `ObjectiveRail.tsx` (renderer agent) and `store.ts`,
+`achievements.ts`, `save.ts` (rewards agent).
+
+### The silver-band fact, confirmed and bounded
+
+Silver's band is empty below par 4 (`floor(3 x 1.25) = 3`), which bites **exactly two**
+levels, `w5-02` and `w6-01` — and neither par is a design figure. `w6-01`'s own comment says
+its par is 1 *because the registry test requires a positive par*; the reference costs 0. A
+test now fails if a third appears. Second finding on the way through: **`SILVER_FACTOR` in
+`score.ts` was dead** — nothing read it, the live 1.25 is inline in `medalFor`. Two copies,
+one authoritative: the same shape as the two tick counters and the two character counters
+found earlier today. **That is three duplicated-constant bugs in one day; worth a sweep.**
+
+### In flight
+
+- **Divergence** — the audit's top finding. Also carrying the silver-band widening, the dead
+  `SILVER_FACTOR`, and the two `power()` fact-row deletions.
+- **`w4-02` visited-tile trail**, plus the `DocsPanel` per-level `costs` bug.
+- **Publish gate + Performance Review scoping.**
+
+### Still open, unassigned
+
+- `w1-01` has no bonus and cannot have the obvious one: nothing in a trace distinguishes a
+  loop from 78 `move()` calls, and character count stays deleted. Recorded so it is not
+  re-litigated.
+- CURRICULUM drift on `w2-01`/`w2-05` — `premise`/`world`/`bonus` rows still describe
+  pre-compression versions. Deliberately not folded into the par change.
+- Worlds 3–8 pars unmeasured against the lazy/smart criterion; World 3 already silvers a
+  beginner three times.
