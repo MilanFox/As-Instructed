@@ -1436,8 +1436,13 @@
   }
 }
 
+/*
+ * `.rail` is excluded on purpose. It carries `.panel` too, so it was being handed `flex: 1` here
+ * and taking half the lower panel — a 268px list of short rows sitting in a 400px column, with
+ * the brief paying for it. Its own `width: 268px` up in the objective block is the intent.
+ */
 .workspace__column > .panel,
-.workspace__lower > .panel {
+.workspace__lower > .panel:not(.rail) {
   flex: 1;
   min-height: 0;
 }

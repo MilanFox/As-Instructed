@@ -45,7 +45,7 @@ export function effectiveLayout(saved: Layout, box: WorkspaceBox, gridAspect: nu
   if (box.width <= 0 || box.height <= 0) return saved;
   const viewportFraction =
     saved.viewportFraction === DEFAULT_LAYOUT.viewportFraction
-      ? viewportShare(box.height)
+      ? viewportShare(box, gridAspect)
       : saved.viewportFraction;
   const editorFraction =
     saved.editorFraction === DEFAULT_LAYOUT.editorFraction
@@ -54,16 +54,29 @@ export function effectiveLayout(saved: Layout, box: WorkspaceBox, gridAspect: nu
   return { editorFraction, viewportFraction };
 }
 
-function viewportShare(height: number): number {
-  const detail = Math.min(height * (1 - DEFAULT_LAYOUT.viewportFraction), DETAIL_MAX_H);
-  return clamp(1 - detail / height, 0.25, 0.8);
+function viewportShare(box: WorkspaceBox, gridAspect: number): number {
+  const today = box.height * DEFAULT_LAYOUT.viewportFraction - TIMELINE_H - SPLITTER_PX;
+  const tallest = box.height - DETAIL_MAX_H - TIMELINE_H - SPLITTER_PX;
+  // Height is only worth claiming while the grid can spend it. A 30x3 corridor runs out of rows
+  // long before the window runs out of pixels, and the extra would be the same waste on the other
+  // axis — so it goes back to the brief instead.
+  const useful = widestDetail(box) / Math.max(gridAspect, 0.01);
+  const height = clamp(useful, today, Math.max(today, tallest));
+  return clamp((height + TIMELINE_H + SPLITTER_PX) / box.height, 0.25, 0.8);
+}
+
+/**
+ * The width the old constant already handed the right-hand column. Nothing here ever exceeds it:
+ * a grid wider than it is tall was using that width, and taking it back to tidy up the square
+ * ones would only move the waste.
+ */
+function widestDetail(box: WorkspaceBox): number {
+  return box.width * (1 - DEFAULT_LAYOUT.editorFraction) - SPLITTER_PX;
 }
 
 function editorShare(box: WorkspaceBox, viewportFraction: number, gridAspect: number): number {
   const viewportHeight = box.height * viewportFraction - TIMELINE_H - SPLITTER_PX;
-  // Never wider than the old constant gave it. A grid wider than it is tall was already using
-  // that width, and taking it back to tidy up the square ones would only move the waste.
-  const widest = box.width * (1 - DEFAULT_LAYOUT.editorFraction) - SPLITTER_PX;
+  const widest = widestDetail(box);
   const narrowest = Math.min(DETAIL_MIN_W, widest);
   const detail = clamp(
     viewportHeight * gridAspect,

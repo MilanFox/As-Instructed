@@ -46,10 +46,22 @@ describe('effectiveLayout', () => {
     expect(after.height).toBeGreaterThan(before.height);
   });
 
-  it('leaves a wide corridor level the full width it was already using', () => {
+  it('leaves a wide corridor level exactly the box it was already using', () => {
     const before = viewportBox(DEFAULT_LAYOUT, WIDE);
     const after = viewportBox(effectiveLayout(DEFAULT_LAYOUT, WIDE, 30 / 3), WIDE);
     expect(after.width).toBeCloseTo(before.width, 0);
+    // It has three rows. Height it cannot spend belongs to the brief, not to the background.
+    expect(after.height).toBeCloseTo(before.height, 0);
+  });
+
+  it('never gives the site view less room than the old constants did', () => {
+    for (const box of [LAPTOP, WIDE, { width: 1600, height: 766 }]) {
+      const before = viewportBox(DEFAULT_LAYOUT, box);
+      for (const aspect of [1, 1.25, 1.4, 1.79, 2.4, 4, 10]) {
+        const after = viewportBox(effectiveLayout(DEFAULT_LAYOUT, box, aspect), box);
+        expect(after.height).toBeGreaterThanOrEqual(before.height - 0.5);
+      }
+    }
   });
 
   it('keeps the detail panel and the editor usable on a 13" laptop', () => {
