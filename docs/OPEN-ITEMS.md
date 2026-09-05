@@ -286,3 +286,26 @@ everything as flavour is a failed report.
   If it died, its worktree is under `.claude/worktrees/` and the partial report is usable.
 
 All four earlier agents are merged. Main is at 34 levels, 1398 tests, tsc + build clean.
+
+### In flight (2026-09-05, after the window reset)
+
+Three agents live, disjoint file ownership, none merged:
+
+- **Prose pass** — `worktree-agent-ab499d8682cb03eac`, fanned out into three sub-agents
+  sharding worlds 2–3, 4–5 and 6–7 inside one worktree. Holds **all of `src/levels/**`**,
+  which is why the character-count plumbing removal cannot start yet.
+- **Library moment** — owns `src/meta/**`, `src/ui/library.ts`, `App.tsx`, `src/ui/screens/**`,
+  `src/ui/copy.ts`, `src/ui/components/**`. Told to verify the "six times" claim against the
+  post-cut 34-level order before designing, since the phrasing predates `525ce7a`, and to
+  answer `unlock.ts`'s own argument for the World 3 close rather than ignore it. Any brief
+  change is written to the report as a diff for the orchestrator, not applied.
+  Report: `docs/FIX-LIBRARY-MOMENT.md`.
+- **Viewport aspect** — owns `Workspace.tsx`, `src/ui/panels/**`, `src/render/**`, and the
+  three shared stylesheets. Before/after screenshots at 1440x900 and 2560x1440 are the
+  evidence. Report: `docs/FIX-VIEWPORT.md`.
+
+Verified at the reset: main green at **1398 tests, tsc clean**. All four earlier agents'
+worktrees clean and fully merged — nothing was lost to the window, nothing to salvage.
+
+Housekeeping still open: four merged worktrees and their branches remain on disk, plus
+`wip/wave1-interrupted`. Pruning them was blocked by the permission classifier.
