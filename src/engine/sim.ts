@@ -807,7 +807,17 @@ export class Sim {
     return message;
   }
 
-  /** Creates a new bot on the adjacent tile in `dir`. Returns its id, or -1 if the tile is taken. */
+  /**
+   * Creates a new bot on the adjacent tile in `dir`. Returns its id, or -1 when the tile refuses.
+   *
+   * The refusal is `move`'s, decided by the same `blockReason`, and the answer now rides on the
+   * event as `detail` instead of being computed and dropped. It stays a `-1` rather than a throw
+   * because the tile is transient: the neighbour walks off and the identical call succeeds.
+   *
+   * `blockReason` is asked about arrival at `t + costs.spawn`, not `t + costs.move`, so `canMove`
+   * is the nearest free test but not an exact one — where the two prices differ, a tile another
+   * bot is still vacating can pass `canMove` and refuse the spawn.
+   */
   spawn(botId: number, dir: Dir, options: { name?: string; capacity?: number } = {}): number {
     const parent = this.requireActiveBot(botId);
     const t = parent.clock;
@@ -815,8 +825,18 @@ export class Sim {
     this.requireFuel(parent, dt, 'spawn');
     const at = step(parent.at, dir);
 
-    if (this.blockReason(parent, at, t + dt) !== null) {
-      this.builder.push({ t, botId, dt, kind: 'act', name: 'spawn', at, ok: false });
+    const reason = this.blockReason(parent, at, t + dt);
+    if (reason !== null) {
+      this.builder.push({
+        t,
+        botId,
+        dt,
+        kind: 'act',
+        name: 'spawn',
+        at,
+        ok: false,
+        detail: reason,
+      });
       this.charge(parent, dt);
       return -1;
     }

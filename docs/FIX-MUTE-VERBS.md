@@ -186,3 +186,56 @@ restores the same clock on replay that the live run spent (docs/ENGINE.md §6).
 
 Net **+1 test** (1627 from 1626); three existing tests were rewritten in place rather than added,
 because they asserted the contract that changed.
+
+---
+
+## 3. `spawn()` — the reason it already computed now survives
+
+**Kept on the `-1` side.** The tile is transient: the neighbour walks off and the identical call
+succeeds. `spawn()` still returns the child's id or `-1`, and still costs `costs.spawn` either way.
+
+`spawn()` called `this.blockReason(...)`, used the answer to decide, and then threw it away —
+pushing `{ kind: 'act', name: 'spawn', ok: false }` with no trace of *which* of the three rules
+refused. `move()` makes the identical call and puts `reason` on its event. The `ActEvent` already
+carries a `detail` field for exactly this (`power()` puts the machine id there), so the fix is one
+argument and no type change.
+
+### What the player now reads
+
+The reference page for `spawn` named the three causes and stopped. It now says which free call
+answers which, and admits the one it cannot:
+
+> Creates a new bot on the adjacent tile in `dir` and returns its id. Returns -1 when that tile is
+> out of bounds, not walkable, or held by another bot, and the failed spawn still costs the full
+> price. `scan(dir)` reads the first two for free as `inBounds` and `walkable`; the third is the
+> same rule `move` obeys, so a tile a neighbour is still stepping off can refuse a spawn even
+> though it looks empty.
+
+That last clause is the honest part and the reason `spawn` is not simply given a `canSpawn`.
+`blockReason` is asked about arrival at `t + costs.spawn`, **not** `t + costs.move`, so `canMove`
+is the nearest free test and not an exact one: where the two prices differ, the occupancy interval
+resolves differently. Adding a free check that agreed with `spawn` would mean either a new verb or
+changing which cost `spawn` measures arrival at — and the second would move `w7-02`'s fleet size,
+which is difficulty. So the page tells the player the rule and where it bites, and the engine
+records the answer for the trace.
+
+### Difficulty is unmoved
+
+`w7-02.ts:72` is the only `spawn()` in the campaign and it **depends on the `-1` sentinel**
+(`if (child < 0) break;`) to stop growing the fleet. That contract is untouched: same return, same
+conditions, same price. Only an optional `detail` string on a refusal event is new.
+
+### What changed
+
+| File | Change |
+|---|---|
+| `src/engine/sim.ts` | `spawn()` keeps `blockReason`'s answer and puts it on the event as `detail`. Doc comment was one line, said "if the tile is taken" — which is one of three cases — and did not mention the arrival-time subtlety that makes `canMove` inexact here. |
+| `src/runtime/api-spec.ts` | The `spawn` reference page, as above. |
+| `src/engine/__tests__/sim.test.ts` | +2 tests. |
+
+The first new test drives all three refusals and asserts each records the reason a refused *move*
+would have recorded — then feeds it to `describeBlock()` and asserts the rendered sentence, so the
+field is demonstrably the one that turns into player-facing text rather than a private enum. The
+second asserts `scan()` independently reports the same two causes it is documented to cover.
+
+Full suite: **1629 passing across 64 files.**

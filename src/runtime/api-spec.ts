@@ -705,7 +705,7 @@ if (msg !== null && msg.body === 'go') {
       },
     ],
     returns: 'number',
-    doc: 'Creates a new bot on the adjacent tile in `dir` and returns its id. Returns -1 when that tile is out of bounds, not walkable, or already taken, and the failed spawn still costs the full price.',
+    doc: 'Creates a new bot on the adjacent tile in `dir` and returns its id. Returns -1 when that tile is out of bounds, not walkable, or held by another bot, and the failed spawn still costs the full price. `scan(dir)` reads the first two for free as `inBounds` and `walkable`; the third is the same rule `move` obeys, so a tile a neighbour is still stepping off can refuse a spawn even though it looks empty.',
     example: `const helper = spawn(Dir.East, { name: 'mule', capacity: 8 });
 if (helper >= 0) {
   send(helper, 'harvest');

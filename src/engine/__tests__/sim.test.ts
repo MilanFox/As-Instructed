@@ -1066,6 +1066,40 @@ describe('spawn', () => {
     const sim = new Sim(world);
     expect(sim.spawn(0, Dir.North)).toBe(-1);
   });
+
+  /*
+   * The reason was already computed and then dropped on the floor, so a refused spawn and a
+   * refused move told the trace different amounts about the same decision. `describeBlock` turns
+   * either into the sentence a player reads, which is only possible once the reason survives.
+   */
+  test('a refused spawn records the same reason a refused move would, and it renders', () => {
+    const walled = new Sim(asciiWorld(['.#.'], { bots: [vec(0, 0)] }));
+    expect(walled.spawn(0, Dir.East)).toBe(-1);
+    const blockedByWall = must(eventsOfKind(walled.finish().events, 'act')[0]);
+    expect(blockedByWall.detail).toBe('terrain');
+    expect(describeBlock(blockedByWall.detail as string, Dir.East)).toContain('solid');
+
+    const crowded = new Sim(openWorld(3, 3, 2));
+    expect(crowded.spawn(0, Dir.East)).toBe(-1);
+    const blockedByBot = must(eventsOfKind(crowded.finish().events, 'act')[0]);
+    expect(blockedByBot.detail).toBe('bot');
+    expect(describeBlock(blockedByBot.detail as string, Dir.East)).toContain('Another bot');
+
+    const edge = new Sim(openWorld(3, 3, 1));
+    expect(edge.spawn(0, Dir.North)).toBe(-1);
+    expect(must(eventsOfKind(edge.finish().events, 'act')[0]).detail).toBe('bounds');
+  });
+
+  test('scan() tells the player the same thing the refusal did', () => {
+    const world = asciiWorld(['.#.'], { bots: [vec(0, 0)] });
+    const sim = new Sim(world);
+    expect(sim.spawn(0, Dir.East)).toBe(-1);
+
+    const ahead = sim.scan(0, Dir.East);
+    expect(ahead.inBounds).toBe(true);
+    expect(ahead.walkable).toBe(false);
+    expect(sim.scan(0, Dir.North).inBounds).toBe(false);
+  });
 });
 
 describe('sync', () => {
