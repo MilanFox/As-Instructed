@@ -1,4 +1,4 @@
-import type { Machine, ObjectiveContext, Vec, World } from '../../engine/index.ts';
+import type { Divergence, Machine, ObjectiveContext, Vec, World } from '../../engine/index.ts';
 import {
   Dir,
   MachineKind,
@@ -7,6 +7,7 @@ import {
   Terrain,
   addBot,
   addMachine,
+  clipValue,
   createWorld,
   setTerrain,
   vec,
@@ -143,6 +144,36 @@ function progress(ctx: ObjectiveContext): [number, number] {
 }
 
 /**
+ * The first job still on the board, and how far into it the fleet got.
+ *
+ * `4 of 12 uses` is the reading `2 of 26` could never give: a job left untouched and a job the
+ * fleet walked away from halfway are different mistakes, and one use too many wraps the state
+ * back to `open`, which looks from the outside exactly like never having started.
+ */
+function unfinishedJob(ctx: ObjectiveContext): Divergence | undefined {
+  const job = jobMachines(ctx.world).find((machine) => machine.state !== 'done');
+  if (job === undefined) return undefined;
+  const cost = job.vars.cost ?? 0;
+  const used = job.state === 'open' ? 0 : Number(job.state);
+  return {
+    where: job.id,
+    expected: 'done',
+    received: Number.isFinite(used)
+      ? `${String(used)} of ${String(cost)} uses`
+      : clipValue(job.state),
+  };
+}
+
+/** The allowance the label promises, against the clock the last bot actually stopped on. */
+function overBound(ctx: ObjectiveContext): Divergence {
+  return {
+    where: 'the whole run',
+    expected: `${String(Math.floor((loadBound(ctx.initialWorld) * 4) / 3))} ticks`,
+    received: `${String(ctx.trace.endTick)} ticks`,
+  };
+}
+
+/**
  * Par: measured from the reference, which hands the longest job still on the board to whichever
  * bot comes free soonest. That lands between 51 and 79 ticks across the five seeds and par is
  * the worst of them, because every seed has to clear it. Dealing the board out in advance is
@@ -242,7 +273,7 @@ export const w7_04: LevelDef = {
       'board-clear',
       'Leave every job on the board done',
       (ctx) => doneCount(ctx.world) === jobMachines(ctx.initialWorld).length,
-      progress,
+      { progress, divergence: unfinishedJob },
     ),
   ],
   bonus: [
@@ -250,6 +281,7 @@ export const w7_04: LevelDef = {
       'within-bound',
       'Finish within a third of the load bound',
       (ctx) => ctx.trace.endTick <= Math.floor((loadBound(ctx.initialWorld) * 4) / 3),
+      { divergence: overBound },
     ),
   ],
   starter: [

@@ -1,4 +1,4 @@
-import type { ObjectiveContext, World } from '../../engine/index.ts';
+import type { Divergence, ObjectiveContext, World } from '../../engine/index.ts';
 import {
   Dir,
   Objectives,
@@ -11,7 +11,14 @@ import {
   vec,
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
-import { blockedMoves, botsOnPads, heardFromAnother, localSeed } from './shared.ts';
+import {
+  at,
+  blockedMoves,
+  botsOnPads,
+  firstBump,
+  heardFromAnother,
+  localSeed,
+} from './shared.ts';
 
 const HEIGHT = 5;
 const MAX_LEN = 9;
@@ -50,6 +57,64 @@ function floorTicks(ctx: ObjectiveContext): number {
     if (pad >= 0) longest = Math.max(longest, Math.abs(pad - bot.at.x));
   }
   return longest + 1;
+}
+
+/** The first bot the run did not leave standing on the pad at the end of its own corridor. */
+function unparked(ctx: ObjectiveContext): Divergence | undefined {
+  for (const bot of ctx.world.bots) {
+    if (bot.alive && tileAt(ctx.world, bot.at)?.terrain === Terrain.Pad) continue;
+    const row = ctx.initialWorld.bots.find((each) => each.id === bot.id)?.at.y ?? bot.at.y;
+    const column = padColumn(ctx.initialWorld, row);
+    return {
+      where: `bot #${String(bot.id)}`,
+      expected: column >= 0 ? at(vec(column, row)) : 'the pad on its own row',
+      received: bot.alive ? at(bot.at) : `${at(bot.at)}, and not running`,
+    };
+  }
+  return undefined;
+}
+
+/**
+ * The first bot that never read a message another bot sent it, and whether it asked at all.
+ *
+ * `recv` handing back `null` until the reader's own clock catches up is the whole difficulty
+ * here, so the count of reads that came back empty is exactly the thing the program cannot see
+ * and the trace can. A bot that never asked and a bot that asked forty times too early are the
+ * two different mistakes that `1 of 2` was hiding.
+ */
+function unheard(ctx: ObjectiveContext): Divergence | undefined {
+  for (const bot of ctx.world.bots) {
+    if (heardFromAnother(ctx.trace.events, bot.id)) continue;
+    const calls = ctx.trace.events.filter(
+      (event) => event.kind === 'recv' && event.botId === bot.id,
+    );
+    const empty = calls.filter((event) => event.kind === 'recv' && event.from === null).length;
+    return {
+      where: `bot #${String(bot.id)}`,
+      expected: 'a message from the other bot',
+      received:
+        calls.length === 0
+          ? 'never called recv()'
+          : empty === 0
+            ? 'only its own messages'
+            : `${String(empty)} empty recv() calls`,
+    };
+  }
+  return undefined;
+}
+
+/**
+ * A blocked move first, because it names a tick and a tile. Only a run that never bumped into
+ * anything and was simply slow gets priced against the floor the label already promises.
+ */
+function slack(ctx: ObjectiveContext): Divergence {
+  return (
+    firstBump(ctx.trace.events) ?? {
+      where: 'the whole run',
+      expected: `${String(floorTicks(ctx))} ticks`,
+      received: `${String(ctx.trace.endTick)} ticks`,
+    }
+  );
 }
 
 export const w7_01: LevelDef = {
@@ -104,16 +169,22 @@ export const w7_01: LevelDef = {
       'both-parked',
       'Park each bot on the pad at the end of its corridor',
       (ctx) => botsOnPads(ctx) === ctx.world.bots.length,
-      (ctx) => [botsOnPads(ctx), ctx.world.bots.length],
+      {
+        progress: (ctx) => [botsOnPads(ctx), ctx.world.bots.length],
+        divergence: unparked,
+      },
     ),
     Objectives.custom(
       'both-heard',
       "Have each bot receive the other bot's message",
       (ctx) => ctx.world.bots.every((bot) => heardFromAnother(ctx.trace.events, bot.id)),
-      (ctx) => [
-        ctx.world.bots.filter((bot) => heardFromAnother(ctx.trace.events, bot.id)).length,
-        ctx.world.bots.length,
-      ],
+      {
+        progress: (ctx) => [
+          ctx.world.bots.filter((bot) => heardFromAnother(ctx.trace.events, bot.id)).length,
+          ctx.world.bots.length,
+        ],
+        divergence: unheard,
+      },
     ),
   ],
   bonus: [
@@ -121,6 +192,7 @@ export const w7_01: LevelDef = {
       'no-slack',
       'Finish at the theoretical minimum with no blocked moves',
       (ctx) => ctx.trace.endTick <= floorTicks(ctx) && blockedMoves(ctx.trace.events) === 0,
+      { divergence: slack },
     ),
   ],
   starter: [

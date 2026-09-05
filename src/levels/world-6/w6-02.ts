@@ -1,10 +1,12 @@
-import type { ObjectiveContext, World } from '../../engine/index.ts';
+import type { Divergence, ObjectiveContext, World } from '../../engine/index.ts';
 import {
   Dir,
+  NOTHING,
   Objectives,
   Rng,
   Terrain,
   addBot,
+  clipValue,
   createWorld,
   paintAscii,
   vec,
@@ -95,6 +97,103 @@ const reported = (ctx: ObjectiveContext): string[] =>
     .filter((line) => line.startsWith('bad '));
 
 /**
+ * The first packet the run handled differently from the band did.
+ *
+ * Walking the band rather than the outgoing stream is what lets the report name *which* packet
+ * went the wrong way, and in which direction, rather than which slot of the relay disagreed. It
+ * gives back the level's verdict on one packet out of twenty to forty; the rule that produces
+ * that verdict is still the player's to write.
+ */
+function firstMishandled(ctx: ObjectiveContext): Divergence | undefined {
+  const salt = postVar(ctx.initialWorld, 'salt');
+  const sent = relayed(ctx);
+  const packets = band(ctx.initialWorld);
+  let next = 0;
+  for (let i = 0; i < packets.length; i++) {
+    const packet = packets[i] as Packet;
+    const clean = verifies(packet, salt);
+    const wentOut = sent[next] === packet.text;
+    if (clean && !wentOut) {
+      return {
+        where: `packet ${String(i)} on the band`,
+        expected: 'relayed',
+        received: sent[next] === undefined ? 'nothing more was sent' : 'not relayed',
+      };
+    }
+    if (!clean && wentOut) {
+      return {
+        where: `packet ${String(i)} on the band`,
+        expected: 'held back',
+        received: 'relayed',
+      };
+    }
+    if (wentOut) next++;
+  }
+  const extra = sent[next];
+  if (extra === undefined) return undefined;
+  return {
+    where: 'after the last clean packet',
+    expected: 'nothing more',
+    received: clipValue(extra),
+  };
+}
+
+/** `bad <packet> <byte>` split back into its two numbers, or null when it is not that shape. */
+function readFault(line: string): { packet: number; byte: number } | null {
+  const parts = line.split(' ');
+  if (parts.length !== 3) return null;
+  const packet = Number(parts[1]);
+  const byte = Number(parts[2]);
+  if (!Number.isInteger(packet) || !Number.isInteger(byte)) return null;
+  return { packet, byte };
+}
+
+/**
+ * Where the fault report and the band part company, without ever saying which byte was altered.
+ *
+ * Naming the byte would be the whole bonus, so what comes back instead is the run's own answer
+ * for one packet and the fact that it is the wrong one. That rules out a single byte of the four
+ * to ten in that packet and leaves the arithmetic that finds the rest exactly where it was.
+ */
+function firstFault(ctx: ObjectiveContext): Divergence | undefined {
+  const wanted = faultReports(ctx.initialWorld);
+  const said = reported(ctx);
+  const i = matchingPrefix(said, wanted);
+  const want = wanted[i];
+  const got = said[i];
+  if (want === undefined) {
+    if (got === undefined) return undefined;
+    return {
+      where: `fault line ${String(i + 1)}`,
+      expected: 'no more corrupt packets',
+      received: clipValue(got),
+    };
+  }
+  const target = readFault(want);
+  if (target === null) return undefined;
+  if (got === undefined) {
+    return {
+      where: `packet ${String(target.packet)} on the band`,
+      expected: 'a line naming its altered byte',
+      received: NOTHING,
+    };
+  }
+  const mine = readFault(got);
+  if (mine !== null && mine.packet === target.packet) {
+    return {
+      where: `packet ${String(target.packet)} on the band`,
+      expected: 'a different byte',
+      received: `byte ${String(mine.byte)}`,
+    };
+  }
+  return {
+    where: `fault line ${String(i + 1)}`,
+    expected: `a line about packet ${String(target.packet)}`,
+    received: clipValue(got),
+  };
+}
+
+/**
  * The salt is the anti-hardcode axis alongside the corruption pattern: it is drawn per seed and
  * only readable from the antenna, so a memorised check fails on the next shift.
  *
@@ -176,9 +275,12 @@ export const w6_02: LevelDef = {
         const sent = relayed(ctx);
         return sent.length === wanted.length && matchingPrefix(sent, wanted) === wanted.length;
       },
-      (ctx) => {
-        const wanted = cleanTraffic(ctx.initialWorld);
-        return [matchingPrefix(relayed(ctx), wanted), wanted.length];
+      {
+        progress: (ctx) => {
+          const wanted = cleanTraffic(ctx.initialWorld);
+          return [matchingPrefix(relayed(ctx), wanted), wanted.length];
+        },
+        divergence: firstMishandled,
       },
     ),
   ],
@@ -191,9 +293,12 @@ export const w6_02: LevelDef = {
         const said = reported(ctx);
         return said.length === wanted.length && matchingPrefix(said, wanted) === wanted.length;
       },
-      (ctx) => {
-        const wanted = faultReports(ctx.initialWorld);
-        return [matchingPrefix(reported(ctx), wanted), wanted.length];
+      {
+        progress: (ctx) => {
+          const wanted = faultReports(ctx.initialWorld);
+          return [matchingPrefix(reported(ctx), wanted), wanted.length];
+        },
+        divergence: firstFault,
       },
     ),
   ],

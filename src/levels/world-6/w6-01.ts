@@ -82,7 +82,10 @@ export const w6_01: LevelDef = {
       'log-the-band',
       'Print every queued packet, in order',
       (ctx) => expected(ctx).evaluate(ctx),
-      (ctx) => expected(ctx).progress?.(ctx) ?? [0, 0],
+      {
+        progress: (ctx) => expected(ctx).progress?.(ctx) ?? [0, 0],
+        divergence: (ctx) => expected(ctx).divergence?.(ctx),
+      },
     ),
   ],
   starter: [

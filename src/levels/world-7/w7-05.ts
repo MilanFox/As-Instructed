@@ -1,4 +1,4 @@
-import type { Machine, ObjectiveContext, Vec, World } from '../../engine/index.ts';
+import type { Divergence, Machine, ObjectiveContext, Vec, World } from '../../engine/index.ts';
 import {
   Dir,
   MachineKind,
@@ -8,6 +8,7 @@ import {
   addBot,
   addMachine,
   createWorld,
+  machineById,
   manhattan,
   setTerrain,
   tileAt,
@@ -84,6 +85,13 @@ export function workerIds(world: World): number[] {
   return world.bots.map((bot) => bot.id).filter((id) => id >= scouts);
 }
 
+interface Orders {
+  ordered: number;
+  switched: number;
+  /** The first site switched on by a bot with no order it had read by its own clock. */
+  jumped?: { botId: number; t: number; told: number | undefined };
+}
+
 /**
  * Every site that came up, came up under orders.
  *
@@ -92,22 +100,131 @@ export function workerIds(world: World): number[] {
  * switch a site on only if, by its own clock, it had already read a message somebody else sent
  * it — which is the whole content of the level.
  */
-function underOrders(ctx: ObjectiveContext): [number, number] {
+function readOrders(ctx: ObjectiveContext): Orders {
   const briefed = new Map<number, number>();
   const sites = new Set(siteMachines(ctx.initialWorld).map((machine) => key(machine.at)));
-  let ordered = 0;
-  let switched = 0;
+  const out: Orders = { ordered: 0, switched: 0 };
   for (const event of ctx.trace.events) {
     if (event.kind === 'recv' && event.from !== null && event.from !== event.botId) {
       if (!briefed.has(event.botId)) briefed.set(event.botId, event.t);
       continue;
     }
     if (event.kind !== 'use' || !event.ok || !sites.has(key(event.at))) continue;
-    switched++;
+    out.switched++;
     const told = briefed.get(event.botId);
-    if (told !== undefined && told <= event.t) ordered++;
+    if (told !== undefined && told <= event.t) {
+      out.ordered++;
+      continue;
+    }
+    if (out.jumped === undefined) out.jumped = { botId: event.botId, t: event.t, told };
   }
-  return [ordered, Math.max(switched, siteMachines(ctx.initialWorld).length)];
+  return out;
+}
+
+function underOrders(ctx: ObjectiveContext): [number, number] {
+  const orders = readOrders(ctx);
+  return [orders.ordered, Math.max(orders.switched, siteMachines(ctx.initialWorld).length)];
+}
+
+/**
+ * How near the fleet ever got to one site: never came, stood on it and left it alone, or switched
+ * it on and switched it straight back off again.
+ */
+function reach(ctx: ObjectiveContext, siteId: string, at: Vec): string {
+  let stood = false;
+  for (const event of ctx.trace.events) {
+    if (event.kind === 'use' && event.ok && event.machineId === siteId) {
+      return 'switched on and off again';
+    }
+    if (event.kind === 'move' && event.ok && event.to.x === at.x && event.to.y === at.y) {
+      stood = true;
+    }
+  }
+  return stood ? 'reached but not switched on' : 'never reached';
+}
+
+/**
+ * The first site still cold, and how close the fleet ever got to it.
+ *
+ * The tile is deliberately absent. The sites are on no plan and `probe()` with no argument is the
+ * only thing on this level that finds one, so a coordinate would not be a diff — it would be the
+ * search. What the report gives instead is the one thing the program could not observe: whether
+ * anybody ever stood there.
+ */
+function coldSite(ctx: ObjectiveContext): Divergence | undefined {
+  const sites = siteMachines(ctx.initialWorld);
+  if (sites.length === 0) {
+    return { where: 'the north workings', expected: 'a relay site', received: 'none on the plan' };
+  }
+  for (const site of sites) {
+    if (machineById(ctx.world, site.id)?.state === 'on') continue;
+    return {
+      where: site.id,
+      expected: 'on',
+      received: `cold, ${reach(ctx, site.id, site.at)}`,
+    };
+  }
+  return undefined;
+}
+
+/**
+ * The first site switched on by a bot that had not read an order yet, with both ticks.
+ *
+ * A run that simply never reached every site has no such moment, so it gets the count instead:
+ * the question of who was told what does not arise until the sites are up.
+ */
+function firstUnordered(ctx: ObjectiveContext): Divergence {
+  const orders = readOrders(ctx);
+  const jumped = orders.jumped;
+  if (jumped !== undefined) {
+    return {
+      where: `bot #${String(jumped.botId)} · tick ${String(jumped.t)}`,
+      expected: 'an order read before this',
+      received:
+        jumped.told === undefined
+          ? 'no order all shift'
+          : `first order at tick ${String(jumped.told)}`,
+    };
+  }
+  const total = Math.max(orders.switched, siteMachines(ctx.initialWorld).length);
+  return {
+    where: 'the relay sites',
+    expected: `all ${String(total)} switched on under orders`,
+    received: `${String(orders.ordered)} of ${String(total)}`,
+  };
+}
+
+/**
+ * How long the workers stood about, and which one stood about longest.
+ *
+ * Waiting is the cost this bonus is named for and it is invisible from inside the program: a bot
+ * blocked on `sync` looks the same as a bot walking. The fleet total is what the objective grades,
+ * and the worst single bot is where a fix would start.
+ */
+function idleWorkers(ctx: ObjectiveContext): Divergence {
+  const ids = workerIds(ctx.initialWorld);
+  const span = ctx.trace.endTick * ids.length;
+  if (span === 0) {
+    return {
+      where: 'the workers',
+      expected: 'a shift with work in it',
+      received: `the run ended at tick ${String(ctx.trace.endTick)}`,
+    };
+  }
+  const idle = idleTicks(ctx.trace.events, new Set(ids));
+  let worst = ids[0] as number;
+  let worstIdle = -1;
+  for (const id of ids) {
+    const own = idleTicks(ctx.trace.events, new Set([id]));
+    if (own <= worstIdle) continue;
+    worstIdle = own;
+    worst = id;
+  }
+  return {
+    where: `bot #${String(worst)} waited longest`,
+    expected: `under ${String(Math.ceil(span * 0.1))} idle ticks in all`,
+    received: `${String(idle)} in all, ${String(worstIdle)} on this bot`,
+  };
 }
 
 function progress(ctx: ObjectiveContext): [number, number] {
@@ -269,7 +386,7 @@ export const w7_05: LevelDef = {
         const total = siteMachines(ctx.initialWorld).length;
         return total > 0 && litCount(ctx.world) === total;
       },
-      progress,
+      { progress, divergence: coldSite },
     ),
     Objectives.custom(
       'told-where-to-go',
@@ -278,7 +395,7 @@ export const w7_05: LevelDef = {
         const [ordered, total] = underOrders(ctx);
         return total > 0 && ordered === total;
       },
-      underOrders,
+      { progress: underOrders, divergence: firstUnordered },
     ),
   ],
   bonus: [
@@ -290,6 +407,7 @@ export const w7_05: LevelDef = {
         const span = ctx.trace.endTick * ids.size;
         return span > 0 && idleTicks(ctx.trace.events, ids) < span * 0.1;
       },
+      { divergence: idleWorkers },
     ),
   ],
   starter: [

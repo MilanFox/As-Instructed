@@ -1,11 +1,13 @@
-import type { Vec, World } from '../../engine/index.ts';
+import type { Divergence, ObjectiveContext, Vec, World } from '../../engine/index.ts';
 import {
   Dir,
+  NOTHING,
   Objectives,
   Rng,
   Terrain,
   addBot,
   botById,
+  clipValue,
   createWorld,
   setTerrain,
   step,
@@ -13,7 +15,15 @@ import {
   vec,
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
-import { additive, charCodes, encipher, installPost, stayOnRoute, weighted } from './signal.ts';
+import {
+  additive,
+  charCodes,
+  encipher,
+  installPost,
+  point,
+  stayOnRoute,
+  weighted,
+} from './signal.ts';
 
 const FIELD = 30;
 /** Every seed's route is exactly this long, so par means the same thing on all five. */
@@ -215,12 +225,76 @@ export function telemetryFor(seed: number): Telemetry {
   return { blocks, packets: rng.shuffle(packets), salt, start, pad, moves };
 }
 
-/** The repair lines the bonus wants, in the order the corrupt blocks arrive. */
-function repairs(world: World): string[] {
+interface RepairTarget {
+  /** Where the corrupt block sat on the band, counting from 0. */
+  index: number;
+  line: string;
+}
+
+/** The repair lines the bonus wants, each tagged with the band slot it answers. */
+function repairTargets(world: World): RepairTarget[] {
   const seed = world.vars.seed ?? 1;
-  return telemetryFor(seed)
-    .packets.filter((packet) => packet.corrupt)
-    .map((packet) => `fix ${packet.plain.slice(0, packet.plain.lastIndexOf('*'))}`);
+  const out: RepairTarget[] = [];
+  telemetryFor(seed).packets.forEach((packet, index) => {
+    if (!packet.corrupt) return;
+    out.push({ index, line: `fix ${packet.plain.slice(0, packet.plain.lastIndexOf('*'))}` });
+  });
+  return out;
+}
+
+/** Every `fix ...` line the run printed, in the order it printed them. */
+function printedFixes(ctx: ObjectiveContext): string[] {
+  return ctx.trace.events
+    .filter((event) => event.kind === 'print')
+    .map((event) => (event.kind === 'print' ? event.text : ''))
+    .filter((line) => line.startsWith('fix '));
+}
+
+/** The pad against where the run left the bot. Both tiles are painted on the map already. */
+function parked(ctx: ObjectiveContext): Divergence | undefined {
+  const pad = telemetryFor(ctx.initialWorld.vars.seed ?? 1).pad;
+  const bot = botById(ctx.world, 0);
+  if (bot === undefined) {
+    return { where: 'end of run', expected: point(pad), received: NOTHING };
+  }
+  return {
+    where: 'end of run',
+    expected: point(pad),
+    received: bot.alive ? point(bot.at) : `${point(bot.at)}, and not running`,
+  };
+}
+
+/**
+ * Which corrupt block the repair report first disagrees about — never what the repair should say.
+ *
+ * Where the altered character sits is the arithmetic the bonus exists for, and the character
+ * itself falls straight out of the position, so neither appears. The block is named by the slot
+ * it arrived in, which is the player's own copy of the band, and the run's own line comes back
+ * unchanged beside it.
+ */
+function firstRepair(ctx: ObjectiveContext): Divergence | undefined {
+  const targets = repairTargets(ctx.initialWorld);
+  const said = printedFixes(ctx);
+  if (targets.length === 0) {
+    return { where: 'the band', expected: 'a corrupt block to repair', received: 'none arrived' };
+  }
+  for (let i = 0; i < targets.length; i++) {
+    const target = targets[i] as RepairTarget;
+    const line = said[i];
+    if (line === target.line) continue;
+    return {
+      where: `block ${String(target.index)} on the band`,
+      expected: line === undefined ? 'a repair for it' : 'a different repair',
+      received: line === undefined ? NOTHING : clipValue(line),
+    };
+  }
+  const extra = said[targets.length];
+  if (extra === undefined) return undefined;
+  return {
+    where: `repair line ${String(targets.length + 1)}`,
+    expected: 'no more corrupt blocks',
+    received: clipValue(extra),
+  };
 }
 
 /**
@@ -304,10 +378,15 @@ export const w6_05: LevelDef = {
     return world;
   },
   objectives: [
-    Objectives.custom('reach-pad', 'Park the bot on the landing pad', (ctx) => {
-      const bot = botById(ctx.world, 0);
-      return bot !== undefined && tileAt(ctx.world, bot.at)?.terrain === Terrain.Pad;
-    }),
+    Objectives.custom(
+      'reach-pad',
+      'Park the bot on the landing pad',
+      (ctx) => {
+        const bot = botById(ctx.world, 0);
+        return bot !== undefined && tileAt(ctx.world, bot.at)?.terrain === Terrain.Pad;
+      },
+      { divergence: parked },
+    ),
     stayOnRoute(),
   ],
   bonus: [
@@ -315,17 +394,15 @@ export const w6_05: LevelDef = {
       'repair-blocks',
       'Repair every corrupt block instead of discarding it',
       (ctx) => {
-        const wanted = repairs(ctx.initialWorld);
-        const said = ctx.trace.events
-          .filter((event) => event.kind === 'print')
-          .map((event) => (event.kind === 'print' ? event.text : ''))
-          .filter((line) => line.startsWith('fix '));
+        const wanted = repairTargets(ctx.initialWorld).map((target) => target.line);
+        const said = printedFixes(ctx);
         return (
           wanted.length > 0 &&
           said.length === wanted.length &&
           wanted.every((line, i) => said[i] === line)
         );
       },
+      { divergence: firstRepair },
     ),
   ],
   starter: [

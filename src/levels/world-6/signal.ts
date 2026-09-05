@@ -119,6 +119,11 @@ export function matchingPrefix(actual: readonly string[], expected: readonly str
   return i;
 }
 
+/** A coordinate, written the way the briefs and the fact tables write one. */
+export function point(pos: Vec): string {
+  return `(${String(pos.x)}, ${String(pos.y)})`;
+}
+
 /**
  * The route is the only floor there is; everything else is a pit, so leaving it is fatal.
  *
@@ -131,18 +136,19 @@ export function stayOnRoute(): Objective {
     'stay-on-route',
     'Keep the bot out of the pits',
     (ctx) => botById(ctx.world, 0)?.alive === true,
-    undefined,
-    (ctx) => {
-      const fall = ctx.trace.events.find(
-        (event): event is DieEvent => event.kind === 'die' && event.botId === 0,
-      );
-      if (!fall) return undefined;
-      const terrain = tileAt(ctx.initialWorld, fall.at)?.terrain ?? Terrain.Pit;
-      return {
-        where: `tick ${String(fall.t)} · (${String(fall.at.x)}, ${String(fall.at.y)})`,
-        expected: Terrain.Floor,
-        received: terrain,
-      };
+    {
+      divergence: (ctx) => {
+        const fall = ctx.trace.events.find(
+          (event): event is DieEvent => event.kind === 'die' && event.botId === 0,
+        );
+        if (!fall) return undefined;
+        const terrain = tileAt(ctx.initialWorld, fall.at)?.terrain ?? Terrain.Pit;
+        return {
+          where: `tick ${String(fall.t)} · ${point(fall.at)}`,
+          expected: Terrain.Floor,
+          received: terrain,
+        };
+      },
     },
   );
 }

@@ -1,4 +1,4 @@
-import type { ObjectiveContext, Vec, World } from '../../engine/index.ts';
+import type { Divergence, ObjectiveContext, Vec, World } from '../../engine/index.ts';
 import {
   Dir,
   ItemKind,
@@ -12,7 +12,7 @@ import {
   vec,
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
-import { blockedMoves, localSeed } from './shared.ts';
+import { at, blockedMoves, firstBump, localSeed } from './shared.ts';
 
 const HEIGHT = 9;
 /** The tunnel, and both rooms' loading aisle, share this row. */
@@ -62,6 +62,32 @@ function cratesHome(world: World): number {
 
 function delivered(ctx: ObjectiveContext): [number, number] {
   return [cratesHome(ctx.world), totalCrates(ctx.initialWorld)];
+}
+
+/**
+ * The first crate the run did not get into the silo bay — on the ground in the wrong column, or
+ * still in a gripper because the bot that picked it up never put it down.
+ */
+function strayCrate(ctx: ObjectiveContext): Divergence | undefined {
+  const stray = ctx.world.items
+    .filter((stack) => stack.kind === ItemKind.Crate && stack.at.x !== SILO_X)
+    .sort((a, b) => a.at.x - b.at.x || a.at.y - b.at.y)[0];
+  if (stray) {
+    return {
+      where: at(stray.at),
+      expected: `column ${String(SILO_X)}`,
+      received: `column ${String(stray.at.x)}`,
+    };
+  }
+  const carrier = ctx.world.bots.find((bot) =>
+    bot.inventory.some((stack) => stack.kind === ItemKind.Crate),
+  );
+  if (carrier === undefined) return undefined;
+  return {
+    where: `bot #${String(carrier.id)} · ${at(carrier.at)}`,
+    expected: 'dropped in the silo bay',
+    received: 'still carrying a crate',
+  };
 }
 
 export const w7_03: LevelDef = {
@@ -121,7 +147,7 @@ export const w7_03: LevelDef = {
       'crates-in-silo',
       'Deliver every crate to the silo bay in column 1',
       (ctx) => cratesHome(ctx.world) === totalCrates(ctx.initialWorld),
-      delivered,
+      { progress: delivered, divergence: strayCrate },
     ),
   ],
   bonus: [
@@ -129,6 +155,7 @@ export const w7_03: LevelDef = {
       'no-bumps',
       'Complete the run without a single blocked move',
       (ctx) => blockedMoves(ctx.trace.events) === 0,
+      { divergence: (ctx) => firstBump(ctx.trace.events) },
     ),
   ],
   starter: [

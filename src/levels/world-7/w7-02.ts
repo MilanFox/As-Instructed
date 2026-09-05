@@ -1,4 +1,4 @@
-import type { ObjectiveContext, Vec, World } from '../../engine/index.ts';
+import type { Divergence, ObjectiveContext, Vec, World } from '../../engine/index.ts';
 import {
   Dir,
   ItemKind,
@@ -14,7 +14,7 @@ import {
   vec,
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
-import { packPos } from './shared.ts';
+import { at, packPos } from './shared.ts';
 
 const WIDTH = 24;
 const HEIGHT = 16;
@@ -84,6 +84,33 @@ export function lowerBound(ctx: ObjectiveContext): number {
   for (let i = 1; i < crops.length; i++) tour += manhattan(crops[i - 1] as Vec, crops[i] as Vec);
   const approach = Math.min(...crops.map((crop) => manhattan(ORIGIN, crop)));
   return approach + Math.ceil((2 * crops.length + tour) / fleet);
+}
+
+/**
+ * The first crop the run left standing, and how many are behind it.
+ *
+ * The tile is not a secret to keep: the depot publishes every crop position as `vars.c0` upward
+ * before anything moves, so the coordinate is the player's own input read back at them.
+ */
+function standingCrop(ctx: ObjectiveContext): Divergence | undefined {
+  for (let i = 0; i < ctx.world.tiles.length; i++) {
+    if (ctx.world.tiles[i]?.crop === undefined) continue;
+    return {
+      where: at(vec(i % ctx.world.w, Math.floor(i / ctx.world.w))),
+      expected: 'harvested',
+      received: `still standing, ${String(ripeCrops(ctx.world))} left`,
+    };
+  }
+  return undefined;
+}
+
+/** The allowance the label promises, against the clock the last bot actually stopped on. */
+function overFloor(ctx: ObjectiveContext): Divergence {
+  return {
+    where: 'the whole run',
+    expected: `${String(Math.ceil(lowerBound(ctx) * 1.1))} ticks`,
+    received: `${String(ctx.trace.endTick)} ticks`,
+  };
 }
 
 export const w7_02: LevelDef = {
@@ -165,9 +192,12 @@ export const w7_02: LevelDef = {
       'field-cleared',
       'Harvest every crop in the field',
       (ctx) => ripeCrops(ctx.world) === 0,
-      (ctx) => {
-        const total = ripeCrops(ctx.initialWorld);
-        return [total - ripeCrops(ctx.world), total];
+      {
+        progress: (ctx) => {
+          const total = ripeCrops(ctx.initialWorld);
+          return [total - ripeCrops(ctx.world), total];
+        },
+        divergence: standingCrop,
       },
     ),
   ],
@@ -176,6 +206,7 @@ export const w7_02: LevelDef = {
       'within-ten-percent',
       'Finish within 10% of the shared-work floor for this field',
       (ctx) => ctx.trace.endTick <= Math.ceil(lowerBound(ctx) * 1.1),
+      { divergence: overFloor },
     ),
   ],
   starter: [

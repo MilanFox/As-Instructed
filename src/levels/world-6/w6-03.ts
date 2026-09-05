@@ -1,10 +1,12 @@
-import type { Vec, World } from '../../engine/index.ts';
+import type { Divergence, ObjectiveContext, Vec, World } from '../../engine/index.ts';
 import {
   Dir,
+  NOTHING,
   Objectives,
   Rng,
   Terrain,
   addBot,
+  clipValue,
   createWorld,
   setTerrain,
   step,
@@ -132,6 +134,50 @@ const inbound = (world: World): string =>
   decipher(queued(world)[0] ?? '', postVar(world, 'key'));
 
 /**
+ * What the return packet got wrong: the wrong number of lines, a stream that does not parse, the
+ * first move it disagrees with the route on, or — the case the bonus is actually about — a
+ * faithful route that is no shorter than the one that arrived.
+ *
+ * Both counts are counts of characters on the wire, which is what the band is metered by and what
+ * the invoice is written from. Handing back the inbound length is handing back the invoice: which
+ * two groups can be merged into one is still the whole of the work.
+ */
+function returnPacket(ctx: ObjectiveContext): Divergence | undefined {
+  const sent = transmitted(ctx.world);
+  const theirs = inbound(ctx.initialWorld);
+  if (sent.length !== 1) {
+    return {
+      where: 'the return packet',
+      expected: '1 line',
+      received: sent.length === 0 ? 'nothing sent' : `${String(sent.length)} lines`,
+    };
+  }
+  const mine = sent[0] ?? '';
+  const mineMoves = expand(mine);
+  if (mineMoves.length === 0) {
+    return {
+      where: 'the return packet',
+      expected: 'a count then N, E, S or W',
+      received: clipValue(mine),
+    };
+  }
+  const routeMoves = expand(theirs);
+  for (let i = 0; i < Math.max(mineMoves.length, routeMoves.length); i++) {
+    if (mineMoves[i] === routeMoves[i]) continue;
+    return {
+      where: `move ${String(i + 1)} of the route`,
+      expected: routeMoves[i] ?? NOTHING,
+      received: mineMoves[i] ?? NOTHING,
+    };
+  }
+  return {
+    where: 'characters on the wire',
+    expected: `fewer than ${String(theirs.length)}`,
+    received: String(mine.length),
+  };
+}
+
+/**
  * The route is fixed at 37 moves on every seed, so par is the route plus the single `transmit`
  * the bonus costs: 38. The reference walks the decoded route once and sends its own encoding
  * back, so there is nothing to shave — 37 of those ticks are the shortest legal path.
@@ -191,17 +237,22 @@ export const w6_03: LevelDef = {
     stayOnRoute(),
   ],
   bonus: [
-    Objectives.custom('shorter-encoding', 'Send the same route back in fewer characters', (ctx) => {
-      const sent = transmitted(ctx.world);
-      if (sent.length !== 1) return false;
-      const mine = sent[0] ?? '';
-      const theirs = inbound(ctx.initialWorld);
-      return (
-        mine.length < theirs.length &&
-        expand(mine).length === ROUTE_MOVES &&
-        expand(mine).join('') === expand(theirs).join('')
-      );
-    }),
+    Objectives.custom(
+      'shorter-encoding',
+      'Send the same route back in fewer characters',
+      (ctx) => {
+        const sent = transmitted(ctx.world);
+        if (sent.length !== 1) return false;
+        const mine = sent[0] ?? '';
+        const theirs = inbound(ctx.initialWorld);
+        return (
+          mine.length < theirs.length &&
+          expand(mine).length === ROUTE_MOVES &&
+          expand(mine).join('') === expand(theirs).join('')
+        );
+      },
+      { divergence: returnPacket },
+    ),
   ],
   starter: [
     '// Everything off the route is a pit.',

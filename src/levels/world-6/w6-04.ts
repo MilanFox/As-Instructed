@@ -1,16 +1,26 @@
-import type { ObjectiveContext, World } from '../../engine/index.ts';
+import type { Divergence, ObjectiveContext, World } from '../../engine/index.ts';
 import {
   Dir,
+  NOTHING,
   Objectives,
   Rng,
   Terrain,
   addBot,
+  clipValue,
   createWorld,
   paintAscii,
   vec,
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
-import { KEYSPACE, encipher, installPost, matchingPrefix, transmitted } from './signal.ts';
+import {
+  KEYSPACE,
+  decipher,
+  encipher,
+  installPost,
+  matchingPrefix,
+  queued,
+  transmitted,
+} from './signal.ts';
 
 const SHACK = [
   '############',
@@ -119,6 +129,79 @@ const tailPlain = (world: World): string => bandFor(world.vars.seed ?? 1).tail;
 const relayed = (ctx: ObjectiveContext): string[] => transmitted(ctx.world);
 
 /**
+ * The first packet on the wire that is not the plain text of the headed packet it stands for.
+ *
+ * The header is the level's own test and the facts publish it, so a report that says the line did
+ * not open with it gives nothing away that the fact table has not already given. When the header
+ * did survive and the rest did not, the point narrows to the one character where the two texts
+ * part, which is the smallest thing there is to say.
+ */
+function firstRelayed(ctx: ObjectiveContext): Divergence | undefined {
+  const expected = wanted(ctx.initialWorld);
+  const sent = relayed(ctx);
+  const i = matchingPrefix(sent, expected);
+  const want = expected[i];
+  if (want === undefined) return undefined;
+  const got = sent[i];
+  if (got === undefined || !got.startsWith(MAGIC)) {
+    return {
+      where: `packet ${String(i)}`,
+      expected: `plain text opening "${MAGIC}"`,
+      received: got === undefined ? NOTHING : clipValue(got),
+    };
+  }
+  let n = 0;
+  while (n < want.length && n < got.length && want[n] === got[n]) n++;
+  return {
+    where: `packet ${String(i)} · character ${String(n + 1)}`,
+    expected: want[n] === undefined ? NOTHING : `"${want[n]}"`,
+    received: got[n] === undefined ? NOTHING : `"${got[n]}"`,
+  };
+}
+
+/**
+ * The straggler's plain text is the entire bonus, so the report never contains a character of it.
+ *
+ * What it can give back is the shift the run actually used, recovered from what went on the wire.
+ * One of the ninety-five is ruled out, the run's own number is the thing being ruled out, and the
+ * other ninety-four are still there to be sifted by whatever test the player comes up with.
+ */
+function firstStraggler(ctx: ObjectiveContext): Divergence | undefined {
+  const expected = wanted(ctx.initialWorld);
+  const sent = relayed(ctx);
+  const matched = matchingPrefix(sent, expected);
+  if (matched < expected.length) {
+    return {
+      where: 'the headed packets',
+      expected: `all ${String(expected.length)} in plain text first`,
+      received: `${String(matched)} of ${String(expected.length)}`,
+    };
+  }
+  const got = sent[expected.length];
+  if (got === undefined) {
+    return {
+      where: 'after the last headed packet',
+      expected: 'the straggler in plain text',
+      received: NOTHING,
+    };
+  }
+  const cipher = queued(ctx.initialWorld)[expected.length] ?? '';
+  for (let key = 0; key < KEYSPACE; key++) {
+    if (decipher(cipher, key) !== got) continue;
+    return {
+      where: 'the straggler',
+      expected: 'a different shift',
+      received: `shift ${String(key)}`,
+    };
+  }
+  return {
+    where: 'the straggler',
+    expected: 'the last packet, shifted back',
+    received: clipValue(got),
+  };
+}
+
+/**
  * Par: the reference sends one line per headed packet plus the straggler, and a packet cannot be
  * relayed for less than one transmit. Thirteen headed packets on seed 4 plus the straggler is 14,
  * which is par exactly — the search itself is free.
@@ -184,9 +267,12 @@ export const w6_04: LevelDef = {
         const expected = wanted(ctx.initialWorld);
         return matchingPrefix(relayed(ctx), expected) === expected.length;
       },
-      (ctx) => {
-        const expected = wanted(ctx.initialWorld);
-        return [matchingPrefix(relayed(ctx), expected), expected.length];
+      {
+        progress: (ctx) => {
+          const expected = wanted(ctx.initialWorld);
+          return [matchingPrefix(relayed(ctx), expected), expected.length];
+        },
+        divergence: firstRelayed,
       },
     ),
   ],
@@ -202,6 +288,7 @@ export const w6_04: LevelDef = {
           sent[expected.length] === tailPlain(ctx.initialWorld)
         );
       },
+      { divergence: firstStraggler },
     ),
   ],
   starter: [
