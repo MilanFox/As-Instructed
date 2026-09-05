@@ -550,6 +550,7 @@ export const useGame = create<GameState>((set, get) => {
           senseBudgetMet: verdict.objectives.some(
             (objective) => objective.met && isSenseBudget(objective.id),
           ),
+          returnedForStar: previous.completed && previous.stars.length === 0 && earned.length > 0,
           ...(previous.bestTicks !== undefined ? { previousBestTicks: previous.bestTicks } : {}),
           worldMedals,
         };

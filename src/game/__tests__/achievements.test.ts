@@ -13,6 +13,7 @@ function facts(patch: Partial<RunFacts> = {}): RunFacts {
     blockedMoves: 2,
     stars: 0,
     senseBudgetMet: false,
+    returnedForStar: false,
     worldMedals: [Medal.Bronze, Medal.None],
     ...patch,
   };
@@ -50,6 +51,20 @@ describe('the commendation list', () => {
 });
 
 describe('earnedBy', () => {
+  it('rewards coming back to a closed order for its star', () => {
+    expect(earnedBy(facts({ returnedForStar: true }))).toContain('came-back-for-it');
+    expect(earnedBy(facts({ returnedForStar: false }))).not.toContain('came-back-for-it');
+  });
+
+  it('awards the persistence tiers at four runs and at ten', () => {
+    expect(earnedBy(facts({ attempt: 3 }))).not.toContain('second-look');
+    expect(earnedBy(facts({ attempt: 4 }))).toContain('second-look');
+    expect(earnedBy(facts({ attempt: 9 }))).not.toContain('raised-again');
+    expect(earnedBy(facts({ attempt: 10 }))).toEqual(
+      expect.arrayContaining(['second-look', 'raised-again']),
+    );
+  });
+
   it('awards nothing at all for a failed run', () => {
     expect(earnedBy(facts({ passed: false, medal: Medal.Gold, attempt: 1 }))).toEqual([]);
   });

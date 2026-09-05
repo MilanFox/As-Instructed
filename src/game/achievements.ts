@@ -56,6 +56,8 @@ export const ELEGANT_FACTOR = 0.5;
 /** Runs on one work order before a close still counts as persistence rather than as noise. */
 export const PERSISTENCE_ATTEMPTS = 10;
 
+export const SECOND_LOOK_ATTEMPTS = 4;
+
 export const ACHIEVEMENTS: readonly Achievement[] = [
   {
     id: 'filed',
@@ -104,6 +106,18 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     title: 'THERE IS NO BONUS',
     requirement: 'Meet a bonus objective.',
     note: 'Bonus met. There is no bonus. There is a star.',
+  },
+  {
+    id: 'came-back-for-it',
+    title: 'REOPENED ON PURPOSE',
+    requirement: 'Meet a bonus objective on a work order you had already closed.',
+    note: 'The order was closed. You reopened it anyway. Scheduling has stopped asking why.',
+  },
+  {
+    id: 'second-look',
+    title: 'A SECOND LOOK, AND A THIRD',
+    requirement: `Close a work order on your ${SECOND_LOOK_ATTEMPTS}th run or later.`,
+    note: 'Four runs, one closed order. The runs in between are not filed anywhere.',
   },
   {
     id: 'raised-again',
@@ -164,6 +178,8 @@ export interface RunFacts {
   senseBudgetMet: boolean;
   /** The recorded best before this run, when there was one. */
   previousBestTicks?: number;
+  /** A bonus met on a work order that was already closed, and had no star before. */
+  returnedForStar: boolean;
   /** Medals across every issued work order in this world, with this result already folded in. */
   worldMedals: readonly Medal[];
 }
@@ -190,6 +206,8 @@ export function earnedBy(facts: RunFacts): string[] {
   if (facts.blockedMoves === 0) earned.push('no-contact');
   if (facts.senseBudgetMet) earned.push('minimal-observation');
   if (facts.stars > 0) earned.push('there-is-a-star');
+  if (facts.returnedForStar) earned.push('came-back-for-it');
+  if (facts.attempt >= SECOND_LOOK_ATTEMPTS) earned.push('second-look');
   if (facts.attempt >= PERSISTENCE_ATTEMPTS) earned.push('raised-again');
 
   const world = facts.worldMedals;
