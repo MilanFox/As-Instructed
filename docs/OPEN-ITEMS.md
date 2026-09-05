@@ -1226,3 +1226,55 @@ possible, not smuggled in.
 Report: `docs/SPIKE-ART-DIRECTION.md`, shots under `docs/shots/art/<direction>/`, three
 separate commits so any one can be taken forward alone. A recommendation is required —
 "they're all fine" is a failed report.
+
+### 2026-09-05, 23:10 — the screen half of A7, and the crash contained (merged)
+
+Green at **1692 tests / 68 files** (+27, +2 files: 13 site map, 14 results), tsc / build clean.
+
+All five defects the previous agent measured but could not touch are fixed. Boot Sector reads
+`6/11 pts` instead of `0/11`; `ALL AT PAR` and the at-par aside now count an ungraded close,
+while the `GOLD`/`SILVER`/`BRONZE` columns stay medal-only — a `Tally.atPar` was added rather
+than blurring the medal counts, which is the right side of that line.
+
+**The accessibility fix, in the real tree:**
+
+```
+before: "w1-01, Cold Start. Closed. no medal."      "w1-05. Open. no medal."
+after:  "w1-01, Cold Start. Closed. Not graded."    "w1-05. Closed. gold medal."
+                                                     "w2-01. Open. no medal."
+```
+
+Three states now say three different things. `MedalBadge` took a real `Medal | null` arm
+rather than a call-site special case.
+
+**A regression the browser caught in its own fix, which no test would have:** `medalForLevel`
+returns `null` on an ungraded level *regardless of whether the run passed*, so a **failed** run
+was stamped with the green closed mark under the words `WORK ORDER OPEN`. Now routed through
+`reportedMedal`. That is the second time today that driving the thing caught a defect in a fix
+that typechecked.
+
+**AUDIT-UI F21 — the modal layer now has an error boundary.** The five stacked modals each get
+the existing `PanelBoundary`. Reproduced against the live crash: `#root.children.length` goes
+`0` → `1`, the workspace survives with the player's program intact, and the fault contains to a
+145px *"The publish offer — unavailable"* notice. It also found that **most of what the crash
+actually cost was a layout bug**: without `.modal-layer { flex: none; height: auto }` the
+fallback inherited `height: 100%` and pushed the editor off screen. The `src/meta/**` loop
+itself is untouched and still throws — that fix is a separate agent's, and the boundary is
+containment, not a cure.
+
+### Open from the audit, with owners now free
+
+- **F1** — a medal legend on the site map. `MedalBadge` now has the honest `CLOSED` state it
+  needs and `medal={medalOf(node.level, node.progress)}` drops straight in; the legend layout
+  is a design call.
+- **F9** — `.modal__body { min-height: 0; overflow-y: auto }`. Real bug: the run report's last
+  paragraph is drawn under its own footer.
+- **F18** — blocked on a ruling: the `GRADE` stat's denominator counts medals while the header
+  counts points. **Ruling: the header follows `reportFor`.** Points are the thing A7 made
+  uniform across graded and ungraded levels, so a second denominator beside it is the
+  disagreeing-tick-counter bug in miniature. Whoever takes F18 should verify that against the
+  code before acting.
+- **F22 half** — `aria-label="Playback speed"` on the speed combobox; the accessible name is
+  currently just `1x`. Left rather than half-done.
+- The ticks cell still reads `par 78 · best 78` on an ungraded level. One ternary; not a target,
+  no colour, so it was flagged rather than changed.
