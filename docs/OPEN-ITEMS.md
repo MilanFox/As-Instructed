@@ -1181,3 +1181,48 @@ findings to counts of blocks and repetitions rather than sentences.
   medal legend needs an honest `CLOSED` state now that six levels have no medal.
 
 Everything else in the audit is unassigned and is the largest block of open work in this file.
+
+### 2026-09-05, 22:45 — "looks boring." Art-direction spike commissioned.
+
+The user, on reading the UI audit: *"the verdict is — looks boring. I would agree. Can we make
+it look like a cool GAME? Something I would want to showcase on Steam (we are not going to
+Steam, but that's the benchmark)."*
+
+**This is a different charge from the audit's**, and the distinction is the whole item. The
+audit judged *correctness* — contrast ratios, scroll cues, wasted measure. Fixing all 23
+findings yields a well-laid-out version of the same boring screen. Both streams are worth
+running; neither substitutes for the other.
+
+**The diagnosis handed to the spike, to test rather than accept:**
+
+1. **The screenshot is of the chrome, not the simulation.** Every benchmark game is
+   screenshot-worthy because the *sim* is the spectacle — Opus Magnum's arms, Factorio's belts,
+   Baba's rules sitting on the board as objects. Here the hero rectangle reads `NO TRACE ON
+   FILE` until Run is pressed, then draws 18%-alpha grid lines over a floor of the same value.
+   **A puzzle game that opens on a black rectangle has thrown away its establishing shot.**
+2. **The game has a strong identity it will not commit to.** Dry institutional bureaucracy is
+   TIS-100 territory, and TIS-100 wins by committing *absolutely* — fake 1970s manual,
+   monochrome CRT, no concession. **Half-committing to a bit is what reads as boring.**
+3. The palette already fights itself: eight world accents over a six-colour semantic palette,
+   three outside `tokens.css`, with World 7 *being* `--danger` and World 8 *being* `--gold`.
+
+**Format: a spike, deliberately.** Three implemented, running, screenshotted directions — not
+mockups, not a filter — compared at the same level, size and tick so they can be flipped
+between. Taste is the user's; they pick by looking. Told to reach for the strongest version of
+each bet rather than the safe one, because a timid spike tells them nothing, and to take a
+fourth direction if it is obviously better.
+
+**The constraint that outranks the brief:** readability beats beauty every time. This is a
+puzzle game and the player reads the board to debug their program. Anything that makes the grid
+harder to count, the bot harder to find or a divergence harder to see is wrong however good it
+looks — and each direction must state what it costs in legibility. Contrast is a floor, not a
+preference; the audit already found `--ink-dim` failing AA across 111 uses.
+
+Scoped to `src/render/**` and `src/ui/styles/**` — enough to change theme, palette, canvas,
+type scale and spacing without touching component structure, and disjoint from the two live
+agents. A direction needing markup changes gets described and screenshotted as close as
+possible, not smuggled in.
+
+Report: `docs/SPIKE-ART-DIRECTION.md`, shots under `docs/shots/art/<direction>/`, three
+separate commits so any one can be taken forward alone. A recommendation is required —
+"they're all fine" is a failed report.
