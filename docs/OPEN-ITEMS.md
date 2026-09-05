@@ -1278,3 +1278,37 @@ containment, not a cure.
   currently just `1x`. Left rather than half-done.
 - The ticks cell still reads `par 78 · best 78` on an ungraded level. One ternary; not a target,
   no colour, so it was flagged rather than changed.
+
+### 2026-09-05, 23:20 — the art brief, sharpened
+
+User: *"I would want something that has an actual art style. Not a 'UI'. A 'game'."*
+
+**My original brief was too small and this is a correction to it, not an addition.** I scoped
+the spike to theme, palette, type scale and spacing — which is a **restyle by construction**. A
+perfectly executed restyle still answers "what UI framework is this" rather than "who drew
+this". Recorded because the same mistake is easy to repeat: scoping an art task to CSS
+variables guarantees a CSS-variable answer.
+
+**What the target actually is:**
+
+- **The things in the world must be drawn, not tokened.** A bot should read as a machine with a
+  silhouette and a front, not a coloured rounded rect. Rock should look like rock; a feeder like
+  industrial equipment; a depot recognisable from across the board. The board is currently
+  semantic fills and it needs to look **authored**.
+- **Silhouette at tile size is the real design problem.** `w8-05` is 48x40 at roughly 24px
+  tiles, and the visited-tile trail has to stay legible *on top of* whatever gets drawn. Dense,
+  small, still readable is exactly what Factorio and Opus Magnum solved.
+- **Identity, not surface.** A title treatment and a consistent line/dither/edge language —
+  something recognisable cropped to a 200px square. TIS-100 is identifiable from any crop.
+- **The chrome must belong to the same world as the board.** The audit's observation that the
+  warm-grey canvas does not join the chrome gets fixed by making them one artefact.
+
+**Scope grew to match: the agent may now author and commit real art assets** — hand-authored
+SVG, sprite sheets, pixel art as data, canvas routines with craft in them. `src/render/sprites.ts`
+is the existing seam. Ownership extended to `src/assets/**` and `public/**`. Constraints: no new
+runtime dependencies, nothing fetched — everything authored in-repo with stated provenance and
+weight.
+
+**Unchanged and still outranking all of it: readability beats beauty.** The player debugs by
+reading the board. A direction that makes the grid harder to count, the bot harder to find or a
+divergence harder to see is wrong however good it looks, and each must state that cost honestly.
