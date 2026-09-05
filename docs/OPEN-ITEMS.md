@@ -783,3 +783,59 @@ The fix is a structured field on the objective declaring its unit, with the labe
 say whatever reads best. The parsing can stay as a fallback for levels that have not
 declared, but a level that declares should never be guessed at. Worth a test that fails when
 a label changes in a way that changes the inferred unit.
+
+### 2026-09-05, 17:05 — Performance Review cut (merged). SESSION HANDOFF POINT.
+
+Green at **1445 tests**, tsc / build clean. Main is `HEAD` of everything below; nothing of
+value is unmerged except the divergence agent's branch, described further down.
+
+**−500 lines net.** Gone: `PerformanceReview.tsx`, the `review` route and `Screen` member,
+the top-bar icon, the site-map button, and the scope/rows machinery in `review.ts`.
+`screens.css` 931 → 669. **Nothing lost that the site map does not already carry** — checked
+line by line. The wall's one unique datum was `TICKS / PAR` per work order, and `Results.tsx`
+already prints `· best {bestTicks}` on every run report, which is when it is actionable. It
+deliberately did *not* add a tick column to the site map: that would rebuild the deleted
+surface one screen to the left. Correct instinct.
+
+**Three cuts beyond the ruling, all right:** the five-rung tier ladder (a progress meter, in
+a game that had just deleted its second completion fraction, where every tier's prose already
+says where it sits); the `POINTS 102/102` row, which used a *different denominator* from the
+site map's own `POINTS x/y` — two disagreeing readings of one word; and the `SCOPE` row. The
+percentage moved onto the grade line.
+
+**The memo lands on the site map**, gated like `RepositoryIssue`. That is the only screen
+with zero ceremonies — the close-a-work-order transition already stacks the run report, the
+publish offer and the hardware crate, which was the veteran's complaint. It is also where the
+game starts, so a memo earned at the end of a session opens the next one.
+
+**Delivery is once per tier, ever** (`save.reviewedRanks`), not on tier change. Firing on
+change misbehaves under the new medals-only scoring: the first gold reads 100%, so the grade
+**oscillates across the tier-5 boundary** and would re-issue `RETAINED` repeatedly. That is
+the kind of thing only found by actually running it.
+
+### Left over, small, none blocking
+
+1. `src/ui/components/Icons.tsx` — `IconReview` is now a dead export. Diff in
+   `docs/FIX-REVIEW-CUT.md`.
+2. `docs/DESIGN.md:258` and `README.md:59` still describe the deleted screen. Diffs in the
+   same report.
+3. **Tier 1 can never be shown.** The medals-only denominator floors a graded record at
+   `1/3` = 33.3%, so `DEVELOPING` (0–24%) is unreachable and tier 2 needs a nearly all-bronze
+   record. Fell out of the morning's scoring fix, not the cut. `NARRATIVE.md` §7 records it;
+   moving the thresholds is a design call in `score.ts`.
+
+### If this session ended here — how to resume
+
+One agent was still running: **divergence**, branch `worktree-agent-a7462ef9324db5988`. It
+had already committed the mechanism, Worlds 1, 2 and 8, and the `score.ts` tier-5 change
+(`d73d6ac`), with more uncommitted in its worktree and a 33KB `docs/FIX-DIVERGENCE.md`
+written incrementally. **Merge what is committed, salvage the rest, read the report for which
+levels are converted.** Its remaining bundled items were the silver-band widening, the dead
+`SILVER_FACTOR`, the two `power()` fact-row deletions, and a judgement call on cutting Dot's
+"the tunnels join up" line from `w4-02`'s brief.
+
+The queue after that, in order: apply leftovers 1–3 above; implement **DESIGN §11 A7**
+(`graded?: boolean`, measured set `w1-01, w1-03, w5-02, w6-01, w6-03, w6-05`); sweep for more
+duplicated constants (**three found in one day**); work `AUDIT-INCENTIVES.md` findings 3 and
+5–12; the ranked mute verbs (`plant()`, `send()`, and `use()` returning a mute *success*);
+the UI/visual audit, now unblocked; then the loose content items.
