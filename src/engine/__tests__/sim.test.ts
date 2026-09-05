@@ -597,6 +597,48 @@ describe('pickup', () => {
     expect(sim.pickup(0, ItemKind.Ore, 0)).toBe(0);
     expect(bot(world).clock).toBe(DEFAULT_COSTS.pickup);
   });
+
+  /*
+   * A `0` folds four different worlds together. As with `plant`, what has to be true is that free
+   * calls pull them back apart — `scan().items` for the tile, `inventory()` against `capacity()`
+   * for the bot — and that the reason the engine recorded is the one those calls arrive at.
+   */
+  test('free calls tell the four zeroes apart, and match the recorded reason', () => {
+    function diagnose(sim: Sim, kind: ItemKind, requested: number): string {
+      if (requested <= 0) return 'count';
+      const here = sim.scan(0).items;
+      if (here.length === 0) return 'empty';
+      if (!here.some((stack) => stack.kind === kind)) return 'kind';
+      if (sim.inventory(0) >= sim.capacity(0)) return 'full';
+      return 'would take';
+    }
+
+    const bare = openWorld(3, 1, 1);
+    const wrongKind = openWorld(3, 1, 1);
+    addGroundItems(wrongKind, vec(0, 0), ItemKind.Crate, 3);
+    const noRoom = openWorld(3, 1, 1, {
+      capacity: 1,
+      inventory: [{ kind: ItemKind.Ore, count: 1 }],
+    });
+    addGroundItems(noRoom, vec(0, 0), ItemKind.Ore, 3);
+    const plenty = openWorld(3, 1, 1);
+    addGroundItems(plenty, vec(0, 0), ItemKind.Ore, 3);
+
+    const cases: [World, number, string][] = [
+      [bare, 1, 'empty'],
+      [wrongKind, 1, 'kind'],
+      [noRoom, 1, 'full'],
+      [plenty, 0, 'count'],
+    ];
+
+    for (const [world, requested, expected] of cases) {
+      const sim = new Sim(world);
+      expect(sim.pickup(0, ItemKind.Ore, requested)).toBe(0);
+      const diagnosis = diagnose(sim, ItemKind.Ore, requested);
+      expect(diagnosis).toBe(expected);
+      expect(must(eventsOfKind(sim.finish().events, 'pickup')[0]).reason).toBe(diagnosis);
+    }
+  });
 });
 
 describe('drop', () => {
@@ -644,6 +686,29 @@ describe('drop', () => {
     const world = openWorld(3, 1, 1, { inventory: [{ kind: ItemKind.Ore, count: 2 }] });
     const sim = new Sim(world);
     expect(sim.drop(0, ItemKind.Crate, 1)).toBe(0);
+  });
+
+  test('free calls tell the three zeroes apart, and match the recorded reason', () => {
+    function diagnose(sim: Sim, kind: ItemKind, requested: number): string {
+      if (requested <= 0) return 'count';
+      if (sim.inventory(0) === 0) return 'empty';
+      if (!sim.carrying(0).includes(kind)) return 'kind';
+      return 'would drop';
+    }
+
+    const cases: [World, number, string][] = [
+      [openWorld(3, 1, 1), 1, 'empty'],
+      [openWorld(3, 1, 1, { inventory: [{ kind: ItemKind.Ore, count: 2 }] }), 1, 'kind'],
+      [openWorld(3, 1, 1, { inventory: [{ kind: ItemKind.Crate, count: 2 }] }), 0, 'count'],
+    ];
+
+    for (const [world, requested, expected] of cases) {
+      const sim = new Sim(world);
+      expect(sim.drop(0, ItemKind.Crate, requested)).toBe(0);
+      const diagnosis = diagnose(sim, ItemKind.Crate, requested);
+      expect(diagnosis).toBe(expected);
+      expect(must(eventsOfKind(sim.finish().events, 'drop')[0]).reason).toBe(diagnosis);
+    }
   });
 
   test('a negative count throws IllegalActionError', () => {

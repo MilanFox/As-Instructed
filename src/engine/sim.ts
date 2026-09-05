@@ -506,6 +506,11 @@ export class Sim {
   /**
    * Picks loose items up off the bot's own tile. Omit `kind` to take whatever is there.
    * Returns how many were actually picked up, clamped by inventory capacity.
+   *
+   * A `0` is the same "the world says no" a `false` is, and stays one: every cause is transient.
+   * Which cause it was rides on the event as `reason`, because `0` alone folds together an empty
+   * tile, a tile with none of the kind asked for, a full inventory and a `count` of zero. The
+   * player recovers the same answer from `scan().items`, `inventory()` and `capacity()`, all free.
    */
   pickup(botId: number, kind?: ItemKind, count = 1): number {
     const bot = this.requireActiveBot(botId);
@@ -536,6 +541,7 @@ export class Sim {
         item: target ?? null,
         count: 0,
         ok: false,
+        reason: pickupBlockReason(Math.floor(count), available.length > 0, onGround),
       });
       this.charge(bot, dt);
       return 0;
@@ -549,7 +555,13 @@ export class Sim {
     return taken;
   }
 
-  /** Drops items onto the bot's own tile. Returns how many were actually dropped. */
+  /**
+   * Drops items onto the bot's own tile. Returns how many were actually dropped.
+   *
+   * Same shape as `pickup`, one notch milder because the player already knows what they are
+   * carrying: a `0` means the bot holds nothing at all, holds none of the kind named, or was asked
+   * for zero. `reason` says which, and `carrying()` / `inventory(kind)` answer it for free.
+   */
   drop(botId: number, kind?: ItemKind, count = 1): number {
     const bot = this.requireActiveBot(botId);
     if (!Number.isFinite(count) || count < 0) {
@@ -575,6 +587,7 @@ export class Sim {
         item: target ?? null,
         count: 0,
         ok: false,
+        reason: dropBlockReason(Math.floor(count), inventoryCount(bot)),
       });
       this.charge(bot, dt);
       return 0;
@@ -1209,6 +1222,27 @@ function plantBlockReason(tile: Tile | undefined, seeds: number): string | null 
   if (tile.crop !== undefined) return 'occupied';
   if (seeds <= 0) return 'seed';
   return null;
+}
+
+/**
+ * Why a `pickup` came back with nothing.
+ *
+ * Ordered by what the player can act on soonest: their own argument, then the tile, then what is
+ * on it, then the inventory. Every one of these is readable for free — `scan().items` and
+ * `inventory()` / `capacity()` — which is what keeps `pickup` a `0` rather than a throw.
+ */
+function pickupBlockReason(requested: number, anyOnGround: boolean, onGround: number): string {
+  if (requested <= 0) return 'count';
+  if (!anyOnGround) return 'empty';
+  if (onGround <= 0) return 'kind';
+  return 'full';
+}
+
+/** Why a `drop` came back with nothing. `carrying` is the bot's total across every kind. */
+function dropBlockReason(requested: number, carrying: number): string {
+  if (requested <= 0) return 'count';
+  if (carrying <= 0) return 'empty';
+  return 'kind';
 }
 
 /** Human-readable rendering of a move failure, for hint text and failure messages. */

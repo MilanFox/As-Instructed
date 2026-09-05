@@ -239,3 +239,71 @@ field is demonstrably the one that turns into player-facing text rather than a p
 second asserts `scan()` independently reports the same two causes it is documented to cover.
 
 Full suite: **1629 passing across 64 files.**
+
+---
+
+## 4. `pickup()` / `drop()` — mute in a different type
+
+**Kept on the "world says no" side.** A `0` is the numeric spelling of `false`, and every cause is
+transient: items get dropped, inventories get emptied, a computed `count` is recomputed. Both verbs
+still return the same number on the same conditions, and still charge the full price.
+
+`pickup()` folded **four** worlds into one `0` — nothing on the tile, nothing *of that kind* on the
+tile, no room left, and a `count` that floored to zero. The event distinguished only the first
+(`item: null`) and even that ambiguously. `drop()` folded three. Both now carry `reason`.
+
+| verb | `reason` | free check |
+|---|---|---|
+| `pickup` | `count` | the argument the player passed |
+| | `empty` | `scan().items` is empty |
+| | `kind` | `scan().items` has no stack of that kind |
+| | `full` | `inventory()` against `capacity()` |
+| `drop` | `count` | the argument the player passed |
+| | `empty` | `inventory()` is 0 |
+| | `kind` | `carrying()` does not list it |
+
+Every one is exact and free, so — as with `plant` — no new verb is warranted and the reference
+pages carry the fix the player actually reads.
+
+### What the player now reads
+
+> Picks loose items up off the bot's own tile and returns how many were actually taken. […] A zero
+> has three causes and each has a free check: nothing is lying there, or none of the kind you named
+> is (`scan().items`), or the bot is already full (`inventory()` against `capacity()`). It costs the
+> full price either way.
+
+and
+
+> Drops items from the inventory onto the bot's own tile and returns how many actually left the
+> inventory. A zero means the bot is carrying nothing at all, or none of the kind you named —
+> `carrying()` lists the kinds and `inventory(kind)` counts one of them, both free — and it still
+> costs a tick.
+
+The `drop` page previously covered only one of its causes ("dropping a kind the bot is not
+carrying"), which is the *rarer* of the two; a bot carrying nothing at all got no mention.
+
+### Difficulty is unmoved, and one call site had to be checked by hand
+
+`w8-02.ts:109` is the only reference solution that reads either return value, and it reads it
+numerically:
+
+```
+if (sim.pickup(botId, stack.kind, stack.count) < stack.count) { capacity = sim.inventory(botId); }
+```
+
+It infers the bot's real carry capacity from a **partial** pickup. That is a `taken > 0` path, so
+it never enters the branch this change touches, and it depends on `pickup` returning a short count
+rather than throwing — which is exactly why `pickup` had to stay a number. No reference solution
+reads `drop()`'s return at all. No par, budget, cost or objective moved.
+
+### What changed
+
+| File | Change |
+|---|---|
+| `src/engine/trace.ts` | `PickupEvent` and `DropEvent` each gain their own `reason?: string`. Added per-member rather than to the shared `ItemTransfer`, so `harvest` and `mine` are not silently given a field nothing sets. |
+| `src/engine/sim.ts` | `pickupBlockReason` and `dropBlockReason` beside `plantBlockReason`; both refusal events carry the answer. Both doc comments rewritten — `drop`'s was a single line. |
+| `src/runtime/api-spec.ts` | Both reference pages, as above. |
+| `src/engine/__tests__/sim.test.ts` | +2 tests, one per verb, each diagnosing every cause with free calls only and asserting the diagnosis equals the recorded reason. |
+
+Full suite: **1631 passing across 64 files.** `npx eslint src` reports exactly the one known
+pre-existing error.

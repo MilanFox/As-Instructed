@@ -345,7 +345,7 @@ print(\`crops held: \${inventory('crop')}\`);`,
       },
     ],
     returns: 'number',
-    doc: "Picks loose items up off the bot's own tile and returns how many were actually taken. The result is clamped by what is on the ground and by the remaining inventory capacity, so it can be smaller than `count`, or zero.",
+    doc: "Picks loose items up off the bot's own tile and returns how many were actually taken. The result is clamped by what is on the ground and by the remaining inventory capacity, so it can be smaller than `count`, or zero. A zero has three causes and each has a free check: nothing is lying there, or none of the kind you named is (`scan().items`), or the bot is already full (`inventory()` against `capacity()`). It costs the full price either way.",
     example: `const taken = pickup('ore', 5);
 print(\`loaded \${taken} ore\`);`,
     cost: 1,
@@ -372,7 +372,7 @@ print(\`loaded \${taken} ore\`);`,
       },
     ],
     returns: 'number',
-    doc: "Drops items from the inventory onto the bot's own tile and returns how many actually left the inventory. Dropping a kind the bot is not carrying returns 0 and still costs a tick.",
+    doc: "Drops items from the inventory onto the bot's own tile and returns how many actually left the inventory. A zero means the bot is carrying nothing at all, or none of the kind you named — `carrying()` lists the kinds and `inventory(kind)` counts one of them, both free — and it still costs a tick.",
     example: `while (inventory() > 0) {
   drop();
   move(Dir.East);

@@ -83,8 +83,16 @@ export type PlantEvent = BotAction & {
   reason?: string;
 };
 
-export type PickupEvent = ItemTransfer & { kind: 'pickup' };
-export type DropEvent = ItemTransfer & { kind: 'drop' };
+export type PickupEvent = ItemTransfer & {
+  kind: 'pickup';
+  /** Why a pickup came back with 0: 'empty' | 'kind' | 'full' | 'count'. */
+  reason?: string;
+};
+export type DropEvent = ItemTransfer & {
+  kind: 'drop';
+  /** Why a drop came back with 0: 'empty' | 'kind' | 'count'. */
+  reason?: string;
+};
 /** `pickup` moves ground -> inventory, `drop` moves inventory -> ground. */
 export type TransferEvent = PickupEvent | DropEvent;
 
