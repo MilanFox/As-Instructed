@@ -824,7 +824,10 @@ Theme: the finale. Unlocks nothing (DESIGN.md §6). Four large levels plus one m
 - `naive-fails` Any solution that solves one subproblem well and the rest naively misses the deadline. The only shape that reaches gold is a fleet with **roles** — scouts, haulers, electricians — coordinated over `send`/`recv`.
 - `generalize` Over everything at once. This is the only level in the game where that sentence is allowed.
 - `seeds` `[1,2,3,4,5,6,7]` — the highest count in the game.
-- `size` ~250 lines · `difficulty` **10/10**
+- `size` ~500 lines · `difficulty` **10/10** — the shipped reference source is 500 lines exactly.
+  The ~250 this document carried until now was a planning figure from before the level existed;
+  it was never true of anything that passes seven seeds. A player who has published the §18
+  ladder writes considerably less of it here, which is the whole argument for the Repository.
 - `bonus` **Three separate stars:** (a) beat the deadline by 20%; (b) come in a third under the character budget; (c) zero blocked moves across a 12-bot fleet.
 - `note` **This level must be beatable at bronze by a patient player with a slow, ugly solution.** Bronze's deadline is generous; gold is where it bites. Gating the ending behind gold ends the game for most players one level before the payoff, and the payoff (NARRATIVE.md §3.3) is the reason the other 39 levels exist.
 
@@ -1064,3 +1067,75 @@ Not changes — flags. DESIGN.md is the contract and this document does not amen
 4. **DESIGN.md §7, medal points.** The Performance Review tiers in NARRATIVE.md §7 assume
    gold = 3, silver = 2, bronze = 1, bonus star = +1. If scoring picks different weights, the
    tier thresholds need updating with them.
+
+---
+
+## 18. The Brick Ladder
+
+The Repository (`docs/LIBRARY.md`) is optional and stays optional: **every level on this ladder
+is solvable by writing the same routine inside the level**, and a player who never opens the
+second editor tab finishes the campaign with the same medals. What the ladder specifies is
+something else — which routines are worth *owning*, where each one is earned, and which later
+work orders are authored on the assumption that it exists.
+
+The rule that decides membership: **a routine with one caller is not a brick.** A level is added
+to the reuse column only when its brief could honestly name the routine — when the natural
+solution really does want that shape, not when a caller could be forced.
+
+### 18.1 The six bricks
+
+| Routine | Earned in | Named by | Costs ticks? |
+|---|---|---|---|
+| `survey(b?)` — look every way from where a bot stands, record what it saw | w4-04 | w4-05, w7-05, w8-02 | no |
+| `pathTo(x, y, b?)` — walk a bot to a tile the record already knows | w4-04 | w4-05, w7-02, w7-05, w8-01, w8-02, w8-03 | **yes** |
+| `waves(deps)` — group a dependency graph into startable-at-once sets | w5-03 | w5-05, w8-03 | no |
+| `unpack(route)` — a run-length route into the moves it stands for | w6-03 | w6-05, w8-04 | no |
+| `findKey(packets)` — the shift a band was sent with | w6-04 | w6-05, w8-04, w8-05 | no |
+| `deal(costs, fleet)` — heaviest job to the least-loaded worker | w7-04 | w7-05, w8-03 | no |
+
+`pathTo` is the only one with weight, which makes it the one the Cost tab has something to say
+about: walking costs ticks, so a cheaper `pathTo` measurably improves six work orders at once.
+The other five are free at the tick level and earn their place on reuse alone.
+
+**Earned means earned.** The five levels in the first column import nothing. Their briefs close
+with a paragraph saying the routine is worth keeping and naming it, so that the name the later
+brief uses is a name the player has already read. A brief must never make the earning level
+*sound* like it is missing something.
+
+### 18.2 The two composites
+
+| Routine | Built from | Earned in | Named by |
+|---|---|---|---|
+| `reach(x, y, b?)` — route to a tile, surveying first when the record does not know it yet | `survey` + `pathTo` | w8-02 | w8-04, w8-05 |
+| `dispatch(deps, costs, fleet)` — group the work into waves, deal each wave across the fleet | `waves` + `deal` | w8-03 | w8-05 |
+
+These exist because the best thing this system can show a player is a routine of theirs calling
+two other routines of theirs, and the tick cost flowing up through the chain into the work order
+that called the outermost one (`meterExport`, `docs/LIBRARY.md` §2). w8-02 and w8-03 are the two
+levels whose brief says so outright: *"they are two routines and this depot wants one."*
+
+`w8-05` then imports `findKey`, `reach` and `dispatch` — one brick and two composites — which is
+the joke and the payoff at the same time. The whole site runs on Contractor #4471's code.
+
+### 18.3 The refactor beat
+
+`survey` and `pathTo` are written in World 4 against the single-bot binding, and World 7 hands
+the player a fleet. `w7-02`'s brief says plainly that the filed `pathTo` will not work here and
+that the fix is a trailing `b?: Bot` argument. Because the argument is optional, the four earlier
+work orders that already import it keep passing untouched — which is what the regression suite is
+for, and the cheapest possible demonstration that it works.
+
+Do not "fix" this by shipping the bot argument from `w4-05`. World 4 has no `bot()`; the growth
+is the lesson.
+
+### 18.4 Deliberate absences
+
+- **`w4-03`** — importing `w4-02`'s visited-set sweep would erase the w4-02/w4-03 diptych (§1.2).
+- **`w4-04`, `w5-03`, `w6-03`, `w6-04`, `w7-04`** — these are the earning levels. Handing a player
+  the routine the level exists to teach is the one thing this system must never do.
+- **`w6-02`'s checksum** — reused by `w6-05` and by nothing else. World 8's band uses a different
+  check (unsalted, mod 1000), so it has exactly one caller and is therefore not a brick. Do not
+  add it to §18.1 without first unifying the two packet formats, which is a level change and
+  needs re-proving on every seed of `w8-04` and `w8-05`.
+- **A fleet-wide router separate from `pathTo`** — rejected as padding. One routine that grew an
+  argument is better content than two routines that do the same thing.
