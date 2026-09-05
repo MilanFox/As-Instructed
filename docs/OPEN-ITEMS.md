@@ -101,3 +101,38 @@ testers would have quit in. Gold on nine of the first ten levels, first honest r
 - Par is default-gold through World 2. Deliberately frozen until the above lands, because
   the fix is either "raise par" or "par is not the axis" and that depends on the new bonuses.
 - Housekeeping: 2 pre-existing eslint false positives; delete branch `wip/wave1-interrupted`.
+
+### Backlog — i18n, German toggle
+
+Requested 2026-09-05. Not started, and deliberately not started small: this is a
+structural change, not a string sweep.
+
+**Scope.** Player-facing prose lives in four places and none of it is extracted:
+briefs and hints inline in the 34 level files (~2200 quoted lines), `src/ui/copy.ts`
+(316), `src/meta/copy.ts` (263), and the docs entries in `src/runtime/api-spec.ts`
+(793, mixed prose and signatures). Plus commendation titles/notes/requirements in
+`src/game/achievements.ts`, verdict and failure copy, and the objective labels that
+`budgets.ts` now parses for their unit.
+
+**Three things make this harder than a normal i18n job:**
+
+1. **The API must stay English.** `move`, `harvest`, `scan().crop`, `Dir.North` are real
+   TypeScript the player writes. Identifiers, the generated `.d.ts`, starter code and
+   every code sample stay as they are. So `api-spec.ts` splits: signatures fixed,
+   surrounding prose translated. Same for briefs, which quote the API inline.
+2. **`budgets.ts` parses English labels.** A label ending `, in <plural noun>` is how a
+   budget declares its unit, and label words are matched against event kinds. That
+   coupling has to be replaced with explicit structured fields *before* any label is
+   translated, or German labels silently stop being budgets.
+3. **The tone is the product.** The dry corporate register — work orders, requisitions,
+   Scheduling, "the last recorded instance was in 2204 and is disputed" — is most of the
+   game's character. Machine-translated German would read as flat instructions and lose
+   it. The German copy has to be *written*, by someone who can be funny in German, against
+   the English as a reference rather than a source.
+
+**Order of work:** decouple `budgets.ts` from label prose → extract strings behind a
+lookup keyed by id, English as the fallback locale → verify nothing regressed with the
+English still in place → then write the German. Steps 1–3 are the engineering and are
+worth doing on their own; step 4 is a writing job.
+
+A language toggle belongs in Settings next to the layout controls, persisted in the save.
