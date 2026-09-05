@@ -4,8 +4,7 @@ import { getAchievement } from '../../game/achievements.ts';
 import type { Budget, BudgetSource, ObjectiveReading } from '../../game/budgets.ts';
 import { budgetFor, budgetReadout, failureCauses } from '../../game/budgets.ts';
 import { playbackFor } from '../../game/playback.ts';
-import type { Medal } from '../../game/score.ts';
-import { levelPoints, medalFor } from '../../game/score.ts';
+import { Medal, levelPoints, medalForLevel, medalOf } from '../../game/score.ts';
 import { currentLevel, useGame } from '../../game/store.ts';
 import { nextLevel } from '../../levels/index.ts';
 // Deep imports on purpose: `src/meta/ui/index.ts` re-exports `LibraryPanel`, which pulls Monaco
@@ -46,6 +45,41 @@ const MEDAL_WORD: Record<Medal, string> = {
 };
 
 /**
+ * What the report calls the result. `null` is an ungraded work order (DESIGN.md §11 A7): there was
+ * never a medal to award, so the word for it is the state — closed — and never a medal's absence.
+ */
+export function resultWord(medal: Medal | null): string {
+  return medal === null ? 'closed' : MEDAL_WORD[medal];
+}
+
+/**
+ * What this run earned, as the report says it.
+ *
+ * A failed run earned nothing on any level, which is `none` — a medal not held rather than a level
+ * that awards none. `medalForLevel` answers the second question, and on an ungraded work order it
+ * answers `null` whether the run passed or not, which would stamp a failed report CLOSED.
+ *
+ * `level` is optional because every hook in the report runs before the screen can bail out on a
+ * missing one; the par of 1 is the fallback the report has always used there.
+ */
+export function reportedMedal(
+  level: { graded?: boolean; par: { ticks: number } } | null | undefined,
+  passed: boolean,
+  ticks: number,
+): Medal | null {
+  if (!passed) return Medal.None;
+  return medalForLevel(level ?? { par: { ticks: 1 } }, passed, ticks);
+}
+
+/**
+ * The ring the viewport throws. An ungraded close takes the same `pass` arc `none` does: the
+ * ceremony is the reward for the work, and A7 removes the grade rather than the reward.
+ */
+export function celebrationFor(medal: Medal | null): 'gold' | 'silver' | 'bronze' | 'pass' {
+  return medal === null || medal === 'none' ? 'pass' : medal;
+}
+
+/**
  * The end-of-run report.
  *
  * Remounted for every result (`key={resultId}`) so the escalation always starts from nothing — a
@@ -81,7 +115,7 @@ function ResultsReport(): JSX.Element | null {
 
   const passed = verdict?.passed ?? false;
   const ticks = verdict?.stats.ticks ?? 0;
-  const medal = medalFor(passed, ticks, level?.par.ticks ?? 1);
+  const medal = reportedMedal(level, passed, ticks);
   const bonusIds = new Set((level?.bonus ?? []).map((objective) => objective.id));
   const required = (verdict?.objectives ?? []).filter((objective) => !bonusIds.has(objective.id));
   const reportedBonus = (verdict?.objectives ?? []).filter((objective) =>
@@ -184,8 +218,8 @@ function ResultsReport(): JSX.Element | null {
 
     if (collapsed) {
       if (stage >= medalStep && from < medalStep) {
-        audio.medal(medal);
-        renderer().celebrate(medal === 'none' ? 'pass' : medal);
+        audio.medal(medal ?? undefined);
+        renderer().celebrate(celebrationFor(medal));
       }
       return;
     }
@@ -195,8 +229,8 @@ function ResultsReport(): JSX.Element | null {
         audio.cue('objective', step);
         renderer().pulse();
       } else if (step === medalStep) {
-        audio.medal(medal);
-        renderer().celebrate(medal === 'none' ? 'pass' : medal);
+        audio.medal(medal ?? undefined);
+        renderer().celebrate(celebrationFor(medal));
       } else if (step >= commendStep) {
         audio.commend(step - commendStep);
         renderer().pulse('commend');
@@ -352,8 +386,10 @@ function ResultsReport(): JSX.Element | null {
              */}
             {passed ? (
               <div className="score-cell">
-                <div className="score-cell__label">medal</div>
-                <div className="score-cell__value score-cell__value--word">{MEDAL_WORD[medal]}</div>
+                {/* An ungraded work order has no medal cell to fill, so the cell is not headed
+                    `medal` — it reports the result, and the result is that it is closed. */}
+                <div className="score-cell__label">{medal === null ? 'result' : 'medal'}</div>
+                <div className="score-cell__value score-cell__value--word">{resultWord(medal)}</div>
                 <div className="score-cell__note">
                   {levelPoints(medal, stars.length)} pts
                   {stars.length > 0
@@ -365,7 +401,7 @@ function ResultsReport(): JSX.Element | null {
               <div className="score-cell">
                 <div className="score-cell__label">on record</div>
                 <div className="score-cell__value score-cell__value--word">
-                  {progress?.completed ? MEDAL_WORD[progress.medal] : 'still open'}
+                  {progress?.completed ? resultWord(medalOf(level, progress)) : 'still open'}
                 </div>
                 <div className="score-cell__note">
                   {progress?.completed ? 'this run changed nothing' : 'nothing to lose'}

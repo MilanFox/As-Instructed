@@ -1216,6 +1216,13 @@
   color: var(--ink-dim);
 }
 
+/* An ungraded work order is closed, not un-medalled: the stamp reads as done (DESIGN.md §11 A7). */
+.medal--closed {
+  border-color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 16%, transparent);
+  color: var(--ok);
+}
+
 .medal--lg {
   width: 44px;
   height: 44px;
@@ -1606,6 +1613,21 @@
   min-width: 440px;
   border-right: 1px solid var(--border-strong);
   box-shadow: 12px 0 32px rgb(0 0 0 / 45%);
+}
+
+/*
+ * A failed modal reports itself as a notice, not as a panel. `.panel-boundary` is sized for the
+ * Repository's column, where taking the full height is right; in the app's flex column it would
+ * take the workspace's height with it and the player would lose sight of their program over a
+ * dialog they did not open (docs/AUDIT-UI.md F21).
+ */
+.modal-layer {
+  flex: none;
+}
+
+.modal-layer .panel-boundary {
+  height: auto;
+  border-top: 1px solid var(--border);
 }
 
 .panel-boundary {

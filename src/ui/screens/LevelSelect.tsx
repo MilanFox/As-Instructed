@@ -9,7 +9,14 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, JSX, KeyboardEvent } from 'react';
 import { emptyProgress } from '../../game/save.ts';
 import type { LevelProgress, SaveFile } from '../../game/save.ts';
-import { Medal, levelMaxPoints, levelPoints, starsFor } from '../../game/score.ts';
+import {
+  Medal,
+  isGraded,
+  levelMaxPoints,
+  medalOf,
+  progressPoints,
+  starsFor,
+} from '../../game/score.ts';
 import { isLevelUnlocked, useGame } from '../../game/store.ts';
 import { campaignOrder, levelsByWorld } from '../../levels/index.ts';
 import { CommendationShelf } from '../components/CommendationShelf.tsx';
@@ -39,19 +46,26 @@ interface WorldRow {
   closed: number;
   points: number;
   maxPoints: number;
+  /** At par or under: gold, or closed where the level carries no ladder (DESIGN.md §11 A7). */
   gold: number;
   /** Every issued work order in this world is closed. The sector is done. */
   complete: boolean;
-  /** Every issued work order in this world is gold. */
+  /** Every issued work order in this world is at par or under. */
   perfect: boolean;
 }
 
 interface Tally {
   points: number;
   maxPoints: number;
+  /**
+   * Medals held, and nothing else. An ungraded work order genuinely has no medal, so it belongs in
+   * none of these three columns however it was closed (DESIGN.md §11 A7).
+   */
   gold: number;
   silver: number;
   bronze: number;
+  /** Work orders closed at par or under, which an ungraded close is by definition. */
+  atPar: number;
   stars: number;
   issued: number;
   closed: number;
@@ -65,7 +79,7 @@ function medalWord(medal: Medal): string {
   return medal === Medal.None ? 'no medal' : `${medal} medal`;
 }
 
-function buildRows(save: SaveFile): WorldRow[] {
+export function buildRows(save: SaveFile): WorldRow[] {
   const nextUp = campaignOrder().find(
     (level) => isLevelUnlocked(save, level.id) && !progressOf(save, level.id).completed,
   );
@@ -89,12 +103,7 @@ function buildRows(save: SaveFile): WorldRow[] {
     const issued = levels.length;
     const closed = nodes.filter((node) => node.status === 'CLOSED').length;
     const points = levels.reduce(
-      (sum, level) =>
-        sum +
-        levelPoints(
-          progressOf(save, level.id).medal,
-          starsFor(level.bonus, progressOf(save, level.id).stars),
-        ),
+      (sum, level) => sum + progressPoints(level, progressOf(save, level.id)),
       0,
     );
     const maxPoints = levels.reduce(
@@ -102,7 +111,12 @@ function buildRows(save: SaveFile): WorldRow[] {
       0,
     );
 
-    const gold = levels.filter((level) => progressOf(save, level.id).medal === Medal.Gold).length;
+    // A world holding an ungraded level could otherwise never be `perfect`, and `ALL AT PAR` would
+    // be unattainable in worlds 1, 5 and 6 — a close there is worth a gold (DESIGN.md §11 A7).
+    const gold = levels.filter((level) => {
+      const progress = progressOf(save, level.id);
+      return isGraded(level) ? progress.medal === Medal.Gold : progress.completed;
+    }).length;
     const complete = issued > 0 && closed === issued;
 
     return {
@@ -119,13 +133,14 @@ function buildRows(save: SaveFile): WorldRow[] {
   });
 }
 
-function campaignTally(rows: WorldRow[]): Tally {
+export function campaignTally(rows: WorldRow[]): Tally {
   const tally: Tally = {
     points: 0,
     maxPoints: 0,
     gold: 0,
     silver: 0,
     bronze: 0,
+    atPar: 0,
     stars: 0,
     issued: 0,
     closed: 0,
@@ -136,6 +151,7 @@ function campaignTally(rows: WorldRow[]): Tally {
     tally.maxPoints += row.maxPoints;
     tally.issued += row.issued;
     tally.closed += row.closed;
+    tally.atPar += row.gold;
     for (const node of row.nodes) {
       tally.stars += starsFor(node.level.bonus, node.progress.stars);
       if (node.progress.medal === Medal.Gold) tally.gold++;
@@ -147,13 +163,17 @@ function campaignTally(rows: WorldRow[]): Tally {
   return tally;
 }
 
-function nodeLabel(node: WorkOrderNode): string {
+export function nodeLabel(node: WorkOrderNode): string {
   const name = `${node.id}, ${node.level.title}`;
   if (!node.playable) return `Work order ${name}. On hold. Locked.`;
   const stars = starsFor(node.level.bonus, node.progress.stars);
   const bonus = stars === 1 ? '1 bonus star.' : `${stars} bonus stars.`;
   const state = node.progress.completed ? 'Closed' : 'Open';
-  return `Work order ${name}. ${state}. ${medalWord(node.progress.medal)}. ${bonus}`;
+  // `no medal` on a closed ungraded order announces finished work as unfinished, in the identical
+  // words an untouched graded order gets. An absent medal is not a missing one (DESIGN.md §11 A7).
+  const medal = medalOf(node.level, node.progress);
+  const grade = medal === null ? 'Not graded' : medalWord(medal);
+  return `Work order ${name}. ${state}. ${grade}. ${bonus}`;
 }
 
 function LockGlyph(): JSX.Element {
@@ -302,7 +322,7 @@ export function LevelSelect(): JSX.Element {
           </div>
           <p className="campaign-bar__caption numeric">
             {Math.round(campaignPercent)}% of the site closed
-            <span className="campaign-bar__aside"> · {tally.gold} at par or under</span>
+            <span className="campaign-bar__aside"> · {tally.atPar} at par or under</span>
           </p>
         </div>
       </header>
