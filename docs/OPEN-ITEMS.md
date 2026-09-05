@@ -1392,3 +1392,43 @@ much is a success condition, not a failure: *"see what sticks" is licence to fai
   to assert behaviour. A renderer test failing because the palette changed on purpose is a
   signal to update the test; one failing because the grid stopped being countable is a signal
   to stop.
+
+---
+
+## 2026-09-06 — publish crash merged; the reward and invariant agents still out
+
+**Merged: the publish dialog no longer loops the render** (`f90f842`). Main is green at
+**1698 tests / 69 files**, tsc and build clean.
+
+The diagnosis is worth keeping because it is a *class* of bug, not an incident. `PublishOffer`
+carried a `selection` field, so `setSelection` minted a new object identity on every keystroke,
+and a memo that legitimately depended on `offer` could never converge. The regression commit is
+`befef62`, which added `offer` to the memo deps — **the correct move by the rules of hooks**. It
+stepped into a trap laid the day the component was written. The fix is structural rather than a
+guard: `offer` is now write-once (minted by `offerPublish`, cleared by confirm/skip) and
+`confirmPublish(selection)` takes the draft as an argument. An identity guard or narrowed deps
+would both have stopped today's loop while leaving the trap armed for the next reader.
+
+**Rejected on the way:** a hand-written deep compare (stops guarding silently the day
+`PublishSelection` gains a field) and a sibling store field (same trap for the first component
+that subscribes to it). *A mid-interaction draft does not belong in a frozen fact.*
+
+`src/meta/__tests__/publish-dialog.test.ts` brings its own React — a hand-cranked renderer with
+real hook semantics and `Object.is` dep comparison, no jsdom, no testing-library, no new deps.
+Verified by checking the two pre-fix sources back out under it: **3 of 6 fail before, 6 pass
+after**, and it settles in exactly 2 passes rather than never. `skipPublish` and `confirmPublish`
+had **no test at all** in the repo before this.
+
+**Two findings picked up in passing:** F13's 37-word scolding now fires only when actionable and
+is one sentence; the COST tab no longer repeats the status bar verbatim; the Repository's Monaco
+gained `ariaLabel: 'lib.ts'` (two textboxes were both named "Editor content" in the a11y tree).
+
+**Still open from that report:** F20 is live on main — `src/ui/library.ts:90` throws
+`Uncaught (in promise)` from `installTypes` on level entry, logged twice per entry. Routed to
+whoever owns `src/ui/` when the art direction settles. The modal-layer error boundary is still
+owed and still worth having with the loop gone.
+
+**In flight overnight:** the art direction spike (the one that matters), the reward-layer cut,
+and the invariant guards. Reveille armed for the window reset at 04:42 with a full brief; the
+Mac is caffeinated. The art comparison shots go **to the user to pick from** — that call is
+taste, so it is theirs. Every other call is mine.
