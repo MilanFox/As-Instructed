@@ -258,6 +258,253 @@ and cutting one lowers a level's maximum points and the Performance Review's den
 `src/levels/**` but not the licence to change what a level offers, so the two content changes are
 diffs below rather than commits.
 
+---
+
+## 5. Every finding's disposition
+
+| # | finding | disposition |
+|---|---|---|
+| 3 | strictly linear unlock | **Fixed** in `store.ts`, §3 above. One rendering note left for the site map. |
+| 5 | `AS PER THE BRIEF` taxes pressing Run | **Fixed by deletion.** Taken as tidying, not as a fix, per the audit's own §18 correction — the behavioural claim was refuted by both playtests and I did not act on it. What I acted on is the coherence claim: three entries read `RunFacts.attempt`, one of them backwards. Now two read it, both forwards. |
+| 6 | six systems pay for not bumping | **Partly fixed, fully answered.** §4 above. Commendation deleted; ruling recorded as A10; two content diffs handed over. |
+| 7 | the golf moved onto ticks; 73% of bonuses are tightenings | **Partly fixed.** `outside-tolerance` deleted — it was a hidden second par on the visible par's own axis, invisible until met, and unreachable rather than hard wherever the route is forced. `revised-downward` deleted for the related reason that it was a once-ever, lossier copy of `personalBestLine`. `personalBestLine` untouched, as instructed and as it deserves. The bonus-layer half is content and is listed below. |
+| 8 | should ticks be the medal axis in the early game | **Superseded.** The audit's own prescription — `LevelDef.graded`, `CLOSED` on a pass, 3 points flat — landed this week as §11 A7, at the narrower scope the orchestrator ruled (six levels, not "everything through World 2"). The par numbers were never mine. One sub-point survives and is a UI naming problem, listed below: `w1-01` shows **90** in the objective rail as a hard limit and **78** as par, with nothing on screen saying one is a fail and the other is a boundary. `w8-01` does the same with 215 and 165. |
+| 9 | the Repository is unmeasured | **Partly fixed.** `no-regressions` deleted — it made a red result feel like a personal failure on the one screen in the game where a red result is the useful outcome, which is the opposite of what a refactoring suite is for. `repository` kept, and it is now one of five rather than one of fifteen, which is the whole of the visibility change I can make without adding points. The audit is right that the fix is *legibility, not points*, and it is right for a better reason than it gives: §18 records that the veteran used the Repository for its own sake with no reward at all, so the prescription "do not add points" is not a preference, it is a tested result. Both legibility items are UI and are listed below. |
+| 10 | a Discrepancy reports a failure with no way to look | **Not fixed — `src/meta/**` is held by the crash-fix agent.** My ruling and the cheapest honest version are below. |
+| 11 | a bonus star graded on one seed, the medal beside it on all of them | **Not fixed — needs `src/runtime/**`, which is outside my scope.** Cause confirmed and the exact patch is below. |
+| 12 | DESIGN.md §7.1 still mandates the streak | **Fixed**, §2 above. |
+
+---
+
+## Changes for the orchestrator to apply
+
+Each one leads with the intent, because a diff against a component that is being rebuilt does not
+survive and an intent does.
+
+### A. UI — the commendation shelf and the run report
+
+**Intent: the shelf is a list of five, and nothing in the game may count it as a fraction of a
+whole.** `src/ui/components/CommendationShelf.tsx` renders `{earned.length}/{ACHIEVEMENTS.length}`.
+At fifteen that was a progress bar the player could not influence; at five it is worse, because
+five is small enough that "1/5" reads as failing. **Drop the count entirely** and render the list.
+No code change is required for correctness — the component maps `ACHIEVEMENTS` and will simply show
+five rows — so this is a judgement call and it is the only one I would insist on.
+
+`src/ui/screens/Results.tsx` needs nothing: it maps `freshCommendations` through `getAchievement`
+and already filters `undefined`, so a retired id arriving from an old code path renders nothing
+rather than crashing.
+
+### B. `src/ui/library.ts:197` — delete the retired award
+
+**Intent: the regression suite must not imply that a clean pass is the goal.** Refactoring is
+supposed to break things so you find out; the suite already protects the player correctly
+(`applySuite`'s `acceptMedals` defaults false).
+
+```diff
+-    const summary = state.suite?.summary;
+-    if (
+-      summary &&
+-      state.suite !== previous.suite &&
+-      summary.total > 0 &&
+-      summary.broken === 0 &&
+-      !state.suite?.run.cancelled
+-    ) {
+-      useGame.getState().award('no-regressions');
+-    }
+```
+
+Not urgent: `store.award` now refuses an id this build does not issue, so the call is inert. It is
+dead code, not a bug.
+
+### C. `src/ui/styles/screens.css:564` — delete `.sitemap .screen-stat__streak`
+
+The last physical trace of the streak.
+
+### D. `src/audio/__tests__/sounds.test.ts:198` — a stale comment
+
+`// Fifteen commendations exist. The fifteenth must not be a dog whistle.` The test itself is fine
+and still passes: it asserts the `commend` sound holds pitch at the top of its ladder instead of
+climbing out of the audible range, which is a property of the synth, not of the list length. Only
+the comment is wrong. `src/audio` is not mine.
+
+### E. `src/runtime/**` — finding 11, the bonus star graded on one seed
+
+**Intent: a bonus is a level objective and must be graded on the same conjunction as every other
+objective — every seed, worst result reported.** Right now the medal reads
+`maxOf(runs.map(ticks))` while the star is re-evaluated in `store.ts`'s `withBonus` against the one
+returned trace, which `aggregate.ts:81` picks as `runs[0]` when everything passed. That is why
+`w3-02` shows `TICKS 402 · par 332` with "Bonus met — beat par by ten percent" underneath: 402 is
+the worst seed, 281 is seed one.
+
+Three small changes, and then `withBonus` disables itself — its `missing` filter returns the
+verdict untouched once the worker reports the bonus, so nothing in `src/game` has to change on the
+same commit.
+
+`src/runtime/protocol.ts`, in `PerSeedResult`:
+
+```diff
+   objectives: ObjectiveReport[];
++  /** The level's bonus objectives on this seed. Never affects `passed`. */
++  bonus?: ObjectiveReport[];
+   failure?: RuntimeFailure;
+```
+
+`src/runtime/run-level.ts`, after the existing `buildVerdict` call — a second pass rather than
+adding them to the first, because `buildVerdict` derives `passed` from *every* objective it is
+given and a bonus is optional by definition:
+
+```diff
+   const result: PerSeedResult = { seed, passed: verdict.passed, ticks: …, ops: …,
+     objectives: verdict.objectives };
++  const bonus = level.bonus ?? [];
++  if (bonus.length > 0) {
++    result.bonus = buildVerdict({
++      objectives: bonus, world: sim.world, trace, initialWorld,
++      ops: sim.ops, seeds: 1, spend: sim.spendTotals(),
++    }).objectives;
++  }
+```
+
+`src/runtime/aggregate.ts` — the same worst-seed-per-objective rule the required objectives already
+get, which is the whole point:
+
+```diff
++function bonusAcrossSeeds(runs: readonly SeedRun[]): Verdict['objectives'] {
++  const reported = runs[0]?.result.bonus;
++  if (!reported) return [];
++  return reported.map((objective) => {
++    for (const run of runs) {
++      const missed = run.result.bonus?.find((c) => c.id === objective.id && !c.met);
++      if (missed) return missed;
++    }
++    return objective;
++  });
++}
+```
+```diff
+-    objectives: worstPerObjective(runs, reported),
++    objectives: [...worstPerObjective(runs, reported), ...bonusAcrossSeeds(runs)],
+```
+
+Then delete `withBonus` from `src/game/store.ts` — its own comment says *"Delete this the day the
+verdict carries them"* — and note that `FakeRunner` in `src/game/ports.ts` runs only
+`submission.seeds[0]`, so it will keep needing `withBonus`'s behaviour or an equivalent. That is
+the one thing to check before deleting.
+
+**This is a scoring change and it will make some stars harder.** That is the correction, not a side
+effect: those stars are currently awarded on a weaker standard than the objectives beside them.
+
+### F. `src/meta/**` — finding 10, the Discrepancy nobody can look at
+
+**Intent: either the player can run the layout they are told failed, or the game does not tell
+them.** Being told you are wrong and given no instrument is worse than not being told, and the card
+already offers `Stop raising these`, so the system's own opt-out is its most attractive option.
+
+I would **give them the seed**, and the ranked options are:
+
+1. **Best, and not much work.** When a discrepancy is open on level X, add its seed to X's run set.
+   Everything needed exists: `run()` in `store.ts` passes `seeds: [...level.seeds]` to the runner,
+   the runner takes a seed list, `seedResults` already carries per-seed objective readings, and
+   `Results.tsx` already renders per-seed marks for multi-seed levels. The seam is one optional
+   field on the store that the meta layer sets — `store.ts` must not import `src/meta`, or the
+   layering inverts. I did not build half of it because the shape belongs to whoever owns `meta`.
+2. **Minimum honest version.** Render the raised seed's trace on the card itself.
+3. **If neither, stop raising them.** A costless notification about an unobservable failure trains
+   the player to mute the one mechanism in the game that challenges overfitting — which is the
+   single most likely wrong mental model a player of this game can form.
+
+Once it can be inspected, `MIN_CLOSED_BEFORE_FIRST = 6` and `COMPLETIONS_PER_DISCREPANCY = 5`
+should come down. Five events across 34 levels is the right rarity for a notification and the wrong
+rarity for a teaching device.
+
+### G. `src/levels/**` — the content half of findings 6 and 7
+
+I own these files but not the licence to change what a level asks, so they are diffs. Both are
+deletions of an optional bonus; neither touches par, a threshold, a budget, a tick cost or a
+required objective.
+
+**G1. `src/levels/world-8/w8-05.ts:857–872` — delete the `no-blocked-moves` bonus.** Intent: stop
+paying a star for the non-occurrence of an error on a level that already asks two harder questions.
+It sits beside `under-budget` and `fleet-utilisation`; `w8-05` keeps two bonuses and loses one
+point of maximum. This is the clean cut of the four and the one I would take.
+
+**G2. `src/levels/world-7/w7-01.ts:194` — probably delete the second conjunct**, pending the one
+measurement in §4: `(ctx) => ctx.trace.endTick <= floorTicks(ctx) && blockedMoves(...) === 0`. If
+`floorTicks` is the real floor the conjunct is unreachable-when-false and deleting it changes
+nothing observable.
+
+**G3. Do not cut `w7-03`'s `no-bumps`** despite the audit naming it. Argument in §4.
+
+**G4. Finding 7's wider list, unactioned and ranked.** The audit names the pure tightenings; the
+two playtests independently confirm the symptom (beginner §8 *"these are… confetti"*, veteran §8
+*"Dead bonus: most of them"*) and independently name the same single exception, `w4-02`'s mark
+budget. The ones I would retire or replace first, because they restate the required solution with a
+tighter number and ask no new question: `w3-01` clean-run, `w8-01` audit-tight, `w8-03` tight-shift.
+The models for what a replacement looks like are all in World 6 — `w6-02` `name-the-fault` asks the
+player to *report which byte was altered*, which is a question the required objective does not ask.
+**A level with no second idea in it is allowed to have no bonus**, which is already true of `w1-01`
+and `w6-01`.
+
+### H. UI — finding 8's surviving sub-point: a limit and a budget are not the same object
+
+**Intent: two different tick numbers on one screen need two different words.** `w1-01` shows `90` in
+the objective rail (`Objectives.withinTicks(90, { id: 'bay-booking' })` — a hard fail) and `78` as
+par (a medal boundary). `w8-01` shows 215 and 165 the same way. The player is given no way to tell
+which one ends the run. Whatever the new site map and workspace look like, a **limit** and a
+**budget** should not both be labelled "ticks".
+
+### I. Findings 9.1 and 9.2 — make the Repository legible without pricing it
+
+**Intent: the one honest number already exists and is not shown.** `LibraryUsage` (`ticks`, `calls`)
+is computed on every meta run and thrown away.
+
+1. On the Results screen, for any run that linked the library: *"3 routines from the Repository, 41
+   ticks inside them."* A fact about the run, not a score.
+2. On the Repository panel, the reuse count per published routine: `pathTo` called by six work
+   orders is the argument for the feature made by the save file rather than by a brief.
+
+Neither adds a point to anything, which is the point — §18 records that intrinsic utility was
+sufficient for the veteran with no extrinsic reward at all.
+
+---
+
+## 6. Verification
+
+`npx tsc --noEmit` clean. `npm run build` clean. `npx eslint src` reports the one pre-existing
+error at `src/levels/world-5/__solutions__/w5-01.ts:32` and nothing else. No re-run was needed —
+the `onTaskUpdate` contention never appeared in this session.
+
+**`npx vitest run`: 1692 tests, 68 files, green — the same total as the baseline, which needs
+explaining because a cut should lower it.** Two changes moved it in opposite directions and they
+happen to cancel:
+
+| change | delta | detail |
+|---|---:|---|
+| the commendation cut | **−12** | `achievements.test.ts` went 24 → 12. Twelve died with ten commendations: `filed`'s first close; gold-only-on-gold; first-run-on-attempt-one; the personal-best commendation; the half-of-par bar; zero-blocked-moves; a duplicate tenth-attempt test; four sector tests; ungraded-pays-no-gold; the bonus-star commendation. Three arrived: the information budget in isolation, an ordinary close earning nothing, and the live-vs-retired disjointness invariant. |
+| the save-retirement fixture | **+6** | `save.test.ts`, the new *"a save written by a build that had fifteen commendations"* block. |
+| the unlock gate | **+6** | `store.test.ts`, the new *"the unlock gate"* block. |
+| everything else | 0 | Six tests rewritten in place across `save.test.ts`, `store.test.ts` and `ungraded.test.ts` — re-pointed from retired ids onto live ones, or re-aimed at the new behaviour. None added, none removed. |
+
+**−12 + 6 + 6 = 0.** The commendation layer is 12 tests lighter; the two things that replaced it are
+a save-compatibility fixture and a progression invariant, which are worth more per test than an
+assertion that a gold pays a gold commendation.
+
+### Checked in the browser
+
+Dev server on `:5191` in this worktree, own PID, killed after; own tab, closed after. Seeded a save
+holding five commendation ids — three of them retired — with `w1-01` closed.
+
+- The site map renders `w1-01` **CLOSED**, `w1-03` **OPEN**, `w1-05` **OPEN**, and every World 2
+  node **ON HOLD**. That is the new gate exactly: one close, two open, the next world still shut.
+- The shelf reads **2/5** and lists five rows — `A SECOND LOOK, AND A THIRD` (earned),
+  `RAISED, AND RAISED AGAIN`, `REOPENED ON PURPOSE`, `MINIMAL OBSERVATION`,
+  `ADDED TO THE REPOSITORY` (earned).
+- `localStorage` still held `filed`, `within-budget` and `no-contact` — the retirement is a drop on
+  *read*, so the header count, the shelf and everything downstream already read 2 while the stale
+  keys sit in storage until the next write. That is the pattern behaving as designed, and it is why
+  a player's other awards survive: nothing rewrites the record, it is filtered as it is loaded.
+- No console errors.
+
 
 
 
