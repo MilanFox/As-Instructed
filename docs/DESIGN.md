@@ -324,7 +324,8 @@ believes this.
 Review tiers in `docs/NARRATIVE.md` §7 assume exactly this.
 
 **A5 — Three cross-cutting requirements, owned as stated:**
-- RENDER must draw plant growth stages as distinct overlays (needed by w2-03).
+- RENDER must draw plant growth stages as distinct overlays (needed by w2-02's `defuse`;
+  originally written for the withdrawn w2-03, which w2-02 absorbed in the compression cut).
 - RENDER must draw all bots simultaneously with per-bot clocks in the trace viewer, and must draw
   a *blocked* move visibly differently from a successful one (needed by w7-01 and w7-03).
 - ENGINE/RUNTIME must report resource spend (e.g. cable used) in `Verdict.stats` as a generic

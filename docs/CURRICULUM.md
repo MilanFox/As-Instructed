@@ -862,9 +862,16 @@ uniquely bad place to leave someone.
 **Defuse:**
 1. **A dedicated failure code and message for sustained mutual blocking**, not a generic
    timeout — the game must name what happened. NARRATIVE.md §5 line 21 exists for this, and
-   memo KD-2704 sets it up one level in advance — it is circulated in **`w7-02`'s brief**, where
-   the apron is open ground and none of it bites — so the player has heard the words "sustained
-   mutual courtesy" before it happens to them. `w7-03`'s brief cites it by number.
+   the engine's `LivelockError` satisfies it: it names sustained mutual blocking at the moment
+   the player hits it.
+
+   **Amended 2026-09-05.** Memo KD-2704 used to pre-teach the phrase one level early, circulated
+   in `w7-02`'s brief where the apron is open ground and none of it bites. The prose pass cut it
+   and the cross-reference in `w7-03`, and that stands: 71 words of pre-teaching in a brief that
+   admits the failure cannot happen there is exactly the "told me" half of PLAYTEST-BEGINNER §9,
+   and it is redundant with an error that says the same thing at the moment it bites. The
+   requirement above is unchanged — the failure must still be named. The memo survives in
+   NARRATIVE.md §712 as fiction, not as instruction.
 2. **A two-bot seed is the first seed**, small enough to trace by hand.
 3. The replay must render blocked moves distinctly (a bump, a spark) so the player *sees* the
    collisions rather than inferring them from a tick count. Flagged to RENDER.
