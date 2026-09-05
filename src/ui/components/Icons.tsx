@@ -77,13 +77,6 @@ export function IconBook(): React.JSX.Element {
   );
 }
 
-export function IconReview(): React.JSX.Element {
-  return (
-    <svg {...BASE}>
-      <path d="M2.5 13.5h11M4.5 11V7M8 11V3.5M11.5 11V8.5" />
-    </svg>
-  );
-}
 
 export function IconClose(): React.JSX.Element {
   return (

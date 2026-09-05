@@ -255,8 +255,9 @@ The reward systems are `src/game/achievements.ts` (commendations) and the `stats
 - **Everything that plays on completion is skippable**: `prefers-reduced-motion` collapses it,
   `settings.celebrations` turns it off permanently, and a click finishes it immediately.
 
-Per-level and per-world medal totals feed a "Performance Review" screen from management, which
-summarizes your medals with escalating passive aggression.
+Medal totals earn a memo from management, escalating in passive aggression across five grades
+and delivered once per grade on the site map. It had a whole screen until 2026-09-05; the screen
+restated the site map and neither playtester opened it, so only the memo survives (§11 A8).
 
 ## 8. Visual Language
 
@@ -337,6 +338,15 @@ Review tiers in `docs/NARRATIVE.md` §7 assume exactly this.
 **A6 — `FailureCode.BLOCKED_LIVELOCK`.** When every bot in a multi-bot level has its move blocked
 for N consecutive resolution rounds, fail with a dedicated code and a message that names livelock
 explicitly. Silent livelock reads as an engine bug and will make players quit.
+
+**A8 — The Performance Review is a memo, not a screen.** Deleted 2026-09-05. Its medal wall
+restated the site map, which already shows points, closed count, medal counts, per-world totals
+and `ALL AT PAR`; it was the second place in the game a completion fraction rendered; and neither
+playtester opened it once. The memo survives and is delivered on the site map, once per grade,
+through the same ceremony as `Requisition` and `RepositoryIssue`. Delivery is keyed to the grade
+reached, not to a change of grade: under the medals-only denominator a player's first gold reads
+100%, so "on change" oscillates across the top boundary and re-issues the same memo. This
+overrides §7's description of a review screen.
 
 **A7 — A level may be ungraded.** `LevelDef` gains `graded?: boolean`, default `true`. An ungraded
 level shows `CLOSED` on a pass, has no medal ladder, and is still worth 3 points. This overrides §7,
