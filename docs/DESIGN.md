@@ -406,6 +406,25 @@ whitelist pattern that drops a medal from a level that no longer carries one. An
 not recognise is *kept*, not dropped — it belongs to a newer build, and a downgrade must not eat a
 player's record.
 
+**A11 — The campaign is not a single file.** Ruled 2026-09-06. Closing a work order opens the
+**next two**, and closing a world opens the whole of the next world. `isLevelUnlocked` in
+`src/game/store.ts` is the one place that decides it.
+
+Strictly N−1 made all 33 joins single points of failure. A stuck player's only legal action was to
+keep grinding the same order; the hint ladder is the only other escape and it ends. Both playtests
+land on this from opposite directions — the veteran asked for a skip door, the beginner spent 55
+minutes and 11 runs on one order and stopped. **Not yet succeeding must never be able to close a
+door.**
+
+The teaching order survives because the entitlement is bought with closes: reaching World 5 still
+means closing most of World 4. What the gate is *not* allowed to do is be the campaign's only
+failure mode.
+
+The requisition ceremony is delivered cumulatively for this reason — `openLevel` offers every
+unsigned command in the order's API surface, not only the ones the order itself adds. A player who
+skipped the level that granted `scan` still gets the card, because the scope they run against was
+cumulative all along.
+
 **A10 — A blocked move is priced once, in ticks.** Ruled 2026-09-06. `move` returning `false` is a
 free sensing channel the game teaches deliberately (`w1-01`'s own hint sells bump-and-turn as a
 real, slightly-expensive strategy), and the blocked move's tick cost is the correct, proportional

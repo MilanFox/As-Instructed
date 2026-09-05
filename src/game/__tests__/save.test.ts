@@ -411,8 +411,11 @@ describe('a save that names a withdrawn work order', () => {
   it('does not gate the order that followed it', () => {
     const save = emptySave();
     save.levels['w1-01'] = { ...emptyProgress(), completed: true };
+    /* `w1-02` was withdrawn, so the order after `w1-01` is `w1-03`. The gate walks campaign order,
+       not the ids. Two open at a time reaches `w1-05`; `w2-01` is three along and still shut. */
     expect(isLevelUnlocked(save, 'w1-03')).toBe(true);
-    expect(isLevelUnlocked(save, 'w1-05')).toBe(false);
+    expect(isLevelUnlocked(save, 'w1-05')).toBe(true);
+    expect(isLevelUnlocked(save, 'w2-01')).toBe(false);
   });
 
   it('counts only issued work orders towards the campaign', () => {

@@ -129,5 +129,56 @@ beneath it — is deleted in `save.ts`.
 **Left for the orchestrator:** `src/ui/styles/screens.css:564` still defines
 `.sitemap .screen-stat__streak`. That file belongs to the art-direction agent.
 
+---
+
+## 3. Finding 3 — the strictly linear unlock. **Fixed in the store; one line left for the screen.**
+
+I did think hard before adding machinery, and the honest answer turned out not to be "stop
+pretending the gate is strict" but "**stop the gate being the campaign's only failure mode**". The
+difference matters: deleting the gate outright would have put all 34 work orders on the board at
+minute one, and the leak the audit found — `openLevel` never checked the lock — is an argument that
+the gate is *incoherently* enforced, not that it should not exist.
+
+`isLevelUnlocked` in `src/game/store.ts` now implements the audit's own proposal:
+
+- **closing a work order opens the next two**, measured from the deepest close in campaign order,
+  so closing an order you skipped ahead to still moves the frontier;
+- **closing a world opens the whole of the next world**;
+- a fresh save still opens exactly one, so the on-ramp is unchanged.
+
+Eleven lines, one exported constant, no new state and nothing persisted. The teaching order
+survives because the entitlement is bought with closes — reaching World 5 still means closing most
+of World 4. What does not survive is *not yet succeeding* closing a door, which it never should
+have been able to do. Recorded as **DESIGN.md §11 A11** so it is not quietly re-tightened.
+
+**One thing the change required, and it is the interesting one.** With two orders open, a player
+can reach an order having skipped the one that granted a command — and `hardwareUnlockedBy` was
+always cumulative, so they would have had `scan()` in scope with no requisition card for it.
+`openLevel` now offers **every unsigned command in the order's API surface**, not only the ones
+that order adds. `seenRequisitions` still makes each one once, ever, so nobody sees a card twice.
+This bug existed before the change too, via the `openLevel` leak; it is now closed.
+
+Six tests added in `store.test.ts` under *"the unlock gate"*: fresh save opens one; a close opens
+two; **a player stuck on order 2 who closes order 3 keeps moving**; a closed world opens the next
+world entire; a world whose predecessor is unclosed stays shut; a withdrawn id is unknown rather
+than open. The existing withdrawn-level test in `save.test.ts` was re-pointed — `w1-05` is now open
+after closing `w1-01`, and `w2-01`, three along, is the probe that must still be shut.
+
+**Left for the orchestrator — intent first.** The gate lives *only* in the store now. The site map
+must render a locked order as unavailable and an open one as available, and it must call
+`isLevelUnlocked(save, id)` to decide — it must not re-derive the rule. Two specific things in the
+current `src/ui/screens/LevelSelect.tsx`, for whatever replaces it:
+
+1. `LevelSelect.tsx:84` picks the "current" order as the first unlocked-and-not-completed one.
+   That still works with two open and needs no change, but whatever replaces it should keep
+   picking the *earliest* open incomplete order, so the eye lands on the on-ramp and the second
+   open order reads as the alternative rather than as the destination.
+2. **`openLevel` still does not check the gate, and the Performance Review used to open locked
+   orders through it.** The review screen is gone (A8), so the disagreement the audit found is
+   already half-resolved. If the new site map wants the gate to be real, the guard belongs in
+   `openLevel` and I have deliberately not added it: a store that silently refuses to open a level
+   is a soft-lock risk, and with two orders open the gate is no longer worth defending that hard.
+   My recommendation is to leave `openLevel` permissive and let the screen decide what it offers.
+
 
 

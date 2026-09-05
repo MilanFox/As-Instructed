@@ -2,8 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { RunResponse } from '../../runtime/protocol.ts';
 import type { RunSubmission, RunnerPort } from '../ports.ts';
 import { FakeRunner } from '../ports.ts';
-import { emptySave } from '../save.ts';
-import { useGame } from '../store.ts';
+import { campaignOrder } from '../../levels/index.ts';
+import type { SaveFile } from '../save.ts';
+import { emptyProgress, emptySave } from '../save.ts';
+import { isLevelUnlocked, useGame } from '../store.ts';
 
 /** A runner the test drives by hand, so every branch of the state machine is reachable. */
 class ScriptedRunner implements RunnerPort {
@@ -401,5 +403,55 @@ describe('rewards', () => {
     useGame.getState().award('no-regressions');
     expect(useGame.getState().save.achievements['no-regressions']).toBeUndefined();
     expect(useGame.getState().freshCommendations).not.toContain('no-regressions');
+  });
+});
+
+/**
+ * DESIGN.md §11 A11. The property that matters is not the number two — it is that no single work
+ * order can be the end of a campaign. Being stuck must always leave somewhere else to go.
+ */
+describe('the unlock gate', () => {
+  const order = campaignOrder();
+  const closing = (...ids: string[]): SaveFile => {
+    const save = emptySave();
+    for (const id of ids) save.levels[id] = { ...emptyProgress(), completed: true };
+    return save;
+  };
+
+  it('opens only the first work order on a fresh save', () => {
+    const save = emptySave();
+    expect(isLevelUnlocked(save, order[0]?.id ?? '')).toBe(true);
+    expect(isLevelUnlocked(save, order[1]?.id ?? '')).toBe(false);
+  });
+
+  it('opens two more with every close, so being stuck is never the end', () => {
+    const save = closing(order[0]?.id ?? '');
+    expect(isLevelUnlocked(save, order[1]?.id ?? '')).toBe(true);
+    expect(isLevelUnlocked(save, order[2]?.id ?? '')).toBe(true);
+    expect(isLevelUnlocked(save, order[3]?.id ?? '')).toBe(false);
+  });
+
+  it('lets a player skip the one they are stuck on and bank the next', () => {
+    /* Stuck on order 2, closed order 3. The frontier moved even though 2 is still open. */
+    const save = closing(order[0]?.id ?? '', order[2]?.id ?? '');
+    expect(isLevelUnlocked(save, order[1]?.id ?? '')).toBe(true);
+    expect(isLevelUnlocked(save, order[4]?.id ?? '')).toBe(true);
+  });
+
+  it('opens the whole of the next world once a world is closed', () => {
+    const worldOne = order.filter((level) => level.world === 1);
+    const worldTwo = order.filter((level) => level.world === 2);
+    const save = closing(...worldOne.map((level) => level.id));
+    for (const level of worldTwo) expect(isLevelUnlocked(save, level.id), level.id).toBe(true);
+  });
+
+  it('still refuses a world whose predecessor is not closed', () => {
+    const save = closing(order[0]?.id ?? '');
+    const worldThree = order.filter((level) => level.world === 3);
+    for (const level of worldThree) expect(isLevelUnlocked(save, level.id), level.id).toBe(false);
+  });
+
+  it('knows nothing about a work order the campaign never issued', () => {
+    expect(isLevelUnlocked(emptySave(), 'w2-03')).toBe(false);
   });
 });

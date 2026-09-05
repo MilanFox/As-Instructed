@@ -295,7 +295,11 @@ export const useGame = create<GameState>((set, get) => {
       get().renderer().setTrace(null);
       get().runner().prepare(levelId);
       clearWatchdog();
-      const undelivered = level.hardware.filter(
+      /* Everything this order's API surface holds that has not been signed for, not just what this
+         order adds. Two orders are open at once now, so a player can arrive here having skipped
+         the one that granted `scan` — and the scope they run against is cumulative either way.
+         Delivering only `level.hardware` would hand them a command nobody announced. */
+      const undelivered = hardwareUnlockedBy(levelId).filter(
         (name) => !get().save.seenRequisitions.includes(name),
       );
       set({
@@ -721,13 +725,39 @@ export function progressFor(state: GameState, levelId: string): LevelProgress {
   return state.save.levels[levelId] ?? emptyProgress();
 }
 
-/** A level is open once the level before it in campaign order has been closed. */
+/** Closing one work order opens the next two. DESIGN.md §11 A11. */
+export const LEVELS_OPENED_BY_A_CLOSE = 2;
+
+/**
+ * Whether a work order is on the board.
+ *
+ * Two live at a time rather than one, and closing a world puts the whole of the next world up.
+ *
+ * Strictly N−1 made every join in the campaign a single point of failure: a stuck player's only
+ * legal move was to keep grinding the same order, and the hint ladder — which is finite and ends —
+ * was the only other way out. This genre's answer to *stuck* is lateral movement, and the gate
+ * removed it. Two open orders means being stuck is somewhere you leave and come back to.
+ *
+ * The teaching order survives, because the entitlement is bought with closes: reaching World 5
+ * still means closing most of World 4. What does not survive is *not yet succeeding* closing a
+ * door, which it never should have been able to do.
+ */
 export function isLevelUnlocked(save: SaveFile, levelId: string): boolean {
   const order = campaignOrder();
   const index = order.findIndex((level) => level.id === levelId);
-  if (index <= 0) return index === 0;
-  const previous = order[index - 1];
-  return previous ? (save.levels[previous.id]?.completed ?? false) : false;
+  if (index < 0) return false;
+  if (index === 0) return true;
+
+  let deepestClosed = -1;
+  for (const [at, level] of order.entries()) {
+    if (save.levels[level.id]?.completed) deepestClosed = at;
+  }
+  if (deepestClosed >= 0 && index <= deepestClosed + LEVELS_OPENED_BY_A_CLOSE) return true;
+
+  const world = order[index]?.world;
+  if (world === undefined) return false;
+  const before = order.filter((candidate) => candidate.world === world - 1);
+  return before.length > 0 && before.every((c) => save.levels[c.id]?.completed === true);
 }
 
 export function unlockedHardware(levelId: string): string[] {
