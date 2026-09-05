@@ -489,6 +489,10 @@ happen to cancel:
 a save-compatibility fixture and a progression invariant, which are worth more per test than an
 assertion that a gold pays a gold commendation.
 
+`main` moved five commits during the work (the publish-crash fix and its docs). Merged in at the
+end, no conflicts — the two changes are disjoint — and the suite is **1698 across 69 files**, which
+is my 1692 plus the six `src/meta/__tests__/publish-dialog.test.ts` brought with it.
+
 ### Checked in the browser
 
 Dev server on `:5191` in this worktree, own PID, killed after; own tab, closed after. Seeded a save
