@@ -8,7 +8,7 @@ import { WORLD_6_LEVELS } from './world-6/index.ts';
 import { WORLD_7_LEVELS } from './world-7/index.ts';
 import { WORLD_8_LEVELS } from './world-8/index.ts';
 
-export type { LevelDef, ReferenceSolution, WorldMeta } from './types.ts';
+export type { LevelDef, LevelFact, ReferenceSolution, WorldMeta } from './types.ts';
 export type { LevelRunResult } from './harness.ts';
 export { runLevel, runReference } from './harness.ts';
 
@@ -48,7 +48,8 @@ export const WORLDS: readonly WorldMeta[] = [
     id: 5,
     name: 'The Grid',
     subtitle: 'Power infrastructure',
-    blurb: 'Cables that must be energised in the correct order. Constraint solving and graphs.',
+    blurb:
+      'Cables that must be energised in the right order. Working out what has to happen first.',
     accent: '#4ea8ff',
   },
   {
@@ -62,7 +63,8 @@ export const WORLDS: readonly WorldMeta[] = [
     id: 7,
     name: 'Swarm',
     subtitle: 'A hundred cheap robots',
-    blurb: 'Cheaper together, if they do not queue. Parallelism, scheduling, makespan.',
+    blurb:
+      'Cheaper together, if they do not queue. Many bots at once, dividing work, and a clock that stops with the last of them.',
     accent: '#ff5d5d',
   },
   {

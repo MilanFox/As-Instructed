@@ -93,9 +93,12 @@ testers would have quit in. Gold on nine of the first ten levels, first honest r
 
 - **Remove character-count plumbing entirely** — `countChars`, `scoreChars`, `par.chars`,
   `bestChars`, `stats.chars`. Touches all 40 level files, so it waits for the level agents.
-- **The Library needs a moment.** It unlocks with one grey status-bar line, after the
-  player has already hand-written its obvious contents six times. Unlock earlier and
-  make the unlock land. This is the mechanic the user singled out as the best idea.
+- ~~**The Library needs a moment.**~~ Done, in an isolated worktree — see
+  `docs/FIX-LIBRARY-MOMENT.md`. The unlock moved from the close of `w3-04` to the close of
+  `w2-05` and now arrives as a delivery note in the `Requisition` ceremony. Note for whoever
+  reads this next: **"six times" was a pre-cut artefact** (four post-cut, and the thing
+  retyped — a serpentine sweep — is not on the Library ladder at all), and the unlock was
+  *not* too late in the campaign; it was too early to hold anything. See §1 of that file.
 - Viewport aspect: 891×393, 56% of width wasted on square grids.
 - Refill the achievement set further if it reads thin once the cut lands.
 - Par is default-gold through World 2. Deliberately frozen until the above lands, because
@@ -230,9 +233,14 @@ square grids at 891x393; the Library's unlock has no ceremony.
 screen and the specific change. "It looks fine" is a failed report. Where a fix is a CSS
 or layout change small enough to prove, make it and show the before/after.
 
-### Backlog — accessible language pass
+### Backlog — accessible language pass — **DONE, see `docs/FIX-PROSE.md`**
 
-Requested 2026-09-05. The game role-plays corporate jargon; the player has not studied
+Requested 2026-09-05, delivered the same day, together with the brief-length target from
+PLAYTEST-BEGINNER §13, in one sweep over the same files. Mean brief 220 → 58 words; every
+term classified; `makespan`, `precedence` and `audit` replaced in player-facing text. The
+item is left below as written, because the report is scored against it.
+
+The game role-plays corporate jargon; the player has not studied
 economics or operations research. The tone stays — this is not a de-flavouring pass.
 
 **The test, and it is the whole item:** is the word *flavour* or is it *load-bearing*?
@@ -286,3 +294,27 @@ everything as flavour is a failed report.
   If it died, its worktree is under `.claude/worktrees/` and the partial report is usable.
 
 All four earlier agents are merged. Main is at 34 levels, 1398 tests, tsc + build clean.
+
+### In flight (2026-09-05, after the window reset)
+
+Three agents live, disjoint file ownership, none merged:
+
+- **Prose pass** — `worktree-agent-ab499d8682cb03eac`, fanned out into three sub-agents
+  sharding worlds 2–3, 4–5 and 6–7 inside one worktree. Holds **all of `src/levels/**`**,
+  which is why the character-count plumbing removal cannot start yet.
+- **Library moment** — owns `src/meta/**`, `src/ui/library.ts`, `App.tsx`, `src/ui/screens/**`,
+  `src/ui/copy.ts`, `src/ui/components/**`. Told to verify the "six times" claim against the
+  post-cut 34-level order before designing, since the phrasing predates `525ce7a`, and to
+  answer `unlock.ts`'s own argument for the World 3 close rather than ignore it. Any brief
+  change is written to the report as a diff for the orchestrator, not applied.
+  Report: `docs/FIX-LIBRARY-MOMENT.md`.
+- **Viewport aspect** — owns `Workspace.tsx`, `src/ui/panels/**`, `src/render/**`, and the
+  three shared stylesheets. Before/after screenshots at 1440x900 and 2560x1440 are the
+  evidence. Report: `docs/FIX-VIEWPORT.md`.
+
+Verified at the reset: main green at **1398 tests, tsc clean**. All four earlier agents'
+worktrees clean and fully merged — nothing was lost to the window, nothing to salvage.
+
+Housekeeping done: the five merged agent worktrees and their branches are pruned, leaving
+only the three live ones. `wip/wave1-interrupted` was already gone — the earlier note listing
+it as outstanding was wrong.

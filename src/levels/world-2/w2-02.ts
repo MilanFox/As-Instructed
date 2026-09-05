@@ -54,16 +54,24 @@ export const w2_02: LevelDef = {
     'you will have seen the rotation memo. it is real and they do check. the silo was moved',
     'again over the winter, so the mule drops you at a different corner than last time.',
     '',
-    'Work every tile of the field. **A crop is ready when its `growth` has reached its',
-    '`maxGrowth`.** On a tile whose crop is ready: **harvest it, then plant the same tile',
-    'again before moving on.** On a tile that is bare: plant it. **No soil tile may be left',
-    'empty at the end of the shift.**',
-    '',
-    'Crops that are not ready are left standing; they already count as planted. The hopper',
-    'holds far more seed than the field needs. `harvest()` and `plant()` cost two ticks each',
-    'whether or not they find anything, and seed only goes into bare soil. Bare soil reports',
-    '`crop: null` with `growth: 0` of `maxGrowth: 0`.',
+    'Work every tile of the field.',
   ].join('\n'),
+  facts: [
+    { label: 'Ready', value: 'A crop whose `growth` has reached its `maxGrowth`.' },
+    { label: 'A ready tile', value: 'Harvest it, then plant it again before you move on.' },
+    {
+      label: 'Bare soil',
+      value:
+        'Plant it. Reads `crop: null` and `growth: 0` of `maxGrowth: 0`. Seed only goes into bare soil.',
+    },
+    { label: 'Not ready', value: 'Leave it standing. It already counts as planted.' },
+    {
+      label: 'A swing',
+      value:
+        '`harvest()` and `plant()` cost **two ticks each**, whether or not they find anything.',
+    },
+    { label: 'The hopper', value: 'Far more seed than the field needs.' },
+  ],
   seeds: [1, 2, 3, 4],
   par: { ticks: 76, chars: 600 },
   build(seed: number): World {
@@ -93,11 +101,11 @@ export const w2_02: LevelDef = {
     '',
   ].join('\n'),
   hints: [
-    'A swing of the arm costs two ticks even on bare soil. What can you find out for free before you spend them?',
-    'Ready means growth has caught up with maxGrowth. Bare soil reports both as zero, which is technically also caught up.',
-    'The tile you just harvested is bare, and the tile you just planted is not ready. Both were true one tick after you last sensed them.',
-    'Which corner you woke up in decides which way the field runs. Two free questions at the start of the run settle it for good.',
-    'A tile needs at most two actions and the order is not negotiable. Doing them the other way round leaves the tile empty.',
+    'A swing of the arm costs two ticks even on bare soil. Scanning first costs nothing.',
+    'Ready means growth has caught up with maxGrowth. Bare soil reports both as zero, which also counts as caught up.',
+    'Each tile needs at most two actions. Harvest, then plant. The other way round leaves the tile empty.',
+    'You start in a different corner each shift. Two free canMove questions tell you which way the field runs.',
+    'Sweep row by row and turn at the walls. canMove finds the walls, so the same sweep works from any corner.',
   ],
   docs: ['scan', 'harvest', 'plant'],
 };

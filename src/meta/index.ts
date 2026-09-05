@@ -60,7 +60,10 @@ export {
   LIBRARY_FIRST_WORLD,
   LIBRARY_REQUIREMENTS,
   LIBRARY_UNLOCK_LEVEL,
+  isDeliveryNoteOwed,
   isLibraryUnlocked,
+  nextRequirementAfter,
+  requirementLevelCount,
   requirementsFor,
 } from './unlock.ts';
 

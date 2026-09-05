@@ -293,7 +293,10 @@ export const useLibrary = create<MetaState>((set, get) => {
 
     offerPublish(levelId: string, code: string, hardware: readonly string[]): void {
       const save = get().save;
-      if (!save.unlocked || save.publishMuted || save.publishDeclined.includes(levelId)) return;
+      // Not before the delivery note has been read: an offer to publish into a Repository the
+      // player has not been told about is the third modal on one transition and explains nothing.
+      if (!save.unlocked || !save.briefed) return;
+      if (save.publishMuted || save.publishDeclined.includes(levelId)) return;
       const declarations = publishableDeclarations(code, hardware);
       if (!declarations.some((each) => each.callable)) return;
       set({ offer: { levelId, code, declarations, selection: [] } });

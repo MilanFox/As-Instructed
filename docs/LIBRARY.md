@@ -1,7 +1,9 @@
 # The Library — Shared Subroutines Repository
 
-The metagame. Unlocks at the end of World 3 (`w3-04`). Everything lives in `src/meta/`, with the
-two-file linker and the module-aware error reporting in `src/runtime/`.
+The metagame. Unlocks at the end of World 2 (`w2-05`), and arrives as a delivery note rather than
+as a status-bar line — see `docs/FIX-LIBRARY-MOMENT.md` for why it moved and what the ceremony has
+to do. Everything lives in `src/meta/`, with the two-file linker and the module-aware error
+reporting in `src/runtime/`.
 
 **The one rule: the whole system is optional.** A player who never opens the Repository finishes
 the campaign with the same medals as one who lives in it. No work order is gated on a library
@@ -102,8 +104,8 @@ be the thing that got dropped.
 ```ts
 interface LibrarySave {
   version: number;
-  unlocked: boolean;              // false until w3-04
-  briefed: boolean;               // player has read the unlock memo
+  unlocked: boolean;              // false until w2-05
+  briefed: boolean;               // the delivery note has been shown; gates the publish offer
   source: string;                 // current lib.ts. Sacred.
   revisions: LibraryRevision[];   // newest last, capped at MAX_REVISIONS (40)
   lastKnownGood?: string;         // revision id — the revert target
@@ -165,8 +167,13 @@ Everything below is re-exported from `src/meta/index.ts`. UI components come fro
 `recordRevision`, `revisionOf`, `lastKnownGoodRevision` · `hashText`, `hashParts`, `runKey`
 
 ### Unlock — `unlock.ts`
-`LIBRARY_UNLOCK_LEVEL` (`'w3-04'`), `LIBRARY_FIRST_WORLD` (`4`), `LIBRARY_REQUIREMENTS`,
-`requirementsFor`, `isLibraryUnlocked`
+`LIBRARY_UNLOCK_LEVEL` (`'w2-05'`), `LIBRARY_FIRST_WORLD` (`3`), `LIBRARY_REQUIREMENTS`,
+`requirementsFor`, `requirementLevelCount`, `nextRequirementAfter`, `isLibraryUnlocked`,
+`isDeliveryNoteOwed`
+
+`nextRequirementAfter(orderedLevelIds, currentLevelId)` takes the play order as an argument because
+`src/meta` does not know `src/levels` exists. It is what lets the delivery note state its own reason
+from data instead of from prose.
 
 ### Publishing — `publish.ts`
 `Declaration`, `PublishPlan`, `PublishRefusal`, `PublishSelection` ·
@@ -227,7 +234,8 @@ can write a damaged file. See `docs/FIX-LIBRARY.md`.
 |---|---|---|
 | `<LibraryPanel />` | Workspace, as a sibling of `EditorPanel` — a second editor column or a slide-over drawer | Renders `null` until `save.unlocked`. Renders the unlock memo until `save.briefed`. Owns its own five tabs. |
 | `<PublishDialog />` | Top level, next to `<Results />` in `App.tsx` | A modal. Renders `null` unless `useLibrary.getState().offer` is set. |
-| `<UnlockMemo />` | Also exported standalone, if the integrator prefers to show it in the Results screen after `w3-04` | Calls `markBriefed()` on acknowledge. |
+| `<RepositoryIssue />` | Top level in `App.tsx`, alongside `<Requisition />` | The delivery note. Renders while `isDeliveryNoteOwed(save)`, and waits for the medal and the hardware crate to clear first. Both buttons call `markBriefed()`; the primary one also opens the panel. |
+| `<UnlockMemo />` | The `!save.briefed` branch of `<LibraryPanel />`, reached by opening the panel from the status bar before the delivery note has had a chance to fire | Calls `markBriefed()` on acknowledge. |
 | `libraryStatusLine(state)` | Workspace status bar | One line: suite progress, or how many subroutines are published. |
 
 `RefactorScreen`, `StructureScreen`, `RegressionReport`, `DiscrepancyList` and `LibraryEditor` are

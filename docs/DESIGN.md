@@ -174,7 +174,8 @@ interface LevelDef {
   world: number;                 // 1..8
   index: number;                 // order within world
   title: string;
-  brief: string;                 // markdown, flavour + the actual ask
+  brief: string;                 // markdown, 2-3 lines of flavour + the actual ask
+  facts?: { label: string; value: string }[];  // the numbers, drawn as a table
   hardware: string[];            // API names unlocked BY this level (cumulative)
   build(seed: number): World;    // must be pure & deterministic given seed
   objectives: Objective[];       // evaluated against final world + trace
@@ -197,6 +198,10 @@ Rules for level authors:
   ~10% so that a clever player is rewarded. `par.chars` is carried for historical reasons and is
   not scored (§7); do not tune it and do not surface it.
 - `hints` are nudges ("What happens if the field is empty when you arrive?"), never code.
+- `brief` is two or three sentences of roleplay and then the ask, capped at 110 words and tested.
+  Every number, unit, budget, reach, dimension and wire format belongs in `facts`, in an objective
+  label, or on the requisition card — somewhere it stays on screen while the player writes code.
+  Players are frequently reading in a second language; prose is read once, a row can be re-read.
 
 ## 6. Progression — 8 Worlds
 

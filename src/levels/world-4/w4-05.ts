@@ -69,9 +69,7 @@ function chooseVeins(rng: Rng, world: World, sites: Vein[], lift: Vec): Vein[] {
   const fromLift = distancesFrom(world, lift);
   const ranked = sites
     .slice()
-    .sort(
-      (a, b) => (fromLift.get(keyOf(a.stand)) ?? 0) - (fromLift.get(keyOf(b.stand)) ?? 0),
-    );
+    .sort((a, b) => (fromLift.get(keyOf(a.stand)) ?? 0) - (fromLift.get(keyOf(b.stand)) ?? 0));
   const split = Math.max(ORE_QUOTA + 1, Math.ceil(ranked.length * 0.5));
   const near = rng.shuffle(ranked.slice(0, split));
   const far = rng.shuffle(ranked.slice(split));
@@ -88,10 +86,7 @@ function build(seed: number): World {
   paintCave(world, grid);
 
   const middle = Math.floor(CELLS / 4);
-  const lift = cellTile(
-    rng.int(middle, CELLS - 1 - middle),
-    rng.int(middle, CELLS - 1 - middle),
-  );
+  const lift = cellTile(rng.int(middle, CELLS - 1 - middle), rng.int(middle, CELLS - 1 - middle));
   setTerrain(world, lift, Terrain.Depot);
 
   for (const vein of chooseVeins(rng, world, veinSites(world, grid, lift), lift)) {
@@ -126,27 +121,30 @@ export const w4_05: LevelDef = {
     '> dot: the shaft runs deeper than survey admit. there is ore in the walls down there and',
     '> the cutting head will take it. you may take the ore. you may not widen the tunnel.',
     '',
-    `Bring back ${ORE_QUOTA} ore and end the run standing on the lift, which is the depot tile the`,
-    'bot starts on.',
-    '',
-    'The veins are ore faces set into the tunnel walls. Stand on the tile next to one and call',
-    '`mine(dir)` to cut a piece loose. Ordinary rock cannot be cut.',
-    '',
-    'The bot carries a fixed tank. Acting spends fuel equal to the ticks it costs; looking,',
-    'reading and waiting spend none. `fuel()` reports what is left and `refuel()` fills the tank,',
-    'but only while parked on the depot. The tank is a different size every shift.',
-    '',
-    'A `look` ray stops at the first thing it cannot see through, and it tells you what that',
-    'thing was.',
-    '',
-    '**The Repository.** This work order assumes `lib.ts` holds the two routines the last one',
-    'offered to keep:',
-    '',
-    "- `survey()` — records what the bot can see from where it stands. `import { survey } from 'lib';`",
-    "- `pathTo(x, y)` — walks to a tile the record knows. `import { pathTo } from 'lib';`",
-    '',
-    'If either is not in there, write it in this file. The ticks are the same either way.',
+    `Bring back ${ORE_QUOTA} ore and end the run standing on the lift.`,
   ].join('\n'),
+  facts: [
+    { label: 'The lift', value: 'The depot tile the bot starts on.' },
+    {
+      label: 'The veins',
+      value:
+        'Ore faces set into the tunnel walls. Stand next to one and call `mine(dir)`. Ordinary rock cannot be cut.',
+    },
+    {
+      label: 'Fuel',
+      value:
+        'Acting spends fuel equal to the ticks it costs. Looking, reading and waiting spend none.',
+    },
+    {
+      label: 'The tank',
+      value:
+        'A different size every shift. `fuel()` reads it; `refuel()` fills it, but only on the depot.',
+    },
+    {
+      label: 'A `look` ray',
+      value: 'Stops at the first thing it cannot see through, and tells you what that thing was.',
+    },
+  ],
   seeds: [1, 2, 3, 4, 5],
   par: { ticks: 700, chars: 3200 },
   budget: { maxTicks: 2600 },
@@ -185,5 +183,5 @@ export const w4_05: LevelDef = {
     'The bot can work out how far it is from the lift at any moment, as long as it wrote down how it got there.',
     'Before each step, ask what it would take to get home from where that step lands you. When the answer is more than the tank holds, you went too far one step ago.',
   ],
-  docs: ['look', 'mine', 'refuel'],
+  docs: ['look', 'mine', 'refuel', 'memory'],
 };

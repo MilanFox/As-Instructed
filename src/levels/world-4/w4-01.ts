@@ -1,5 +1,12 @@
 import type { MoveEvent, Rng, Vec, World } from '../../engine/index.ts';
-import { Objectives, Terrain, addBot, createWorld, setTerrain, tileAt } from '../../engine/index.ts';
+import {
+  Objectives,
+  Terrain,
+  addBot,
+  createWorld,
+  setTerrain,
+  tileAt,
+} from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
 import { carveTunnel, cellTile, paintCave } from './caves.ts';
 
@@ -59,16 +66,17 @@ export const w4_01: LevelDef = {
     '',
     'There is one tunnel. It bends, it does not fork, and it ends on a marked pad.',
     'Drive the bot onto that pad.',
-    '',
-    '`look(dir)` casts a beam along a direction and returns the tiles it crosses, nearest',
-    'first, stopping at the first thing it cannot see through. It costs nothing. The tunnel is',
-    'a different shape every shift.',
-    '',
-    '### Memory',
-    '',
-    'Ordinary JavaScript values — objects, arrays, `Map`, `Set`, closures — hold their contents',
-    'for the whole run. Nothing is cleared between moves.',
   ].join('\n'),
+  facts: [
+    { label: 'The tunnel', value: 'A different shape every shift.' },
+    {
+      label: '`look(dir)`',
+      value:
+        'Returns the tiles along that direction, nearest first. It stops at the first thing it cannot see through.',
+    },
+    { label: 'Looking', value: 'Free, and as often as you like.' },
+    { label: 'The pad', value: 'The only tile in the tunnel that is not plain floor.' },
+  ],
   seeds: [1, 2, 3],
   par: { ticks: 52, chars: 250 },
   build,
@@ -100,5 +108,5 @@ export const w4_01: LevelDef = {
     'So you already know one direction you do not want. Hold on to it across the loop, rather than working it out again.',
     'The pad is the only tile in the tunnel that is not plain floor. Check what is under the bot before you decide to move again.',
   ],
-  docs: ['look', 'coordinates'],
+  docs: ['look', 'coordinates', 'memory'],
 };

@@ -1,5 +1,17 @@
 import type { CostOverrides, Objective, Sim, World } from '../engine/index.ts';
 
+/**
+ * One mechanical fact the player needs and the brief should not be carrying.
+ *
+ * Numbers, units, reaches, dimensions, formats — anything a player has to look up again halfway
+ * through writing a program. Prose is read once; a row stays on screen.
+ */
+export interface LevelFact {
+  label: string;
+  /** Inline markdown. Short enough to sit on one line next to its label. */
+  value: string;
+}
+
 /** DESIGN.md §5. */
 export interface LevelDef {
   /** 'w1-03'. Stable forever — it is the save key and the hardware-unlock key. */
@@ -9,8 +21,10 @@ export interface LevelDef {
   /** Order within the world, 1-based. */
   index: number;
   title: string;
-  /** Markdown. Flavour first, then the actual ask. Jokes live here. */
+  /** Markdown. Two or three lines of flavour, then the ask. Jokes live here, numbers do not. */
   brief: string;
+  /** The numbers and formats the brief used to spell out. Rendered as a table, not as prose. */
+  facts?: LevelFact[];
   /** API names unlocked BY this level. Cumulative across the campaign. */
   hardware: string[];
   /** Must be pure and deterministic given `seed`. */

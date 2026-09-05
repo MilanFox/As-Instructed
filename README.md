@@ -59,7 +59,7 @@ draws the trace.** The renderer never talks to the simulation.
 | `src/ui/` | The React shell: workspace layout, Monaco panel, site map, timeline, results, Performance Review, and the adapters that wire the runtime, renderer, audio and Repository into the store. |
 | `src/game/` | Save file (versioned, migrating, and never allowed to lose your source), scoring, and the one zustand store the shell reads from. |
 | `src/audio/` | WebAudio, synthesized in code — there are no audio files. Because playback is a trace being scrubbed rather than a game being played, the audio is a cursor over `trace.events` driven by the renderer's clock, with rate limiting so 64x becomes texture rather than a machine gun. Ambience ships off; the toggle is in the sound settings. |
-| `src/meta/` | The Library — a shared `lib.ts` you can publish subroutines into, unlocked at the end of World 3. Library calls cost real ticks, so making one faster improves every work order that calls it, and editing it re-runs every closed work order that imports from it. Entirely optional: a player who never opens it finishes with the same medals. |
+| `src/meta/` | The Library — a shared `lib.ts` you can publish subroutines into, unlocked at the end of World 2 and delivered the way every other capability is, as a signed-for note rather than a status-bar line. Library calls cost real ticks, so making one faster improves every work order that calls it, and editing it re-runs every closed work order that imports from it. Entirely optional: a player who never opens it finishes with the same medals. |
 
 Monaco is about nine tenths of the build, so it is loaded on demand: the site map paints first and
 the editor arrives with the workspace.

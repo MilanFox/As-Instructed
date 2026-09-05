@@ -66,18 +66,25 @@ export const w4_02: LevelDef = {
   brief: [
     '> dot: survey have a map of this one. it is a photograph of a whiteboard, and the',
     '> whiteboard has since been cleaned. what i can tell you is that the tunnels join up.',
-    '> you will arrive somewhere you have already been and it will not look any different.',
     '',
-    'Reach the ore vein. It is the one pad tile in the cave, set into the rock at the vein face.',
-    '',
-    '> dot: not every cut is like that, mind. some of them are one long branch with no way back',
-    "> onto yourself, and last shift's rule would walk you straight out. you will not know which",
-    '> one you have got until you are in it.',
-    '',
-    '`mark(text)` writes a breadcrumb onto the tile the bot is standing on, and costs one tick.',
-    "`readMark()` returns the breadcrumb under the bot, and costs nothing. A tile's mark also",
-    'appears in what `look` returns, so a neighbour can be checked without stepping onto it.',
+    'Reach the ore vein.',
   ].join('\n'),
+  facts: [
+    {
+      label: 'The ore vein',
+      value: 'The one pad tile in the cave, set into the rock at the vein face.',
+    },
+    {
+      label: '`mark(text)`',
+      value: 'Writes a **string** onto the tile under the bot. Costs 1 tick.',
+    },
+    { label: '`readMark()`', value: 'Returns the string under the bot. Free.' },
+    {
+      label: 'Neighbours',
+      value:
+        "A tile's mark also shows up in what `look` returns, so you can check one without stepping on it.",
+    },
+  ],
   seeds: [1, 2, 3, 4],
   par: { ticks: 391, chars: 430 },
   budget: { maxTicks: 1600 },
@@ -110,5 +117,5 @@ export const w4_02: LevelDef = {
     'Once every opening out of a tile leads somewhere already accounted for, the tile is finished and the only useful move is backwards.',
     'Backwards is a specific direction, not a general idea. Keep the ones you would need, in order, and the way out is the reverse of the way in.',
   ],
-  docs: ['mark', 'look'],
+  docs: ['mark', 'look', 'memory'],
 };

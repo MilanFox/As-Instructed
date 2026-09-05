@@ -94,17 +94,33 @@ export const w2_05: LevelDef = {
     'two things grow in the west field. one of them is the crop. the other is ice-scrub,',
     'which likes the same soil and is worth nothing to anybody.',
     '',
-    '**Come back with the hopper full of crop.** The hopper holds a different amount every',
-    'shift. A `harvest()` on ripe crop that hands back nothing means it is full.',
-    '',
-    '`scan().crop` names what is growing on a tile: `"crop"` counts towards the quota,',
-    '`"ice"` does not, and a slot spent on ice stays spent for the rest of the shift.',
-    '',
-    '`scan(Dir.North)` and `scan(Dir.South)` read the rows either side of the bot. The sensor',
-    'covers three rows from one; the wheels cover one.',
-    '',
-    `The shift ends after **${String(SHIFT)} ticks**. The field is ${String(WIDTH)} by ${String(HEIGHT)}, far more ground than that buys.`,
+    '**Come back with the hopper full of crop.**',
   ].join('\n'),
+  facts: [
+    {
+      label: 'The field',
+      value: `**${String(WIDTH)} by ${String(HEIGHT)}**. Far more ground than one shift buys.`,
+    },
+    {
+      label: 'The hopper',
+      value: 'Holds a different amount every shift. `inventory()` is the only reading of it.',
+    },
+    {
+      label: '`harvest()`',
+      value:
+        'Hands back nothing on a crop that is not ripe yet, and nothing when the hopper is full. The two look the same.',
+    },
+    {
+      label: '`scan().crop`',
+      value:
+        '`"crop"` counts towards the quota. `"ice"` does not, and the slot it takes stays spent.',
+    },
+    {
+      label: 'Sensor reach',
+      value:
+        '`scan(Dir.North)` and `scan(Dir.South)` read the rows either side. Three rows from one; the wheels cover one.',
+    },
+  ],
   seeds: [1, 2, 3, 4, 5],
   par: { ticks: 74, chars: 700 },
   budget: { maxTicks: SHIFT },
@@ -131,7 +147,8 @@ export const w2_05: LevelDef = {
     '',
   ].join('\n'),
   hints: [
-    'Two things grow in this field and only one of them counts. The sensor separates them for free; the arm does not.',
+    'Two things grow here and only one counts. The sensor tells them apart for free. The arm does not.',
+    'harvest gives back nothing on a crop that is not ripe yet. That is not the hopper being full.',
     'The hopper does not open. A slot spent on the wrong thing is spent for the rest of the shift.',
     'The shift is shorter than the field. Once the hopper is full, every further tile is a tick spent on nothing.',
     'A tile three ticks from ripe may be worth three ticks. A tile thirty ticks from ripe is somebody else’s shift.',

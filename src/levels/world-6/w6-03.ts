@@ -149,24 +149,22 @@ export const w6_03: LevelDef = {
     'the invoice and nothing else.',
     '',
     'One packet is waiting: the route from the tile you are standing on to the landing pad,',
-    'enciphered.',
-    '',
-    '`decode(text, key)` returns the plain text for nothing. The key changes between shifts;',
-    "`probe('mast').vars.key` reads it.",
-    '',
-    'The decoded route is groups run together with nothing between them, like `4E12S1W`: a',
-    'decimal count of one or more digits, then one of `N`, `E`, `S`, `W`. The same direction may',
-    'appear in two groups in a row.',
-    '',
-    'Drive the route and park on the pad. Everything off the route is a pit.',
-    '',
-    '**Extra objective.** Transmit one line: a run-length encoding of the route you drove, in the',
-    'same format, describing the same moves, and shorter than the one you received.',
-    '',
-    '**The Repository.** Nothing here needs it. But this is the station format and it turns up',
-    'twice more before the Contract closes. The half of your program that turns `4E12S1W` into',
-    'the moves it stands for is worth keeping. Later briefs call it `unpack`.',
+    'enciphered. Decode it, drive it, and park on the pad.',
   ].join('\n'),
+  facts: [
+    { label: 'The key', value: "`probe('mast').vars.key`. Free, and a new key every shift." },
+    {
+      label: 'Route format',
+      value:
+        'Groups run together, like `4E12S1W`: a count of one or more digits, then `N`, `E`, `S` or `W`.',
+    },
+    { label: 'Watch for', value: 'The same direction can turn up in two groups in a row.' },
+    { label: 'Off the route', value: 'Pit. Every tile that is not on the route is a pit.' },
+    {
+      label: 'Shorter encoding',
+      value: 'Transmit one line: the same moves, the same format, fewer characters than arrived.',
+    },
+  ],
   seeds: [1, 2, 3, 4],
   par: { ticks: 38, chars: 800 },
   build(seed: number): World {
@@ -193,28 +191,24 @@ export const w6_03: LevelDef = {
     stayOnRoute(),
   ],
   bonus: [
-    Objectives.custom(
-      'shorter-encoding',
-      'Send the same route back in fewer characters',
-      (ctx) => {
-        const sent = transmitted(ctx.world);
-        if (sent.length !== 1) return false;
-        const mine = sent[0] ?? '';
-        const theirs = inbound(ctx.initialWorld);
-        return (
-          mine.length < theirs.length &&
-          expand(mine).length === ROUTE_MOVES &&
-          expand(mine).join('') === expand(theirs).join('')
-        );
-      },
-    ),
+    Objectives.custom('shorter-encoding', 'Send the same route back in fewer characters', (ctx) => {
+      const sent = transmitted(ctx.world);
+      if (sent.length !== 1) return false;
+      const mine = sent[0] ?? '';
+      const theirs = inbound(ctx.initialWorld);
+      return (
+        mine.length < theirs.length &&
+        expand(mine).length === ROUTE_MOVES &&
+        expand(mine).join('') === expand(theirs).join('')
+      );
+    }),
   ],
   starter: [
     '// Everything off the route is a pit.',
     '',
     "const key = probe('mast')?.vars.key ?? 0;",
     'const raw = receive();',
-    'const route = raw === null ? \'\' : decode(raw, key);',
+    "const route = raw === null ? '' : decode(raw, key);",
     'print(route);',
     '',
   ].join('\n'),
