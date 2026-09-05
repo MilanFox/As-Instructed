@@ -242,7 +242,7 @@ export const TILE_VOCABULARY: readonly string[] = [
 
 /**
  * `PLANT_STAGES[i]` is the sprite for maturity bucket `i` of `PLANT_STAGES.length`. DESIGN.md
- * §11 A5 requires the stages to be *visually* distinct — w2-03 is unsolvable if a player cannot
+ * §11 A5 requires the stages to be *visually* distinct — w2-02 is unsolvable if a player cannot
  * read maturity at a glance — so this is a six-step ladder, not a tint ramp.
  */
 export const PLANT_STAGES: readonly string[] = [

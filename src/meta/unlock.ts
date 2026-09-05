@@ -15,7 +15,7 @@
  */
 
 /** Completing this work order provisions the Repository. */
-export const LIBRARY_UNLOCK_LEVEL = 'w3-05';
+export const LIBRARY_UNLOCK_LEVEL = 'w3-04';
 
 /** Any work order in this world or later may assume the Repository exists. */
 export const LIBRARY_FIRST_WORLD = 4;
@@ -55,12 +55,9 @@ export interface LibraryRequirement {
  * every work order that calls it, and `reach` inherits that through the chain. The other five are
  * free at the tick level and earn their place on reuse alone.
  *
- * Two deliberate absences. `w4-03` is missing because the curriculum pairs it with `w4-02` as a
- * diptych contrasting state-in-the-world against state-in-the-algorithm, and letting the player
- * import `w4-02`'s visited-set sweep would erase the contrast the pair exists to draw. `w4-04`,
- * `w5-03`, `w6-03`, `w6-04` and `w7-04` are missing because they are the levels where the routine
- * is written for the first time — their briefs say the thing is worth keeping and name it, but
- * they import nothing.
+ * Deliberate absences. `w4-04`, `w5-03`, `w6-03`, `w6-04` and `w7-04` are missing because they are
+ * the levels where the routine is written for the first time — their briefs say the thing is worth
+ * keeping and name it, but they import nothing.
  *
  * `pathTo` and `survey` were written against the single-bot binding and grow a trailing bot
  * argument at `w7-02`, which is where the campaign first hands the player a fleet. The argument is
@@ -204,7 +201,7 @@ export function requirementsFor(levelId: string): readonly LibraryRequirement[] 
  * True once the Repository has been provisioned.
  *
  * Completing any World 4+ work order counts too, so a save that reached World 5 without a record
- * for `w3-05` — an import, a hand-edited export — is not told it has no Repository.
+ * for `w3-04` — an import, a hand-edited export — is not told it has no Repository.
  */
 export function isLibraryUnlocked(
   completed: readonly { levelId: string; world: number }[],

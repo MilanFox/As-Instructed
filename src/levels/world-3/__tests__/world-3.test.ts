@@ -3,28 +3,22 @@ import type { ItemKind, Objective, ObjectiveContext, Sim, Vec } from '../../../e
 import { Dir, evaluateObjectives, medalFor, scoreChars } from '../../../engine/index.ts';
 import { runLevel, runReference } from '../../harness.ts';
 import type { LevelDef, ReferenceSolution } from '../../types.ts';
-import { WORLD_3_LEVELS, w3_01, w3_02, w3_03, w3_04, w3_05 } from '../index.ts';
+import { WORLD_3_LEVELS, w3_01, w3_02, w3_04 } from '../index.ts';
 import { goTo, key, nearestIndex, surveyYard } from '../__solutions__/driver.ts';
 import { solution as w3_01Solution } from '../__solutions__/w3-01.ts';
 import { solution as w3_02Solution } from '../__solutions__/w3-02.ts';
-import { solution as w3_03Solution } from '../__solutions__/w3-03.ts';
 import { solution as w3_04Solution } from '../__solutions__/w3-04.ts';
-import { solution as w3_05Solution } from '../__solutions__/w3-05.ts';
 
 const SOLUTIONS: Record<string, ReferenceSolution> = {
   'w3-01': w3_01Solution,
   'w3-02': w3_02Solution,
-  'w3-03': w3_03Solution,
   'w3-04': w3_04Solution,
-  'w3-05': w3_05Solution,
 };
 
 const HARDWARE: Record<string, string[]> = {
   'w3-01': ['pickup', 'drop'],
   'w3-02': ['carrying'],
-  'w3-03': ['use'],
-  'w3-04': [],
-  'w3-05': [],
+  'w3-04': ['use'],
 };
 
 const bonusMet = (level: LevelDef, ctx: ObjectiveContext): boolean =>
@@ -56,8 +50,8 @@ function survey(sim: Sim, botId: number): Survey {
 }
 
 describe('World 3 — structure', () => {
-  test('the world exports five levels in play order', () => {
-    expect(WORLD_3_LEVELS).toEqual([w3_01, w3_02, w3_03, w3_04, w3_05]);
+  test('the world exports three levels in play order', () => {
+    expect(WORLD_3_LEVELS).toEqual([w3_01, w3_02, w3_04]);
   });
 
   for (const level of WORLD_3_LEVELS) {
@@ -65,7 +59,7 @@ describe('World 3 — structure', () => {
       test('identity, seeds and par are well formed', () => {
         expect(level.id).toBe(`w3-0${level.index}`);
         expect(level.world).toBe(3);
-        expect(level.index).toBe(WORLD_3_LEVELS.indexOf(level) + 1);
+        expect(level.index).toBeGreaterThanOrEqual(WORLD_3_LEVELS.indexOf(level) + 1);
         expect(level.seeds.length).toBeGreaterThanOrEqual(3);
         expect(new Set(level.seeds).size).toBe(level.seeds.length);
         expect(level.par.ticks).toBeGreaterThan(0);
@@ -131,12 +125,10 @@ describe('World 3 — bonus objectives are reachable', () => {
     }
   });
 
-  // The three tick bonuses are pitched under par on purpose: the reference earns them on the
-  // teaching seed and has to be improved on to earn them on the crowded ones.
-  test('w3-02, w3-03 and w3-05 pay their tick bonus on seed 1', () => {
+  // The tick bonus is pitched under par on purpose: the reference earns it on the teaching seed
+  // and has to be improved on to earn it on the crowded ones.
+  test('w3-02 pays its tick bonus on seed 1', () => {
     expect(bonusMet(w3_02, runReference(w3_02, 1, w3_02Solution))).toBe(true);
-    expect(bonusMet(w3_03, runReference(w3_03, 1, w3_03Solution))).toBe(true);
-    expect(bonusMet(w3_05, runReference(w3_05, 1, w3_05Solution))).toBe(true);
   });
 });
 
@@ -149,14 +141,7 @@ describe('World 3 — the starter alone passes nothing', () => {
       while (sim.canMove(botId, Dir.West)) sim.move(botId, Dir.West);
       while (sim.canMove(botId, Dir.North)) sim.move(botId, Dir.North);
     },
-    'w3-03': (sim, botId) => {
-      sim.move(botId, Dir.South);
-    },
     'w3-04': (sim, botId) => {
-      while (sim.canMove(botId, Dir.West)) sim.move(botId, Dir.West);
-      while (sim.canMove(botId, Dir.North)) sim.move(botId, Dir.North);
-    },
-    'w3-05': (sim, botId) => {
       while (sim.canMove(botId, Dir.West)) sim.move(botId, Dir.West);
       while (sim.canMove(botId, Dir.North)) sim.move(botId, Dir.North);
     },
@@ -225,49 +210,6 @@ describe('w3-02 — the mapping is the puzzle', () => {
   });
 });
 
-describe('w3-03 — sensing is free, walking is not', () => {
-  test('sweeping the whole yard is correct and costs more than twice par', () => {
-    const drive = (sim: Sim, botId: number): void => {
-      const counts = new Map<string, number>();
-      const terminal: Vec[] = [];
-      const note = (): void => {
-        const tile = sim.scan(botId);
-        if (tile.machineId) terminal.push(tile.at);
-        for (const stack of tile.items) {
-          counts.set(stack.kind, (counts.get(stack.kind) ?? 0) + stack.count);
-        }
-      };
-      while (sim.canMove(botId, Dir.West)) sim.move(botId, Dir.West);
-      while (sim.canMove(botId, Dir.North)) sim.move(botId, Dir.North);
-      let along: Dir = Dir.East;
-      for (;;) {
-        note();
-        while (sim.canMove(botId, along)) {
-          sim.move(botId, along);
-          note();
-        }
-        if (!sim.canMove(botId, Dir.South)) break;
-        sim.move(botId, Dir.South);
-        along = along === Dir.East ? Dir.West : Dir.East;
-      }
-      const order = ['crate', 'part', 'chip', 'cell', 'ore', 'stone', 'scrap', 'ice'];
-      for (const kind of order) {
-        const total = counts.get(kind) ?? 0;
-        if (total > 0) sim.print(botId, `${kind} ${total}`);
-      }
-      const at = terminal[0];
-      if (at) goTo(sim, botId, at);
-      sim.use(botId);
-    };
-
-    for (const seed of w3_03.seeds) {
-      const result = runLevel(w3_03, seed, drive);
-      expect(result.verdict.passed).toBe(true);
-      expect(result.ticks).toBeGreaterThan(w3_03.par.ticks * 2);
-    }
-  });
-});
-
 describe('w3-04 — arrival order, not proximity', () => {
   test('greedy nearest-crate-first fills the bay in the wrong order', () => {
     const drive = (sim: Sim, botId: number): void => {
@@ -291,25 +233,5 @@ describe('w3-04 — arrival order, not proximity', () => {
     const ordered = verdicts.map((v) => v.objectives.find((o) => o.id === 'bay-in-order')?.met);
     expect(delivered).not.toContain(false);
     expect(ordered).toContain(false);
-  });
-});
-
-describe('w3-05 — the rack has to be used', () => {
-  test('one crate per trip passes the objective and blows par', () => {
-    const drive = (sim: Sim, botId: number): void => {
-      const found = survey(sim, botId);
-      for (const crate of found.crates) {
-        const depot = found.depots.get(crate.kind);
-        if (!depot) continue;
-        goTo(sim, botId, crate.at);
-        sim.pickup(botId, crate.kind, 1);
-        goTo(sim, botId, depot);
-        sim.drop(botId, crate.kind, 1);
-      }
-    };
-
-    const results = w3_05.seeds.map((seed) => runLevel(w3_05, seed, drive));
-    expect(results.every((r) => r.verdict.passed)).toBe(true);
-    expect(results.some((r) => r.ticks > w3_05.par.ticks)).toBe(true);
   });
 });

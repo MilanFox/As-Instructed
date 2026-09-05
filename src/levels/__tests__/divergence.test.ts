@@ -1,10 +1,11 @@
 /**
  * What a failing objective says about *where* it failed.
  *
- * `docs/PLAYTEST-BEGINNER.md` §3 is the specification for this file: fifty-five minutes on
- * `w3-03` because four plausible manifest lines and an empty program produced the identical
- * `0 of 5 — 5 short`. Every test here is a program that is wrong in a specific way, asserting
- * that the report now names that way.
+ * `docs/PLAYTEST-BEGINNER.md` §3 is the specification for this file: fifty-five minutes lost
+ * because four plausible answers and an empty program produced the identical `0 of 5 — 5 short`.
+ * Every test here is a program that is wrong in a specific way, asserting that the report now
+ * names that way. The printed-text shape the playtest hit lives in
+ * `src/engine/__tests__/divergence.test.ts`; the work order it was found on has been withdrawn.
  */
 import { describe, expect, test } from 'vitest';
 import type { Machine, Objective, ObjectiveContext, Sim, Trace, Vec } from '../../engine/index.ts';
@@ -12,7 +13,6 @@ import { ALL_DIRS, Dir, Terrain, cloneWorld, step, tileAt, vec } from '../../eng
 import { must } from '../../engine/__tests__/helpers.ts';
 import { runLevel } from '../harness.ts';
 import { dependenciesOf, machinesWithPrefix } from '../world-8/shared.ts';
-import { manifestFor, w3_03 } from '../world-3/w3-03.ts';
 import { w6_03 } from '../world-6/w6-03.ts';
 import { w6_05 } from '../world-6/w6-05.ts';
 import { w8_03 } from '../world-8/w8-03.ts';
@@ -25,98 +25,6 @@ function objectiveIn(level: LevelDef, id: string): Objective {
     `objective ${id}`,
   );
 }
-
-// ---------------------------------------------------------------------------
-// w3-03 — the wall
-// ---------------------------------------------------------------------------
-
-describe('w3-03 tells a wrong manifest apart from no manifest at all', () => {
-  const expected = manifestFor(w3_03.build(1));
-
-  const reportOn = (lines: readonly string[]) => {
-    const result = runLevel(w3_03, 1, (sim, botId) => {
-      for (const line of lines) sim.print(botId, line);
-    });
-    return must(
-      result.verdict.objectives.find((objective) => objective.id === 'manifest-printed'),
-      'manifest-printed',
-    );
-  };
-
-  test('the manifest this test is written against is worth diffing', () => {
-    expect(expected.length).toBeGreaterThan(3);
-  });
-
-  test('a program that printed nothing is pointed at line 1', () => {
-    const report = reportOn([]);
-
-    expect(report.met).toBe(false);
-    expect(report.divergence).toEqual({
-      where: 'line 1',
-      expected: expected[0],
-      received: '(nothing)',
-    });
-  });
-
-  test("a program that miscounted one class is pointed at that class's line", () => {
-    const [kind = 'part', count = '0'] = must(expected[2], 'third manifest line').split(' ');
-    const undercounted = expected.slice();
-    undercounted[2] = `${kind} ${String(Number(count) - 1)}`;
-    const report = reportOn(undercounted);
-
-    expect(report.met).toBe(false);
-    expect(report.divergence).toEqual({
-      where: 'line 3',
-      expected: expected[2],
-      received: undercounted[2],
-    });
-  });
-
-  test('the two runs the playtest could not tell apart now read differently', () => {
-    const overcounted = expected.map((line) => {
-      const [kind = '', count = '0'] = line.split(' ');
-      return `${kind} ${String(Number(count) + 1)}`;
-    });
-    const silent = reportOn([]);
-    const plausible = reportOn(overcounted);
-
-    expect(silent.progress).toEqual(plausible.progress);
-    expect(silent.divergence).toEqual({
-      where: 'line 1',
-      expected: expected[0],
-      received: '(nothing)',
-    });
-    expect(plausible.divergence).toEqual({
-      where: 'line 1',
-      expected: expected[0],
-      received: overcounted[0],
-    });
-  });
-
-  test('the terminal objective names the state it was left in', () => {
-    const result = runLevel(w3_03, 1, () => undefined);
-    const report = must(
-      result.verdict.objectives.find((objective) => objective.id === 'manifest-filed'),
-      'manifest-filed',
-    );
-
-    expect(report.divergence).toEqual({ where: 'terminal', expected: 'filed', received: 'idle' });
-  });
-
-  test('a run that filed the right manifest reports no divergence anywhere', () => {
-    const result = runLevel(w3_03, 1, (sim, botId) => {
-      for (const line of expected) sim.print(botId, line);
-    });
-
-    expect(
-      result.verdict.objectives.find((objective) => objective.id === 'manifest-printed')?.met,
-    ).toBe(true);
-    expect(
-      result.verdict.objectives.find((objective) => objective.id === 'manifest-printed')
-        ?.divergence,
-    ).toBeUndefined();
-  });
-});
 
 // ---------------------------------------------------------------------------
 // w6-03 — stay on route

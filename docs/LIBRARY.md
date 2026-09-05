@@ -1,6 +1,6 @@
 # The Library — Shared Subroutines Repository
 
-The metagame. Unlocks at the end of World 3 (`w3-05`). Everything lives in `src/meta/`, with the
+The metagame. Unlocks at the end of World 3 (`w3-04`). Everything lives in `src/meta/`, with the
 two-file linker and the module-aware error reporting in `src/runtime/`.
 
 **The one rule: the whole system is optional.** A player who never opens the Repository finishes
@@ -102,7 +102,7 @@ be the thing that got dropped.
 ```ts
 interface LibrarySave {
   version: number;
-  unlocked: boolean;              // false until w3-05
+  unlocked: boolean;              // false until w3-04
   briefed: boolean;               // player has read the unlock memo
   source: string;                 // current lib.ts. Sacred.
   revisions: LibraryRevision[];   // newest last, capped at MAX_REVISIONS (40)
@@ -165,7 +165,7 @@ Everything below is re-exported from `src/meta/index.ts`. UI components come fro
 `recordRevision`, `revisionOf`, `lastKnownGoodRevision` · `hashText`, `hashParts`, `runKey`
 
 ### Unlock — `unlock.ts`
-`LIBRARY_UNLOCK_LEVEL` (`'w3-05'`), `LIBRARY_FIRST_WORLD` (`4`), `LIBRARY_REQUIREMENTS`,
+`LIBRARY_UNLOCK_LEVEL` (`'w3-04'`), `LIBRARY_FIRST_WORLD` (`4`), `LIBRARY_REQUIREMENTS`,
 `requirementsFor`, `isLibraryUnlocked`
 
 ### Publishing — `publish.ts`
@@ -217,7 +217,7 @@ Everything below is re-exported from `src/meta/index.ts`. UI components come fro
 |---|---|---|
 | `<LibraryPanel />` | Workspace, as a sibling of `EditorPanel` — a second editor column or a slide-over drawer | Renders `null` until `save.unlocked`. Renders the unlock memo until `save.briefed`. Owns its own five tabs. |
 | `<PublishDialog />` | Top level, next to `<Results />` in `App.tsx` | A modal. Renders `null` unless `useLibrary.getState().offer` is set. |
-| `<UnlockMemo />` | Also exported standalone, if the integrator prefers to show it in the Results screen after `w3-05` | Calls `markBriefed()` on acknowledge. |
+| `<UnlockMemo />` | Also exported standalone, if the integrator prefers to show it in the Results screen after `w3-04` | Calls `markBriefed()` on acknowledge. |
 | `libraryStatusLine(state)` | Workspace status bar | One line: suite progress, or how many subroutines are published. |
 
 `RefactorScreen`, `StructureScreen`, `RegressionReport`, `DiscrepancyList` and `LibraryEditor` are

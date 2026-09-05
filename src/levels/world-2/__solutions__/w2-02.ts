@@ -5,16 +5,23 @@ import type { ReferenceSolution } from '../../types.ts';
 /**
  * TEST FIXTURE. Never imported from src/main.tsx — vite.config.ts fails the build if it is.
  *
- * The World 1 serpentine with one decision bolted onto each tile. The scan is what keeps the arm
- * from swinging at bare soil and at the second sowing, both of which cost two ticks and return
- * nothing.
+ * Two free questions at the start fix which way the field runs from whichever corner the mule
+ * parked in; after that it is the same serpentine as ever. Per tile the order is fixed: take the
+ * crop first, then put the seed in the hole it left.
  */
 export const solution: ReferenceSolution = {
   levelId: 'w2-02',
   run(sim: Sim, botId: number): void {
     const service = (): void => {
       const here = sim.scan(botId);
-      if (here.crop !== null && here.growth >= here.maxGrowth) sim.harvest(botId);
+      if (here.crop === null) {
+        sim.plant(botId);
+        return;
+      }
+      if (here.growth >= here.maxGrowth) {
+        sim.harvest(botId);
+        sim.plant(botId);
+      }
     };
     const sweep = (dir: DirType): void => {
       while (sim.canMove(botId, dir)) {
@@ -23,20 +30,31 @@ export const solution: ReferenceSolution = {
       }
     };
 
-    let dir: DirType = Dir.East;
+    const across: DirType = sim.canMove(botId, Dir.East) ? Dir.East : Dir.West;
+    const back: DirType = across === Dir.East ? Dir.West : Dir.East;
+    const down: DirType = sim.canMove(botId, Dir.South) ? Dir.South : Dir.North;
+
+    let dir: DirType = across;
     service();
     sweep(dir);
-    while (sim.canMove(botId, Dir.South)) {
-      sim.move(botId, Dir.South);
+    while (sim.canMove(botId, down)) {
+      sim.move(botId, down);
       service();
-      dir = dir === Dir.East ? Dir.West : Dir.East;
+      dir = dir === across ? back : across;
       sweep(dir);
     }
   },
   source: [
     'function service(): void {',
     '  const here = scan();',
-    '  if (here.crop !== null && here.growth >= here.maxGrowth) harvest();',
+    '  if (here.crop === null) {',
+    '    plant();',
+    '    return;',
+    '  }',
+    '  if (here.growth >= here.maxGrowth) {',
+    '    harvest();',
+    '    plant();',
+    '  }',
     '}',
     'function sweep(dir: Dir): void {',
     '  while (canMove(dir)) {',
@@ -45,13 +63,17 @@ export const solution: ReferenceSolution = {
     '  }',
     '}',
     '',
-    'let dir: Dir = Dir.East;',
+    'const across: Dir = canMove(Dir.East) ? Dir.East : Dir.West;',
+    'const back: Dir = across === Dir.East ? Dir.West : Dir.East;',
+    'const down: Dir = canMove(Dir.South) ? Dir.South : Dir.North;',
+    '',
+    'let dir: Dir = across;',
     'service();',
     'sweep(dir);',
-    'while (canMove(Dir.South)) {',
-    '  move(Dir.South);',
+    'while (canMove(down)) {',
+    '  move(down);',
     '  service();',
-    '  dir = dir === Dir.East ? Dir.West : Dir.East;',
+    '  dir = dir === across ? back : across;',
     '  sweep(dir);',
     '}',
   ].join('\n'),

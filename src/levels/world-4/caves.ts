@@ -143,8 +143,9 @@ export function deadEndCells(grid: CellGrid): Cell[] {
 
 /**
  * Randomized depth-first search over every cell. The carved connectors form a spanning tree, so
- * the floor graph is a tree: connected, and with no cycle anywhere in it. w4-03 depends on that
- * guarantee being structural rather than checked after the fact.
+ * the floor graph is a tree: connected, and with no cycle anywhere in it. `addCycles` is the only
+ * thing that puts a loop in one, so a caller that never calls it gets that guarantee structurally
+ * rather than by checking after the fact.
  */
 export function carvePerfectMaze(rng: Rng, cw: number, ch: number): CellGrid {
   const grid = newCellGrid(cw, ch);
@@ -375,34 +376,6 @@ export function floorGraphSummary(world: World): FloorGraphSummary {
     }
   }
   return { nodes: tiles.length, edges, components, cycles: edges - tiles.length + components };
-}
-
-/**
- * Walks the left-hand rule from `from` and reports whether it arrives at `to`.
- *
- * Used as a shipped-seed invariant for w4-03: the level's promise is that keeping one hand on the
- * wall is enough, and a seed that breaks it would make the brief a lie.
- */
-export function leftHandReaches(world: World, from: Vec, to: Vec, limit: number): boolean {
-  let at = from;
-  let facing: Dir = D.North;
-  for (let n = 0; n < limit; n++) {
-    if (at.x === to.x && at.y === to.y) return true;
-    const order: Dir[] = [
-      ((facing + 3) % 4) as Dir,
-      facing,
-      ((facing + 1) % 4) as Dir,
-      ((facing + 2) % 4) as Dir,
-    ];
-    const chosen = order.find((dir) => {
-      const tile = tileAt(world, step(at, dir));
-      return tile !== undefined && terrainProps(tile.terrain).walkable;
-    });
-    if (chosen === undefined) return false;
-    facing = chosen;
-    at = step(at, chosen);
-  }
-  return false;
 }
 
 /** Picks `count` cells that are as far from one another as a greedy farthest-point pass gets. */

@@ -193,23 +193,9 @@ if (here.x < 5) {
     example: `const here = pos();
 print(\`starting at \${here.x},\${here.y}\`);`,
     cost: 0,
-    unlockedBy: 'w1-02',
+    unlockedBy: 'w1-01',
     world: 1,
     category: 'output',
-  },
-  {
-    name: 'canMove',
-    params: [{ name: 'dir', type: 'Dir', doc: 'The direction to test.' }],
-    returns: 'boolean',
-    doc: 'Reports whether a `move` in `dir` would succeed right now, without spending a tick or moving the bot. The answer reflects this instant only; another bot may take the tile before you get there.',
-    example: `if (!canMove(Dir.North)) {
-  move(Dir.East);
-}`,
-    cost: 0,
-    unlockedBy: 'w1-03',
-    world: 1,
-    category: 'sensing',
-    requiresTypes: ['Dir'],
   },
   {
     name: 'wait',
@@ -224,14 +210,26 @@ print(\`starting at \${here.x},\${here.y}\`);`,
     ],
     returns: 'void',
     doc: "Burns `n` ticks doing nothing, advancing only this bot's clock. Use it to let a crop mature or to let another bot clear a tile you need.",
-    example: `if (!canMove(Dir.East)) {
-  wait(3);
-  move(Dir.East);
-}`,
+    example: `wait(3);
+move(Dir.East);`,
     cost: 'n',
-    unlockedBy: 'w1-04',
+    unlockedBy: 'w1-01',
     world: 1,
     category: 'movement',
+  },
+  {
+    name: 'canMove',
+    params: [{ name: 'dir', type: 'Dir', doc: 'The direction to test.' }],
+    returns: 'boolean',
+    doc: 'Reports whether a `move` in `dir` would succeed right now, without spending a tick or moving the bot. The answer reflects this instant only; another bot may take the tile before you get there.',
+    example: `if (!canMove(Dir.North)) {
+  move(Dir.East);
+}`,
+    cost: 0,
+    unlockedBy: 'w1-03',
+    world: 1,
+    category: 'sensing',
+    requiresTypes: ['Dir'],
   },
   {
     name: 'scan',
@@ -302,7 +300,7 @@ if (picked === null) {
   plant();
 }`,
     cost: 2,
-    unlockedBy: 'w2-03',
+    unlockedBy: 'w2-02',
     world: 2,
     category: 'terraforming',
     requiresTypes: ['ItemKind'],
@@ -414,7 +412,7 @@ print(\`loaded \${taken} ore\`);`,
   move(Dir.North);
 }`,
     cost: 2,
-    unlockedBy: 'w3-03',
+    unlockedBy: 'w3-04',
     world: 3,
     category: 'machines',
     requiresTypes: ['Dir'],

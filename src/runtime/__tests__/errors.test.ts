@@ -201,7 +201,7 @@ describe('rewriteMessage', () => {
       wrapperOffset: 2,
       unlocked,
     });
-    expect(message).toContain('w2-03');
+    expect(message).toContain('w2-02');
   });
 
   test('reading a property of undefined explains array indexes', () => {

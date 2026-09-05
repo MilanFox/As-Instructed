@@ -14,23 +14,17 @@ import {
 } from './naive.ts';
 
 import { solution as w1_01 } from '../world-1/__solutions__/w1-01.ts';
-import { solution as w1_02 } from '../world-1/__solutions__/w1-02.ts';
 import { solution as w1_03 } from '../world-1/__solutions__/w1-03.ts';
-import { solution as w1_04 } from '../world-1/__solutions__/w1-04.ts';
 import { solution as w1_05 } from '../world-1/__solutions__/w1-05.ts';
 import { solution as w2_01 } from '../world-2/__solutions__/w2-01.ts';
 import { solution as w2_02 } from '../world-2/__solutions__/w2-02.ts';
-import { solution as w2_03 } from '../world-2/__solutions__/w2-03.ts';
 import { solution as w2_04 } from '../world-2/__solutions__/w2-04.ts';
 import { solution as w2_05 } from '../world-2/__solutions__/w2-05.ts';
 import { solution as w3_01 } from '../world-3/__solutions__/w3-01.ts';
 import { solution as w3_02 } from '../world-3/__solutions__/w3-02.ts';
-import { solution as w3_03 } from '../world-3/__solutions__/w3-03.ts';
 import { solution as w3_04 } from '../world-3/__solutions__/w3-04.ts';
-import { solution as w3_05 } from '../world-3/__solutions__/w3-05.ts';
 import { solution as w4_01 } from '../world-4/__solutions__/w4-01.ts';
 import { solution as w4_02 } from '../world-4/__solutions__/w4-02.ts';
-import { solution as w4_03 } from '../world-4/__solutions__/w4-03.ts';
 import { solution as w4_04 } from '../world-4/__solutions__/w4-04.ts';
 import { solution as w4_05 } from '../world-4/__solutions__/w4-05.ts';
 import { solution as w5_01 } from '../world-5/__solutions__/w5-01.ts';
@@ -60,23 +54,17 @@ import { solution as w8_05 } from '../world-8/__solutions__/w8-05.ts';
  */
 const SOLUTIONS: Record<string, ReferenceSolution> = {
   'w1-01': w1_01,
-  'w1-02': w1_02,
   'w1-03': w1_03,
-  'w1-04': w1_04,
   'w1-05': w1_05,
   'w2-01': w2_01,
   'w2-02': w2_02,
-  'w2-03': w2_03,
   'w2-04': w2_04,
   'w2-05': w2_05,
   'w3-01': w3_01,
   'w3-02': w3_02,
-  'w3-03': w3_03,
   'w3-04': w3_04,
-  'w3-05': w3_05,
   'w4-01': w4_01,
   'w4-02': w4_02,
-  'w4-03': w4_03,
   'w4-04': w4_04,
   'w4-05': w4_05,
   'w5-01': w5_01,
@@ -117,17 +105,37 @@ function runOnce(level: (typeof LEVELS)[number], seed: number) {
   return result;
 }
 
-const EXPECTED_IDS = Array.from({ length: 40 }, (_, i) => {
-  const world = Math.floor(i / 5) + 1;
-  const index = (i % 5) + 1;
-  return `w${String(world)}-${String(index).padStart(2, '0')}`;
-});
+/**
+ * Six work orders were withdrawn (docs/FIX-COMPRESSION.md) and the survivors kept their ids, so
+ * the campaign is no longer five per world and `index` is no longer contiguous inside one. It is
+ * still strictly ascending, which is all `campaignOrder` and the site map need.
+ */
+const EXPECTED_INDICES: Readonly<Record<number, number[]>> = {
+  1: [1, 3, 5],
+  2: [1, 2, 4, 5],
+  3: [1, 2, 4],
+  4: [1, 2, 4, 5],
+  5: [1, 2, 3, 4, 5],
+  6: [1, 2, 3, 4, 5],
+  7: [1, 2, 3, 4, 5],
+  8: [1, 2, 3, 4, 5],
+};
+
+const EXPECTED_IDS = Object.entries(EXPECTED_INDICES).flatMap(([world, indices]) =>
+  indices.map((index) => `w${world}-${String(index).padStart(2, '0')}`),
+);
 
 describe('registry', () => {
-  test('all forty levels are present, unique and in campaign order', () => {
-    expect(LEVELS.length).toBe(40);
-    expect(new Set(LEVELS.map((level) => level.id)).size).toBe(40);
+  test('every issued level is present, unique and in campaign order', () => {
+    expect(LEVELS.length).toBe(EXPECTED_IDS.length);
+    expect(new Set(LEVELS.map((level) => level.id)).size).toBe(EXPECTED_IDS.length);
     expect(campaignOrder().map((level) => level.id)).toEqual(EXPECTED_IDS);
+  });
+
+  test('nothing still points at a withdrawn work order', () => {
+    for (const id of ['w1-02', 'w1-04', 'w2-03', 'w3-03', 'w3-05', 'w4-03']) {
+      expect(getLevel(id), id).toBeUndefined();
+    }
   });
 
   test('level ids match their world and index', () => {
@@ -141,13 +149,15 @@ describe('registry', () => {
     expect(getLevel('w9-99')).toBeUndefined();
   });
 
-  test('levelsByWorld covers all eight worlds, five each, in index order', () => {
+  test('levelsByWorld covers all eight worlds, in index order', () => {
     const sections = levelsByWorld();
     expect(sections.map((section) => section.world.id)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     for (const section of sections) {
-      expect(section.levels.map((level) => level.index)).toEqual([1, 2, 3, 4, 5]);
+      expect(section.levels.map((level) => level.index), `world ${String(section.world.id)}`).toEqual(
+        EXPECTED_INDICES[section.world.id],
+      );
     }
-    expect(sections.flatMap((section) => section.levels).length).toBe(40);
+    expect(sections.flatMap((section) => section.levels).length).toBe(EXPECTED_IDS.length);
   });
 
   test('every level unlocks exactly what the API spec says it does', () => {

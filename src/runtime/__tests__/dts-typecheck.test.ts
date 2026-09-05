@@ -62,7 +62,7 @@ function messages(diagnostics: readonly ts.Diagnostic[]): string[] {
 }
 
 describe('the generated declarations compile', () => {
-  const levels = ['w1-01', 'w1-04', 'w2-04', 'w3-03', 'w4-05', 'w5-03', 'w6-03', 'w7-03'];
+  const levels = ['w1-01', 'w1-03', 'w2-04', 'w3-04', 'w4-05', 'w5-03', 'w6-03', 'w7-03'];
 
   for (const levelId of levels) {
     test(`${levelId}: the ambient file itself is clean`, () => {

@@ -7,7 +7,7 @@ import { Terrain, setTerrain, setTile, vec } from '../../engine/index.ts';
  * which is what keeps the reference solutions short enough to be honest translations.
  */
 
-/** The classes the Yards stock. w3-03 also files `ice`, which is racked in the cold store. */
+/** The classes the Yards stock. `ice` is racked in the cold store and never sorted. */
 export const YARD_CLASSES: readonly ItemKind[] = [
   'crate',
   'part',
@@ -17,9 +17,6 @@ export const YARD_CLASSES: readonly ItemKind[] = [
   'stone',
   'scrap',
 ];
-
-/** The declared manifest order for w3-03. Printed verbatim in that level's brief. */
-export const MANIFEST_ORDER: readonly ItemKind[] = [...YARD_CLASSES, 'ice'];
 
 /**
  * Discards the first few draws of a fresh stream. mulberry32 seeded with 1, 2 and 3 returns

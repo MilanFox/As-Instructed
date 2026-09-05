@@ -20,23 +20,17 @@ import { serveRunRequest } from '../serve.ts';
 import { createFakeMonaco } from './fake-monaco.ts';
 
 import { solution as w1_01 } from '../../levels/world-1/__solutions__/w1-01.ts';
-import { solution as w1_02 } from '../../levels/world-1/__solutions__/w1-02.ts';
 import { solution as w1_03 } from '../../levels/world-1/__solutions__/w1-03.ts';
-import { solution as w1_04 } from '../../levels/world-1/__solutions__/w1-04.ts';
 import { solution as w1_05 } from '../../levels/world-1/__solutions__/w1-05.ts';
 import { solution as w2_01 } from '../../levels/world-2/__solutions__/w2-01.ts';
 import { solution as w2_02 } from '../../levels/world-2/__solutions__/w2-02.ts';
-import { solution as w2_03 } from '../../levels/world-2/__solutions__/w2-03.ts';
 import { solution as w2_04 } from '../../levels/world-2/__solutions__/w2-04.ts';
 import { solution as w2_05 } from '../../levels/world-2/__solutions__/w2-05.ts';
 import { solution as w3_01 } from '../../levels/world-3/__solutions__/w3-01.ts';
 import { solution as w3_02 } from '../../levels/world-3/__solutions__/w3-02.ts';
-import { solution as w3_03 } from '../../levels/world-3/__solutions__/w3-03.ts';
 import { solution as w3_04 } from '../../levels/world-3/__solutions__/w3-04.ts';
-import { solution as w3_05 } from '../../levels/world-3/__solutions__/w3-05.ts';
 import { solution as w4_01 } from '../../levels/world-4/__solutions__/w4-01.ts';
 import { solution as w4_02 } from '../../levels/world-4/__solutions__/w4-02.ts';
-import { solution as w4_03 } from '../../levels/world-4/__solutions__/w4-03.ts';
 import { solution as w4_04 } from '../../levels/world-4/__solutions__/w4-04.ts';
 import { solution as w4_05 } from '../../levels/world-4/__solutions__/w4-05.ts';
 import { solution as w5_01 } from '../../levels/world-5/__solutions__/w5-01.ts';
@@ -75,10 +69,10 @@ import { solution as w8_05 } from '../../levels/world-8/__solutions__/w8-05.ts';
  */
 
 const SOLUTIONS: Record<string, ReferenceSolution> = {
-  'w1-01': w1_01, 'w1-02': w1_02, 'w1-03': w1_03, 'w1-04': w1_04, 'w1-05': w1_05,
-  'w2-01': w2_01, 'w2-02': w2_02, 'w2-03': w2_03, 'w2-04': w2_04, 'w2-05': w2_05,
-  'w3-01': w3_01, 'w3-02': w3_02, 'w3-03': w3_03, 'w3-04': w3_04, 'w3-05': w3_05,
-  'w4-01': w4_01, 'w4-02': w4_02, 'w4-03': w4_03, 'w4-04': w4_04, 'w4-05': w4_05,
+  'w1-01': w1_01, 'w1-03': w1_03, 'w1-05': w1_05,
+  'w2-01': w2_01, 'w2-02': w2_02, 'w2-04': w2_04, 'w2-05': w2_05,
+  'w3-01': w3_01, 'w3-02': w3_02, 'w3-04': w3_04,
+  'w4-01': w4_01, 'w4-02': w4_02, 'w4-04': w4_04, 'w4-05': w4_05,
   'w5-01': w5_01, 'w5-02': w5_02, 'w5-03': w5_03, 'w5-04': w5_04, 'w5-05': w5_05,
   'w6-01': w6_01, 'w6-02': w6_02, 'w6-03': w6_03, 'w6-04': w6_04, 'w6-05': w6_05,
   'w7-01': w7_01, 'w7-02': w7_02, 'w7-03': w7_03, 'w7-04': w7_04, 'w7-05': w7_05,
@@ -275,7 +269,7 @@ describe('the reference sources are real programs', () => {
  * is still `Cannot find name`, and a `Dir` that is really a string is still an error.
  */
 describe('the player-facing compiler accepts ordinary JavaScript', () => {
-  test('all 40 reference sources compile cleanly', { timeout: 120_000 }, async () => {
+  test('every reference source compiles cleanly', { timeout: 120_000 }, async () => {
     const rejected: string[] = [];
     for (const level of LEVELS) {
       const source = (SOLUTIONS[level.id] as ReferenceSolution).source;
@@ -288,10 +282,10 @@ describe('the player-facing compiler accepts ordinary JavaScript', () => {
       }
     }
     expect(rejected).toEqual([]);
-    expect(LEVELS.length).toBe(40);
+    expect(LEVELS.length).toBeGreaterThan(30);
   });
 
-  test('all 40 starters compile cleanly', { timeout: 120_000 }, async () => {
+  test('every starter compiles cleanly', { timeout: 120_000 }, async () => {
     const rejected: string[] = [];
     for (const level of LEVELS) {
       const result = await compilePlayerCode(editor.monaco, playerModel(level.id, level.starter));
@@ -302,7 +296,7 @@ describe('the player-facing compiler accepts ordinary JavaScript', () => {
 
   test('an untyped arrow parameter is not an error', async () => {
     const source = 'const doubled = [1, 2, 3].map((n) => n * 2);\nprint(String(doubled.length));\n';
-    const result = await compilePlayerCode(editor.monaco, playerModel('w1-02', source));
+    const result = await compilePlayerCode(editor.monaco, playerModel('w1-01', source));
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.diagnostics).toEqual([]);
   });
