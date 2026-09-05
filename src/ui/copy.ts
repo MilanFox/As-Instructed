@@ -31,10 +31,24 @@ const GOLD = [
   'Par met. Facilities asked whether the meter is broken. It is not.',
 ];
 
+/**
+ * Closing an ungraded level (DESIGN.md §11 A7). Not a fourth rung — these levels admit one route,
+ * so there is no budget to have met and nothing to compare against. The level is worth the same
+ * three points a gold is, so none of these may read as a consolation, and none of them mentions
+ * par, a time, or a grade.
+ */
+const CLOSED = [
+  'Work order closed. Kessler & Daughters has no notes.',
+  'Closed. The job had one shape, and you found it.',
+  'Closed. Nothing further is expected.',
+];
+
 export const UNDER_PAR = 'Under par. Par has been adjusted. This is how it has always worked.';
 export const BONUS_MET = 'Bonus met. There is no bonus. There is a star.';
 
-export function successLine(medal: Medal, ticks: number, parTicks: number): string {
+/** `null` is an ungraded level: it passed, it closed, and it was never going to be graded. */
+export function successLine(medal: Medal | null, ticks: number, parTicks: number): string {
+  if (medal === null) return pick(CLOSED, ticks);
   if (medal === Medal.Gold && ticks < parTicks) return UNDER_PAR;
   if (medal === Medal.Gold) return pick(GOLD, ticks);
   if (medal === Medal.Silver) return pick(SILVER, ticks);
