@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { importsLibrary } from '../runtime/index.ts';
 import type { Medal } from '../engine/index.ts';
 import { libraryHashOf } from './adapters.ts';
+import { bindAuditSeeds } from './campaign.ts';
 import { LIBRARY_EMPTY_STARTER } from './copy.ts';
 import type { DiscrepancyCandidate } from './discrepancy.ts';
 import {
@@ -161,6 +162,7 @@ export const useLibrary = create<MetaState>((set, get) => {
   let host: MetaHost | null = null;
   let storage: LibraryStorage | null | undefined;
   let cancelled = false;
+  let unbindAuditSeeds: (() => void) | null = null;
   /**
    * `reports()` is read straight out of a selector, so it has to hand back the *same* array until
    * something it was derived from changes. A fresh array every call is a snapshot that never
@@ -230,8 +232,22 @@ export const useLibrary = create<MetaState>((set, get) => {
     suiteProgress: null,
     busy: false,
 
+    /**
+     * The moment the campaign turns up, and the moment it goes away.
+     *
+     * The audit-seed wire is bound here rather than in the integrator because an open discrepancy
+     * has to be on the run schedule for as long as the campaign is running, not for as long as a
+     * panel is mounted. `bindAuditSeeds` is the only thing in `src/meta` that has heard of
+     * `useGame`; see `campaign.ts` for why the direction is this way round and not the other.
+     */
     attach(next: MetaHost | null): void {
       host = next;
+      if (next) {
+        unbindAuditSeeds ??= bindAuditSeeds();
+        return;
+      }
+      unbindAuditSeeds?.();
+      unbindAuditSeeds = null;
     },
 
     hydrate(next?: LibraryStorage | null): void {
@@ -474,10 +490,18 @@ export const useLibrary = create<MetaState>((set, get) => {
       write(patchDiscrepancy(get().save, id, { closed: true, seen: true }));
     },
 
+    /**
+     * The card's own button, and the panel gets out of the way when it is pressed.
+     *
+     * The instruction on the card is "open it, press Run" — leaving the Repository panel sitting
+     * over the workspace would make the next thing the player is told to do the thing they cannot
+     * see.
+     */
     openDiscrepancyLevel(id: string): void {
       const save = get().save;
       const found = save.discrepancies.find((each: Discrepancy) => each.id === id);
       if (!found) return;
+      set({ panelOpen: false });
       write(patchDiscrepancy(save, id, { seen: true }));
       requireHost()?.openLevel(found.levelId);
     },

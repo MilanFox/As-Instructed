@@ -26,6 +26,24 @@ export type Screen = 'levels' | 'workspace';
 export type RunState = 'idle' | 'running';
 export type ConsoleKind = 'print' | 'system' | 'error' | 'success';
 
+/**
+ * Layouts a work order has to close on that are not in its own `seeds`, and the line that says why.
+ *
+ * The campaign does not know who puts one here and must not find out: the write is one-directional
+ * (`setAuditSeeds`), the read happens once inside `run()`, and nothing here imports the system that
+ * raises them. That is the whole of the seam — `src/game/store.ts` importing `src/meta` would
+ * invert the dependency and make the Repository non-optional.
+ *
+ * `note` travels with the seeds because the console line is the one place this is guaranteed to be
+ * legible whatever the screens look like, and the campaign has no vocabulary for *why* an extra
+ * layout is on the schedule.
+ */
+export interface AuditSeeds {
+  seeds: readonly number[];
+  /** One line, already in the raiser's voice. Printed to the console when the run starts. */
+  note: string;
+}
+
 export interface ConsoleLine {
   id: number;
   t: number;
@@ -81,6 +99,13 @@ export interface GameState {
    * be a line in a brief. It is now a delivery, and it waits until the workspace is actually open.
    */
   requisition: { levelId: string; hardware: string[] } | null;
+  /**
+   * Extra layouts, by work order id. Empty for a player who never opens the Repository.
+   *
+   * Kept in the store rather than read through a port so that a screen can say "this run includes
+   * one you were not shown" without asking anybody who raised it.
+   */
+  auditSeeds: Readonly<Record<string, AuditSeeds>>;
 
   tick: number;
   endTick: number;
@@ -108,6 +133,8 @@ export interface GameState {
   setPanel(panel: 'brief' | 'console' | 'docs'): void;
   setDocsOpen(open: boolean): void;
   setLayout(patch: Partial<SaveFile['settings']['layout']>): void;
+  /** Replaces the whole map. Written from outside; see `AuditSeeds`. */
+  setAuditSeeds(seeds: Readonly<Record<string, AuditSeeds>>): void;
 
   run(): void;
   cancel(): void;
@@ -133,6 +160,20 @@ export interface GameState {
 
   importSaveFile(text: string): void;
   replaceSave(save: SaveFile): void;
+}
+
+/**
+ * The layouts one run has to close on: the work order's own, then any audit layout it does not
+ * already contain.
+ *
+ * The order is the design. The runtime reports the *first* failing seed, so the work order's own
+ * schedule is always answered first and an audit layout can only become the reported failure once
+ * everything the level always asked for already passes. The player is never shown a layout they
+ * were not told about while they still have an ordinary bug.
+ */
+export function runSeeds(own: readonly number[], audit?: AuditSeeds): number[] {
+  if (!audit) return [...own];
+  return [...own, ...audit.seeds.filter((seed) => !own.includes(seed))];
 }
 
 /**
@@ -240,6 +281,7 @@ export const useGame = create<GameState>((set, get) => {
     freshCommendations: [],
     personalBest: null,
     requisition: null,
+    auditSeeds: {},
 
     tick: 0,
     endTick: 0,
@@ -357,6 +399,10 @@ export const useGame = create<GameState>((set, get) => {
     setDocsOpen(open) {
       set({ docsOpen: open });
     },
+    setAuditSeeds(seeds) {
+      set({ auditSeeds: seeds });
+    },
+
     setLayout(patch) {
       const settings = {
         ...get().save.settings,
@@ -374,6 +420,8 @@ export const useGame = create<GameState>((set, get) => {
       const level = state.currentLevelId ? getLevel(state.currentLevelId) : undefined;
       if (!level) return;
 
+      const audit = state.auditSeeds[level.id];
+      const seeds = runSeeds(level.seeds, audit);
       const token = state.runToken + 1;
       state.pause();
       set({
@@ -394,8 +442,11 @@ export const useGame = create<GameState>((set, get) => {
         {
           t: 0,
           kind: 'system',
-          text: `run ${level.id} — ${level.seeds.length} seed${level.seeds.length === 1 ? '' : 's'}`,
+          text: `run ${level.id} — ${seeds.length} seed${seeds.length === 1 ? '' : 's'}`,
         },
+        ...(audit && seeds.length > level.seeds.length
+          ? [{ t: 0, kind: 'system' as const, text: audit.note }]
+          : []),
       ]);
 
       clearWatchdog();
@@ -415,7 +466,7 @@ export const useGame = create<GameState>((set, get) => {
 
       state
         .runner()
-        .run({ code: state.code, levelId: level.id, seeds: [...level.seeds] })
+        .run({ code: state.code, levelId: level.id, seeds })
         .then((response) => {
           if (get().runToken !== token) return;
           if (!response.ok) {

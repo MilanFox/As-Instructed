@@ -54,36 +54,6 @@ interface Confession {
 
 const PROSE = 'PROSE';
 
-/**
- * Live breaches this file found and could not fix, because `src/meta/**` belongs to another agent.
- *
- * This is a ratchet, not an exemption. Every guard below asserts the breach set *exactly*, in both
- * directions, so fixing one of these fails the test until its entry is deleted — and introducing a
- * second one fails it immediately. An allowlist that only ever grows is how the confessed-invariant
- * index got into the state it was in.
- */
-const KNOWN_OPEN = {
-  /**
-   * `src/meta/profile.ts:24` declares a second `SILVER_FACTOR`, and its comment states the silver
-   * rule as it was *before* `docs/FIX-PAR.md` §7 widened it. `medalThresholds` on the next line
-   * returns `silver: Math.floor(parTicks * SILVER_FACTOR)` with no `par + 1` floor, while
-   * `medalFor` — imported into the same file, used forty lines further down — has the floor. On
-   * `w6-01` (par 1) and `w5-02` (par 2) the two disagree: `medalThresholds` puts silver at the
-   * same tick count as gold, so the Refactor screen's "this goes silver to gold" projection offers
-   * the player a rung the engine does not use.
-   *
-   * The fix is one line — the file already imports from `../engine/index.ts` on line 2:
-   *
-   *   -import { medalFor } from '../engine/index.ts';
-   *   -/** Silver is everything up to this multiple of par. Mirrors `medalFor`. *\/
-   *   -const SILVER_FACTOR = 1.25;
-   *   +import { SILVER_FACTOR, medalFor } from '../engine/index.ts';
-   *
-   * and then `medalThresholds` has to grow the floor `medalFor` already applies.
-   */
-  silverFactor: 'src/meta/profile.ts',
-} as const;
-
 const REGISTRY: readonly Confession[] = [
   // --- Class A: a real duplicated value, held by a test below. ---
   {
@@ -134,11 +104,6 @@ const REGISTRY: readonly Confession[] = [
   {
     file: 'src/levels/world-4/objectives.ts',
     says: 'Mirrors the ledger `Sim.charge` keeps',
-    guard: 'a constant that claims to be the only copy is the only copy',
-  },
-  {
-    file: KNOWN_OPEN.silverFactor,
-    says: 'Mirrors `medalFor`',
     guard: 'a constant that claims to be the only copy is the only copy',
   },
 
@@ -355,7 +320,7 @@ test('a constant declared in two files has one value', () => {
 });
 
 /**
- * The rule the whole game is scored on, in the three places it is written out in prose.
+ * The rule the whole game is scored on, in the four places it is written out in prose.
  *
  * `docs/FIX-PAR.md` §7 widened the silver band to `max(par + 1, par * 1.25)` so a par below four
  * still has a reachable rung. The amendment landed in `medalFor` and in nothing else, so DESIGN.md
@@ -388,6 +353,21 @@ test('every prose copy of the silver rule states both halves of it', () => {
         .filter((line) => /silver/i.test(line))
         .join('\n'),
     ],
+    /*
+     * The fourth copy, and the one this guard was written to catch: `medalThresholds` is what the
+     * Refactor screen projects a "silver to gold" rung from, so a copy of the rule that drops the
+     * floor offers the player a rung the engine does not award. It was live on `w6-01` (par 1) and
+     * `w5-02` (par 2) and was carried here as a `KNOWN_OPEN` breach; `docs/FIX-DISCREPANCY.md` §5
+     * fixed it, and it is now held to the same standard as the other three.
+     */
+    [
+      'src/meta/profile.ts medalThresholds()',
+      (() => {
+        const profile = read('src/meta/profile.ts');
+        const end = profile.indexOf('export function medalThresholds');
+        return profile.slice(profile.lastIndexOf('/**', end), end);
+      })(),
+    ],
   ];
 
   for (const [where, text] of copies) {
@@ -399,25 +379,6 @@ test('every prose copy of the silver rule states both halves of it', () => {
       true,
     ]);
   }
-
-  /*
-   * The fourth copy, and the only one still stating the pre-`FIX-PAR.md` rule. `medalThresholds`
-   * puts silver at `floor(par * 1.25)`, which on a par of 1 or 2 is the gold tick count — see
-   * `KNOWN_OPEN`. Asserted as still-broken rather than skipped, so that fixing it fails here and
-   * forces the entry out of `KNOWN_OPEN` instead of leaving a permanent hole in this guard.
-   */
-  const stale = read(KNOWN_OPEN.silverFactor);
-  const rule = stale.slice(stale.indexOf('/** Silver is'), stale.indexOf('export interface'));
-  expect(['profile.ts', 'multiplier', multiplier.test(rule)]).toEqual([
-    'profile.ts',
-    'multiplier',
-    true,
-  ]);
-  expect(['profile.ts', 'still missing the floor', floor.test(rule)]).toEqual([
-    'profile.ts',
-    'still missing the floor',
-    false,
-  ]);
 });
 
 /**
@@ -427,7 +388,7 @@ test('every prose copy of the silver rule states both halves of it', () => {
  */
 test('a constant that claims to be the only copy is the only copy', () => {
   const expected: Record<string, string[]> = {
-    SILVER_FACTOR: ['src/engine/verdict.ts', KNOWN_OPEN.silverFactor],
+    SILVER_FACTOR: ['src/engine/verdict.ts'],
     FUEL_BURNING: ['src/engine/trace.ts'],
   };
   for (const [name, sites] of Object.entries(expected)) {
