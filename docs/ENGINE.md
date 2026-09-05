@@ -147,7 +147,7 @@ that, every read now:
   `ok` means "the read found something" (a machine for `probe`, a mark for `readMark`, a tile in
   bounds for `scan`), and `detail` is a small flat value — `"3,4"`, a direction name, an id.
 
-That gives levels a third scoring axis next to ticks and characters: **information**. Budget it
+That gives levels a second scoring axis next to ticks: **information**. Budget it
 with `Objectives.withinSenses(name, n)` (`progress()` reports `7 / 10`), or the whole op count with
 `Objectives.withinOps(n)`.
 
@@ -235,8 +235,18 @@ Register new levels in `src/levels/index.ts` (`LEVELS`) and new solutions in the
 Objective builders live behind a namespace — `Objectives.botAt(pad)` — because `botAt(world, pos)`
 is a world query and having both flat would be a trap. Available: `botAt`, `allTilesAre`,
 `tileCount`, `inventoryAtLeast`, `machineState`, `itemsDelivered`, `printedSequence`, `withinTicks`,
-`withinSenses`, `withinOps`, `machinesAllIn`, `custom`. Each takes an optional `{ id, label }`; every one that can show
-"7 / 12" implements `progress()`.
+`withinSenses`, `withinOps`, `machinesAllIn`, `custom`. Each takes an optional
+`{ id, label, meter, unit }`; every one that can show "7 / 12" implements `progress()`.
+
+**An objective that is a budget should declare `meter`.** `src/game/budgets.ts` recovers the
+unclamped spend behind a `[done, total]` pair — the `21 / 16 beams` a clamp would report as
+`16 / 16` — and it works out *which* of the run's totals to count. Given a `meter` it counts that
+one. Given nothing it reads the label: tick and op words, then the sense and resource names the run
+produced, matched word by word. That fallback is kept for the levels that have not declared, but a
+label is prose written for the player, and rewording one used to move a budget off its meter with
+nothing going red. `withinTicks`, `withinOps` and `withinSenses` declare for themselves;
+`custom` budgets have to say. `unit` overrides the plural noun in the readout and is only worth
+setting where the meter's own name reads badly.
 
 Solutions are **test fixtures**. `vite.config.ts` hard-fails the production build the moment a
 `__solutions__` module becomes reachable from `src/main.tsx`.

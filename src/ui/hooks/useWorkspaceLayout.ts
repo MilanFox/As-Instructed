@@ -2,7 +2,8 @@
  * Where the workspace splits, derived from the window and from the shape of the level being run.
  *
  * The two saved fractions are the player's and a value they have dragged is used exactly as
- * given — the splitters stay authoritative. What is derived here is only the *default*, because
+ * given — a splitter the player has dragged always wins. What is derived here is only the
+ * *default*, because
  * one constant pair cannot serve a 13" laptop and a 27" monitor at once, and the pair we had
  * produced a 2.27:1 letterbox with a square grid sitting in the middle of it.
  *
