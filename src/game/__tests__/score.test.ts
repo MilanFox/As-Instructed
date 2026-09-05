@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   BONUS_STAR_POINTS,
   Medal,
+  REVIEW_TIERS,
   levelMaxPoints,
   levelPoints,
   medalFor,
@@ -67,9 +68,8 @@ describe('points', () => {
 
 describe('reviewTier', () => {
   it('picks the tier at each boundary', () => {
-    expect(reviewTier(0).grade).toBe('DEVELOPING');
-    expect(reviewTier(24).grade).toBe('DEVELOPING');
-    expect(reviewTier(25).grade).toBe('CONSISTENT WITH EXPECTATION');
+    expect(reviewTier(0).grade).toBe('CONSISTENT WITH EXPECTATION');
+    expect(reviewTier(33.4).grade).toBe('CONSISTENT WITH EXPECTATION');
     expect(reviewTier(49.9).grade).toBe('CONSISTENT WITH EXPECTATION');
     expect(reviewTier(50).grade).toBe('ABOVE BASELINE');
     expect(reviewTier(74).grade).toBe('ABOVE BASELINE');
@@ -80,8 +80,28 @@ describe('reviewTier', () => {
   });
 
   it('survives nonsense input', () => {
-    expect(reviewTier(Number.NaN).rank).toBe(1);
-    expect(reviewTier(-40).rank).toBe(1);
+    expect(reviewTier(Number.NaN).rank).toBe(2);
+    expect(reviewTier(-40).rank).toBe(2);
     expect(reviewTier(4000).rank).toBe(5);
+  });
+
+  it('has no rung a real record cannot stand on', () => {
+    /* The grade is medal points over medal points available and the cheapest closed work order is
+       a bronze, so 100/3 is the floor of every graded record and no percentage below it exists.
+       A tier whose whole band lies under that floor can never be delivered to anyone, which is
+       exactly what `DEVELOPING` was: its band ended at 25. Each tier runs from its own `min` to
+       the next one's, so the test is that the band's far end clears the floor. */
+    const floor = 100 / 3;
+    REVIEW_TIERS.forEach((tier, index) => {
+      const next = REVIEW_TIERS[index + 1];
+      const bandEnds = next ? next.min : 100;
+      expect([tier.grade, bandEnds > floor]).toEqual([tier.grade, true]);
+    });
+  });
+
+  it('keeps the rank ids saves already carry', () => {
+    /* Literals, not `map((_, i) => i + 2)`: these four numbers are in `save.reviewedRanks` on
+       disk, and a test that derives them from the array cannot notice a renumbering. */
+    expect(REVIEW_TIERS.map((tier) => tier.rank)).toEqual([2, 3, 4, 5]);
   });
 });
