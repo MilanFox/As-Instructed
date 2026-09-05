@@ -331,6 +331,15 @@ describe('rewards', () => {
     expect(best?.now).toBeLessThan(best?.previous ?? 0);
     expect(useGame.getState().save.achievements['revised-downward']).toBeGreaterThan(0);
 
+    /*
+     * `w1-01` is ungraded (DESIGN.md §11 A7), and this is the test that proves ungrading removed
+     * the ladder without removing the mirror: no medal is recorded and no gold is awarded, while
+     * the personal best — the diff both playtesters named the best reward in the game — still
+     * fires and still pays its commendation.
+     */
+    expect(useGame.getState().save.levels['w1-01']?.medal).toBe('none');
+    expect(useGame.getState().save.achievements['within-budget']).toBeUndefined();
+
     await runOnce(W1_01_SOLUTION);
     expect(useGame.getState().personalBest).toBeNull();
   });

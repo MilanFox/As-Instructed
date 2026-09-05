@@ -36,7 +36,9 @@ const expected = (ctx: ObjectiveContext): Objective =>
  * No traversal, no bonus, one objective.
  *
  * Par: every verb the level unlocks is free, so the reference finishes in 0 ticks. `par.ticks` is
- * 1 because the registry test requires a positive par.
+ * 1 because the registry test requires a positive par — which is exactly why the level is
+ * ungraded (DESIGN.md §11 A7). A ladder built on a number that exists to satisfy a test would
+ * teach the player the grade is noise, one world before the grade starts carrying information.
  */
 export const w6_01: LevelDef = {
   id: 'w6-01',
@@ -62,6 +64,7 @@ export const w6_01: LevelDef = {
   ],
   seeds: [1, 2, 3],
   par: { ticks: 1 },
+  graded: false,
   build(seed: number): World {
     const world = createWorld({ w: 10, h: 6, seed, fill: Terrain.Floor });
     paintAscii(world, SHACK, LEGEND);

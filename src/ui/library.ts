@@ -16,6 +16,7 @@ import type {
 } from '../meta/index.ts';
 import { createMetaRunner, prepareLibrary, useLibrary } from '../meta/index.ts';
 import { emptyProgress } from '../game/save.ts';
+import { isGraded } from '../game/score.ts';
 import { unlockedHardware, useGame } from '../game/store.ts';
 import { campaignOrder } from '../levels/index.ts';
 import type { RuntimeRunner } from './adapters.ts';
@@ -61,6 +62,7 @@ function targets(): RegressionTarget[] {
         seeds: [...level.seeds],
         parTicks: level.par.ticks,
         medal: progress.medal,
+        graded: isGraded(level),
         ...(progress.bestTicks !== undefined ? { ticks: progress.bestTicks } : {}),
       },
     ];
@@ -74,6 +76,7 @@ function facts(): LevelFacts[] {
     world: level.world,
     parTicks: level.par.ticks,
     seeds: [...level.seeds],
+    graded: isGraded(level),
   }));
 }
 

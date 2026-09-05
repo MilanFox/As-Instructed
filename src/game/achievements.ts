@@ -134,7 +134,7 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   {
     id: 'sector-gold',
     title: 'THE BUDGETS WERE SET CORRECTLY',
-    requirement: 'Take gold on every issued work order in one world.',
+    requirement: 'Take gold on every issued work order in one world that carries a medal.',
     note: 'Gold across a sector. The budgets are now under review, which is the thanks you get.',
   },
   {
@@ -163,9 +163,21 @@ export function getAchievement(id: string): Achievement | undefined {
  * Deliberately not a `Verdict`: the interesting facts are comparisons against the *save* (was this
  * a personal best, is the world now closed), and the verdict cannot see the save.
  */
+export interface WorldResult {
+  /** `null` where the work order carries no medal at all. DESIGN.md §11 A7. */
+  medal: Medal | null;
+  closed: boolean;
+}
+
 export interface RunFacts {
   passed: boolean;
-  medal: Medal;
+  /**
+   * `null` on an ungraded work order (DESIGN.md §11 A7), which is also the flag for it: the two
+   * commendations that read par as a ladder — a gold, and half the budget — are the ones an
+   * ungraded level must not pay out, and `null` is precisely the condition under which par stopped
+   * being a ladder.
+   */
+  medal: Medal | null;
   ticks: number;
   parTicks: number;
   /** Runs on this work order including this one. */
@@ -180,8 +192,8 @@ export interface RunFacts {
   previousBestTicks?: number;
   /** A bonus met on a work order that was already closed, and had no star before. */
   returnedForStar: boolean;
-  /** Medals across every issued work order in this world, with this result already folded in. */
-  worldMedals: readonly Medal[];
+  /** Every issued work order in this world, with this result already folded in. */
+  worldResults: readonly WorldResult[];
 }
 
 /**
@@ -200,7 +212,7 @@ export function earnedBy(facts: RunFacts): string[] {
   if (facts.previousBestTicks !== undefined && facts.ticks < facts.previousBestTicks) {
     earned.push('revised-downward');
   }
-  if (facts.parTicks > 0 && facts.ticks < facts.parTicks * ELEGANT_FACTOR) {
+  if (facts.medal !== null && facts.parTicks > 0 && facts.ticks < facts.parTicks * ELEGANT_FACTOR) {
     earned.push('outside-tolerance');
   }
   if (facts.blockedMoves === 0) earned.push('no-contact');
@@ -210,10 +222,19 @@ export function earnedBy(facts: RunFacts): string[] {
   if (facts.attempt >= SECOND_LOOK_ATTEMPTS) earned.push('second-look');
   if (facts.attempt >= PERSISTENCE_ATTEMPTS) earned.push('raised-again');
 
-  const world = facts.worldMedals;
-  if (world.length > 0 && world.every((medal) => medal !== Medal.None)) {
+  /*
+   * Both sector commendations used to read the medal alone, because on a graded level a closed
+   * work order and a medal are the same fact. They are not on an ungraded one, and reading the
+   * medal there would have taken both of these permanently off the board in worlds 1, 5 and 6 —
+   * a requirement made public in the list above and then quietly made impossible. So closure is
+   * read as closure, and an ungraded close satisfies the gold sweep because it is worth a gold.
+   */
+  const world = facts.worldResults;
+  if (world.length > 0 && world.every((result) => result.closed)) {
     earned.push('sector-nominal');
-    if (world.every((medal) => medal === Medal.Gold)) earned.push('sector-gold');
+    if (world.every((result) => result.medal === null || result.medal === Medal.Gold)) {
+      earned.push('sector-gold');
+    }
   }
 
   return earned;

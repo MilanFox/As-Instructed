@@ -3,6 +3,7 @@ import { replayTo } from '../../engine/index.ts';
 import type { Budget } from '../../game/budgets.ts';
 import { budgetFor, budgetReadout, overBudgetLine } from '../../game/budgets.ts';
 import { activeTrack, metAt, playbackFor, progressAt } from '../../game/playback.ts';
+import { isGraded } from '../../game/score.ts';
 import { currentLevel, levelUsesFuel, useGame } from '../../game/store.ts';
 import { BudgetBar } from '../components/BudgetBar.tsx';
 import { FuelGauge } from '../components/FuelGauge.tsx';
@@ -103,6 +104,7 @@ export function ObjectiveRail(): React.JSX.Element {
   const met = rows.filter((row) => !row.bonus && row.met).length;
   const total = rows.filter((row) => !row.bonus).length;
 
+  const graded = isGraded(level);
   const gradesTicks = level.objectives.some((objective) => TICK_OBJECTIVE.test(objective.label));
   const hardStop = gradesTicks ? undefined : level.budget?.maxTicks;
 
@@ -137,19 +139,31 @@ export function ObjectiveRail(): React.JSX.Element {
 
       <div className="rail__section">
         <div className="rail__label">targets</div>
+        {/*
+          On an ungraded work order (DESIGN.md §11 A7) par is not a target, so it is not drawn as
+          one. The clock still shows — it is the number `personalBestLine` compares against, and
+          both playtesters called that the best reward in the game — but there is no denominator
+          to fall short of and no red for falling short of it. A `78 / 78` in green on the level
+          whose only correct program costs 78 is the ladder in miniature, and it teaches exactly
+          the lesson A7 exists to stop teaching.
+        */}
         <div className="par-row">
           <span className="par-row__label">ticks</span>
-          <span
-            className={
-              ticks === undefined
-                ? undefined
-                : ticks <= level.par.ticks
-                  ? 'par-row__value--good'
-                  : 'par-row__value--over'
-            }
-          >
-            {ticks ?? '—'} / {level.par.ticks}
-          </span>
+          {graded ? (
+            <span
+              className={
+                ticks === undefined
+                  ? undefined
+                  : ticks <= level.par.ticks
+                    ? 'par-row__value--good'
+                    : 'par-row__value--over'
+              }
+            >
+              {ticks ?? '—'} / {level.par.ticks}
+            </span>
+          ) : (
+            <span>{ticks ?? '—'}</span>
+          )}
         </div>
         {hardStop !== undefined ? (
           <div className="par-row">

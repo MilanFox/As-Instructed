@@ -31,6 +31,7 @@ export const w1_03: LevelDef = {
   ],
   seeds: [1, 4, 7],
   par: { ticks: 24 },
+  graded: false,
   build(seed: number): World {
     const world = createWorld({ w: 30, h: 3, seed, fill: Terrain.Wall });
     // Drawn per seed: no integer constant survives all three shifts.

@@ -57,7 +57,10 @@ describe('points', () => {
     expect(levelPoints(Medal.Silver)).toBe(2);
     expect(levelPoints(Medal.Bronze)).toBe(1);
     expect(levelPoints(Medal.None)).toBe(0);
-    expect(levelPoints(Medal.Gold, 2)).toBe(3 + 2 * BONUS_STAR_POINTS);
+    /* Literals, not arithmetic over the constants under test: DESIGN.md §11 A4 fixes these
+       weights, so a change to one has to break this line rather than travel through it. */
+    expect(BONUS_STAR_POINTS).toBe(1);
+    expect(levelPoints(Medal.Gold, 2)).toBe(5);
     expect(levelMaxPoints(2)).toBe(5);
   });
 });

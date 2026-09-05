@@ -55,14 +55,63 @@ export interface LevelScore {
   ticks: number;
 }
 
-/** Medal points for one level result. DESIGN.md §11 A4: gold 3, silver 2, bronze 1, star +1. */
-export function levelPoints(medal: Medal, stars = 0): number {
-  return MEDAL_WEIGHT[medal] + stars * BONUS_STAR_POINTS;
+/**
+ * Medal points for one level result. DESIGN.md §11 A4: gold 3, silver 2, bronze 1, star +1.
+ *
+ * `null` is an ungraded work order (§11 A7) and weighs a gold's three. The player loses nothing by
+ * a level having no ladder, which is the whole reason ungrading one is safe.
+ */
+export function levelPoints(medal: Medal | null, stars = 0): number {
+  const weight = medal === null ? MEDAL_WEIGHT[Medal.Gold] : MEDAL_WEIGHT[medal];
+  return weight + stars * BONUS_STAR_POINTS;
 }
 
 /** The best a level can be worth: gold plus every bonus star it offers. */
 export function levelMaxPoints(bonusCount = 0): number {
   return MEDAL_WEIGHT[Medal.Gold] + bonusCount * BONUS_STAR_POINTS;
+}
+
+/**
+ * The two facts about a level that A7 separates, in one type.
+ *
+ * `Medal.None` and `null` are not the same state and nothing may treat them as one. `Medal.None`
+ * is *no medal yet* — a graded work order still on the bench. `null` is *no medal ever* — a work
+ * order whose level admits one solution, so its par is a price rather than a budget. A missing
+ * medal is a gap the player can close; an absent one is not, and drawing them the same way tells
+ * the player their finished work is unfinished.
+ */
+export function isGraded(level: { graded?: boolean }): boolean {
+  return level.graded !== false;
+}
+
+/** The medal a finished run earns, or `null` where the level carries no ladder (§11 A7). */
+export function medalForLevel(
+  level: { graded?: boolean; par: { ticks: number } },
+  passed: boolean,
+  ticks: number,
+): Medal | null {
+  return isGraded(level) ? medalFor(passed, ticks, level.par.ticks) : null;
+}
+
+/** The medal on record for a level, or `null` where the level carries no ladder (§11 A7). */
+export function medalOf(level: { graded?: boolean }, progress: { medal: Medal }): Medal | null {
+  return isGraded(level) ? progress.medal : null;
+}
+
+/**
+ * What one saved result is worth, medal plus surviving stars.
+ *
+ * An ungraded work order scores a gold's three the moment it closes and nothing before, so the
+ * site map's per-world totals stay honest in both directions: it cannot be short-changed for
+ * having no ladder, and it cannot be paid for work that has not happened.
+ */
+export function progressPoints(
+  level: { graded?: boolean; bonus?: readonly { id: string }[] },
+  progress: { completed: boolean; medal: Medal; stars: readonly string[] },
+): number {
+  const stars = starsFor(level.bonus, progress.stars);
+  if (isGraded(level)) return levelPoints(progress.medal, stars);
+  return progress.completed ? levelPoints(null, stars) : 0;
 }
 
 export interface ReviewTier {
