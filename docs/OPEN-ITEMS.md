@@ -58,3 +58,46 @@ it, and that 40 levels is an arbitrary number.
 - `npx eslint` reports 2 errors, both false positives: `react-hooks/rules-of-hooks` firing on the
   game's own `use()` and `useLog()` names in `src/levels/`. Needs a rule scope, not a rename.
 - `wip/wave1-interrupted` branch is superseded and can be deleted.
+
+---
+
+## 2026-09-05 — post-playtest state
+
+Both playtests are in and committed: `docs/PLAYTEST-BEGINNER.md`, `docs/PLAYTEST-VETERAN.md`.
+Headline: the ceiling is real from `w4-04`; everything before it is a runway both
+testers would have quit in. Gold on nine of the first ten levels, first honest run.
+
+### Merged to main
+
+- `2268ccd` — failing objectives report `{where, expected, received}`; `HARDWARE` card
+  copy pinned to `api-spec.ts` by a structural test (it had drifted in 13 places);
+  all 40 starters asserted to compile (`w4-03`'s did not).
+- `fc77133` — player-facing character count removed (docs claim, editor footer,
+  success line). Scoring plumbing still present, see below.
+
+### In flight (isolated worktrees, none committed)
+
+- **Bonuses** — every bonus in worlds 1–3 rebuilt as a failable challenge. Eight stars
+  were earned and zero attempted; `w4-02`'s mark budget is the target shape. Scoped to
+  the eight survivors after the cut.
+- **Library integrity** — publish silently truncated multi-line arrow functions and wrote
+  an unparseable `lib.ts`. Fix + validate-before-commit + shrink the 19-checkbox dialog.
+  Regression tab explicitly off-limits: both testers praised it, H9 refuted.
+- **Finale** — `power()` works remotely (8 calls, 16 ticks, no travel, satisfies both grid
+  objectives and deletes `dispatch`'s reason to exist). Plus per-objective credit,
+  per-seed visibility, 7 seeds → 3, signal thread cut. Difficulty must not drop.
+- **Compression** — deleting `w1-02`, `w1-04`, `w2-03`, `w3-03`, `w3-05`, `w4-03`. 40 → 34.
+  No renumbering; save files must survive; sole-introducer dependencies move to survivors.
+
+### Decided, not yet started
+
+- **Remove character-count plumbing entirely** — `countChars`, `scoreChars`, `par.chars`,
+  `bestChars`, `stats.chars`. Touches all 40 level files, so it waits for the level agents.
+- **The Library needs a moment.** It unlocks with one grey status-bar line, after the
+  player has already hand-written its obvious contents six times. Unlock earlier and
+  make the unlock land. This is the mechanic the user singled out as the best idea.
+- Viewport aspect: 891×393, 56% of width wasted on square grids.
+- Hint-reveal state not persisted. Unhandled rejection at `src/ui/library.ts:86`.
+- Par is default-gold through World 2. Deliberately frozen until the above lands, because
+  the fix is either "raise par" or "par is not the axis" and that depends on the new bonuses.
+- Housekeeping: 2 pre-existing eslint false positives; delete branch `wip/wave1-interrupted`.
