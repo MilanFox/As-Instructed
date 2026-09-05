@@ -94,9 +94,6 @@ export const MEDAL_WEIGHT: Readonly<Record<Medal, number>> = Object.freeze({
   none: 0,
 });
 
-/** DESIGN.md §11 A4: a bonus objective is worth one extra star on top of the medal. */
-export const BONUS_STAR_WEIGHT = 1;
-
 export const Medal = {
   Gold: 'gold',
   Silver: 'silver',
@@ -108,7 +105,12 @@ export type Medal = (typeof Medal)[keyof typeof Medal];
 /** Silver is everything up to this multiple of par. DESIGN.md §7. The one authoritative copy. */
 export const SILVER_FACTOR = 1.25;
 
-/** DESIGN.md §7: `<= par` gold, `<= par * SILVER_FACTOR` silver, a pass is bronze. */
+/**
+ * DESIGN.md §7: `<= par` gold, `<= max(par + 1, par * SILVER_FACTOR)` silver, a pass is bronze.
+ *
+ * The `par + 1` floor is not in §7's formula; it is there because ticks are integers, so a par
+ * under four would otherwise have an empty silver band. docs/FIX-PAR.md §7.
+ */
 export function medalFor(passed: boolean, ticks: number, parTicks: number): Medal {
   if (!passed) return Medal.None;
   if (ticks <= parTicks) return Medal.Gold;

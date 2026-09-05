@@ -129,8 +129,10 @@ covers every living bot and reaches `livelockRounds * livingBots` (default 8, vi
 `SimOptions.livelockRounds`), the Sim throws `LivelockError` naming the bots. Single-bot sims can
 never trip it — a lone bot bumping a wall is an ordinary bug and hits `HaltError` instead.
 
-**Medals (A4).** `MEDAL_WEIGHT` = gold 3, silver 2, bronze 1, none 0; `BONUS_STAR_WEIGHT` = 1.
-Both exported from `verdict.ts`. The Performance Review tiers assume exactly these.
+**Medals (A4).** `MEDAL_WEIGHT` = gold 3, silver 2, bronze 1, none 0, exported from `verdict.ts`.
+A bonus star is worth 1 on top of that, and the one live copy of *that* number is
+`BONUS_STAR_POINTS` in `src/game/score.ts` — the engine no longer keeps a second one. The
+Performance Review tiers assume exactly these.
 
 ---
 

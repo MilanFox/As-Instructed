@@ -151,7 +151,6 @@ export * as Objectives from './objectives.ts';
 
 export type { Verdict, VerdictInput } from './verdict.ts';
 export {
-  BONUS_STAR_WEIGHT,
   MEDAL_WEIGHT,
   Medal,
   SILVER_FACTOR,
