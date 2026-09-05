@@ -44,6 +44,28 @@ export interface Divergence {
   received: string;
 }
 
+/**
+ * What a budget objective is denominated in, and where the run's spend against it is counted.
+ *
+ * `src/game/budgets.ts` recovers the unclamped spend behind a `[done, total]` progress pair, and
+ * until now it worked out which of the run's totals to count by **reading the objective's English
+ * label** — matching `/\btick(s)?\b/`, then sense and resource names word by word, then a trailing
+ * `…, in ticks`. A label is player-facing prose. Rewording one silently changed which meter a
+ * budget was read against, or stopped it being read as a budget at all: no error, no failing test,
+ * a number that quietly stops scoring. Every objective label in the campaign was rewritten in one
+ * week, so this is not hypothetical.
+ *
+ * An objective that says what it counts is never guessed at. The parsing stays as the fallback for
+ * the ones that have not said.
+ */
+export type BudgetMeter =
+  | { kind: 'ticks' }
+  | { kind: 'ops' }
+  | { kind: 'sense'; name: string }
+  | { kind: 'spend'; resource: string }
+  /** Anything a level counts by walking the trace itself — marks placed, moves made. */
+  | { kind: 'events'; event: string };
+
 /** One objective as the verdict reports it. */
 export interface ObjectiveReport {
   id: string;
@@ -53,6 +75,10 @@ export interface ObjectiveReport {
   progress?: [number, number];
   /** Only ever present on an unmet objective that opted into reporting one. */
   divergence?: Divergence;
+  /** Declared by the objective; carried through so the shell never has to read the label. */
+  meter?: BudgetMeter;
+  /** The plural noun both numbers are shown in, where the level wants one of its own. */
+  unit?: string;
 }
 
 export interface Objective {
@@ -81,11 +107,24 @@ export interface Objective {
    * default cost: 31 of 34 work orders could only ever say `not met`.
    */
   binary?: true;
+  /**
+   * What this objective's `progress` counts, for a level that is spending against a limit.
+   *
+   * Set it and the readout is exact whatever the label says. Leave it off and `budgetFor` falls
+   * back to reading the words, which is right often enough to be worth keeping and wrong silently
+   * when the words change. `withinTicks`, `withinOps` and `withinSenses` set it for themselves.
+   */
+  meter?: BudgetMeter;
+  /** Overrides the noun the readout uses. Omit unless the meter's own name reads badly. */
+  unit?: string;
 }
 
 export interface ObjectiveOptions {
   id?: string;
   label?: string;
+  /** Declares the budget rather than leaving `budgetFor` to infer it from `label`. */
+  meter?: BudgetMeter;
+  unit?: string;
 }
 
 /** How long a value may run in a divergence before it is cut. Two of these fit one report row. */
@@ -125,6 +164,7 @@ function define(
   evaluate: (ctx: ObjectiveContext) => boolean,
   progress?: (ctx: ObjectiveContext) => [number, number],
   divergence?: (ctx: ObjectiveContext) => Divergence | undefined,
+  meter?: BudgetMeter,
 ): Objective {
   const objective: Objective = {
     id: options?.id ?? fallbackId,
@@ -133,6 +173,9 @@ function define(
   };
   if (progress) objective.progress = progress;
   if (divergence) objective.divergence = divergence;
+  const denomination = options?.meter ?? meter;
+  if (denomination) objective.meter = denomination;
+  if (options?.unit) objective.unit = options.unit;
   return objective;
 }
 
@@ -351,6 +394,7 @@ export function withinTicks(n: number, options?: ObjectiveOptions): Objective {
       expected: `${String(n)} ticks`,
       received: `${String(ctx.trace.endTick)} ticks`,
     }),
+    { kind: 'ticks' },
   );
 }
 
@@ -375,6 +419,7 @@ export function withinSenses(name: string, n: number, options?: ObjectiveOptions
       expected: `${String(n)} calls`,
       received: `${String(used(ctx))} calls`,
     }),
+    { kind: 'sense', name },
   );
 }
 
@@ -392,6 +437,7 @@ export function withinOps(n: number, options?: ObjectiveOptions): Objective {
       expected: `${String(n)} operations`,
       received: `${String(used(ctx))} operations`,
     }),
+    { kind: 'ops' },
   );
 }
 
@@ -484,6 +530,8 @@ export function evaluateObjectives(
     const report: ObjectiveReport = { id: objective.id, label: objective.label, met };
     if (progress) report.progress = progress;
     if (divergence) report.divergence = divergence;
+    if (objective.meter) report.meter = objective.meter;
+    if (objective.unit) report.unit = objective.unit;
     return report;
   });
 }
