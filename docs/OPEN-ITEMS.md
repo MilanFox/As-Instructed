@@ -1042,3 +1042,74 @@ level still pays 3 points. Nothing may read as a consolation or a withheld medal
 
 Two full-suite runs reported failures with **10x inflated timings that never reproduced in
 isolation** — contention from parallel agents, not real. Re-run before trusting a red.
+
+### 2026-09-05, 22:25 — the mute-verb sweep is done (merged)
+
+Green at **1665 tests / 66 files**, tsc / build clean. All 86 reference solutions pass
+unedited; nothing under `src/levels/**`, `src/game/**`, `src/meta/**` or `src/ui/panels/**`
+was touched.
+
+**The finding that reframed the whole job.** Before changing anything it traced what a player
+can actually *read*, and found exactly two channels: the **throw channel** (`SimError` →
+`verdict.failure.message` → console) and the **return value** the verb hands the program. **A
+trace event is not a player channel** — `store.ts` builds the console from `print` events and
+one failure line, and `describeBlock()` is exported, tested, and *called by nothing*. So
+`MoveEvent.reason`, the model `FIX-POWER.md` held up as exemplary, is for replay and tests, not
+for the player. Every `false` case therefore had to answer a second question: **is the reason
+reachable by a free call?**
+
+| Verb | Ruling |
+|---|---|
+| `plant()` | `reason` on the event, reference page names the three free checks. **No `canPlant`** — every input is already free and exact, so a boolean restores the same one bit and a string hands World 2 the answer it asks the player to assemble. |
+| `send()` | **Throws.** `move(99,…)` threw while `send(0,99,…)` shrugged. A dropped message also adds a second cause to World 7's hardest symptom — an empty inbox — which already happens to *correct* programs that forgot `sync()`. |
+| `spawn()` | `detail` on the act event. No `canSpawn`: `blockReason` is asked about arrival at `t + costs.spawn`, so `canMove` is inexact and fixing that would move `w7-02`'s fleet size, i.e. difficulty. |
+| `pickup()`/`drop()` | `reason` on both. They stay numbers — `w8-02` infers real carry capacity from a *short* pickup, so the numeric contract is load-bearing. |
+| `applyMachineChange()` | **Left `false`, stopped and reported.** See the ruling below. |
+| `refuel()` | **Left `false`.** `w8-05` calls it *speculatively* from wherever a bot stands and branches on the `false`; throwing would break the finale's own solution. |
+
+**The `use()` ruling — returns `false`, does not throw.** It was the worst case in the sweep:
+it returned `true`, wrote `ok: true`, emitted a `machineChange` whose `before` and `after` were
+identical, and played the `use` cue — four assertions that the machine had been operated. A
+mute *success* is undetectable by the program **and** by the objective, so the only symptom is
+an objective that stays open after a run that looked complete, and the player debugs the
+objective.
+
+It applied the deciding test more carefully than I did: **`use` is the only verb that never
+names its target.** `power("sub-3")` carries its target in the argument, so that call is
+permanently wrong; `use(dir)` carries a *direction*, and the bot walks one tile and the
+identical expression succeeds. The refusal is positional, and position is the most transient
+state in the game. A throw would also have been actively wrong — 19 authoring sites produce
+cycle-less machines, seven on `w8-05`, whose own reference **stands bots on `depot-*` and the
+slots** to `drop()`. Throwing would lose the run for standing on a delivery bay.
+
+Its new `copy.test.ts` guards the ungraded line by **rejecting grading vocabulary**, which
+caught its own first draft, "filed under done".
+
+### Two decisions that were sitting in a code comment — ruled
+
+Found by grepping `w8-05.ts` to verify a leftover, not by anything pointing at them. Worth
+noting as a process failure: `docs/FIX-FINALE.md` flagged both for the orchestrator and nothing
+surfaced them.
+
+1. **`w8-05` par stays at 1050.** The reference comes in at 560–977 across the three surviving
+   seeds, so there is ~7% headroom against a campaign whose median is 0%. Loose by local
+   standards — but this is the finale, the one level where a player arrives with a large program
+   and the fewest chances to iterate, and tightening a medal **nobody has closed yet** is tuning
+   a number with no evidence behind it. It folds into the Worlds 3–8 par measurement, which is
+   already queued and which is the instrument that should decide it.
+2. **Reconcile the `w8-05` CURRICULUM drift.** §10 still says seven seeds across six independent
+   axes (now `[1, 4, 7]`), an enciphered partly-corrupt signal stream (now a clear manifest), and
+   a 500-line reference (now 487). Bundle it with the `w2-01`/`w2-05` drift already open. The
+   constant audit just demonstrated that unenforced doc-versus-code invariants are this
+   codebase's most common bug class; a curriculum that describes a level that no longer exists
+   is exactly that.
+
+### Still open from the sweep
+
+**`applyMachineChange` / `link` / `transmit` unknown-id ruling.** By the deciding test an
+unknown *machine* id is permanent, so `link("reactor","ghost")` is a branch that can never flip
+— but `api-bindings.ts:124,180` call it with ids *guaranteed* not to resolve (`''`) purely to
+charge the tick, so throwing today would turn `transmit()`-with-no-antenna into a stopped run in
+W5/W6. **My reading, for whoever takes it: the tick-charge path and the change path should be
+separated first, then a player-supplied unknown id throws.** Verify that against the code before
+acting — it reopens `power()`'s shipped unknown-id ruling and lands in level-owned files.
