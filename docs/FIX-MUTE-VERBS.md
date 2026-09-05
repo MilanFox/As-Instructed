@@ -410,3 +410,126 @@ did nothing then and does nothing now. All 86 reference-solution tests pass **un
 | `src/engine/__tests__/sim.test.ts` | `'a machine with no cycle is a no-op that still costs ticks'` was a test asserting the defect; rewritten to assert the refusal, that the machine is still named, and that **no** `machineChange` and **no** `fx` are emitted. +1 further test proving the refusal is positional by succeeding one tile over. |
 
 Net **+1 test** (1632 from 1631).
+
+### Confirmed in a browser, both halves
+
+Dev build on `:5187` in this worktree, save seeded with every work order closed, then cleared and
+the tab closed afterwards. The server was killed by its own PID.
+
+**The refusal, on `w8-05`.** Bot 5 (`KD-85`) starts at (3, 20), one tile east of the cycle-less
+`desk` at (2, 20) — so the case is reachable in the finale without walking anywhere. Program run,
+console panel:
+
+> `desk at 2,20, state idle`
+> `machine west of bot 5: desk`
+> `use(Dir.West) on the desk → false`
+> `desk state after: idle`
+> `run still going, tick 1`
+> `Seed 1 of 3 (seed 1) failed. Contract not fulfilled. Outstanding: …`
+
+Before this change that third line printed `true`. **The run did not stop** — the closing line is
+the ordinary `objectives-unmet` one, not an `illegal-action`, which is the whole point of not
+throwing. The result panel's diff read alongside it, unchanged and true: *"sub-0 at (27, 25) /
+want on, switched by a use() at the tile / got never used; no bot stood on it."*
+
+**The success, on `w5-01`.** A cycled machine under the bot must still work, since that is the
+mechanism the finale's stations and airlock run on:
+
+> `start 1,2 → sub-1 at 4,2, state off`
+> `standing on machine: sub-1`
+> `use() on the substation → true`
+> `sub-1 state after: on`
+
+and the objective rail moved to `1/6` on *"Leave every substation on"*. The cycled branch is
+untouched; only the branch that used to lie about itself changed.
+
+---
+
+## 5. `applyMachineChange()` — left as a `false`, and this one is a stop-and-report
+
+**Not changed.** The brief ranked it fifth and described it as consistent with the `false` that
+`power()` kept, just terse. That is right, and there is a harder reason not to touch it that only
+showed up on reading the call sites.
+
+`applyMachineChange` is not really reached with a bad id by accident. **Two runtime bindings call
+it with an id that is guaranteed not to resolve, on purpose:**
+
+- `src/runtime/api-bindings.ts:124` — `transmit()` with no antenna in range calls
+  `sim.applyMachineChange(botId, '', () => {}, cost)`. The empty string is a sentinel: it cannot
+  match a machine, so the call charges the tick and emits the `ok: false` act event, and
+  `transmitPayload` then returns `false` to the player.
+- `src/runtime/api-bindings.ts:180` — `link()` with an unknown id does the same with whichever of
+  the two ids is bad, then returns `false`.
+
+So making `applyMachineChange` throw would not clarify a mute failure; it would convert
+`transmit()`-with-no-antenna and `link()`-with-a-bad-id from documented `false` returns into
+**stopped runs**, in World 5 and World 6, changing the player-facing contract of two level-defined
+verbs. `link`'s own doc comment states the current behaviour outright (*"Unknown ids cost the full
+price and return false"*), and three World 5 and four World 6 reference solutions call those verbs.
+
+There is a real question underneath — by the deciding test, an unknown *machine* id is permanent,
+so `link("reactor", "ghost")` is a branch that can never flip — but answering it means reopening
+`power()`'s unknown-id ruling, which FIX-POWER made deliberately and which is shipped. **That is a
+ruling for the orchestrator, not a patch for this sweep**, and it would land in level-owned files.
+Recorded here rather than acted on.
+
+The one thing that is already right: the refusal event carries `detail: machineId`, so the trace
+does name the id that missed. It is terse, not mute.
+
+---
+
+## 6. `refuel()` — left as a `false`, and the justification is stronger than "arguably fine"
+
+**Not changed**, and it should not be. Three independent reasons, in increasing order of how much
+they would have cost to ignore:
+
+**1. It is correctly a `false` by the deciding test.** The refusal is positional — the bot is not
+on a `Terrain.Depot` tile — and position is transient. The identical `refuel()` succeeds after one
+`move()`.
+
+**2. The reason is already free and already exact.** There is exactly one cause, so there is no bit
+to disambiguate: `scan().terrain === 'depot'` answers it before the call and after it, and
+`fuel()` / `fuelMax()` report the outcome directly. This is the one verb in the sweep where a `0`
+or a `false` genuinely carries the whole story, because there is only one story.
+
+**3. `w8-05`'s reference solution structurally depends on the `false`.** `w8-05.ts:216` calls
+`if (sim.refuel(id)) return true;` **speculatively**, from wherever the bot happens to be standing,
+inside a five-attempt `fill()` loop, and `:243` returns the result of a final attempt. A throwing
+`refuel()` would break the finale's own solution on the first speculative call. That is exactly the
+"stop and report rather than proceed" case the brief describes, and it was found by reading the
+call sites before writing any code.
+
+The silence is also covered downstream, as the brief suggested: `OutOfFuelError` names the bot, the
+action, the fuel required and the fuel remaining, and it arrives through the throw channel with a
+line number. The fuel gauge is on screen whenever a level uses fuel. Nothing here is mute.
+
+---
+
+## Verification
+
+- `npx vitest run` — **1665 tests across 66 files, all passing.** Baseline was 1653 across 65 after
+  merging the ungraded-levels work, so **+12**: eight for the verbs (`plant` 2, `send` 1, `spawn`
+  2, `pickup`/`drop` 2, `use` 1) and four for the `copy.ts` ungraded case in a new test file. Four
+  existing tests were rewritten in place rather than added, because they asserted contracts that
+  changed (`send` ×2, `bot-handle` ×1, `use` ×1).
+- **All 86 reference-solution tests pass unedited.** Not one reference solution was touched.
+- `npx tsc --noEmit` — silent. `npm run build` — clean.
+- `npx eslint src` — the one known pre-existing error
+  (`src/levels/world-5/__solutions__/w5-01.ts:32`, the `use()` / `rules-of-hooks` false positive).
+  Nothing new.
+- **Flake worth knowing about.** Two full-suite runs reported a single spurious failure alongside
+  `Error: [vitest-worker]: Timeout calling "onTaskUpdate"`, and both took ~80s against a clean
+  run's ~9s. It is a worker RPC timeout under machine load — several agents were running — not a
+  real failure; each reran clean and green. If a lone failure appears with that error attached and
+  an inflated duration, rerun before believing it.
+- `src/runtime/api-spec.ts` and `src/ui/copy.ts` do not satisfy `prettier --check`. **Both were
+  already unformatted on `main` before this work** (verified against the original blobs); eslint is
+  the gate here and is clean, so they were left as found. `src/engine/__tests__/sim.test.ts` was
+  clean and was reformatted after editing so it stayed that way.
+
+## Nothing left behind
+
+No par, medal threshold, budget, tick cost or objective was touched anywhere in this sweep. No
+character count was reintroduced. No new dependency, no new error channel, no new `FailureCode`.
+Every failing message added goes through `runSeed` → `toRuntimeFailure` → `toVerdictFailure`, the
+path `power()` and `LivelockError` already use.
