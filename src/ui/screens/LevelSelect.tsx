@@ -177,7 +177,6 @@ function LockGlyph(): JSX.Element {
 export function LevelSelect(): JSX.Element {
   const save = useGame((state) => state.save);
   const openLevel = useGame((state) => state.openLevel);
-  const goto = useGame((state) => state.goto);
   const commendations = Object.keys(save.achievements).length;
 
   const rows = useMemo(() => buildRows(save), [save]);
@@ -305,13 +304,6 @@ export function LevelSelect(): JSX.Element {
             {Math.round(campaignPercent)}% of the site closed
             <span className="campaign-bar__aside"> · {tally.gold} at par or under</span>
           </p>
-          <button
-            type="button"
-            className="screen-btn screen-btn--primary"
-            onClick={() => goto('review')}
-          >
-            PERFORMANCE REVIEW
-          </button>
         </div>
       </header>
 

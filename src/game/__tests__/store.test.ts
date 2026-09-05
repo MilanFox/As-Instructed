@@ -357,6 +357,15 @@ describe('rewards', () => {
     expect(useGame.getState().requisition).toBeNull();
   });
 
+  it('files a review tier once and keeps the ranks in order', () => {
+    reset();
+    expect(useGame.getState().save.reviewedRanks).toEqual([]);
+    useGame.getState().fileReview(5);
+    useGame.getState().fileReview(3);
+    useGame.getState().fileReview(5);
+    expect(useGame.getState().save.reviewedRanks).toEqual([3, 5]);
+  });
+
   it('lets the player turn the ceremony off and have it stay off', () => {
     reset();
     expect(useGame.getState().save.settings.celebrations).toBe(true);

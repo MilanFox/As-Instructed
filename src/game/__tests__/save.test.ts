@@ -251,6 +251,33 @@ describe('migrate to the reward fields', () => {
     expect(migrated.seenRequisitions).toEqual(['scan']);
   });
 
+  it('loads a save written before the review was delivered rather than hosted', () => {
+    const before = {
+      version: SAVE_VERSION,
+      updatedAt: 1,
+      levels: { 'w1-01': { completed: true, medal: 'gold', stars: [], attempts: 2 } },
+      settings: {},
+      achievements: {},
+      stats: { runs: 2, passes: 1, fails: 1 },
+      seenRequisitions: ['move'],
+    };
+    const migrated = migrate(before);
+
+    expect(migrated.reviewedRanks).toEqual([]);
+    expect(migrated.levels['w1-01']?.medal).toBe('gold');
+    expect(migrated.seenRequisitions).toEqual(['move']);
+  });
+
+  it('keeps only whole tier ranks out of a hand-edited review history', () => {
+    const migrated = migrate({
+      version: SAVE_VERSION,
+      updatedAt: 1,
+      levels: {},
+      reviewedRanks: [3, 3, 4.5, 0, -2, '5', null, 5],
+    });
+    expect(migrated.reviewedRanks).toEqual([3, 5]);
+  });
+
   it('keeps ceremony off once the player has turned it off', () => {
     const migrated = migrate({
       version: SAVE_VERSION,
@@ -304,6 +331,16 @@ describe('importSave and the reward fields', () => {
 
     const merged = importSave(current, JSON.stringify(incoming));
     expect([...merged.seenRequisitions].sort()).toEqual(['move', 'pos', 'scan']);
+  });
+
+  it('unions read reviews so a memo is never re-delivered', () => {
+    const current = emptySave();
+    current.reviewedRanks = [3, 4];
+    const incoming = emptySave();
+    incoming.reviewedRanks = [4, 5];
+
+    const merged = importSave(current, JSON.stringify(incoming));
+    expect(merged.reviewedRanks).toEqual([3, 4, 5]);
   });
 
   it('still never drops code while merging the new fields', () => {

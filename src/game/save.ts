@@ -82,6 +82,14 @@ export interface SaveFile {
   stats: CampaignStats;
   /** Hardware names whose requisition note has already been signed for. */
   seenRequisitions: string[];
+  /**
+   * Review tiers whose memo has already been delivered, by rank.
+   *
+   * A memo is read once, like a requisition. The grade itself is recomputed from `levels` every
+   * time, so this records only what the player has been shown — a rank that no longer exists is
+   * inert, because delivery is keyed off the live tier list rather than off this array.
+   */
+  reviewedRanks: number[];
 }
 
 export const DEFAULT_LAYOUT: Layout = { editorFraction: 0.44, viewportFraction: 0.58 };
@@ -104,6 +112,7 @@ export function emptySave(): SaveFile {
     achievements: {},
     stats: emptyStats(),
     seenRequisitions: [],
+    reviewedRanks: [],
   };
 }
 
@@ -251,6 +260,7 @@ export function migrate(raw: unknown): SaveFile {
     achievements: rescueAchievements(working['achievements']),
     stats: rescueStats(working['stats']),
     seenRequisitions: rescueStrings(working['seenRequisitions']),
+    reviewedRanks: rescueRanks(working['reviewedRanks']),
   };
 }
 
@@ -277,6 +287,15 @@ function rescueStats(raw: unknown): CampaignStats {
 function rescueStrings(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   return [...new Set(raw.filter((value): value is string => typeof value === 'string'))];
+}
+
+/** Tier ranks are whole numbers from one upward. Anything else was never written by this game. */
+function rescueRanks(raw: unknown): number[] {
+  if (!Array.isArray(raw)) return [];
+  const ranks = raw.filter(
+    (value): value is number => typeof value === 'number' && Number.isInteger(value) && value >= 1,
+  );
+  return [...new Set(ranks)].sort((a, b) => a - b);
 }
 
 // ---------------------------------------------------------------------------
@@ -356,6 +375,9 @@ export function importSave(current: SaveFile, text: string): SaveFile {
     achievements,
     stats: mergeStats(current.stats, incoming.stats),
     seenRequisitions: [...new Set([...current.seenRequisitions, ...incoming.seenRequisitions])],
+    reviewedRanks: [...new Set([...current.reviewedRanks, ...incoming.reviewedRanks])].sort(
+      (a, b) => a - b,
+    ),
     version: SAVE_VERSION,
     updatedAt: Date.now(),
   };
