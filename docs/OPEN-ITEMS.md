@@ -987,3 +987,58 @@ finding 2 outright, but it is **blind to every case where both copies are live**
 3, 5, 7, 8 — so it is worth shipping first and worth not mistaking for closing the class.
 
 Neither guard is built yet. Both are queued.
+
+### 2026-09-05, 20:55 — ungraded levels merged (DESIGN §11 A7)
+
+Green at **1653 tests / 65 files** (1624 + 25 `ungraded.test.ts` + 4 achievements), tsc /
+build clean. `w1-01`, `w1-03`, `w5-02`, `w6-01`, `w6-03` and `w6-05` no longer carry a ladder.
+
+The pair worth knowing: **`w1-01` and `w1-05` both finish at exactly 78 ticks.** The ungraded
+rail reads `ticks 78`; the graded one reads `ticks 78 / 50` in over-budget amber. The ungraded
+rail reports the clock, the graded rail grades it.
+
+**Two of the "places a medal was assumed" turned out to be live bugs, not adaptations:**
+
+- **`outside-tolerance` was paying out on every single `w6-01` close.** Par there is 1 *because
+  the registry test requires a positive par*, the only solution costs 0, so `0 < 0.5` always
+  held. Every player was being congratulated for restraint on the one level with no other
+  number available. Found only because A7 forced someone to read every medal assumption.
+- **`sector-nominal` and `sector-gold` would have silently become unattainable** in worlds 1, 5
+  and 6 — both read `medal !== None` as "closed". `RunFacts.worldMedals` is now
+  `worldResults: {medal, closed}[]`.
+
+"Ungraded" is `Medal | null` minted outside the engine, deliberately **not** a fifth `Medal`
+value, so `src/engine/**` stayed untouched while another agent held it.
+
+**Verified rather than trusted, as instructed:** `reportFor` needs no filter — it already skips
+on `Medal.None` before touching either side of the fraction. Four tests pin it, including that
+an ungraded close cannot drag a perfect record below 100% nor inflate a weak one.
+
+**Save compatibility** is whitelist-on-read, exactly like the retired char-count field: a
+pre-A7 gold on `w1-01` is dropped while everything else survives, and an id this build does not
+know **keeps** its medal, so a retired level does not lose one to a lookup miss. Six cases.
+
+### Three defects only running it found — assigned
+
+The screens were not that agent's to touch, so it measured each against the live app and wrote
+exact diffs. Now with an agent owning `src/ui/screens/**`, `App.tsx`, `components/**`:
+
+1. **An ungraded close pays 0 points on the site map** — `0/11 pts · 2/3 closed`, should be
+   `6/11`.
+2. **`ALL AT PAR` and the gold tally are unattainable in worlds 1, 5 and 6.**
+3. **From the real accessibility tree, a closed ungraded order is announced
+   `"Closed. no medal."` — identical to an untouched level's `"Open. no medal."`** The "must
+   not render as a missing medal" requirement, failing in the one place sighted players never
+   see. The visual ring was already correct, which is why nothing else caught it.
+
+Plus `Results.tsx` still awarding a gold badge, and `App.tsx` drawing par as a target (`78/78`).
+`copy.ts`'s ungraded `successLine` is routed to the mute-verbs agent that owns it.
+
+**The instruction that matters most for that work: ungrading removes the grade, not the
+reward.** The ceremony still fires, the audio and celebration take the `pass` path, and the
+level still pays 3 points. Nothing may read as a consolation or a withheld medal.
+
+### Note for anyone reading a red test run today
+
+Two full-suite runs reported failures with **10x inflated timings that never reproduced in
+isolation** — contention from parallel agents, not real. Re-run before trusting a red.
