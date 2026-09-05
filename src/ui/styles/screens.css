@@ -547,7 +547,9 @@
   min-width: 0;
 }
 
-.memo__meta dd {
+/* Beats `.review .screen-stat dd { white-space: nowrap }` on specificity: the memo's own values
+   are sentences, and a nowrap sentence lands on top of the column beside it. */
+.review .memo__meta dd {
   white-space: normal;
   overflow-wrap: anywhere;
 }

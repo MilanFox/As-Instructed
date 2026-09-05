@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useGame } from '../../game/store.ts';
+import { useLibrary } from '../../meta/index.ts';
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -28,7 +29,10 @@ export function useKeyboard(): void {
       }
 
       if (event.key === 'Escape') {
-        if (state.showResults) state.dismissResults();
+        // Innermost thing first. The publish offer is a modal, and Escape on a modal closes the
+        // modal — it does not walk out of the work order underneath it.
+        if (useLibrary.getState().offer) useLibrary.getState().skipPublish(false);
+        else if (state.showResults) state.dismissResults();
         else if (state.screen !== 'levels') state.goto('levels');
         event.preventDefault();
         return;

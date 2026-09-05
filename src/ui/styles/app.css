@@ -1174,3 +1174,15 @@
   border-right: 1px solid var(--border-strong);
   box-shadow: 12px 0 32px rgb(0 0 0 / 45%);
 }
+
+.panel-boundary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  justify-content: center;
+  height: 100%;
+  padding: var(--space-5);
+  background: var(--bg-panel);
+  color: var(--ink-dim);
+  font-size: 12px;
+}

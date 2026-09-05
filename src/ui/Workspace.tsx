@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { useGame } from '../game/store.ts';
 import { useLibrary } from '../meta/index.ts';
 import { LibraryPanel, libraryStatusLine } from '../meta/ui/index.ts';
+import { PanelBoundary } from './components/PanelBoundary.tsx';
 import { Splitter } from './components/Splitter.tsx';
 import { BriefPanel } from './panels/BriefPanel.tsx';
 import { ConsolePanel } from './panels/ConsolePanel.tsx';
@@ -38,7 +39,9 @@ export function Workspace(): React.JSX.Element {
           <EditorPanel />
           {libraryOpen ? (
             <div className="workspace__library">
-              <LibraryPanel />
+              <PanelBoundary label="The Repository">
+                <LibraryPanel />
+              </PanelBoundary>
             </div>
           ) : null}
         </div>

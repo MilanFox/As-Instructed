@@ -7,7 +7,7 @@
  * three "after a work order closes" hooks fire (docs/LIBRARY.md §6).
  */
 import type { Medal } from '../engine/index.ts';
-import type { LevelFacts, MetaHost, MetaRunner, RegressionTarget } from '../meta/index.ts';
+import type { LevelFacts, MetaHost, MetaRunner, RegressionTarget, RunnerLike } from '../meta/index.ts';
 import { createMetaRunner, prepareLibrary, useLibrary } from '../meta/index.ts';
 import { emptyProgress } from '../game/save.ts';
 import { unlockedHardware, useGame } from '../game/store.ts';
@@ -24,6 +24,24 @@ const SUITE_TIMEOUT_MS = 15_000;
  * second model at the same URI — which React's StrictMode double-mount does reliably.
  */
 let metaRunner: MetaRunner | null = null;
+
+/**
+ * Which `RuntimeRunner` is live right now.
+ *
+ * The metagame's runner outlives any single mount, but the simulation worker does not: React's
+ * StrictMode double-mount builds a second `RuntimeRunner` and disposes the first. Handing
+ * `createMetaRunner` the runner directly would leave the whole Repository talking to a disposed
+ * worker, so it gets a forwarder instead.
+ */
+let activeRunner: RuntimeRunner | null = null;
+
+const liveSimulation: RunnerLike = {
+  run: (request) => {
+    const runner = activeRunner;
+    if (!runner) return Promise.reject(new Error('No simulation worker is attached.'));
+    return runner.simulation.run(request);
+  },
+};
 
 function targets(): RegressionTarget[] {
   const save = useGame.getState().save;
@@ -100,6 +118,7 @@ function setLevelCode(levelId: string, code: string): void {
  * it needs Monaco, which arrives with the editor.
  */
 export function mountLibrary(runner: RuntimeRunner): () => void {
+  activeRunner = runner;
   useLibrary.getState().hydrate();
 
   const host: MetaHost = {
@@ -115,22 +134,40 @@ export function mountLibrary(runner: RuntimeRunner): () => void {
   useLibrary.getState().attach(host);
   useLibrary.getState().refreshUnlock();
 
-  void runner.ready().then(async (monaco) => {
+  /*
+   * Installs `declare module 'lib'`, which is what makes the player's own `import` type-check.
+   *
+   * It awaits `ready()` rather than taking Monaco as it finds it, because `lib.ts` is compiled
+   * against the *level's* hardware declarations: run this before `configurePlayerLanguage` has
+   * caught up and a library that calls `look()` fails to build against World 1's firmware, the
+   * declaration is dropped, and every import in the editor turns red until the next Run.
+   */
+  const installTypes = async (): Promise<void> => {
+    const state = useLibrary.getState();
+    if (!state.save.unlocked || !activeRunner) return;
+    await prepareLibrary(await activeRunner.ready(), state.save.source);
+  };
+
+  void runner.ready().then((monaco) => {
     metaRunner ??= createMetaRunner({
       monaco,
-      runner: runner.simulation,
+      runner: liveSimulation,
       timeoutMs: SUITE_TIMEOUT_MS,
     });
     host.runner = metaRunner;
-    if (useLibrary.getState().save.unlocked) {
-      await prepareLibrary(monaco, useLibrary.getState().source);
-    }
+    void installTypes();
+  });
+
+  const unsubscribeLibrary = useLibrary.subscribe((state, previous) => {
+    if (state.save.source !== previous.save.source) void installTypes();
   });
 
   // The offer waits for the report to be dismissed: two modals at once is one modal too many.
   let pending: { levelId: string; code: string } | null = null;
 
   const unsubscribe = useGame.subscribe((state, previous) => {
+    if (state.currentLevelId !== previous.currentLevelId) void installTypes();
+
     if (state.showResults && !previous.showResults && state.verdict?.passed) {
       const levelId = state.currentLevelId;
       if (!levelId) return;
@@ -151,6 +188,7 @@ export function mountLibrary(runner: RuntimeRunner): () => void {
 
   return () => {
     unsubscribe();
+    unsubscribeLibrary();
     useLibrary.getState().attach(null);
   };
 }

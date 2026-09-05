@@ -36,10 +36,15 @@ export function EditorPanel(): React.JSX.Element {
 
   // A runtime failure is not a compile error, so it gets its own marker owner and is cleared
   // the moment the next run starts.
+  //
+  // The model is looked up by URI rather than taken from the editor: `@monaco-editor/react` mounts
+  // asynchronously, so on a level change this effect runs while `editorRef` still points at the
+  // editor that is being torn down — and an early return there leaves the previous work order's
+  // error underlined in the new one.
   useEffect(() => {
-    const editor = editorRef.current;
-    const model = editor?.getModel();
+    const model = monaco.editor.getModel(monaco.Uri.parse(PLAYER_FILE_PATH));
     if (!model) return;
+    const editor = editorRef.current;
     if (!failure || failure.line === undefined) {
       monaco.editor.setModelMarkers(model, RUNTIME_MARKER_OWNER, []);
       return;
