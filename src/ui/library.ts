@@ -195,7 +195,8 @@ export function mountLibrary(runner: RuntimeRunner): () => void {
     }
   });
 
-  // The offer waits for the report to be dismissed: two modals at once is one modal too many.
+  // The offer waits for the report to be dismissed: two modals at once is one modal too many. The
+  // notice does not wait, because it is not a modal — it is a line on the report itself.
   let pending: { levelId: string; code: string } | null = null;
 
   const unsubscribe = useGame.subscribe((state, previous) => {
@@ -206,6 +207,7 @@ export function mountLibrary(runner: RuntimeRunner): () => void {
       if (!levelId) return;
       const library = useLibrary.getState();
       library.refreshUnlock();
+      library.reviewForPublish(levelId, state.code, unlockedHardware(levelId));
       pending = { levelId, code: state.code };
       void library.recheckDiscrepancies();
       void library.probeForDiscrepancy();

@@ -106,6 +106,16 @@ export const PUBLISH = {
   nothingToPublish:
     'There is nothing here that can be lifted out on its own. A subroutine has to be a top-level ' +
     'function, class or const.',
+  noticeLabel: 'repository',
+  noticeNothing:
+    'Nothing in this work order is shaped like a subroutine, so there was nothing to file. A ' +
+    'subroutine is a named function at the top level of the file, and a later work order can ' +
+    'import it and call it.',
+  noticeNested: (names: readonly string[]): string =>
+    `${names.map((name) => `\`${name}\``).join(', ')} ` +
+    `${names.length === 1 ? 'is a subroutine, but it is' : 'are subroutines, but they are'} ` +
+    `nested inside something else. Move ${names.length === 1 ? 'it' : 'them'} out to the top ` +
+    'level of the file and the Repository can file it.',
   dependencyWarning: (missing: readonly string[]): string =>
     `This also uses ${missing.map((name) => `\`${name}\``).join(', ')}, which would stay behind. ` +
     'Publish those too, or the subroutine will not run.',

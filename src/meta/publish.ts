@@ -630,6 +630,33 @@ function isCallable(kind: Declaration['kind'], text: string): boolean {
 }
 
 /**
+ * Routines the player has already written but left indented inside something else.
+ *
+ * `publishableDeclarations` only looks at column zero, so a helper the player factored out and
+ * then left inside `main()` is invisible to it. That player has done the thinking and is one
+ * outdent away from a publishable subroutine, and telling them that is worth more than telling
+ * them what a subroutine looks like. Nothing publishes from here — it only chooses the sentence.
+ */
+export function nestedRoutineNames(source: string): string[] {
+  const found: string[] = [];
+  for (const raw of source.split('\n')) {
+    if (!/^\s/.test(raw)) continue;
+    const line = raw.trimStart();
+    const match = DECLARATION_START.exec(line);
+    if (!match) continue;
+    const name = match[1] ?? match[2] ?? match[4];
+    if (name === undefined) continue;
+    const kind: Declaration['kind'] = match[1]
+      ? 'function'
+      : match[2]
+        ? 'class'
+        : ((match[3] ?? 'const') as 'const' | 'let' | 'var');
+    if (isCallable(kind, line)) found.push(name);
+  }
+  return [...new Set(found)];
+}
+
+/**
  * A routine plus everything it needs: the transitive `uses` closure, in source order.
  *
  * A subroutine is a function, the helpers it calls and the state it closes over. Asking the player

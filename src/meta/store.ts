@@ -22,7 +22,7 @@ import type { LibraryStorage } from './save.ts';
 import type { Discrepancy, LevelFacts, LibraryRevision, LibrarySave } from './types.ts';
 import { isLibraryUnlocked } from './unlock.ts';
 import type { Declaration, PublishSelection } from './publish.ts';
-import { planPublication, publishableDeclarations } from './publish.ts';
+import { nestedRoutineNames, planPublication, publishableDeclarations } from './publish.ts';
 
 /**
  * The metagame's own store.
@@ -69,6 +69,18 @@ export interface PublishOffer {
   selection: PublishSelection[];
 }
 
+/**
+ * What the Repository has to say about a work order it cannot take anything from.
+ *
+ * The publish offer used to go silent here, which taught the player who most needed the Repository
+ * that it did not exist. A refusal is information; silence is not.
+ */
+export interface PublishNotice {
+  levelId: string;
+  /** Routines the player wrote but left nested. Empty when there is nothing routine-shaped at all. */
+  nested: string[];
+}
+
 export type MetaPanel = 'library' | 'refactor' | 'structure' | 'regression' | 'discrepancies';
 
 export interface MetaState {
@@ -81,6 +93,7 @@ export interface MetaState {
   panelOpen: boolean;
 
   offer: PublishOffer | null;
+  notice: PublishNotice | null;
   suite: SuiteResult | null;
   suiteProgress: { done: number; total: number } | null;
   busy: boolean;
@@ -102,6 +115,9 @@ export interface MetaState {
   dismissSuite(): void;
 
   offerPublish(levelId: string, code: string, hardware: readonly string[]): void;
+  /** Raises the notice, if one is owed, while the result is still on screen. */
+  reviewForPublish(levelId: string, code: string, hardware: readonly string[]): void;
+  muteNotice(): void;
   setSelection(selection: PublishSelection[]): void;
   confirmPublish(): Promise<void>;
   skipPublish(forever: boolean): void;
@@ -201,6 +217,7 @@ export const useLibrary = create<MetaState>((set, get) => {
     panel: 'library',
     panelOpen: false,
     offer: null,
+    notice: null,
     suite: null,
     suiteProgress: null,
     busy: false,
@@ -298,8 +315,38 @@ export const useLibrary = create<MetaState>((set, get) => {
       if (!save.unlocked || !save.briefed) return;
       if (save.publishMuted || save.publishDeclined.includes(levelId)) return;
       const declarations = publishableDeclarations(code, hardware);
+      // Nothing to tick means nothing to show. The player is not left in silence — `reviewForPublish`
+      // has already said so on the result itself, in a sentence rather than an empty dialog.
       if (!declarations.some((each) => each.callable)) return;
       set({ offer: { levelId, code, declarations, selection: [] } });
+    },
+
+    /**
+     * Whether the Repository has anything to say about a work order that just closed.
+     *
+     * Called while the result is still on screen, which is why it is not part of `offerPublish` —
+     * the offer waits for that modal to close, and the notice belongs *inside* it. A notice is not
+     * a dialog and asks for nothing, so it costs the transition no ceremony.
+     *
+     * The guards are `offerPublish`'s, minus the one this exists to undo: a player with no callable
+     * top-level declaration used to get nothing at all, which is exactly the player the Repository
+     * was built for. It stops once anything has been published — the habit is the message, and by
+     * then the message has landed.
+     */
+    reviewForPublish(levelId: string, code: string, hardware: readonly string[]): void {
+      const save = get().save;
+      set({ notice: null });
+      if (!save.unlocked || !save.briefed) return;
+      if (save.publishMuted || save.publishDeclined.includes(levelId)) return;
+      if (save.published.length > 0) return;
+      if (publishableDeclarations(code, hardware).some((each) => each.callable)) return;
+      set({ notice: { levelId, nested: nestedRoutineNames(code) } });
+    },
+
+    muteNotice(): void {
+      const save = get().save;
+      set({ notice: null });
+      write({ ...save, publishMuted: true });
     },
 
     setSelection(selection: PublishSelection[]): void {
