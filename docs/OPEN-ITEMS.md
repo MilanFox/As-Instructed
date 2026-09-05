@@ -911,3 +911,35 @@ change. The paired text half is now applied in both files — `score.ts:137` is 
    `w2-01`/`w2-05`, Worlds 3–8 pars unmeasured against the lazy/smart criterion.
 
 **No agents are running. Main is green and everything is merged.**
+
+### 2026-09-05, 18:45 — window reset, leftovers cleared, four agents out
+
+State verified before starting: main `358414b`, **1624 tests / 64 files**, tsc / build clean,
+no agents running, every worktree branch already an ancestor of main. Nothing was lost to the
+window and there was nothing to salvage.
+
+**Leftovers applied (`8e67604`).** Dead `IconReview` export removed; `DESIGN.md` and
+`README.md` no longer describe the deleted review screen. **DESIGN gains §11 A8** recording
+the cut and, more usefully, *why delivery is keyed to the grade reached rather than to a
+change of grade* — under the medals-only denominator a first gold reads 100%, so "on change"
+oscillates across the top boundary and re-issues the same memo. That reasoning was only in an
+agent report; it belongs in the binding document.
+
+### In flight — four agents, disjoint ownership
+
+- **Ungraded levels** — DESIGN §11 A7. Owns `src/levels/**`, `src/game/**`, `src/meta/**`,
+  `ObjectiveRail.tsx`. Told to verify rather than trust the claim that ungraded levels are
+  already inert in the review's denominator, and that `personalBestLine` must survive
+  ungrading — both testers called it the best reward in the game, and ungrading removes the
+  ladder, not the mirror.
+- **Mute verbs** — `plant()`, `send()`, `spawn()`, `pickup()`/`drop()`, plus a ruling on
+  `use()` returning a mute *success*. Owns `src/engine/**`, `src/runtime/**`, `copy.ts`.
+  Committing per verb so a partial merge is usable. Warned that `send()` throwing is where
+  the 86 unedited reference solutions would break first.
+- **UI/visual audit** — read-only. Explicitly handed the one thing the viewport work deferred
+  to it: 1576px of Monaco for a 40-line program at 2560.
+- **Duplicated-constant sweep** — read-only. **Three instances in one day is a rate, not a
+  coincidence.** Asked not just for a fourth but for the cheapest *guard* that would have
+  caught each of the three known ones, since a guard that closes the class beats a fix.
+
+Next wake-up armed for 23:42.
