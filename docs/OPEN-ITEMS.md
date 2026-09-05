@@ -736,3 +736,56 @@ since the trail only speaks *after* a run while the line speaks before it.
 `resize_window` does not work in this environment; Chrome suspends ResizeObserver delivery
 in a hidden tab; and **Vite HMR of a `src/render/**` module does not reliably reach a hidden
 tab's mounted renderer**, so a stale module looks exactly like a bug. Hard reload.
+
+### 2026-09-05, 16:38 — publish gate and review scoping merged (`299622d`)
+
+Green at **1440 tests** (1384 + 14 review scoping + 16 publish notice), tsc / build clean.
+
+**The publish refusal is a line on the result, not a dialog.** When the scan finds nothing
+callable, the report grows one section under the commendations saying there was nothing
+shaped like a subroutine to file, what a subroutine is, and how a later work order would
+call it — with a *stop offering* control. If the player factored a helper but left it
+indented, that sentence is replaced by one naming it, which turns the audit's second-order
+note (`publishableDeclarations` only sees column zero) into the one sentence worth saying.
+
+No new modal and no new stylesheet — `report-section`, `rail__label`, `modal__line` and
+`modal__quiet` already existed. Rejected on the way: deleting the early return (a modal that
+interrupts, asks, then refuses an answer, and the *fourth* on that transition); the dialog in
+an explanatory state; a floating toast; and a line in the Repository panel, which the player
+who needs it never opens. New guard `published.length === 0` stops it becoming wallpaper.
+
+**The review's denominator was 139, not the audit's 134** — 34 levels and 37 stars. The
+defects reproduced anyway.
+
+| Player | Before | After |
+|---|---|---|
+| Nothing closed | 0% `DEVELOPING` | `NOT ASSESSED` |
+| 17/17 gold, all stars | 49% `CONSISTENT WITH EXPECTATION` | 100% `RETAINED` |
+| 34/34 gold, no stars | 73% `EXCEPTIONAL` | 100% `RETAINED` |
+| 32 gold + 2 silver | 72%, tier 3, prints "34 of 34" | 98%, tier 4, "32 gold results" |
+
+Three rules: the wall lists **reached** work orders, the grade counts only **closed** ones,
+and the denominator is **medals only**. It declined the audit's version of the second rule —
+keeping the level you are standing on in the denominator as a zero caps a flawless player
+below 100% forever, which is the same disease in miniature. Correct call.
+
+### Ruling: cut the Performance Review down. Assigned.
+
+Its own agent recommended it and I agree. Neither tester opened the screen; the medal wall
+restates the site map, which already shows points, closed count, medal counts, per-world
+totals and an `ALL AT PAR` badge; it is the second place a completion fraction renders
+(audit finding 13); and cutting beats fixing. **The memo stays** — best writing in the game,
+changes at four thresholds — but it gets *delivered* on tier change through the existing
+`Requisition`/`RepositoryIssue` ceremony rather than hosted behind a top-bar icon. World tabs
+go. Roughly 200 of 330 lines, plus a screen and a route.
+
+The one risk flagged to that agent: the veteran already complained about three stacked modals
+on one transition, so a delivered memo must not become a fourth.
+
+### Paired change, deliberately split across two agents
+
+Tier 5 goes `min: 93 → 100` in `score.ts` (divergence agent) and its text "Every work order
+**on this site**" → "**issued to you**" in `NARRATIVE.md` §7 (review-cut agent). Under a
+medals-only denominator 100% means every closed order is gold, which is what the tier's own
+text claims; at 93% a player carries seven silvers and is told otherwise. **No test depends
+on the value**, which is exactly why it needed routing rather than leaving to be noticed.
