@@ -97,7 +97,7 @@ testers would have quit in. Gold on nine of the first ten levels, first honest r
   player has already hand-written its obvious contents six times. Unlock earlier and
   make the unlock land. This is the mechanic the user singled out as the best idea.
 - Viewport aspect: 891×393, 56% of width wasted on square grids.
-- Hint-reveal state not persisted. Unhandled rejection at `src/ui/library.ts:86`.
+- Refill the achievement set further if it reads thin once the cut lands.
 - Par is default-gold through World 2. Deliberately frozen until the above lands, because
   the fix is either "raise par" or "par is not the axis" and that depends on the new bonuses.
 - Housekeeping: 2 pre-existing eslint false positives; delete branch `wip/wave1-interrupted`.
@@ -136,3 +136,19 @@ English still in place → then write the German. Steps 1–3 are the engineerin
 worth doing on their own; step 4 is a writing job.
 
 A language toggle belongs in Settings next to the layout controls, persisted in the save.
+
+### Done since that list was written
+
+- `5f1341c` — the streak is gone. It reset on any failed run, taxing the loop the game is
+  made of, and contradicted RAISED, AND RAISED AGAIN on the same screen.
+- `575f729` — two commendations replacing it with the opposite incentive: REOPENED ON
+  PURPOSE (a bonus met on an already-closed order) and A SECOND LOOK, AND A THIRD (close
+  on the 4th run or later).
+- `baaddb5` — revealed hints persist in the save; they had lived in a module-level Map.
+- `b223b57` — `w8-05` par 1300 → 1050, holding the gold bar where it was after the seed cull.
+- `b566142` — `w2-05` brief states the sensor's reach, owed by the bonus work.
+- Unhandled rejection at `src/ui/library.ts:86` — fixed with the Library work; the cause was
+  Monaco compiler options being re-pushed on every level change, disposing the worker
+  mid-`installTypes`.
+- `aggregate.ts` scoring the bonus on seed 1 alone — already fixed by the finale work's
+  `worstPerObjective`; verified, no action needed.
