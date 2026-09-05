@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import type { Trace } from '../../engine/index.ts';
 import { replayTo } from '../../engine/index.ts';
+import { activeTrack, metAt, playbackFor, progressAt } from '../../game/playback.ts';
 import { currentLevel, levelUsesFuel, useGame } from '../../game/store.ts';
 import { FuelGauge } from '../components/FuelGauge.tsx';
 
@@ -9,21 +9,9 @@ interface ObjectiveRow {
   label: string;
   met: boolean;
   bonus: boolean;
+  /** The one the run is working towards at this tick. Exactly one row has it, or none. */
+  active: boolean;
   progress?: [number, number];
-}
-
-/**
- * Objective state as of the current playback tick, from the trace's `objective` events. Before a
- * run there are no events, so everything reads as outstanding — which is the truth.
- */
-function stateAtTick(trace: Trace | null, tick: number): Map<string, boolean> {
-  const state = new Map<string, boolean>();
-  if (!trace) return state;
-  for (const event of trace.events) {
-    if (event.t > tick) break;
-    if (event.kind === 'objective') state.set(event.id, event.state === 'met');
-  }
-  return state;
 }
 
 export function ObjectiveRail(): React.JSX.Element {
@@ -33,29 +21,41 @@ export function ObjectiveRail(): React.JSX.Element {
   const tick = useGame((state) => state.tick);
 
   const flooredTick = Math.floor(tick);
-  const live = useMemo(() => stateAtTick(trace, flooredTick), [trace, flooredTick]);
+  const playback = useMemo(() => playbackFor(level, trace), [level, trace]);
   const atEnd = !trace || flooredTick >= trace.endTick;
+  const active = activeTrack(playback, flooredTick);
 
+  /*
+   * The rail is live during playback, not just afterwards.
+   *
+   * Objective state and progress both come from `src/game/playback.ts` — the run replayed forward
+   * and evaluated as it goes — so a tick ticks over on screen at the moment the bot earned it,
+   * and "7/12" counts up while you watch. At the very end the verdict wins: it is the record, and
+   * it knows about ops and sense budgets that a partial replay cannot.
+   */
   const rows: ObjectiveRow[] = useMemo(() => {
     if (!level) return [];
     const bonusIds = new Set((level.bonus ?? []).map((objective) => objective.id));
     const reported = new Map(verdict?.objectives.map((o) => [o.id, o]) ?? []);
+    const tracks = new Map((playback?.tracks ?? []).map((track) => [track.id, track]));
     const defs = [...level.objectives, ...(level.bonus ?? [])];
     return defs.map((objective) => {
       const result = reported.get(objective.id);
-      const met = live.has(objective.id)
-        ? (live.get(objective.id) ?? false)
-        : atEnd && (result?.met ?? false);
+      const track = tracks.get(objective.id);
+      const met = atEnd ? (result?.met ?? false) : track ? metAt(track, flooredTick) : false;
       const row: ObjectiveRow = {
         id: objective.id,
         label: result?.label ?? objective.label,
         met,
         bonus: bonusIds.has(objective.id),
+        active: !atEnd && active?.id === objective.id,
       };
-      if (result?.progress) row.progress = result.progress;
+      const live = track ? progressAt(track, flooredTick) : undefined;
+      const progress = atEnd ? result?.progress : (live ?? result?.progress);
+      if (progress) row.progress = progress;
       return row;
     });
-  }, [level, verdict, live, atEnd]);
+  }, [level, verdict, playback, atEnd, active, flooredTick]);
 
   const showFuel = useMemo(() => (level ? levelUsesFuel(level) : false), [level]);
   const fuel = useMemo(() => {
@@ -137,13 +137,14 @@ function ObjectiveItem({ row }: { row: ObjectiveRow }): React.JSX.Element {
     'objective',
     row.met ? 'objective--met' : 'objective--pending',
     row.bonus ? 'objective--bonus' : '',
+    row.active ? 'objective--active' : '',
   ]
     .filter(Boolean)
     .join(' ');
   return (
-    <div className={className}>
+    <div className={className} aria-current={row.active ? 'step' : undefined}>
       <span className="objective__mark" aria-hidden="true">
-        {row.met ? '✓' : ''}
+        {row.met ? '✓' : row.active ? '▸' : ''}
       </span>
       <span className="objective__label">{row.label}</span>
       {row.progress ? (
@@ -151,7 +152,9 @@ function ObjectiveItem({ row }: { row: ObjectiveRow }): React.JSX.Element {
           {row.progress[0]}/{row.progress[1]}
         </span>
       ) : null}
-      <span className="sr-only">{row.met ? 'met' : 'outstanding'}</span>
+      <span className="sr-only">
+        {row.met ? 'met' : row.active ? 'in progress' : 'outstanding'}
+      </span>
     </div>
   );
 }

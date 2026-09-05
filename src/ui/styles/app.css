@@ -414,14 +414,144 @@
   align-items: center;
 }
 
-.timeline__scrub {
+/*
+ * What the run is doing right now, at the bottom of the picture.
+ *
+ * The rail says the same thing, but the eye is on the canvas during playback and asking it to
+ * look away to find out what it is watching is the whole problem this is fixing.
+ */
+.viewport__now {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-3);
+  left: var(--space-3);
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  padding: 3px var(--space-2);
+  border-left: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--bg-panel) 74%, transparent);
+  font-size: 11px;
+}
+
+.viewport__now--done {
+  border-left-color: var(--ok);
+}
+
+.viewport__now-tag {
+  flex: none;
+  color: var(--ink-dim);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.viewport__now-label {
+  overflow: hidden;
+  color: var(--ink);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* A pass is worth seeing through the scrim: the flourish is happening behind this. */
+.overlay--celebrate {
+  background: color-mix(in srgb, var(--bg-void) 56%, transparent);
+}
+
+/*
+ * The scrubber and its landmarks share one positioning context, so an objective pip at tick 340
+ * sits exactly over the point the thumb reaches at tick 340. The acts sit under the track and the
+ * pips over it; both are `pointer-events: none` except the pips themselves, which are targets.
+ */
+.timeline__track {
+  position: relative;
   flex: 1;
   min-width: 80px;
+  height: 20px;
+}
+
+.timeline__scrub {
+  position: relative;
+  z-index: 1;
+  width: 100%;
   height: 20px;
   margin: 0;
   background: transparent;
   cursor: pointer;
   appearance: none;
+}
+
+.timeline__acts {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.timeline__act {
+  position: absolute;
+  top: 14px;
+  height: 3px;
+  border-right: 1px solid var(--bg-panel);
+  background: color-mix(in srgb, var(--ink-dim) 60%, transparent);
+}
+
+.timeline__act--alt {
+  background: color-mix(in srgb, var(--ink-dim) 32%, transparent);
+}
+
+/* The act the playhead is inside. The only coloured thing down here, so it reads at a glance. */
+.timeline__act--current {
+  background: color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+.timeline__step {
+  position: absolute;
+  top: 13px;
+  width: 1px;
+  height: 5px;
+  background: var(--ok);
+  opacity: 0.55;
+}
+
+.timeline__marks {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.timeline__mark {
+  position: absolute;
+  top: 1px;
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--ok);
+  transform: translateX(-3.5px);
+  cursor: pointer;
+  pointer-events: auto;
+  opacity: 0.85;
+}
+
+.timeline__mark:hover,
+.timeline__mark:focus-visible {
+  outline: 1px solid var(--ink);
+  outline-offset: 1px;
+  opacity: 1;
+}
+
+.timeline__mark--lost {
+  background: var(--danger);
+}
+
+.timeline__mark--bonus {
+  width: 5px;
+  height: 5px;
+  background: var(--accent-2);
+  transform: translateX(-2.5px);
 }
 
 .timeline__scrub::-webkit-slider-runnable-track {
@@ -686,6 +816,51 @@
 
 .objective--pending .objective__label {
   color: var(--ink-dim);
+}
+
+/* The row the run is working towards right now. One at a time, and never after the run ends. */
+.objective--active .objective__mark {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.objective--active .objective__label {
+  color: var(--ink);
+}
+
+.objective--active {
+  position: relative;
+}
+
+.objective--active::before {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: -8px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  content: '';
+  animation: objective-active 1.6s ease-in-out infinite;
+}
+
+@keyframes objective-active {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .objective--active::before {
+    animation: none;
+    opacity: 0.8;
+  }
 }
 
 .objective__progress {

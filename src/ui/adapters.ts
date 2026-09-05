@@ -17,9 +17,9 @@ import {
   importsLibrary,
 } from '../runtime/index.ts';
 import { Renderer } from '../render/index.ts';
-import type { Trace } from '../engine/index.ts';
+import type { Trace, Vec } from '../engine/index.ts';
 import { LIBRARY_FAILURE, prepareLibrary, useLibrary } from '../meta/index.ts';
-import type { RendererPort, RunSubmission, RunnerPort } from '../game/ports.ts';
+import type { CelebrationKind, RendererPort, RunSubmission, RunnerPort } from '../game/ports.ts';
 
 type LibraryRequest = NonNullable<RunRequest['library']>;
 
@@ -156,6 +156,26 @@ export class CanvasRenderer implements RendererPort {
   onTick(listener: (tick: number, playing: boolean) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  setHighlights(cells: readonly Vec[], met = false): void {
+    this.renderer.setHighlights(cells, met);
+  }
+
+  celebrate(kind: CelebrationKind): void {
+    this.renderer.celebrate(kind);
+  }
+
+  pulse(kind: 'objective' | 'commend' = 'objective'): void {
+    this.renderer.pulse(kind);
+  }
+
+  setCelebrationsEnabled(enabled: boolean): void {
+    this.renderer.setCelebrationsEnabled(enabled);
+  }
+
+  skipCelebration(): void {
+    this.renderer.skipCelebration();
   }
 
   dispose(): void {

@@ -6,7 +6,7 @@
  * below stand in wherever a browser is not available — tests, and any point at which either
  * subsystem is missing.
  */
-import type { Trace, Verdict } from '../engine/index.ts';
+import type { Trace, Vec, Verdict } from '../engine/index.ts';
 import { FailureCode, Sim, buildVerdict, cloneWorld, isSimError } from '../engine/index.ts';
 import type { RunResponse } from '../runtime/protocol.ts';
 import { getLevel } from '../levels/index.ts';
@@ -40,6 +40,12 @@ export interface RunnerPort {
 }
 
 /**
+ * The verdict, as a flourish. Mirrors `CelebrationKind` in `src/render/renderer.ts`; it is spelled
+ * out here rather than imported so the shell still compiles against the ports alone.
+ */
+export type CelebrationKind = 'gold' | 'silver' | 'bronze' | 'pass' | 'fail';
+
+/**
  * Draws a trace into a canvas and owns the playback clock.
  *
  * The renderer runs the frame loop, because it is the thing that has to interpolate; the shell
@@ -56,6 +62,28 @@ export interface RendererPort {
   pause(): void;
   /** Subscribes to playback position. Returns an unsubscribe. */
   onTick(listener: (tick: number, playing: boolean) => void): () => void;
+
+  /**
+   * Cells the objective in progress is about, bracketed under the bots.
+   *
+   * The shell recomputes this as the playhead moves (`src/game/playback.ts`), which is what turns
+   * a replay into something with a shape: the eye is told where the work is happening now.
+   */
+  setHighlights(cells: readonly Vec[], met?: boolean): void;
+
+  /**
+   * The end-of-run flourish, and the per-row beat a staged report needs.
+   *
+   * `<Results/>` owns the timing of both, because the sounds and the rings have to land on the
+   * same instants — `MEDAL_BEAT` is the number the two sides agree on (docs/AUDIO.md §8).
+   */
+  celebrate(kind: CelebrationKind): void;
+  pulse(kind?: 'objective' | 'commend'): void;
+  /** Mirrors `save.settings.celebrations`. Off means no-op, not quieter. */
+  setCelebrationsEnabled(enabled: boolean): void;
+  /** Cuts a flourish dead, for the click or key that finishes the reveal early. */
+  skipCelebration(): void;
+
   dispose(): void;
 }
 
@@ -207,6 +235,16 @@ export class FakeRenderer implements RendererPort {
   }
 
   setWorld(): void {}
+
+  setHighlights(): void {}
+
+  celebrate(): void {}
+
+  pulse(): void {}
+
+  setCelebrationsEnabled(): void {}
+
+  skipCelebration(): void {}
 
   seek(tick: number): void {
     this.tick = tick;

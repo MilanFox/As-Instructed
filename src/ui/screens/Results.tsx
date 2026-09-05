@@ -1,10 +1,11 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { JSX } from 'react';
 import { getAchievement } from '../../game/achievements.ts';
 import type { Medal } from '../../game/score.ts';
 import { levelPoints, medalFor } from '../../game/score.ts';
 import { currentLevel, useGame } from '../../game/store.ts';
 import { nextLevel } from '../../levels/index.ts';
+import { MEDAL_BEAT } from '../../audio/index.ts';
 import { audio } from '../audio.ts';
 import { MedalBadge } from '../components/MedalBadge.tsx';
 import { useReveal } from '../hooks/useReveal.ts';
@@ -19,18 +20,21 @@ import {
   successLine,
 } from '../copy.ts';
 
+/**
+ * The reveal's tempo, in milliseconds.
+ *
+ * `MEDAL_BEAT` is the interval between the notes of the medal figure, and the renderer mirrors it
+ * for the rings (`src/render/renderer.ts`). Staging the whole report on the same grid is what
+ * makes the objectives, the medal and the commendations read as one phrase rather than three
+ * things that happen to overlap.
+ */
+const REVEAL_BEAT_MS = Math.round(MEDAL_BEAT * 1000);
+
 const MEDAL_WORD: Record<Medal, string> = {
   gold: 'gold',
   silver: 'silver',
   bronze: 'bronze',
   none: 'no medal',
-};
-
-const MEDAL_SOUND: Record<Medal, 'medalGold' | 'medalSilver' | 'medalBronze' | null> = {
-  gold: 'medalGold',
-  silver: 'medalSilver',
-  bronze: 'medalBronze',
-  none: null,
 };
 
 /**
@@ -85,7 +89,15 @@ function ResultsReport(): JSX.Element | null {
   const scoreStep = medalStep + 1;
   const commendStep = scoreStep + 1;
   const steps = commendStep + commendations.length;
-  const { stage, done, skip } = useReveal(steps, passed && celebrations);
+  const { stage, done, skip } = useReveal(steps, passed && celebrations, REVEAL_BEAT_MS);
+
+  // The viewport is the other half of this sequence: the rings land on the notes, so both are
+  // placed from here rather than each firing at t=0 on its own clock (docs/AUDIO.md §8).
+  const renderer = useGame((state) => state.renderer);
+  const finish = useCallback(() => {
+    renderer().skipCelebration();
+    skip();
+  }, [renderer, skip]);
 
   // The dialog takes focus the moment it opens, so a screen reader announces the verdict rather
   // than leaving focus on the Run button behind the overlay while the reveal plays.
@@ -106,19 +118,48 @@ function ResultsReport(): JSX.Element | null {
     else audio.outcome({ passed: false });
   }, [passed, failure?.kind]);
 
+  // The verdict tone opens the panel, ahead of anything the reveal does with the rows.
+  useEffect(() => {
+    if (passed) audio.verdict(true);
+  }, [passed]);
+
+  /*
+   * One beat per stage, audio and viewport together.
+   *
+   * A skip — or reduced motion, or the ceremony switched off — arrives here as a jump of more
+   * than one stage. That collapses to the medal alone: fifteen commendation rings fired into the
+   * same frame is not a celebration, it is a burst, and the rate limiter would eat most of it
+   * anyway (docs/AUDIO.md §5).
+   */
   const cued = useRef(0);
   useEffect(() => {
     if (!passed) return;
-    for (let step = cued.current + 1; step <= stage; step++) {
-      if (step <= required.length) audio.cue('objective', step);
-      else if (step === medalStep) {
-        audio.outcome({ passed: true, medal });
-        const sound = MEDAL_SOUND[medal];
-        if (sound) audio.cue(sound);
-      } else if (step >= commendStep) audio.cue('objective', step * 7);
+    const from = cued.current;
+    if (stage <= from) return;
+    cued.current = stage;
+    const collapsed = stage - from > 1;
+
+    if (collapsed) {
+      if (stage >= medalStep && from < medalStep) {
+        audio.medal(medal);
+        renderer().celebrate(medal === 'none' ? 'pass' : medal);
+      }
+      return;
     }
-    cued.current = Math.max(cued.current, stage);
-  }, [stage, passed, required.length, medalStep, commendStep, medal]);
+
+    for (let step = from + 1; step <= stage; step++) {
+      if (step <= required.length) {
+        audio.cue('objective', step);
+        renderer().pulse();
+      } else if (step === medalStep) {
+        audio.medal(medal);
+        renderer().celebrate(medal === 'none' ? 'pass' : medal);
+      } else if (step >= commendStep) {
+        audio.commend(step - commendStep);
+        renderer().pulse('commend');
+      }
+    }
+  }, [stage, passed, required.length, medalStep, commendStep, medal, renderer]);
 
   if (!level) return null;
 
@@ -136,7 +177,11 @@ function ResultsReport(): JSX.Element | null {
   const showScores = !passed || stage >= scoreStep;
 
   return (
-    <div className="overlay" role="presentation" onClick={dismiss}>
+    <div
+      className={`overlay${passed ? ' overlay--celebrate' : ''}`}
+      role="presentation"
+      onClick={dismiss}
+    >
       <div
         ref={dialogRef}
         tabIndex={-1}
@@ -146,10 +191,10 @@ function ResultsReport(): JSX.Element | null {
         aria-label="Run report"
         onClick={(event) => {
           event.stopPropagation();
-          if (!done) skip();
+          if (!done) finish();
         }}
         onKeyDownCapture={() => {
-          if (!done) skip();
+          if (!done) finish();
         }}
       >
         <header className="modal__head">
