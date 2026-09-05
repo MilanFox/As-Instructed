@@ -21,7 +21,36 @@ import type { Medal } from '../engine/index.ts';
 
 export const REPOSITORY_NAME = 'Shared Subroutines Repository';
 
-/** Delivered once, at the end of World 3. Ninety words including the headers. */
+/**
+ * The delivery note for the Repository itself.
+ *
+ * Every other capability in the game arrives through `Requisition` — a modal, an item, a spec, a
+ * line about what it opens up, a signature. The Repository is the largest capability in the game
+ * and it used to arrive as one grey line along the bottom of the editor. This is the same
+ * ceremony, for a file instead of a function, and it is deliberately short: the crate, what goes
+ * in it, what will ask for it, and a button that opens it.
+ *
+ * `perCall` is here rather than only in the memo on purpose. It is the one fact a player needs
+ * *before* they publish, and in the old shape it lived behind a panel they only opened afterwards.
+ */
+export const REPOSITORY_ISSUE = {
+  title: 'REPOSITORY — PROVISIONED',
+  from: 'Site Systems, via Dep. Coordinator M. Vance',
+  intro: 'Filed as a capability rather than as an asset. Nobody has to sign for a folder.',
+  file: 'lib.ts',
+  spec: 'A second file, kept between work orders. It is not reset when one closes.',
+  perCall: 'A subroutine is charged at the point of use, in full, on every call.',
+  importLabel: 'Anything exported from it can be imported by any work order after this one.',
+  asksLabel: (count: number): string =>
+    `${count} later work ${count === 1 ? 'order names a subroutine it expects' : 'orders name a subroutine they expect'} to find in it. The first is`,
+  dot:
+    "it's a folder. that's the entire feature. you put a function in it and every work order " +
+    'after this one can read it',
+  open: 'Open it',
+  dismiss: 'Sign for it',
+} as const;
+
+/** Delivered once, when the Repository is provisioned. Ninety words including the headers. */
 export const UNLOCK_MEMO = {
   ref: 'MEMO KD-2338',
   from: 'Dep. Coordinator M. Vance',

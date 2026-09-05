@@ -13,6 +13,7 @@ import { useKeyboard } from './hooks/useKeyboard.ts';
 import { AudioSettings } from './screens/AudioSettings.tsx';
 import { LevelSelect } from './screens/LevelSelect.tsx';
 import { PerformanceReview } from './screens/PerformanceReview.tsx';
+import { RepositoryIssue } from './screens/RepositoryIssue.tsx';
 import { Requisition } from './screens/Requisition.tsx';
 import { Results } from './screens/Results.tsx';
 import './styles/fonts.css';
@@ -63,6 +64,8 @@ export function App(): React.JSX.Element {
       ) : null}
       <Results />
       <PublishDialog />
+      {/* The Repository note waits for the hardware crate itself, so order here is cosmetic. */}
+      <RepositoryIssue />
       {/* Last, so the delivery note stacks above a publish offer raised by the same transition. */}
       <Requisition />
     </div>

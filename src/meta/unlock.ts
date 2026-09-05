@@ -1,11 +1,25 @@
 /**
  * When the Repository arrives, and which work orders assume something is in it.
  *
- * The unlock is the close of World 3, not earlier. World 3 is where the player first writes code
- * worth keeping — a class-to-depot router, a queue — and World 4 is exploration and pathfinding,
- * which is the code the rest of the campaign keeps asking for. Handing the Repository over any
- * sooner would put a second editor tab in front of a player who is still learning what a `while`
- * loop does, and the on-ramp has to stay one file.
+ * The unlock is the close of World 2. It used to be the close of World 3, on the grounds that
+ * World 3 is where the player first writes code worth keeping. That premise is right and it is
+ * the reason to move: the file that keeps the code has to exist *before* the code is written, and
+ * provisioning it at the close of World 3 handed it over after everything World 3 produced had
+ * already been thrown away.
+ *
+ * The old comment also argued that a second editor tab in front of a player still learning what a
+ * `while` loop does is worse than a late unlock. That describes a World 1 player. `while` is
+ * taught in `w1-03` and `w1-05`; by the close of `w2-05` the player has closed seven work orders
+ * and written loops, conditionals, a state machine and a resource cycle. Worlds 1 and 2 — the
+ * whole on-ramp — stay strictly one file, and the on-ramp is what that argument was protecting.
+ *
+ * `w2-05` and not `w4-04`, which is where the first routine on the ladder below is earned: the
+ * unlock follows the *retyping*, not the ladder. `w1-05` (inspect every tile), `w2-05`, `w3-01`
+ * and `w3-02` all want the same floor-walk, so the close of `w2-05` is the first point at which
+ * "you are about to write this again" is true of something the player has already written twice.
+ *
+ * Nothing here forces the second file open. `LibraryPanel` renders nothing until the player asks
+ * for it, and the campaign is finishable by someone who never does.
  *
  * Requirements are held here rather than on `LevelDef` because `src/levels/` is owned by the
  * content agents and a level must never *depend* on the metagame: DESIGN.md's rule is that the
@@ -15,10 +29,10 @@
  */
 
 /** Completing this work order provisions the Repository. */
-export const LIBRARY_UNLOCK_LEVEL = 'w3-04';
+export const LIBRARY_UNLOCK_LEVEL = 'w2-05';
 
 /** Any work order in this world or later may assume the Repository exists. */
-export const LIBRARY_FIRST_WORLD = 4;
+export const LIBRARY_FIRST_WORLD = 3;
 
 export interface LibraryRequirement {
   /** The name the brief uses. */
@@ -75,7 +89,8 @@ export const LIBRARY_REQUIREMENTS: Readonly<Record<string, readonly LibraryRequi
       {
         name: 'pathTo',
         signature: 'pathTo(x: number, y: number): boolean',
-        assumes: 'Walks the bot to a tile the record already knows, and reports whether it arrived.',
+        assumes:
+          'Walks the bot to a tile the record already knows, and reports whether it arrived.',
       },
     ],
     'w5-05': [
@@ -125,7 +140,8 @@ export const LIBRARY_REQUIREMENTS: Readonly<Record<string, readonly LibraryRequi
       {
         name: 'pathTo',
         signature: 'pathTo(x: number, y: number): boolean',
-        assumes: 'Walks the bot to a tile the record already knows, and reports whether it arrived.',
+        assumes:
+          'Walks the bot to a tile the record already knows, and reports whether it arrived.',
       },
     ],
     'w8-02': [
@@ -137,7 +153,8 @@ export const LIBRARY_REQUIREMENTS: Readonly<Record<string, readonly LibraryRequi
       {
         name: 'pathTo',
         signature: 'pathTo(x: number, y: number, b?: Bot): boolean',
-        assumes: 'Walks the bot to a tile the record already knows, and reports whether it arrived.',
+        assumes:
+          'Walks the bot to a tile the record already knows, and reports whether it arrived.',
       },
     ],
     'w8-03': [
@@ -192,12 +209,50 @@ export function requirementsFor(levelId: string): readonly LibraryRequirement[] 
   return LIBRARY_REQUIREMENTS[levelId] ?? [];
 }
 
+/** How many work orders name a subroutine they expect to find in `lib.ts`. */
+export function requirementLevelCount(): number {
+  return Object.keys(LIBRARY_REQUIREMENTS).length;
+}
+
+/**
+ * The next work order that will name a subroutine, given the campaign order and where the player
+ * is standing in it.
+ *
+ * The unlock ceremony uses this to state its own reason from data rather than from prose. The
+ * order is passed in because `src/meta` does not know `src/levels` exists and is not going to
+ * start now.
+ */
+export function nextRequirementAfter(
+  orderedLevelIds: readonly string[],
+  currentLevelId: string | null,
+): { levelId: string; requirements: readonly LibraryRequirement[] } | null {
+  const from = currentLevelId ? orderedLevelIds.indexOf(currentLevelId) : -1;
+  for (let index = Math.max(from, 0); index < orderedLevelIds.length; index++) {
+    const levelId = orderedLevelIds[index] as string;
+    const requirements = requirementsFor(levelId);
+    if (requirements.length > 0) return { levelId, requirements };
+  }
+  return null;
+}
+
 /**
  * True once the Repository has been provisioned.
  *
- * Completing any World 4+ work order counts too, so a save that reached World 5 without a record
- * for `w3-04` — an import, a hand-edited export — is not told it has no Repository.
+ * Completing any World 3+ work order counts too, so a save that reached World 5 without a record
+ * for `w2-05` — an import, a hand-edited export, or a save written before the unlock moved — is
+ * not told it has no Repository.
  */
+/**
+ * True while the player is owed the Repository's delivery note.
+ *
+ * Both flags are in the Repository save, so this survives a reload mid-ceremony and — the case
+ * that matters — a save written under the old World 3 unlock by a player who never clicked the
+ * status bar. That save is `unlocked` and not `briefed`, and it gets the note it never had.
+ */
+export function isDeliveryNoteOwed(save: { unlocked: boolean; briefed: boolean }): boolean {
+  return save.unlocked && !save.briefed;
+}
+
 export function isLibraryUnlocked(
   completed: readonly { levelId: string; world: number }[],
 ): boolean {

@@ -93,9 +93,12 @@ testers would have quit in. Gold on nine of the first ten levels, first honest r
 
 - **Remove character-count plumbing entirely** — `countChars`, `scoreChars`, `par.chars`,
   `bestChars`, `stats.chars`. Touches all 40 level files, so it waits for the level agents.
-- **The Library needs a moment.** It unlocks with one grey status-bar line, after the
-  player has already hand-written its obvious contents six times. Unlock earlier and
-  make the unlock land. This is the mechanic the user singled out as the best idea.
+- ~~**The Library needs a moment.**~~ Done, in an isolated worktree — see
+  `docs/FIX-LIBRARY-MOMENT.md`. The unlock moved from the close of `w3-04` to the close of
+  `w2-05` and now arrives as a delivery note in the `Requisition` ceremony. Note for whoever
+  reads this next: **"six times" was a pre-cut artefact** (four post-cut, and the thing
+  retyped — a serpentine sweep — is not on the Library ladder at all), and the unlock was
+  *not* too late in the campaign; it was too early to hold anything. See §1 of that file.
 - Viewport aspect: 891×393, 56% of width wasted on square grids.
 - Refill the achievement set further if it reads thin once the cut lands.
 - Par is default-gold through World 2. Deliberately frozen until the above lands, because
