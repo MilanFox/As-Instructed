@@ -136,8 +136,10 @@ export const w5_02: LevelDef = {
         return [patched.includes(broken) && stray === 0 ? 1 : 0, 1 + stray];
       },
     ),
+    /* Id left as `withinSenses` mints it: `game/achievements.ts` recognises an information
+       budget by the `within-<n>-<command>` shape, and `probe-budget` did not match. Objective
+       ids are not save keys — `LevelProgress` records medals and star ids only. */
     Objectives.withinSenses('probe', 10, {
-      id: 'probe-budget',
       label: 'Locate the break using at most 10 probes',
     }),
   ],

@@ -5,7 +5,13 @@ import { LIBRARY_FIRST_WORLD, requirementsFor } from '../../meta/unlock.ts';
 import { LEVELS, campaignOrder, getLevel, hardwareUnlockedBy, levelsByWorld } from '../index.ts';
 import { runLevel, runReference } from '../harness.ts';
 import type { ReferenceSolution } from '../types.ts';
-import { flatReader, literalPlanFollower, rawRelay, roundRobinDispatch } from './naive.ts';
+import {
+  fieldSweep,
+  flatReader,
+  literalPlanFollower,
+  rawRelay,
+  roundRobinDispatch,
+} from './naive.ts';
 
 import { solution as w1_01 } from '../world-1/__solutions__/w1-01.ts';
 import { solution as w1_02 } from '../world-1/__solutions__/w1-02.ts';
@@ -273,6 +279,21 @@ describe('randomization defeats hardcoding', () => {
       ...level.seeds.map((seed) => runReference(level, seed, roundRobinDispatch).ticks),
     );
     expect(worst).toBeGreaterThan(level.par.ticks);
+  });
+
+  test('w8-01: the World 2 sweep is correct and still misses the shift budget', () => {
+    const level = getLevel('w8-01') as NonNullable<ReturnType<typeof getLevel>>;
+    for (const seed of level.seeds) {
+      const result = runReference(level, seed, fieldSweep);
+      const unmet = result.verdict.objectives.filter((objective) => !objective.met);
+      expect(
+        result.verdict.objectives.find((objective) => objective.id === 'ripe-to-silo')?.met,
+        `seed ${String(seed)}`,
+      ).toBe(true);
+      expect(unmet.map((objective) => objective.id), `seed ${String(seed)}`).toEqual([
+        'shift-budget',
+      ]);
+    }
   });
 
   test('w8-04: following the filed plan literally fails on a drifted seed', () => {

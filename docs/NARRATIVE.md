@@ -707,7 +707,7 @@ why I have never removed it.
 > Fleet performance nominal. Makespan is the only number read upstairs, and yours is small.
 > Nobody upstairs knows what makespan is, which has never once stopped them reading it.
 
-**MEMO — place at w7-03**
+**MEMO — place at w7-02** (one level ahead of the livelock it names; CURRICULUM.md §11)
 ```
 MEMO KD-2704
 FROM: Dep. Coordinator M. Vance

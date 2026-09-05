@@ -18,6 +18,14 @@ const WIDTH = 32;
 const HEIGHT = 24;
 const USE_COST = 2;
 
+/**
+ * Reading the desk and then every station once costs at most 21 probes on the widest seed, so
+ * the star is there for anyone who plans from that one read rather than polling the grid for
+ * state they already hold. It is deliberately not a gate: the second axis on this level is a
+ * consolation, not a fifth way to fail a 9/10.
+ */
+const SURVEY_BUDGET = 26;
+
 /** Where the crew parks. The desk sits in the middle of it and every bot starts within a tile. */
 const DESK = vec(2, 12);
 const CREW: readonly Vec[] = [
@@ -211,6 +219,10 @@ export const w8_03: LevelDef = {
     '',
     'The plain is open and the cable on the ground is walkable. Your score is the makespan.',
     '',
+    '**Extra objective.** Restart the grid on at most 26 reads of the desk and the stations',
+    'together. The grid is fixed the moment the shift starts; a station polled to find out',
+    'whether it came up yet is a station you already knew about.',
+    '',
     '**The Repository.** You have already filed everything this needs. It assumes `lib.ts`',
     'holds:',
     '',
@@ -318,6 +330,9 @@ export const w8_03: LevelDef = {
       (ctx) => ctx.trace.endTick <= targetFor(ctx.initialWorld),
       (ctx) => [ctx.trace.endTick, targetFor(ctx.initialWorld)],
     ),
+    Objectives.withinSenses('probe', SURVEY_BUDGET, {
+      label: `Plan the restart on ${String(SURVEY_BUDGET)} reads or fewer`,
+    }),
   ],
   starter: [
     "// import { waves, deal, pathTo } from 'lib';",

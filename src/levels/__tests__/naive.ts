@@ -184,3 +184,57 @@ export const literalPlanFollower: ReferenceSolution = {
   },
   source: '',
 };
+
+/**
+ * w8-01: the World 2 answer, on a World 8 work order. Sweep every row of the field, scan the tile
+ * underfoot, harvest whatever is ripe, and run the load back to the silo whenever the arms fill.
+ *
+ * It is correct, it never wastes a beam because it never casts one, and it is exactly what the
+ * two budgets exist to reject: the walk alone is longer than the shift.
+ */
+export const fieldSweep: ReferenceSolution = {
+  levelId: 'w8-01',
+  run(sim: Sim, botId: number): void {
+    const silo = sim.probe(botId, 'silo')?.at ?? sim.pos(botId);
+    const across = silo.x === 0 ? Dir.East : Dir.West;
+    const back = across === Dir.East ? Dir.West : Dir.East;
+    const along = silo.y === 0 ? Dir.South : Dir.North;
+
+    const go = (to: Vec): void => {
+      while (sim.pos(botId).x !== to.x) {
+        sim.move(botId, sim.pos(botId).x < to.x ? Dir.East : Dir.West);
+      }
+      while (sim.pos(botId).y !== to.y) {
+        sim.move(botId, sim.pos(botId).y < to.y ? Dir.South : Dir.North);
+      }
+    };
+
+    let held = 0;
+    let heading = across;
+    for (;;) {
+      const tile = sim.scan(botId);
+      if (tile.crop !== null && tile.growth >= tile.maxGrowth && sim.harvest(botId)) {
+        held++;
+        if (held === sim.capacity(botId)) {
+          const resume = sim.pos(botId);
+          go(silo);
+          sim.drop(botId, ItemKind.Crop, held);
+          held = 0;
+          go(resume);
+        }
+      }
+      if (sim.canMove(botId, heading)) {
+        sim.move(botId, heading);
+        continue;
+      }
+      if (!sim.canMove(botId, along)) break;
+      sim.move(botId, along);
+      heading = heading === across ? back : across;
+    }
+    if (held > 0) {
+      go(silo);
+      sim.drop(botId, ItemKind.Crop, held);
+    }
+  },
+  source: '',
+};

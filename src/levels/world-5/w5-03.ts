@@ -20,6 +20,14 @@ const HEIGHT = 18;
 const REACTOR_AT = vec(2, 9);
 const PREREQ_PREFIX = 'prereq:';
 
+/**
+ * The reactor, then each station once, then the `null` that ends the walk: 18 reads on the
+ * widest seed. The star is for holding what came back rather than asking the grid again, and it
+ * stays a star — the retry-until-stable loop CURRICULUM.md §7 deliberately lets through is
+ * already priced in ticks, and failing it on reads as well would be scoring it twice.
+ */
+const READ_BUDGET = 20;
+
 export type GraphShape = 'mixed' | 'chain' | 'wide' | 'split';
 
 /**
@@ -252,6 +260,10 @@ export const w5_03: LevelDef = {
     'reports the allowance in `vars.travelBudget` — the sum of the grid distances between',
     'consecutive stations, starting at the reactor.',
     '',
+    'For the second bonus: bring the district up on at most 20 reads. A `probe` still costs no',
+    'ticks. It is only counted, and the district does not rewire itself while you work — a',
+    'station you read twice told you the same thing twice.',
+    '',
     '**The Repository.** Nothing here needs it. But whatever turns that prerequisite list into a',
     'workable order is worth keeping; three later briefs ask the same question. Later briefs call',
     'it `waves`. What it should hand back is the groups: everything that can start now, then',
@@ -336,6 +348,9 @@ export const w5_03: LevelDef = {
         return [Math.min(travelled(ctx), budget), budget];
       },
     ),
+    Objectives.withinSenses('probe', READ_BUDGET, {
+      label: `Bring the district up on ${String(READ_BUDGET)} reads or fewer`,
+    }),
   ],
   starter: [
     '// NOTE(4470): the cable does not care what order you lay it in. the power does',

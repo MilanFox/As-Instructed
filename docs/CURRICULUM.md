@@ -128,6 +128,38 @@ planning figures for pacing, not promises.
 8. **Every level's bonus should absorb ambition**, not add grind. A good bonus is "do the same
    thing but properly"; a bad bonus is "now do it 50 times".
 
+### 2.1 Where the information budget belongs
+
+`Objectives.withinSenses(name, n)` is the second scoring axis (DESIGN.md §7). It does not make
+sensing cost ticks; it makes it *countable*, so a level can ration the instrument rather than the
+clock. It is **not** a general-purpose second number and must not be added to a level just to have
+one.
+
+It has teeth in exactly two shapes:
+
+- **Sensing is the search.** `w5-02` — two hundred segments, ten probes. Scanning the space costs
+  nothing in ticks, so without a read budget there is no reason to binary-search.
+- **Re-sensing substitutes for remembering.** `w8-01` — one ray reports a whole row, and the
+  rating forces the player to hold the survey instead of casting it again. The two budgets pull
+  opposite ways: the answer that never looks has to walk.
+
+It is **noise**, and has been deliberately left out, wherever:
+
+- **The sensor is not remote.** `scan` reads the bot's own tile and its four neighbours, so in all
+  of World 3 an information budget is just a tax on ticks that the tick par already collects.
+  `w3-03`'s whole lesson is that reading is free and walking is not; a scan budget contradicts it.
+- **Re-sensing is the level's method.** `w4-03` walks a wall by re-reading its neighbours every
+  step, on purpose, as the deliberate opposite of `w4-02`. `w4-02` already carries a resource
+  budget in this slot (marks placed). `w4-01` is `look`'s isolation level and its brief promises
+  the beam is free "as often as it likes".
+- **The level is on the Frustration Watch (§11).** `w4-04`, `w5-05`, `w6-04`, `w7-03`. Each is
+  already one number away from opaque.
+- **Rationing would punish the better answer.** On `w5-03` and `w8-03` a player who reads state
+  instead of tracking it is *saving* ticks, so the read budget is a bonus star on both and never
+  a gate.
+- **The brief tells the player the opposite.** `w8-02`'s hints end on "that is a reason to keep
+  looking, not a reason to stop carrying."
+
 ---
 
 ## 3. World 1 — Boot Sector
@@ -161,20 +193,21 @@ Constraint: **must be completable by someone who has written a `for` loop and no
 - `size` ~5 lines · `difficulty` **1/10**
 - `bonus` — (the first level offers no optional goal; do not add one)
 
-### w1-02 — Twenty Metres of Corridor
-- `premise` Same bay, longer route: three straight legs with two right-angle turns.
+### w1-02 — Forty-Five Metres of Corridor
+- `premise` Same bay, much longer route: three straight legs, and the last one doubles back.
 - `teaches` Bounded repetition — a counted `for` loop instead of repeated statements.
 - `assumes` `move`.
 - `hardware` —
 - `heritage` —
-- `world` 24×14. Legs of 12, 6, 9 tiles: East, South, East.
+- `world` 23×12. Legs of 20, 9, 16 tiles: East, South, West. 45 moves, par 45.
 - `varies` Nothing.
-- `anti-hardcode` **None — declared exception.** Defeated instead by the **char par**: 27 `move` calls passes bronze; gold requires three loops. Scoring teaches the lesson, not failure.
-- `naive-fails` Writing it out passes and feels bad, which is the intended pedagogy. The char counter is visible while typing.
+- `anti-hardcode` **None — declared exception.**
+- `gate` A **hard 60-tick booking**, plus the length of the route. Nothing in a trace distinguishes three loops from forty-five typed-out `move` calls — the events are identical — so the level cannot fail longhand and does not pretend to. What it can do is make longhand not worth typing, and fail the one answer that skips the counting: firing 30 moves per leg and letting the walls stop them costs 80 ticks against a 60-tick booking. The `noBlockedMoves` bonus is lost by the same answer. *(This replaces the char par named here until DESIGN.md §7 abolished char scoring; see DESIGN-REVIEW-RUBRIC.md H1.)*
+- `naive-fails` Move-at-the-wall-until-it-stops overruns the booking and fails. Writing all forty-five out passes, and is its own punishment.
 - `generalize` —
 - `seeds` `[1]`
-- `size` ~7 lines · `difficulty` **1/10**
-- `bonus` Under 60 characters.
+- `size` ~3 lines · `difficulty` **1/10**
+- `bonus` Reach the pad without one blocked move.
 
 ### w1-03 — Length Unknown
 - `premise` A corridor of unknown length. Reach the end of it.
@@ -531,7 +564,7 @@ textbook heritage and should be authored as honest, well-scaffolded versions of 
 - `generalize` Over graph shape. Seeds must include: one deep chain, one wide shallow graph, one node with three prerequisites, and one graph with two disconnected components.
 - `seeds` `[1,2,3,4]`
 - `size` ~35 lines · `difficulty` **6/10**
-- `bonus` Choose a valid topological order that also minimises travel between stations.
+- `bonus` Two stars: choose a valid topological order that also minimises travel between stations, and bring the district up on 20 `probe` reads or fewer. The retry-until-stable loop above is deliberately still allowed through — it is priced in ticks, and failing it on reads as well would be scoring it twice.
 
 ### w5-04 — Load Balance
 - `premise` Every consumer needs a feeder. Every feeder has a ceiling. There is not much slack.
@@ -752,18 +785,18 @@ Theme: the finale. Unlocks nothing (DESIGN.md §6). Four large levels plus one m
 
 ### w8-01 — Efficiency Audit  *(new mechanic in isolation)*
 - `premise` A field job you could already do. Finance have halved what you may spend doing it.
-- `teaches` **Optimisation as a skill separate from problem-solving** — ticks *and* characters are both hard gates now, not a primary and a secondary.
+- `teaches` **Optimisation as a skill separate from problem-solving** — ticks *and* the information budget are both hard gates now, not a primary and a secondary.
 - `assumes` Worlds 1–3.
 - `hardware` —
-- `heritage` Code golf, as a discipline.
-- `world` A compact 14×10 field-and-silo task, deliberately familiar and deliberately small. Char budget ≈ 60% of a straightforward World 2 solution; tick budget ≈ 90% of a naive sweep.
+- `heritage` — (the second scoring axis, DESIGN.md §7: `Objectives.withinSenses`)
+- `world` A compact 14×10 field-and-silo task, deliberately familiar and deliberately small. Shift budget 215 ticks (par 165); survey budget 16 `look` beams, against the 10 a one-ray-per-row sweep needs.
 - `varies` Layout, ripeness, capacity.
 - `anti-hardcode` Standard layout randomization, but the level's teeth are the budgets, not the seeds.
-- `naive-fails` A perfectly correct World 2-style solution passes **neither** budget. The player must golf and route at the same time, and discover that the two pressures sometimes pull in opposite directions.
+- `naive-fails` A perfectly correct World 2-style solution — sweep every row, harvest what is underfoot — spends no beams at all and still costs 220–252 ticks against a 215-tick shift. Asserted in `levels.test.ts` against the `fieldSweep` fixture. The two pressures pull opposite ways: the answer that never looks has to walk, and the answer that looks whenever it wants runs out of rating.
 - `generalize` Over layout.
 - `seeds` `[1,2,3,4]`
 - `size` reference **under 15 lines** — smallness is the point · `difficulty` **5/10**
-- `bonus` Come in under half the character budget.
+- `bonus` Two stars, one per axis: close the shift in 136 ticks, and survey the field on 10 beams — one a row. A player who cannot route well can still be excellent at looking.
 - `note` **Deliberate plateau** after `w7-05` (9). Without it, World 8 reads 8-9-9-10 and the player reaches the monster already spent.
 
 ### w8-02 — Full Stack
@@ -794,7 +827,7 @@ Theme: the finale. Unlocks nothing (DESIGN.md §6). Four large levels plus one m
 - `generalize` Over DAG shape and fleet size. Include a seed whose DAG is a single chain (where parallelism buys nothing and the player must recognise that) and one that is fully parallel.
 - `seeds` `[1,2,3,4,5]`
 - `size` ~110 lines · `difficulty` **9/10**
-- `bonus` Achieve a makespan equal to the DAG's critical path length.
+- `bonus` Two stars: achieve a makespan equal to the DAG's critical path length, and plan the restart on 26 `probe` reads or fewer. The second is a consolation, not a fifth way to fail a 9/10 — a player who cannot hit the critical path can still hit the read budget.
 
 ### w8-04 — Signal from 4470
 - `premise` An eleven-month-old route description. Most of it is still true.
@@ -895,8 +928,9 @@ uniquely bad place to leave someone.
 **Defuse:**
 1. **A dedicated failure code and message for sustained mutual blocking**, not a generic
    timeout — the game must name what happened. NARRATIVE.md §5 line 21 exists for this, and
-   memo KD-2704 sets it up one level in advance so the player has heard the words "sustained
-   mutual courtesy" before it happens to them.
+   memo KD-2704 sets it up one level in advance — it is circulated in **`w7-02`'s brief**, where
+   the apron is open ground and none of it bites — so the player has heard the words "sustained
+   mutual courtesy" before it happens to them. `w7-03`'s brief cites it by number.
 2. **A two-bot seed is the first seed**, small enough to trace by hand.
 3. The replay must render blocked moves distinctly (a bump, a spark) so the player *sees* the
    collisions rather than inferring them from a tick count. Flagged to RENDER.
@@ -921,7 +955,7 @@ replaced. Recorded here so nobody re-introduces them.
 | `w4-03` | "A larger breadcrumb maze" | `w4-02` (same visited-set technique, more of it) | **Left Hand on the Wall** | Constant-memory invariant traversal — the deliberate opposite of `w4-02` |
 | `w5-02` | "Power a longer, branching chain" | `w5-01` (preconditions again) | **Continuity Test** | Binary search; the only halving-a-space idea in the game |
 | `w7-02` | "Spawn more bots and do `w7-01` again" | `w7-01` (parallel clocks, scaled) | **Divide the Field** | Partitioning by work when the worker count is unknown at write time |
-| `w8-01` | "A medium mixed level" | Everything and nothing | **Efficiency Audit** | Optimisation under a dual budget as a skill in its own right |
+| `w8-01` | "A medium mixed level" | Everything and nothing | **Efficiency Audit** | Optimisation under a dual budget — ticks and the information budget — as a skill in its own right |
 
 **Near-duplicates that were kept, with the distinction stated:**
 
@@ -977,7 +1011,7 @@ replaced. Recorded here so nobody re-introduces them.
 | 33 | w7-03 | Mutual exclusion; livelock |
 | 34 | w7-04 | Dynamic scheduling by earliest-free worker |
 | 35 | w7-05 | Message passing; scout/worker |
-| 36 | w8-01 | Optimisation under a dual budget |
+| 36 | w8-01 | Optimisation under a dual budget (ticks *and* information) |
 | 37 | w8-02 | Pipeline composition with interleaved phases |
 | 38 | w8-03 | Precedence constraints executed in parallel |
 | 39 | w8-04 | Reconciling a stale plan against observation |

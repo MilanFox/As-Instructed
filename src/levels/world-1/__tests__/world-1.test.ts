@@ -158,13 +158,29 @@ describe('starters do not solve their own level', () => {
   test('w1-02 needs all three legs, not just the first', () => {
     const level = byId('w1-02');
     const result = runLevel(level, level.seeds[0] as number, (sim, botId) => {
-      for (let i = 0; i < 12; i++) sim.move(botId, Dir.East);
+      for (let i = 0; i < 20; i++) sim.move(botId, Dir.East);
     });
     expect(result.verdict.passed).toBe(false);
   });
 });
 
 describe('hardcoded answers are rejected', () => {
+  /**
+   * The one w1-02 answer that skips the counting. Nothing distinguishes three loops from
+   * forty-five typed-out moves in a trace, so the booking is what the level actually gates on.
+   */
+  test('w1-02: firing moves at the wall until they stop working overruns the booking', () => {
+    const level = byId('w1-02');
+    const result = runLevel(level, level.seeds[0] as number, (sim, botId) => {
+      for (const dir of [Dir.East, Dir.South, Dir.West]) {
+        for (let i = 0; i < 30; i++) sim.move(botId, dir);
+      }
+    });
+    expect(result.verdict.objectives.find((o) => o.id === 'reach-pad')?.met).toBe(true);
+    expect(result.verdict.objectives.find((o) => o.id === 'bay-booking')?.met).toBe(false);
+    expect(result.verdict.passed).toBe(false);
+  });
+
   test('w1-03: a counted loop tuned to the first seed fails a later one', () => {
     const level = byId('w1-03');
     const outcomes = level.seeds.map(

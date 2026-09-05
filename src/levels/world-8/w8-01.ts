@@ -106,16 +106,28 @@ const ripeAtStart = (world: World): number => {
 const delivered = (ctx: ObjectiveContext): number =>
   countItemsAt(ctx.world, siloTile(ctx.initialWorld), ItemKind.Crop);
 
-/** Ticks and characters are both gates. These two numbers are the whole level. */
-const PAR_TICKS = 198;
+/**
+ * Ticks and readings are both gates. These four numbers are the whole level.
+ *
+ * `SHIFT_TICKS` is the hard one and `PAR_TICKS` is where gold sits, so the medal band underneath
+ * it — silver to 206, bronze to 215 — survives having a failing condition on the same axis. The
+ * shift is set just under the honest World 2 answer: sweeping every row of the field and
+ * harvesting what is underfoot costs 220 ticks on the kindest seed.
+ */
+const PAR_TICKS = 165;
+const SHIFT_TICKS = 215;
 const TIGHT_TICKS = Math.floor(PAR_TICKS * 0.83);
+const SURVEY_BUDGET = 16;
+const TIGHT_SURVEY = FIELD_H;
 
 /**
  * A World 2 job on a World 2 field, priced by Finance rather than by Field Engineering.
  *
- * Everything the player needs is free to look at: the field is open, so one ray per row reports
- * that row, and `probe('silo')` reports the drop point without walking to it. What costs is the
- * route and the size of the program that computes it, and the two do not optimise together.
+ * The two budgets pull against each other, which is the whole level. The field is open, so one
+ * ray per row reports that row and the bot never has to walk to find out what is growing — but
+ * the survey rig is rated for sixteen beams a shift, so the answer has to be *remembered* rather
+ * than re-read. Refusing to look at all is legal and walks the field, which is what the tick
+ * budget is priced against.
  */
 export const w8_01: LevelDef = {
   id: 'w8-01',
@@ -127,8 +139,8 @@ export const w8_01: LevelDef = {
     '**FROM:** Dep. Coordinator M. Vance',
     '',
     'The field is ripe and the work order is one you have run a dozen times. Finance have',
-    'since attached a second budget to it. Ticks were already counted. Characters are now',
-    'also counted, and Finance regard both as final.',
+    'since attached a second budget to it. Time was already costed. Sensor readings are now',
+    'also costed. **Two budgets apply and both are hard. Missing either one is a fail.**',
     '',
     '---',
     '',
@@ -139,9 +151,16 @@ export const w8_01: LevelDef = {
     'blocks a sensor sweep. `probe("silo")` reports where the silo is, from anywhere, for',
     'nothing. The bot starts on it.',
     '',
-    '**Par is the tick budget and it is tight.** Finance also count characters — your program',
-    'with comments and leading whitespace stripped — and regard the number as final. It is the',
-    'one figure on this site that decides nothing.',
+    `- **The shift is ${String(SHIFT_TICKS)} ticks.** Par — where the medal is — is`,
+    `  ${String(PAR_TICKS)}, and the shift ends at ${String(SHIFT_TICKS)} whatever you have`,
+    '  delivered by then.',
+    `- **The survey rig is rated for ${String(SURVEY_BUDGET)} beams a shift.** Every \`look()\``,
+    '  is one beam, however far it reaches and however many tiles come back. `scan()` reads the',
+    '  tile under the bot and the four beside it, and reads nothing further, so it is not a way',
+    '  round the rating — it is a way of paying in ticks instead.',
+    '',
+    'Neither budget is negotiable and neither is the other one. A route that looks at everything',
+    'twice comes in fast and over-rated; a route that never looks walks the field.',
     '',
     '**The Repository.** This work order assumes `lib.ts` holds a `pathTo(x, y)` that walks the',
     "bot to a tile it has already seen. `import { pathTo } from 'lib';` If it is not in there,",
@@ -160,6 +179,15 @@ export const w8_01: LevelDef = {
         return [Math.min(delivered(ctx), total), total];
       },
     ),
+    Objectives.withinTicks(SHIFT_TICKS, {
+      id: 'shift-budget',
+      label: `Close the shift within ${String(SHIFT_TICKS)} ticks`,
+    }),
+    /* Id left as `withinSenses` mints it — `within-<n>-<command>` is the shape
+       `game/achievements.ts` recognises an information budget by. */
+    Objectives.withinSenses('look', SURVEY_BUDGET, {
+      label: `Survey the field on at most ${String(SURVEY_BUDGET)} beams`,
+    }),
   ],
   bonus: [
     Objectives.custom(
@@ -168,22 +196,25 @@ export const w8_01: LevelDef = {
       (ctx) => ctx.trace.endTick <= TIGHT_TICKS,
       (ctx) => [Math.min(ctx.trace.endTick, TIGHT_TICKS), TIGHT_TICKS],
     ),
+    Objectives.withinSenses('look', TIGHT_SURVEY, {
+      label: `Survey the field on ${String(TIGHT_SURVEY)} beams — one a row`,
+    }),
   ],
   starter: [
     "// import { pathTo } from 'lib';",
     '// The field is 14 by 10. probe("silo") reports the drop point.',
-    '// Ticks are graded. Finance count the characters anyway.',
+    '// 215 ticks and 16 beams. Both are hard.',
     '',
     'const silo = probe("silo").at;',
     'print(silo.x + "," + silo.y);',
     '',
   ].join('\n'),
   hints: [
-    'Sensing costs nothing. Walking and harvesting cost ticks. Find out what is on the field before you decide where to walk.',
+    'Sensing still costs no ticks; it is only rationed. Walking and harvesting cost ticks. Find out what is on the field before you decide where to walk.',
     'The bot does not have to stand on a tile to know what is growing there. One pass along the edge of the field can report every row.',
     'The bot carries a fixed number of crops. Which ones travel together is a decision you can make before you set off, not while you are out there.',
     'A green crop is two ticks and nothing to show for it. Check maturity, not just presence.',
-    'Shortening the program can lengthen the route. The tick count is the graded one, so check it again after every edit.',
+    'A beam you spend twice on the same row bought you nothing the first time. Whatever the field told you, hold on to it — nothing out there changes except what you harvest.',
   ],
   docs: ['look', 'harvest', 'probe'],
 };
