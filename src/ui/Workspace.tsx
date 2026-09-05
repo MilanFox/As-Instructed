@@ -1,9 +1,10 @@
-import { useRef } from 'react';
-import { useGame } from '../game/store.ts';
+import { useMemo, useRef } from 'react';
+import { currentLevel, useGame } from '../game/store.ts';
 import { useLibrary } from '../meta/index.ts';
 import { LibraryPanel, libraryStatusLine } from '../meta/ui/index.ts';
 import { PanelBoundary } from './components/PanelBoundary.tsx';
 import { Splitter } from './components/Splitter.tsx';
+import { useWorkspaceLayout } from './hooks/useWorkspaceLayout.ts';
 import { BriefPanel } from './panels/BriefPanel.tsx';
 import { ConsolePanel } from './panels/ConsolePanel.tsx';
 import { DocsPanel } from './panels/DocsPanel.tsx';
@@ -20,14 +21,24 @@ const TABS = [
 
 /** Editor left, site view right, brief/console/reference below it, objectives pinned beside them. */
 export function Workspace(): React.JSX.Element {
-  const layout = useGame((state) => state.save.settings.layout);
+  const saved = useGame((state) => state.save.settings.layout);
   const setLayout = useGame((state) => state.setLayout);
   const panel = useGame((state) => state.brief);
   const setPanel = useGame((state) => state.setPanel);
   const libraryOpen = useLibrary((state) => state.panelOpen && state.save.unlocked);
+  const level = useGame(currentLevel);
+  const trace = useGame((state) => state.trace);
 
   const workspaceRef = useRef<HTMLDivElement | null>(null);
   const rightRef = useRef<HTMLDivElement | null>(null);
+
+  // The split follows the shape of what the site view is drawing, so `w1-03`'s 30x3 corridor and
+  // `w4-05`'s 40x40 maze do not get handed the same box.
+  const gridAspect = useMemo(() => {
+    const world = trace?.initialWorld ?? (level ? level.build(level.seeds[0] as number) : null);
+    return world && world.h > 0 ? world.w / world.h : 1;
+  }, [level, trace]);
+  const layout = useWorkspaceLayout(workspaceRef, saved, gridAspect);
 
   return (
     <>
