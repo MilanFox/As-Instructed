@@ -190,3 +190,42 @@ deletion. A report concluding the systems are well designed is a failed report.
 
 Worth re-running after the compression and par work lands, since both change the
 incentive surface.
+
+### Backlog — UI and visual audit (third instrument)
+
+Requested 2026-09-05. Looking good is a requirement here, not polish, and it is stated as
+one: "Does it look GOOD (which would be kinda important to me too)". The playtests judged
+whether levels were fun and the incentive audit judges what the systems reward; neither
+looks at the screen.
+
+**Method.** Drive the real build in a browser and *look at it*. Screenshot every screen
+and every meaningful state — level select, brief, editor, running, paused mid-trace,
+results at each medal, a failure with a divergence, the docs panel, the publish dialog,
+the Library, the Regression tab, the achievement shelf, settings. Capture at more than one
+window size, including a laptop 13" and a wide monitor. For findability questions, pull
+the actual accessibility tree for roles and labels rather than inferring them from the DOM.
+
+**The three questions, in order:**
+
+1. **Is anything hard to find?** Which controls does a new player miss? Where is a feature
+   discoverable only if you already know it exists? Known instance: the Library unlocks
+   with one grey status-bar line, after the player has hand-written its obvious contents
+   six times. Assume nobody reads; if a thing is only announced in prose, it is hidden.
+2. **Too much information, or too little?** The standing directive is that LLMs
+   over-estimate how much humans read: cut text, show don't tell, de-noise in doubt. Find
+   the screens that violate it. Equally, find where the game is silent when it should show
+   a number, a diff, or a state — the failure surface work fixed one of these and there
+   will be more.
+3. **Does it look good?** Judge it as a designer, not as a linter: type scale and
+   hierarchy, spacing rhythm, alignment, colour discipline, contrast, how the canvas
+   grid reads against the chrome, whether motion helps or distracts, whether the whole
+   thing feels like one artefact or several bolted together. Compare against the bar the
+   genre actually sets — Opus Magnum, TIS-100, Baba Is You, Factorio's panels. Say plainly
+   where it falls short of them and what specifically to change.
+
+**Known already, do not re-report as discoveries:** viewport aspect wastes 56% of width on
+square grids at 891x393; the Library's unlock has no ceremony.
+
+**Deliverable.** Ranked, with screenshots inline as evidence, each finding naming the
+screen and the specific change. "It looks fine" is a failed report. Where a fix is a CSS
+or layout change small enough to prove, make it and show the before/after.
