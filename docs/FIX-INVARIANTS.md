@@ -344,3 +344,174 @@ import across a layer even where the runtime may not**, and the sweep does not i
 `:800` specified a bonus star for "coming a third under the character budget". Character count is
 not scored, ranked or displayed anywhere. The star that actually ships is `fleet-utilisation`.
 Both reconciled to the code.
+
+---
+
+## G2 — `src/__tests__/unused-exports.test.ts`, 2 tests
+
+The cheaper half, and no new dependency. 277 files, 1643 export entries, **39 dead exports**.
+
+**The one rule it turns on: a name counts as read only where it appears on a line that is neither
+an import nor an export.** Barrel plumbing is not a reader. That is not a shortcut — it is the
+whole guard. `src/engine/index.ts` re-exporting `BONUS_STAR_WEIGHT` is precisely what made the
+decoy look alive, and a scan that treats a re-export as a read hands back the same green tick the
+suite of 1624 passing tests already handed back.
+
+**Mutation-tested against a real mutated copy of `src/`, not reasoned about.** Restoring
+`BONUS_STAR_WEIGHT` into `verdict.ts` *and* its re-export into `engine/index.ts` — exactly how it
+hid — fails with **two** entries. Un-exporting an already-dead `glowStyle` also fails, so the list
+cannot rot into things that used to be dead.
+
+The 39, grouped: 14 level-authoring helpers under `world-{1,2}/shared.ts`, `world-4/caves.ts` and
+`world-8/shared.ts`; 4 reference-solution helpers; **5 objective builders that `docs/ENGINE.md`
+§236-238 advertises to level authors and no level uses** (`allTilesAre`, `hasTerrain`,
+`itemsDelivered`, `machinesAllIn`); the 10 decoys the audit §10 listed by hand; and 6 dead behind a
+barrel. 20 of the 39 were spot-checked by grep — **zero false positives**, and one real false
+positive was found and fixed during construction (`useLog as machineUseLog` in `w8-05.ts` is a
+genuine read; aliased imports now resolve back).
+
+A second test pins the **68 exports only a test reads, and the 32 of those declared outside
+`__tests__`** — the class the audit ranks *higher* than the outright dead, because a constant read
+only by a test, sitting beside a live inline copy, is a decoy with an alibi. Pinned as a pair of
+counts rather than an allowlist: two thirds of the 68 are fixtures whose readers are tests by
+construction, and 68 lines of mostly-fine would bury the 32 that matter. The assertion carries the
+full list so a mismatch prints the diff.
+
+**Honest note on the dependency constraint.** `knip` would do this better — it resolves modules
+properly, so it handles `export * as Objectives`, computed property access and string-literal
+references, which are this scan's false-positive surface (zero today; that is the shape a future
+one would take). It was not installed, per the brief. What the hand-rolled version buys is that the
+import-line exclusion is explicit and auditable, and that is the one rule `knip`'s default unused-
+exports check would not have given for free — it is the rule the whole `BONUS_STAR_WEIGHT` case
+turns on.
+
+---
+
+# Scorecard — which of the five known instances each guard would have caught
+
+The honest version, including the ones that are misses.
+
+## G1 — the confessed-invariant index
+
+| | Caught? | |
+|---|---|---|
+| K1 two char counters | **no** | neither confessed, and while both are live and both are called, nothing about them looks wrong |
+| K2 two tick counters | **no** | same |
+| K3 `SILVER_FACTOR` dead beside inline `1.25` | **partly** | catches the form where the dead copy is a *named constant declared twice* — which is how it recurred in `meta/profile.ts`. Does not catch the original form, one declaration beside a bare literal: `verdict.ts`'s "the one authoritative copy" was true, and the guard checks declaration sites rather than whether anything reads them |
+| K4 `BONUS_STAR_WEIGHT` | **no** | the confession was in `docs/ENGINE.md`, not in `src/`, and the constant itself said nothing. G2's territory |
+| K5 the silver rule, three stale prose copies | **yes, outright** | every stale copy failed the same way — it named the multiplier and not the `par + 1` floor, which is exactly what the guard asserts |
+
+**K5 is the one that matters here**, because it is the instance no other guard can reach: all four
+copies are live, three of them are not code, and one of them is rendered into the game's own rules
+panel. It is also the instance that had *already shipped wrong*. A guard that catches only K5 is
+worth more than a guard that catches K1 through K4, and this one caught a sixth instance of it in
+`src/meta/profile.ts` within minutes of existing.
+
+## G2 — unused exports
+
+| | Caught? | |
+|---|---|---|
+| K1 two char counters | **no** | both were live and both were called. Catchable only *after* one was deleted, which is the wrong order |
+| K2 two tick counters | **no** | same |
+| K3 `SILVER_FACTOR` | **yes, outright** | exported, read by nothing. This is literally the query |
+| K4 `BONUS_STAR_WEIGHT` | **yes, verified by mutation** | including the barrel re-export that made it look alive |
+| K5 the silver rule | **no, and not close** | two of the three stale copies are English prose and the third is a docstring. There is no export and no identifier to find |
+
+## The other guards, against the same five
+
+| | K1 | K2 | K3 | K4 | K5 |
+|---|---|---|---|---|---|
+| `api-cost-parity` | — | — | — | — | — |
+| `cost-table-live` | — | — | — | — | — |
+| `budget-declarations` | — | — | — | — | — |
+
+These three close audit findings §4 and §5 and Ruling 1. **None of them touches a known instance**,
+and that is worth saying plainly rather than claiming coverage by association: they are guards on
+the same *disease* in three other organs, not on the five cases that were found by accident.
+
+## The shape nothing here catches
+
+**Two live implementations of the same computation, in different files, under different names.**
+That is K1 and K2 exactly, and neither G1 nor G2 nor any parity test can find them, because there
+is nothing in either copy that says the other exists. The audit's G3 is the right instrument — "a
+parity test wherever two live tables encode the same quantity" — but it is a pattern to apply, not
+a detector: somebody has to already know the two things are the same thing.
+
+Three instances of G3 ship here (`api-cost-parity`, the palette, the `MEDAL_BEAT` sweep). Writing
+a *detector* for it would mean comparing behaviour rather than text — fuzzing two exported
+functions with the same arity against each other and reporting pairs that never disagree. That is
+a real thing to build and it is not built here.
+
+---
+
+# Handed back — work for the agents that own these files
+
+Every one of these is a comment or a constant that is currently false. None is guessed at; each was
+found by a guard that is now in the suite and each is written out as an applicable diff.
+
+| Owner | File | What |
+|---|---|---|
+| crash-fix (`src/meta/**`) | `src/meta/profile.ts:23-24` | **Live bug.** A second `SILVER_FACTOR` and a `medalThresholds` that drops the `par + 1` floor. Diff in the guard's `KNOWN_OPEN` JSDoc |
+| incentives (`src/ui/screens/**`) | `src/ui/screens/ReviewMemo.tsx:18` | "The five tiers" — it is four |
+| incentives (`docs/DESIGN.md`) | `docs/DESIGN.md:260` | "escalating in passive aggression across five grades" — four |
+| incentives (`src/ui/panels/**`) | `src/ui/panels/ObjectiveRail.tsx` | Two lines to carry a declared `meter`/`unit` onto the rail row |
+| incentives (`src/levels/**`) | six objectives in `w3-01`, `w8-01`, `w8-03`, `w8-05` | One `meter: { kind: 'ticks' }` each |
+| art spike (`src/render/**`) | `src/render/renderer.ts:167`, `:285` | "Mirrors `settings.celebrations`" — reword; it receives a setting, it does not keep a second copy |
+| incentives (`src/game/store.ts`) | `src/game/store.ts:269` | Same reword |
+| whoever owns the rubric | `docs/DESIGN-REVIEW-RUBRIC.md:601` | Lists the nine-tick airlock as a plant. It was never planted |
+
+The three in `src/render/` and `src/game/store.ts` are registered as `PROSE` in the guard and the
+six level objectives are pinned by `budget-declarations`, so none of them can be quietly forgotten:
+the tests name them.
+
+## Files touched outside the ownership list
+
+`src/game/ports.ts`, `src/ui/hooks/useWorkspaceLayout.ts` and `src/audio/__tests__/offline.ts` are
+in no agent's declared territory. Each got a **one-line comment reword** and nothing else — the
+Class B cleanup that makes the confessed-invariant index readable. Flagged rather than assumed.
+
+---
+
+# Verification
+
+| | |
+|---|---|
+| `npx tsc --noEmit` | clean |
+| `npx vitest run` | **1717 passed, 73 files** — from a baseline of 1692 across 68 |
+| `npm run build` | clean |
+| `npx eslint src` | 1 error, the pre-existing `src/levels/world-5/__solutions__/w5-01.ts:32`. Untouched |
+| `npx prettier` | every new and changed file formatted |
+
+**+25 tests, +5 files.** Where they went:
+
+| File | Tests | For |
+|---|---|---|
+| `src/__tests__/confessed-invariants.test.ts` | 10 | G1 — the index, and seven guards on it |
+| `src/__tests__/unused-exports.test.ts` | 2 | G2 — dead exports, and the test-only count |
+| `src/game/__tests__/budget-declarations.test.ts` | 5 | Ruling 1 — the six that still infer, and that a declaration wins |
+| `src/runtime/__tests__/api-cost-parity.test.ts` | 3 | audit §5 — told vs charged |
+| `src/engine/__tests__/cost-table-live.test.ts` | 2 | audit §4 — no unreachable cost key |
+| `src/game/__tests__/score.test.ts` | +3 | Ruling 2 — no unreachable tier, rank ids pinned, no save can hold a rank 1 |
+
+Two existing tests changed rather than added: `senses.test.ts` and `run-level.test.ts` each do an
+exact `toEqual` on an `ObjectiveReport`, and now carry the `meter` the objective declares.
+
+## Difficulty
+
+Unchanged, and checked rather than asserted. No par, medal threshold, budget, tick cost or
+objective moved. The three places it could have:
+
+- **`link`/`transmit` routing** — `DEFAULT_COSTS` already matched `api-spec` on both, and no level
+  overrides either. `reference-solutions.test.ts` runs all forty levels through the real runtime
+  against their pars: 86 tests, unchanged.
+- **The tier deletion** — a label on a memo. Every reachable percentage lands where it did.
+- **The objective `meter`** — `evaluate` is untouched everywhere. A declaration changes what the
+  readout *says a number is*, never what passes.
+
+## Saves
+
+No persisted shape changed, so no migration and no fixture is needed — but the argument is written
+down as a test rather than left in a commit message. `reviewedRanks` only ever gains a rank
+`reviewTier` returned, and `score.test.ts` asserts across the whole 0–100 range plus `NaN` that
+rank 1 is never returned. No save on disk can hold it, and the four survivors keep the ids they
+were saved under.

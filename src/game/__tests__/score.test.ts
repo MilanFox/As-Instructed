@@ -99,6 +99,16 @@ describe('reviewTier', () => {
     });
   });
 
+  it('cannot have written a rank 1 into anyone save', () => {
+    /* Why deleting tier 1 needs no save migration: `reviewedRanks` only ever gains a rank that
+       `reviewTier` returned, and rank 1 was never returned for any input it can be called with.
+       So no save on disk can hold it, and the surviving four keep the ids they were saved under. */
+    for (let percent = 0; percent <= 100; percent += 0.5) {
+      expect([percent, reviewTier(percent).rank]).not.toEqual([percent, 1]);
+    }
+    expect(reviewTier(Number.NaN).rank).not.toBe(1);
+  });
+
   it('keeps the rank ids saves already carry', () => {
     /* Literals, not `map((_, i) => i + 2)`: these four numbers are in `save.reviewedRanks` on
        disk, and a test that derives them from the array cannot notice a renumbering. */
