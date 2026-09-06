@@ -1771,3 +1771,89 @@ thrown away: routines-used and ticks-inside-them on the results screen, reuse co
 the Repository panel. Explicitly **not** priced into anything — the veteran playtester used the
 Repository heavily with no extrinsic reward at all, so the argument for the feature should be made
 by the save file rather than by a brief.
+
+---
+
+## 2026-09-06 — eleven bonuses now ask a second question
+
+**Merged** (`61626cb`). Main green at **1831 tests / 82 files**, tsc, build and eslint clean but for
+the known `w5-01.ts:32` false positive.
+
+Every replacement is **report-shaped**, earned by the reference on **every** seed, and
+**tick-neutral** — `print`, `look` and `clock` are free — so **no medal moved anywhere.**
+
+| level | was | now | the second question |
+|---|---|---|---|
+| `w3-01` | `clean-run` | `straight-runs` | how do the two sidings line up by row? |
+| `w4-01` | `single-pass` | `within-60-look` | did you read the ray as a ray? |
+| `w4-02` | `mark-budget` | `breadcrumb-trail` | what could a bot that never ran your program reconstruct? |
+| `w4-05` | `fuel-reserve` | `filed-return` | do you know the way home before you drive it? |
+| `w5-05` | `tight` | `name-the-weak-link` | what happens when one substation goes down? |
+| `w7-01` | `no-slack` | `name-the-idle` | how long did each bot stand still? |
+| `w7-02` | `within-ten-percent` | `even-share` | did you split the work, or split the map? |
+| `w7-04` | `within-bound` | `name-the-decider` | which job was the critical path? |
+| `w8-01` | `audit-tight` | `name-the-row` | which row held most ripe crop *at the open*? |
+| `w8-04` | `no-resurvey` | `read-the-plan` | what was the cipher, and how many legs? |
+| `w8-05` | three bonuses | `name-the-hold` | which station waited longest on its feeders? |
+
+### The brief gave one test; measurement forced three
+
+1. Does it ask a second question? — kills the tightenings.
+2. **Is it earned by the cheapest correct program?** — kills `w4-02`, `w4-01`, `w8-04`.
+3. **Is it satisfied by a program that does nothing?** — kills `w8-05`'s absence predicates.
+
+**The agent reversed three of its own rulings as evidence arrived** — `w4-02` from *"exemplar, do
+not touch"*, and `w8-05 under-budget` and `w8-04 no-resurvey` from *"looks real, keep"*. `w4-02` and
+`w8-04` turned out to be **the same defect: a star paid for declining to use the level's own idea**,
+and on `w8-04` the lazy route took the star **more comfortably than the reference** (0/0/0/4/11
+off-plan against 17/19/37/14).
+
+They converge on a rule worth keeping: **prefer a bonus requiring evidence of a thing done over one
+requiring the absence of a thing done.** Independently corroborated hours earlier from the other
+direction — when grading moved to worst-seed, the three bonuses that lost their star were all budget
+bonuses and **not one predicate bonus moved.**
+
+`w8-05` loses all three of its bonuses and gains one. `fleet-utilisation` was **unreachable rather
+than hard**: World 8's `idleTicks` charges `sync`, so it paid for *not coordinating* — on the
+coordination finale. World 7–8 star maximum falls 14 → 11; Worlds 3–5 unchanged, every deletion
+matched by a replacement. Worlds 1, 2 and 6 already met the standard.
+
+### The ratchet caught a deletion, and that is the point
+
+The one red test was `confessed-invariants.test.ts` — the entry confessed a comment on `fuelBurned`,
+which was `fuel-reserve`'s only consumer and went with the objective. **There was no fix on the
+agent's side**: restoring the symbol would have failed `unused-exports.test.ts`, the same ratchet
+pointing the other way. It reserved the file as instructed and handed me the four-line diff, which I
+applied. A guard exact in both directions notices when the **evidence** for an invariant leaves, not
+just when a new one appears.
+
+### Par: measured, and one real content bug
+
+**No impossible pars. 19 of 23 graded levels discriminate; Worlds 3 and 7 are clean.** Seven free
+pars, headline **`w8-04`, free by 106–158 ticks — skipping the cipher entirely golds on every
+seed.** The level's whole idea is the cipher and the cheapest way to gold is to ignore it. Same
+defect the bonus work found from the other side.
+
+**`w8-03` admits no scalar par**: silver must sit inside seed 3's own deadline of 98 while the
+reference costs 84.
+
+### Spawned: the par repairs
+
+**Ruled: par stays a scalar. No per-seed par machinery.** A scalar par is a promise the whole game
+makes — site map, results, Refactor projection and Performance Review all read one number per level
+— so a second shape buys one level and taxes every screen. **`w8-03` has a seed problem, not a par
+problem**; the agent is to bring seed 3 into line, and to stop and report with numbers rather than
+implement per-seed par if it cannot.
+
+`w8-04` is a **content repair, not a par tune** — told explicitly not to lower par until only the
+cipher route fits, because that makes the level harder without making the idea load-bearing and
+punishes the player who found the shortcut. **Make the cipher the cheap route.** Also carrying
+`w5-01` 37 → 32 and the four-line `CustomReport` engine diff that unblocks the last two objectives
+still inferring their unit from their label.
+
+### Recorded so it is not rediscovered as a bug
+
+`look`, `scan`, `probe`, `recv` and `print` are **absent from `DEFAULT_COSTS` — sensing and
+reporting are free.** That is deliberate and stays: it is why par can never rank a program for
+sensing less, and why an **information budget is the only instrument in the game that can price
+sensing at all.**
