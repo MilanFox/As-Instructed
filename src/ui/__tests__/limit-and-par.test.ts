@@ -14,90 +14,12 @@
  * run report must not print one. That was the last place the two numbers could still read as one
  * kind of thing.
  *
- * The renderer is local to this file, and so is each sibling's, which is not a preference:
- * `src/__tests__/unused-exports.test.ts` pins the count of exports whose only readers are tests at
- * an exact number, so a shared fixture module fails the suite until that number is changed.
- * `docs/FIX-UI-COVERAGE.md` carries the one-line change that would let them share one.
+ * The renderer is `src/ui/__tests__/react-driver.ts`, one hand-cranked React shared by every UI
+ * test (`docs/FIX-RAIL-METER.md` §4).
  */
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type * as ReactModule from 'react';
-
-const driver = vi.hoisted(() => {
-  interface Slot {
-    filled: boolean;
-    value: unknown;
-    deps: readonly unknown[] | undefined;
-  }
-
-  const slots: Slot[] = [];
-  let cursor = 0;
-
-  function slot(): Slot {
-    const existing = slots[cursor];
-    cursor += 1;
-    if (existing) return existing;
-    const fresh: Slot = { filled: false, value: undefined, deps: undefined };
-    slots[cursor - 1] = fresh;
-    return fresh;
-  }
-
-  function same(a: readonly unknown[] | undefined, b: readonly unknown[] | undefined): boolean {
-    if (!a || !b || a.length !== b.length) return false;
-    return a.every((each, index) => Object.is(each, b[index]));
-  }
-
-  function memo<T>(factory: () => T, deps: readonly unknown[]): T {
-    const here = slot();
-    if (!here.filled || !same(here.deps, deps)) {
-      here.filled = true;
-      here.value = factory();
-      here.deps = deps;
-    }
-    return here.value as T;
-  }
-
-  const hooks = {
-    useState<T>(initial: T | (() => T)): [T, (next: T) => void] {
-      const here = slot();
-      if (!here.filled) {
-        here.filled = true;
-        here.value = typeof initial === 'function' ? (initial as () => T)() : initial;
-      }
-      return [
-        here.value as T,
-        (next: T): void => {
-          here.value = next;
-        },
-      ];
-    },
-    useRef<T>(initial: T): { current: T } {
-      const here = slot();
-      if (!here.filled) {
-        here.filled = true;
-        here.value = { current: initial };
-      }
-      return here.value as { current: T };
-    },
-    useCallback<T>(fn: T, deps: readonly unknown[]): T {
-      return memo(() => fn, deps);
-    },
-    useMemo: memo,
-    useEffect(): void {},
-    useLayoutEffect(): void {},
-    useSyncExternalStore<T>(_subscribe: unknown, snapshot: () => T): T {
-      return snapshot();
-    },
-    useDebugValue(): void {},
-  };
-
-  return {
-    hooks,
-    reset(): void {
-      slots.length = 0;
-      cursor = 0;
-    },
-  };
-});
+import { reactDriver as driver } from './react-driver.ts';
 
 vi.mock('react', async (importOriginal) => {
   const actual = await importOriginal<typeof ReactModule>();

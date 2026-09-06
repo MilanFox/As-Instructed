@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { replayTo } from '../../engine/index.ts';
-import type { Budget } from '../../game/budgets.ts';
+import type { Budget, Meter } from '../../game/budgets.ts';
 import { budgetFor, budgetReadout, overBudgetLine } from '../../game/budgets.ts';
 import { activeTrack, metAt, playbackFor, progressAt } from '../../game/playback.ts';
 import { isGraded } from '../../game/score.ts';
@@ -18,6 +18,10 @@ interface ObjectiveRow {
   /** The one the run is working towards at this tick. Exactly one row has it, or none. */
   active: boolean;
   progress?: [number, number];
+  /** Declared by the objective (DESIGN.md §11 A13). Without it `budgetFor` parses the label. */
+  meter?: Meter;
+  /** Declared by the objective. Without it the noun is taken from the label. */
+  unit?: string;
   /** Set when this objective is something the run spends rather than something it completes. */
   budget?: Budget;
 }
@@ -57,6 +61,8 @@ export function ObjectiveRail(): React.JSX.Element {
         met,
         bonus: bonusIds.has(objective.id),
         active: !atEnd && active?.id === objective.id,
+        ...(objective.meter ? { meter: objective.meter } : {}),
+        ...(objective.unit ? { unit: objective.unit } : {}),
       };
       const live = track ? progressAt(track, flooredTick) : undefined;
       const progress = atEnd ? result?.progress : (live ?? result?.progress);
