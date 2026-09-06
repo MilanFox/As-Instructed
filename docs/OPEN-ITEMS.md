@@ -2085,3 +2085,57 @@ either a fifth-wheel export or giving the shared driver effect semantics the fou
 `docs/AUDIT-UI.md`'s held styling findings still await re-triage against whichever art direction the
 user picks. `DEFAULT_ART` is `survey` pending that call — the one decision on this project that is
 not mine.
+
+---
+
+## 2026-09-06 — two agents on what is left that does not need the user's pick
+
+Main green at **1904 tests / 90 files**. The backlog now splits cleanly into *blocked on the art
+decision* and *not blocked*, and both of these are the second kind.
+
+### Sprites — the boards are currently half-committed
+
+Terrain is authored per direction; **machines, crops and items still come off the shared tile atlas
+in every direction.** So Survey's paper-and-ink plot has atlas sprites sitting on it and Signal is a
+single phosphor with full-colour icons on top. That inconsistency is the most visible thing left
+between here and what the user asked for, and it reads as **unfinished rather than as a style**.
+
+The art agent left this deliberately and was right to — it refused to skip those passes to make its
+screenshots prettier, because **crop maturity is required to solve `w2-02`**. That constraint is now
+the brief's first non-negotiable, and the proof standard is the smallest tile size any level uses
+with ripe and unripe adjacent and every machine kind on screen at once — *not* showcase size.
+
+`standard` keeps the atlas; it is the baseline the others are judged against. All three new
+directions get the same standard of finish, explicitly **including whichever one I might guess is
+going to lose** — that guess is not mine to make.
+
+### Content — four things that have been loose for days
+
+**The unknown-id ruling** for `applyMachineChange`, `link` and `transmit`. The deciding test is the
+one already shipped for `power()`: **can the identical call succeed later in the same run?** Yes
+means a state problem and the machine should say so; no means the id names nothing that exists or
+ever will, which is a program bug and should throw. Told that **a different answer for one of the
+three is a finding, not an inconsistency to paper over** — and that where it throws, the message may
+name the fix outright. Feedback in this game is a diff and never an oracle, but an unknown id is a
+program bug rather than a puzzle, so there is nothing to spoil.
+
+**`w2-01` as a cut candidate**, under the standing ruling that cutting beats fixing: a campaign of 34
+work orders is better one shorter than padded. If it goes, the check is unlock gates, requisitions
+(no later level may ask for a command whose only requisition card was on the cut level), the
+Repository, `CURRICULUM.md`, save migration and the `LEVELS` count other code quotes — proven by
+running the campaign end to end and migrating a real save, not by reasoning.
+
+**`use` requisitioned at `w3-04`, where nothing operates a machine.** A command handed over on a
+level that gives no reason to use it teaches that requisitions are decoration. Told to **prefer
+moving the card over inventing a use** — inventing one is how levels get padded.
+
+**CURRICULUM drift** on `w2-01`, `w2-05`, `w8-05`. Code is the truth and the doc gets corrected —
+*unless* the doc describes something better than what shipped, in which case it stops and says so,
+because that is a design question and mine. `w8-05` specifically must be re-read before anything is
+written down: it has changed twice tonight, losing all three bonuses and gaining `name-the-hold`, so
+the old "accumulates rather than integrates" criticism may no longer hold.
+
+### Still the only thing I am not deciding
+
+`DEFAULT_ART` is `survey`, pending the user. `docs/AUDIT-UI.md`'s held styling findings wait on the
+same call.
