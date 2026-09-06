@@ -101,11 +101,6 @@ const REGISTRY: readonly Confession[] = [
     says: '`FUEL_BURNING` in trace.ts mirrors this',
     guard: 'a constant that claims to be the only copy is the only copy',
   },
-  {
-    file: 'src/levels/world-4/objectives.ts',
-    says: 'Mirrors the ledger `Sim.charge` keeps',
-    guard: 'a constant that claims to be the only copy is the only copy',
-  },
 
   // --- Class B: ordinary English. Reword, do not guard. ---
   {
