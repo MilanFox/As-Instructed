@@ -11,17 +11,15 @@
 import { deepsite } from './deepsite.ts';
 import { signal } from './signal.ts';
 import { standard } from './standard.ts';
-import { survey } from './survey.ts';
 import type { ArtDirection, ArtId } from './types.ts';
 
 export const DIRECTIONS: Readonly<Record<ArtId, ArtDirection>> = Object.freeze({
   standard,
-  survey,
   signal,
   deepsite,
 });
 
-export const ART_IDS: readonly ArtId[] = ['standard', 'survey', 'signal', 'deepsite'];
+export const ART_IDS: readonly ArtId[] = ['standard', 'signal', 'deepsite'];
 
 export function isArtId(value: unknown): value is ArtId {
   return typeof value === 'string' && (ART_IDS as readonly string[]).includes(value);

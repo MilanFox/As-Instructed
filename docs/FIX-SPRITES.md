@@ -562,3 +562,165 @@ read past. Removing it also removes a third of the sweep's surface.
 of exports whose only reader is a test. Deleting three exports may move it. That file is a ratchet
 this lane may not edit — the change belongs to whoever owns it, and the scan reports paths by
 *declaring module*, so the entries to look for are `src/render/art/survey.ts`.
+
+---
+
+## 14. The cost sweep
+
+`docs/LIGHT.md` §7 states the rule and the two tests. This ran both, over `deepsite`'s live paths,
+`signal` on both halves, and the four shared modules. `survey` was not audited; it is deleted in
+§15 below.
+
+**Headline: one new instance, in `deepsite`. The shared modules — where a fifth was expected — are
+clean.** Everything below is measured through the counting context in `marks.test.ts`, never by
+reading the code and reasoning about it.
+
+### 14.1 What was checked, and what it cost
+
+| surface | verdict |
+|---|---|
+| `deepsite` `dither` — 23 call sites | **clean, and the claim is now verified rather than trusted.** Every site sits at line ≤ 936; `buildSheet` starts at 984 and every sheet-row painter is called only from inside it. The sheet is keyed `${T}|${biome}` and the board pays one `drawImage` per frame for the lot. |
+| `deepsite` `hazard` — 2 call sites | clean, same argument: both inside sheet painters. |
+| `deepsite` `stepLine` — 13 live calls | **one miss.** Twelve carry a `Math.max(2, …)` floor. The crate's brace at `deepsite.ts:3436` did not. |
+| `signal` | clean of this defect class. Its terrain is baked exactly like `buildSheet` — `ensureSheet` rebuilds a 20-stamp strip only when `tilePx` moves, and `paintTerrain` runs off `TerrainLayer.sync`, not per frame. Its live loops are all bounded by a fixed part count. |
+| `fx.ts`, `overlays.ts`, `sprites.ts`, `trail.ts` | **clean.** No loop in any of the four takes its bound from a tile size, a tile fraction or a device-pixel step. Every bound is a literal, a `strength`-derived scalar, or a data count. `drawGrid` builds the whole viewport into two `stroke()` calls. `fx`'s pool is a flat 900-slot scan, tile-size-independent. |
+| `renderer.ts` | clean. Every per-frame loop walks a data count — `cropCells`, `markCells`, `conveyorCells`, `world.machines`, `world.items`, bot poses — indexed once per tick by `indexSnapshot`, never a scan of the grid. |
+| `standard` | rises: 3 draw calls at 16 px against 2 at 48. It is the atlas control, its cost is not a player's cost, and the guard excludes it by name. |
+
+Every `Math.max(1.5, …)` and `Math.max(1, tilePx * k)` in the shared modules is a **stroke width or
+a radius inside a single draw call**, not a loop bound. That is the correct legibility pattern and
+the opposite of the defect; `overlays.ts:19-27` already names the distinction. Worth stating because
+the two shapes grep identically.
+
+### 14.2 The instance
+
+`deepsite.ts:3436` — the crate's diagonal brace:
+
+```
+const bw = tileSpan(T, 0.09);       // max(1, round(T * 0.09)) — 1 device px at T ≤ 16
+```
+
+`tileSpan` floors at one device pixel, so at a 16 px tile on a 1x panel the brace walked one
+`fillRect` per device pixel of span while the span kept scaling with the tile. The crate went **up**
+as it got smaller: **18 draw calls at 16 px against 16 at 48 px.** The three sibling `stepLine` sites
+in the same file (`2830`, `3359`, and the bot's at `2043`) all carry the floor and say why in a
+comment; this one was the outlier. Fixed to `Math.max(2, tileSpan(T, 0.09))` — the same expression
+its neighbours use.
+
+Small in isolation, and it flipped a verdict: the whole-campaign per-frame ratio for `deepsite` at
+1x went from **1.002 to 0.993** — from failing the board test to passing it — on that one word.
+
+### 14.3 Did the board test disagree with the element test?
+
+**Yes, on `signal`, and that is the case §7's second half exists for.**
+
+Per element `signal` passes: its machine layer is 136 calls at 16 px against 147 at 48. Per object
+over a real board it is **0.985 — flat**. On `w5-02` zooming from 48 px to 16 px pulls 1.59x more
+objects into view against a per-object cost that does not fall, so the *frame* gets **1.567x more
+expensive as the board gets smaller.** The element test cannot see that; only the board test can.
+
+`deepsite` fails the same board comparison on `w8-05` (1.45x) for the opposite reason — its
+per-object cost *does* fall, to 0.58, but the viewport reveals 2.5x more objects.
+
+**Neither was tuned, and neither should be.** The absolute numbers are why:
+
+| | peak draw calls per frame | where |
+|---|---|---|
+| `signal` | **4,661** | `w5-02`, 24 device px, 1x |
+| `deepsite` | ~3,300 | `w5-02`, 20 device px |
+| `standard` | 811 | `w5-02` |
+
+Four thousand calls a frame is not a frame-rate problem, and the ratio that looks bad is
+*revealing more of the board*, which is real work that no amount of baking makes free. A ratio can
+always be satisfied by making the near rung worse. So the board half of the guard is pinned as an
+**absolute ceiling** rather than as a ratio.
+
+### 14.4 The thing that is not a defect, and the number that goes with it
+
+Every detail rung in this renderer is written `tilePx >= K * dpr` — nine gate sites across
+`deepsite.ts`, `signal.ts`, `overlays.ts` and `sprites.ts`. That is a *screen*-pixel threshold, and
+it is deliberate: `overlays.ts:19-27` records it as a fix for "a `tilePx < 18` cutoff hides a gauge
+at 18 css px while showing it at 9", which reads as the overlay being broken on your machine.
+
+The cost consequence had not been measured, and it is large:
+
+| | far ÷ near, 1x | far ÷ near, 2x |
+|---|---|---|
+| `deepsite` crops | **1.000** | 0.278 |
+| `deepsite` items | 0.984 | 0.782 |
+| `signal` crops | **1.000** | 0.609 |
+| `signal` items | 0.991 | 0.757 |
+| campaign, per frame | 0.993 / 1.048 | 0.731 / 0.880 |
+
+**§9's headline `far ÷ near = 0.48` is a 2x-only number.** On a 1x panel the rungs sit at half the
+device-pixel budget, so almost nothing drops its detail before the guard's floor and the sprite
+layer barely gets cheaper at all. Anyone quoting 0.48 as the direction's scaling should know it
+describes retina and nothing else.
+
+**This was not changed, and the refusal is on the evidence.** The near form at 16 device px is not
+an invisible mark being paid for: rasterised into a 16x16 buffer, a ripe `deepsite` crop draws 48
+fills of which **44 change a pixel**, and lands **6 distinct colours** against the far form's 5 from
+13 fills — mean per-channel difference 53.7. It is a genuinely richer picture, the extra cost is
+bounded at ~4,000 calls a frame, and the standing rule is that the board wins. Flipping the gates to
+device pixels would buy cost that no player can perceive by spending legibility that they can, and
+would re-open the bug `overlays.ts` documents.
+
+Checked while there: the six maturity rungs and ripe-against-every-unripe stay apart **in actual
+pixels**, not merely in call streams, at 16/20/24/32/48 px and at both `dpr`, in both shipping
+directions. There is no legibility hole hiding behind the gate — only a cost one, and it is priced.
+
+### 14.5 The guard
+
+`src/render/__tests__/marks.test.ts` gained a cost section. It reuses the recording context the
+distinctness properties already use, counting the stream instead of comparing it, so there is one
+stand-in for the canvas in that file and not two. Everything runs at `dpr` 1 **and** 2, because §9's
+numbers came from 2 alone.
+
+1. **No mark costs more at the floor than at 48 px** — every machine kind and state, every crop
+   rung, every item kind, every bot facing. This is what catches the crate; it names the offender
+   and both numbers rather than returning a bare `false`. Verified to fail by reverting the fix.
+2. **No layer costs more at the floor than at 48 px** — the granularity §9's ratio was measured at.
+3. **Per frame, whole board: an absolute ceiling of 6,000 draw calls**, over **every level in the
+   campaign** at every rung of `TILE_SIZES`, both `dpr`, both shipping directions. Every level, so
+   one added later is measured without anyone remembering to add it — and because the shape only
+   shows on the big boards. `w5-02` peaks at **24 device px**, not at the floor, which is not a rung
+   anyone would have sampled by hand.
+
+One exception is carried as an entry rather than as a loosened bound: `signal machine antenna/idle
+@2x`, 15 calls at the floor against 13 at 48. Its cost across the ladder runs 15, 15, 10, 9, 13 —
+wobble around a bound of sixteen, because `signal` builds every glyph from a fixed eight rows of at
+most two spans and its far form is already one `fillRect` per span, the cheapest a span can be
+drawn. Bounded by a part count is what §7 calls safe by shape, and sixteen is sixteen at every zoom.
+
+The guard is **123 cases** where it was 153; deleting `survey` removed a direction's worth and the
+cost section added eight.
+
+### 14.6 Not done
+
+- The `* dpr` detail gates, deliberately — §14.4 has the argument and the pixels.
+- `survey` was not audited, as scoped. It is deleted below.
+- No motion or weight work; that concern is still untouched.
+
+---
+
+## 15. `survey`, deleted
+
+§13's proposal, taken. Inside `src/render/`:
+
+- `src/render/art/survey.ts` — gone, ~1,970 lines;
+- `src/render/art/index.ts` — import, `DIRECTIONS` entry and `ART_IDS` entry dropped;
+- `src/render/art/types.ts` — `'survey'` out of the `ArtId` union;
+- `src/render/__tests__/marks.test.ts` — the hook-count expectation is now
+  `['standard:0', 'signal:3', 'deepsite:3']`;
+- `src/render/trail.ts:51` — the prose mention.
+
+The picker ships two entries: **Deep Site** (default) and **Signal**. `standard` survives as the
+guard's atlas control and never reaches a player.
+
+`src/__tests__/unused-exports.test.ts` **did not move.** `KNOWN_TEST_ONLY` stays `[70, 32]` and
+`KNOWN_DEAD` is unchanged — `PAPER` and `INK` had no readers outside their own file at all, so they
+were never counted, and `survey` itself was read by the registry. No ratchet edit is needed.
+
+`src/ui/` was not touched, as scoped. A stale `import './styles/art/survey.css';` in `src/ui/App.tsx`
+and the ~550-line stylesheet it names are the desk lane's half; nothing in `src/render/` refers to
+either, and the build is green with them present or absent.

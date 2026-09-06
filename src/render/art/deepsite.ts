@@ -3432,7 +3432,7 @@ function paintItem(paint: ItemPaint): void {
       const y0 = ground - w + bob;
       volume(c, x0, y0, w, w, body, detail ? e : half, detail);
       if (detail) {
-        const bw = tileSpan(T, 0.09);
+        const bw = Math.max(2, tileSpan(T, 0.09));
         stepLine(c, x0 + e, y0 + e, x0 + w - e, y0 + w - e, bw, body.deep);
         stepLine(c, x0 + w - e, y0 + e, x0 + e, y0 + w - e, bw, body.deep);
       } else {

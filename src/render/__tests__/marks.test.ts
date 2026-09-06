@@ -26,15 +26,18 @@
 import { describe, expect, it } from 'vitest';
 
 import { Dir, ItemKind, MachineKind } from '../../engine/index.ts';
+import type { World } from '../../engine/index.ts';
+import { LEVELS } from '../../levels/index.ts';
 import { ART_IDS, DIRECTIONS } from '../art/index.ts';
 import type {
   ArtDirection,
+  ArtId,
   BotDrawOptions,
   CropPaint,
   ItemPaint,
   MachinePaint,
 } from '../art/types.ts';
-import { drawPlantGauge } from '../overlays.ts';
+import { drawGrid, drawPlantGauge } from '../overlays.ts';
 import { drawBot, drawGroundStack, drawMachine } from '../sprites.ts';
 import { setArtDirection } from '../theme.ts';
 import { createPose, dirVectorX, dirVectorY } from '../timeline.ts';
@@ -278,13 +281,14 @@ function machineStream(
   state: string,
   tilePx: number,
   reduced = false,
+  dpr = 2,
 ): string {
   setArtDirection(art.id);
   const powered = state === 'on' || state === 'open' || state === 'busy';
   const painter = art.drawMachine;
   if (!painter) {
     const { ctx, ops } = recording();
-    drawMachine(ctx, atlas, machineTileName(kind, state), 3, 2, tilePx, powered, 1.5, 2);
+    drawMachine(ctx, atlas, machineTileName(kind, state), 3, 2, tilePx, powered, 1.5, dpr);
     return ops.join('|');
   }
   const { ctx, ops } = recording();
@@ -298,7 +302,7 @@ function machineStream(
     powered,
     facing: 2,
     time: 1.5,
-    dpr: 2,
+    dpr,
     reduced,
   };
   painter(paint);
@@ -311,6 +315,7 @@ function cropStream(
   max: number,
   tilePx: number,
   reduced = false,
+  dpr = 2,
 ): string {
   setArtDirection(art.id);
   const painter = art.drawCrop;
@@ -318,7 +323,7 @@ function cropStream(
   if (!painter) {
     const { ctx, ops } = recording();
     atlas.draw(ctx, PLANT_STAGES[stage] as string, 3 * tilePx, 2 * tilePx, tilePx);
-    drawPlantGauge(ctx, 3, 2, tilePx, growth, max, 1.5, 2);
+    drawPlantGauge(ctx, 3, 2, tilePx, growth, max, 1.5, dpr);
     return ops.join('|');
   }
   const { ctx, ops } = recording();
@@ -333,19 +338,25 @@ function cropStream(
     stages: PLANT_STAGES.length,
     ripe: growth >= max,
     time: 1.5,
-    dpr: 2,
+    dpr,
     reduced,
   };
   painter(paint);
   return ops.join('|');
 }
 
-function itemStream(art: ArtDirection, kind: string, tilePx: number, reduced = false): string {
+function itemStream(
+  art: ArtDirection,
+  kind: string,
+  tilePx: number,
+  reduced = false,
+  dpr = 2,
+): string {
   setArtDirection(art.id);
   const painter = art.drawItem;
   if (!painter) {
     const { ctx, ops } = recording();
-    drawGroundStack(ctx, atlas, itemTileName(kind), 3, 2, 1, tilePx, 1.5, 2);
+    drawGroundStack(ctx, atlas, itemTileName(kind), 3, 2, 1, tilePx, 1.5, dpr);
     return ops.join('|');
   }
   const { ctx, ops } = recording();
@@ -357,7 +368,7 @@ function itemStream(art: ArtDirection, kind: string, tilePx: number, reduced = f
     kind,
     count: 1,
     time: 1.5,
-    dpr: 2,
+    dpr,
     reduced,
   };
   painter(paint);
@@ -375,7 +386,13 @@ function itemStream(art: ArtDirection, kind: string, tilePx: number, reduced = f
  * The pose is built at rest deliberately: mid-move the travel offset alone would separate the four
  * streams and the test would pass on the bot's *position* rather than on anything about the bot.
  */
-function botStream(art: ArtDirection, facing: Dir, tilePx: number, reduced = false): string {
+function botStream(
+  art: ArtDirection,
+  facing: Dir,
+  tilePx: number,
+  reduced = false,
+  dpr = 2,
+): string {
   setArtDirection(art.id);
   const pose = createPose(0);
   pose.present = true;
@@ -398,7 +415,7 @@ function botStream(art: ArtDirection, facing: Dir, tilePx: number, reduced = fal
     showLabel: false,
     rush: 0,
     reduced,
-    dpr: 2,
+    dpr,
   };
   const painter = art.drawBot;
   if (painter) painter(ctx, pose, tilePx, options);
@@ -573,5 +590,328 @@ it('every direction either authors all three live layers or none of them', () =>
     const hooks = [art.drawMachine, art.drawCrop, art.drawItem].filter(Boolean).length;
     return `${id}:${String(hooks)}`;
   });
-  expect(answered).toEqual(['standard:0', 'survey:3', 'signal:3', 'deepsite:3']);
+  expect(answered).toEqual(['standard:0', 'signal:3', 'deepsite:3']);
+});
+
+// ---------------------------------------------------------------------------
+// Cost
+// ---------------------------------------------------------------------------
+
+/**
+ * `docs/LIGHT.md` §7, made mechanical: **a smaller board must be cheaper to draw.**
+ *
+ * The defect this guards is a construct whose draw-call count is *decoupled from the device-pixel
+ * area it covers* — a dither whose cell floors at one device pixel while its extent scales with
+ * the tile, or a stepped line whose weight is a small fraction of a large span. Both were found on
+ * live paths and fixed; the class outlived the instances, which is why it is pinned here rather
+ * than described.
+ *
+ * The recording context the distinctness properties already use is counted rather than compared,
+ * so there is one stand-in for the canvas in this file and not two.
+ *
+ * Both halves of §7 run, and they answer different questions:
+ *
+ * - **per element** — does one mark get cheaper as the tile shrinks;
+ * - **per frame, whole board** — does the *frame* get cheaper, given that zooming out also pulls
+ *   more of the board into view. A construct can pass the first and fail the second, and the
+ *   second is the one a player's frame rate depends on.
+ *
+ * Both run at `dpr` 1 and 2, and that is not ceremony. Every detail rung in this renderer is
+ * written as `tilePx >= K * dpr` — a *screen*-pixel threshold, deliberately, so a mark appears at
+ * the same apparent size on every panel; `overlays.ts` states the argument. The consequence is
+ * that on a 1x panel the rungs sit at half the device-pixel budget they do on a 2x one, so a
+ * measurement taken only at `dpr: 2` says nothing about the machines most likely to need the
+ * headroom. `docs/FIX-SPRITES.md` §14 has the measured spread.
+ */
+const DRAW_OPS =
+  /^(?:fillRect|strokeRect|fill|stroke|fillText|strokeText|drawImage|putImageData|drawFrame)\(/;
+
+function drawCalls(stream: string): number {
+  let n = 0;
+  for (const op of stream.split('|')) if (DRAW_OPS.test(op)) n++;
+  return n;
+}
+
+/** The rung the biggest campaign board fits to, and the one every far form is measured against. */
+const NEAR_TILE_PX = 48;
+
+/** The directions a player can pick. `standard` is the atlas control, not a player's cost. */
+const SHIPPING: readonly ArtId[] = ART_IDS.filter((id) => id !== 'standard');
+
+const DPRS: readonly number[] = [1, 2];
+
+/**
+ * Marks that cost more at the floor than at the near rung, and are not the defect.
+ *
+ * One entry, kept as an entry rather than as a loosened bound, so the next reader sees the shape
+ * instead of inheriting a tolerance. `signal` builds every glyph out of a fixed eight rows of at
+ * most two spans, so its cost is bounded by a *part count* and not by a tile fraction — the thing
+ * §7 calls safe by shape. Its far form is one `fillRect` per span, which is the cheapest a span
+ * can be drawn; the near form perforates that span against a cell grid, and where the cell happens
+ * to swallow a short span whole it emits fewer rectangles than the solid one did. Measured across
+ * the ladder at `dpr: 2` the count runs 15, 15, 10, 9, 13 — wobble around a bound of sixteen,
+ * not a trend, and sixteen is sixteen at every zoom.
+ */
+const BOUNDED_BY_PART_COUNT: readonly string[] = ['signal machine antenna/idle @2x'];
+
+describe('cost', () => {
+  /**
+   * No mark may cost more at the floor than it costs at the rung the board is played at.
+   *
+   * Stated per kind as "not more" rather than "strictly less" on purpose. §7's healthy ratio of
+   * far ÷ near ≈ 0.5 was measured over a whole layer and is asserted over a whole layer below.
+   * Per *kind* the honest bar is that nothing gets more expensive as it gets smaller: a mark built
+   * from a fixed number of parts is flat by shape and cannot be tuned into a fall without changing
+   * what it looks like, and cost work is not allowed a readability surface.
+   */
+  it.each(SHIPPING)('%s draws no mark more expensively at the floor', (id) => {
+    const art = DIRECTIONS[id];
+    const risen: string[] = [];
+    for (const dpr of DPRS) {
+      const at = (label: string, far: number, near: number): void => {
+        const entry = `${id} ${label} @${String(dpr)}x`;
+        if (far > near && !BOUNDED_BY_PART_COUNT.includes(entry))
+          risen.push(
+            `${entry}: ${String(far)} at ${String(SMALLEST_TILE_PX)}px, ${String(near)} at ${String(NEAR_TILE_PX)}px`,
+          );
+      };
+      for (const kind of MACHINE_KINDS)
+        for (const state of [restingState(kind), runningState(kind)])
+          at(
+            `machine ${kind}/${state}`,
+            drawCalls(machineStream(art, kind, state, SMALLEST_TILE_PX, false, dpr)),
+            drawCalls(machineStream(art, kind, state, NEAR_TILE_PX, false, dpr)),
+          );
+      const max = 8;
+      for (let growth = 0; growth <= max; growth++)
+        at(
+          `crop ${String(growth)}/${String(max)}`,
+          drawCalls(cropStream(art, growth, max, SMALLEST_TILE_PX, false, dpr)),
+          drawCalls(cropStream(art, growth, max, NEAR_TILE_PX, false, dpr)),
+        );
+      for (const kind of ITEM_KINDS)
+        at(
+          `item ${kind}`,
+          drawCalls(itemStream(art, kind, SMALLEST_TILE_PX, false, dpr)),
+          drawCalls(itemStream(art, kind, NEAR_TILE_PX, false, dpr)),
+        );
+      for (const facing of FACINGS)
+        at(
+          `bot ${FACING_NAMES[facing] as string}`,
+          drawCalls(botStream(art, facing, SMALLEST_TILE_PX, false, dpr)),
+          drawCalls(botStream(art, facing, NEAR_TILE_PX, false, dpr)),
+        );
+    }
+    expect(risen).toEqual([]);
+  });
+
+  /**
+   * A whole layer must not get dearer as it gets smaller.
+   *
+   * This is the assertion §9's `far ÷ near` number belongs to, and the one that catches a mark
+   * made cheap in one kind and paid for in the next. The bot is held to it with the rest: there
+   * is one of it, but it is redrawn on every frame of every replay.
+   */
+  it.each(SHIPPING)('%s draws no layer more expensively at the floor', (id) => {
+    const art = DIRECTIONS[id];
+    const risen: string[] = [];
+    const ladderMax = (PLANT_STAGES.length - 1) * 2;
+    for (const dpr of DPRS) {
+      const layers: Readonly<Record<string, (tilePx: number) => number>> = {
+        machines: (t) =>
+          MACHINE_KINDS.reduce(
+            (sum, kind) =>
+              sum + drawCalls(machineStream(art, kind, runningState(kind), t, false, dpr)),
+            0,
+          ),
+        crops: (t) =>
+          PLANT_STAGES.reduce(
+            (sum, _frame, i) => sum + drawCalls(cropStream(art, i * 2, ladderMax, t, false, dpr)),
+            0,
+          ),
+        items: (t) =>
+          ITEM_KINDS.reduce((sum, kind) => sum + drawCalls(itemStream(art, kind, t, false, dpr)), 0),
+        bot: (t) =>
+          FACINGS.reduce<number>(
+            (sum, facing) => sum + drawCalls(botStream(art, facing, t, false, dpr)),
+            0,
+          ),
+      };
+      for (const [layer, count] of Object.entries(layers)) {
+        const far = count(SMALLEST_TILE_PX);
+        const near = count(NEAR_TILE_PX);
+        if (far > near)
+          risen.push(`${id} ${layer} @${String(dpr)}x: ${String(far)} > ${String(near)}`);
+      }
+    }
+    expect(risen).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cost, per frame, over the whole campaign
+// ---------------------------------------------------------------------------
+
+/**
+ * The second half of §7: **a per-element count can fall while the per-frame total does not.**
+ *
+ * Zooming out shrinks every mark and pulls more of the board into view at the same time, and the
+ * two move against each other. So the number that decides a player's frame rate is not a ratio —
+ * a ratio can always be satisfied by making the near rung worse. It is the largest number of draw
+ * calls any shipped level asks for at any rung it can be played at, and that is what is pinned.
+ *
+ * Every level in the campaign is built and drawn, so a level added later is measured without
+ * anyone remembering to add it, and because the shape being hunted only appears on the big boards.
+ * `w5-02` is where both directions peak, and it peaks at **24** device px rather than at the
+ * floor — not a rung anyone would have thought to sample by hand. The measured peak is 4,661
+ * calls (`signal`, `w5-02`, 24 px, 1x); the ceiling sits about a quarter above it.
+ */
+const PER_FRAME_CALL_CEILING = 6000;
+
+/** A fixed panel, in device pixels. The tile shrinks; the window does not. */
+const VIEWPORT_W = 1280;
+const VIEWPORT_H = 720;
+
+/** One frame of every live layer, for one level, at one tile size. */
+function boardStream(art: ArtDirection, world: World, tilePx: number, dpr: number): string {
+  setArtDirection(art.id);
+  const { ctx, ops } = recording();
+  const cols = Math.min(world.w, Math.ceil(VIEWPORT_W / tilePx));
+  const rows = Math.min(world.h, Math.ceil(VIEWPORT_H / tilePx));
+
+  /* Terrain is one blit whatever the tile size — that is what the cache buys, and counting it as
+   * one is the point of the comparison rather than a simplification of it. */
+  ctx.drawImage({} as CanvasImageSource, 0, 0);
+  if (art.backdrop)
+    art.backdrop({ ctx, width: VIEWPORT_W, height: VIEWPORT_H, dpr, time: 1.5 });
+  drawGrid(ctx, tilePx, { x0: 0, y0: 0, x1: cols - 1, y1: rows - 1 }, 5, dpr);
+
+  for (let y = 0; y < rows; y++)
+    for (let x = 0; x < cols; x++) {
+      const tile = world.tiles[y * world.w + x];
+      const max = tile?.maxGrowth;
+      if (!tile || max === undefined || max <= 0) continue;
+      const growth = tile.growth ?? 0;
+      const stage = plantStageIndex(growth, max);
+      const painter = art.drawCrop;
+      if (painter)
+        painter({
+          ctx,
+          x,
+          y,
+          tilePx,
+          growth,
+          max,
+          stage,
+          stages: PLANT_STAGES.length,
+          ripe: growth >= max,
+          time: 1.5,
+          dpr,
+          reduced: false,
+        });
+      else {
+        atlas.draw(ctx, PLANT_STAGES[stage] as string, x * tilePx, y * tilePx, tilePx);
+        drawPlantGauge(ctx, x, y, tilePx, growth, max, 1.5, dpr);
+      }
+    }
+
+  for (const machine of world.machines) {
+    const { x, y } = machine.at;
+    if (x >= cols || y >= rows) continue;
+    const state = restingState(machine.kind);
+    const painter = art.drawMachine;
+    if (painter)
+      painter({
+        ctx,
+        x,
+        y,
+        tilePx,
+        kind: machine.kind,
+        state,
+        powered: false,
+        facing: 2,
+        time: 1.5,
+        dpr,
+        reduced: false,
+      });
+    else
+      drawMachine(ctx, atlas, machineTileName(machine.kind, state), x, y, tilePx, false, 1.5, dpr);
+  }
+
+  for (const stack of world.items) {
+    const { x, y } = stack.at;
+    if (x >= cols || y >= rows) continue;
+    const painter = art.drawItem;
+    if (painter)
+      painter({
+        ctx,
+        x,
+        y,
+        tilePx,
+        kind: stack.kind,
+        count: stack.count,
+        time: 1.5,
+        dpr,
+        reduced: false,
+      });
+    else drawGroundStack(ctx, atlas, itemTileName(stack.kind), x, y, stack.count, tilePx, 1.5, dpr);
+  }
+
+  for (const bot of world.bots) {
+    const pose = createPose(bot.id);
+    pose.present = true;
+    pose.x = bot.at.x;
+    pose.y = bot.at.y;
+    pose.atX = bot.at.x;
+    pose.atY = bot.at.y;
+    pose.facing = bot.facing;
+    const options: BotDrawOptions = {
+      accent: art.botAccents[0] as string,
+      time: 1.5,
+      active: false,
+      carrying: 0,
+      fuel: 1,
+      showFuel: true,
+      showLabel: false,
+      rush: 0,
+      reduced: false,
+      dpr,
+    };
+    if (art.drawBot) art.drawBot(ctx, pose, tilePx, options);
+    else drawBot(ctx, pose, tilePx, options);
+  }
+
+  if (art.post)
+    art.post({
+      ctx,
+      width: VIEWPORT_W,
+      height: VIEWPORT_H,
+      dpr,
+      time: 1.5,
+      preview: false,
+      reducedMotion: false,
+      originX: 0,
+      originY: 0,
+      tilePx,
+      cols,
+      rows,
+    });
+  return ops.join('|');
+}
+
+describe.each(SHIPPING)('cost per frame: %s', (id) => {
+  const art = DIRECTIONS[id];
+
+  it.each(DPRS)('stays inside the frame budget on every level, at %ix', (dpr) => {
+    const over: string[] = [];
+    for (const level of LEVELS) {
+      const world = level.build(level.seeds[0] as number);
+      for (const tilePx of TILE_SIZES) {
+        const calls = drawCalls(boardStream(art, world, tilePx, dpr));
+        if (calls > PER_FRAME_CALL_CEILING)
+          over.push(`${level.id} at ${String(tilePx)}px: ${String(calls)}`);
+      }
+    }
+    expect(over).toEqual([]);
+  });
 });
