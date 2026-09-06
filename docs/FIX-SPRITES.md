@@ -503,6 +503,14 @@ Its own agent, before motion, mechanical, no readability surface. Scope was rule
 
 The defect it is sweeping for, the rule, and the mechanical test are in **`docs/LIGHT.md` §7**.
 
+**§7 gained a second half after the desk lane found the hole in the first**, and the sweep must run
+both: a per-element count can fall correctly while the **per-frame total stays flat**, because the
+tile count rises exactly as fast as the per-tile count falls. So count draw calls for a *whole
+board* at two tile sizes as well as for a single element. Anything that loops **per tile per frame**
+is the shape to hunt; it has to move into a cache rather than be tuned. `deepsite` has none — all 23
+`dither` sites are inside the baked sheet and the live painters loop per *object*, whose count does
+not rise when the tile shrinks. `signal` and the shared modules are unaudited on both halves.
+
 ### Then: motion and weight
 
 Alone, never sharing an agent with the sweep. Two things it inherits rather than chooses:
