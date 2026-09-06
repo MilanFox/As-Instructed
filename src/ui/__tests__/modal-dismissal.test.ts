@@ -1,25 +1,36 @@
 /**
- * Every modal's boundary closes the modal it wraps.
+ * Every ceremony lands as paper, stays until it is filed, and has a route back.
  *
- * `src/ui/components/__tests__/modal-boundary.test.ts` proves the boundary offers a way out and
- * that pressing it calls the dismissal. This is the other half, and the half `ModalBoundary`'s own
- * docstring says the whole design rests on: *the store has to agree the dialog is shut, or the next
- * run raises the same broken thing again.* A boundary wired to a dismissal that closes nothing
- * hands the player a button that puts the same fault back.
+ * This file used to assert five `ModalBoundary`s in `App` and that each one's dismissal really
+ * closed the modal underneath it. That was the right test for the interface it was written
+ * against, and it is the wrong test now: four of those five modals do not exist. What it was
+ * *protecting* still does, and it is bigger than a boundary — `docs/AUDIT-UI.md` §6.2 and §6.6:
  *
- * So the assertion is not "the callback ran". It is: take the dismissal `App` really hands each
- * boundary, call it, and then render that modal's own component again — it must now draw nothing.
- * Five modals, five dismissals, five stores' worth of agreement.
+ * > `showResults` is set true by a run and by nothing else, so there is no reopen path. The most
+ * > information-dense card in the game — the medal, the cause, the divergence, the objectives, the
+ * > record, the seeds — is one stray click from gone, and the player's only route back to any of
+ * > it is to run the program again.
  *
- * The hooks-and-zustand driver is `src/ui/__tests__/react-driver.ts`, which grew out of
- * `src/meta/__tests__/publish-dialog.test.ts`: real hook semantics in node with no DOM and no new
- * dependency. Effects are never flushed — `App`'s mount effect builds a `RuntimeRunner` and a
- * canvas renderer, and this file is about what `App` *renders*, not what it mounts.
+ * So the assertion is not "the dismissal closed it". It is the guarantee that makes the desk worth
+ * building, in four parts, and each part is a way the old interface lost a player's work:
+ *
+ *  1. **A run puts paper on the desk** — a certificate on a pass, a HALT notice on a fail — and
+ *     the store stops holding the report open, so nothing can raise it a second time.
+ *  2. **The paper stays.** Nothing dismisses it. There is no backdrop, so there is no backdrop
+ *     click, and the sheet is still there after the next level is opened.
+ *  3. **The paper is a snapshot.** Running again issues a *second* sheet; the first still says
+ *     what it said. A certificate that changes when you run again is not paper.
+ *  4. **Filing does not delete it.** A stamped certificate leaves the desk for the Repository and
+ *     is still in the record — that is the route back the audit asked for.
+ *
+ * The hooks-and-zustand driver is `src/ui/__tests__/react-driver.ts`, and it never flushes
+ * effects — which is why the issuing lives in `deliverPaperwork`, a plain function the hook calls,
+ * rather than inside the hook. Every issue is idempotent by id, so calling it twice is free and
+ * the test can call it exactly where `App`'s effect would have.
  */
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type * as ReactModule from 'react';
 import { reactDriver as driver } from './react-driver.ts';
-import type { Medal as MedalRung } from '../../game/score.ts';
 
 vi.mock('react', async (importOriginal) => {
   const actual = await importOriginal<typeof ReactModule>();
@@ -46,162 +57,265 @@ vi.mock('zustand', async () => {
 });
 
 const { App } = await import('../App.tsx');
-const { ModalBoundary } = await import('../components/ModalBoundary.tsx');
-const { Results } = await import('../screens/Results.tsx');
-const { RepositoryIssue } = await import('../screens/RepositoryIssue.tsx');
-const { Requisition } = await import('../screens/Requisition.tsx');
-const { ReviewMemo } = await import('../screens/ReviewMemo.tsx');
-const { PublishDialog } = await import('../../meta/ui/PublishDialog.tsx');
+const { deliverPaperwork } = await import('../desk/paper/usePaperwork.ts');
+const { usePapers, looseDocs, trayDocs, filedDocs } = await import('../desk/paper/papers.ts');
 const { useGame } = await import('../../game/store.ts');
 const { useLibrary } = await import('../../meta/store.ts');
 const { emptySave } = await import('../../game/save.ts');
 const { emptyLibrary } = await import('../../meta/save.ts');
-const { Medal } = await import('../../game/score.ts');
+const { getLevel } = await import('../../levels/index.ts');
 
-type Modal = () => unknown;
+type Doc = ReturnType<typeof looseDocs>[number];
 
-/** The dismissal `App` hands each boundary, found by the label the boundary is given. */
-function dismissals(): Map<string, () => void> {
+/** One pass of the desk's paperwork — what `App`'s effect does whenever the store moves. */
+function deliver(): void {
   driver.reset();
-  const tree = App();
-  const found = new Map<string, () => void>();
-  const walk = (node: unknown): void => {
-    if (Array.isArray(node)) {
-      node.forEach(walk);
-      return;
-    }
-    if (!node || typeof node !== 'object') return;
-    const element = node as { type?: unknown; props?: Record<string, unknown> };
-    const props = element.props;
-    if (!props) return;
-    if (element.type === ModalBoundary) {
-      found.set(String(props['label']), props['onDismiss'] as () => void);
-    }
-    walk(props['children']);
-  };
-  walk(tree);
-  return found;
+  deliverPaperwork();
 }
 
-/** Whether the modal draws anything at all, which is the only question a closed modal answers. */
-function drawn(modal: Modal): boolean {
-  driver.reset();
-  return modal() !== null;
+/** A finished run sitting in the store the way the worker leaves it. */
+function runFinished(levelId: string, passed: boolean, ticks: number): void {
+  const level = getLevel(levelId);
+  if (!level) throw new Error(`no level ${levelId}`);
+  useGame.setState({
+    screen: 'workspace',
+    currentLevelId: levelId,
+    trace: null,
+    tick: ticks,
+    showResults: true,
+    resultId: useGame.getState().resultId + 1,
+    seedResults: [],
+    failure: null,
+    freshCommendations: [],
+    personalBest: null,
+    verdict: {
+      passed,
+      ticks,
+      stats: { ticks, ops: ticks, chars: 0, senses: {}, spend: {} },
+      objectives: level.objectives.map((objective) => ({
+        id: objective.id,
+        label: objective.label,
+        met: passed,
+      })),
+    } as never,
+  });
 }
 
-function closeLevel(id: string, medal: MedalRung): void {
-  const save = emptySave();
-  save.levels[id] = { completed: true, medal, stars: [], attempts: 1 };
-  useGame.setState({ save });
+/**
+ * Everything the company has delivered and not filed — the sheet lying out *and* the ones waiting
+ * in the in-tray. Both are on the desk as far as this file's guarantee is concerned: neither is
+ * destroyed, and both have a route back. Only one may be lying out at a time; that is asserted
+ * separately below rather than folded in here.
+ */
+function loose(): Doc[] {
+  const state = usePapers.getState();
+  return [...looseDocs(state), ...trayDocs(state)];
+}
+
+function ofKind(kind: string): Doc[] {
+  return loose().filter((doc) => doc.kind === kind);
 }
 
 beforeEach(() => {
+  usePapers.setState({ docs: [], lifted: null, pinned: null, pinnedPage: null, top: 20 });
   useGame.setState({
     save: emptySave(),
-    screen: 'levels',
-    showResults: false,
-    requisition: null,
+    screen: 'workspace',
     currentLevelId: null,
+    showResults: false,
+    resultId: 0,
+    requisition: null,
+    verdict: null,
+    trace: null,
+    seedResults: [],
+    runState: 'idle',
   });
   useLibrary.getState().hydrate(null);
   useLibrary.setState({ save: emptyLibrary(), offer: null, notice: null });
   driver.reset();
 });
 
-describe('every modal in the layer is boundaried, and each boundary knows its own close', () => {
-  test('the five modals the layer stacks each carry a labelled boundary', () => {
-    expect([...dismissals().keys()]).toEqual([
-      'The run report',
-      'The publish offer',
-      'The Repository note',
-      'The delivery note',
-      'The performance memo',
-    ]);
-  });
+describe('the app layer holds no ceremony that can destroy itself', () => {
+  test('the only modal left is the publish offer, and it is not ours', () => {
+    driver.reset();
+    const labels: string[] = [];
+    const walk = (node: unknown): void => {
+      if (Array.isArray(node)) {
+        node.forEach(walk);
+        return;
+      }
+      if (!node || typeof node !== 'object') return;
+      const element = node as { props?: Record<string, unknown> };
+      if (!element.props) return;
+      const label = element.props['label'];
+      if (typeof label === 'string') labels.push(label);
+      walk(element.props['children']);
+    };
+    walk(App());
 
-  test('no boundary is handed a close it does not have', () => {
-    const found = dismissals();
-    expect(found.size).toBe(5);
-    for (const [label, dismiss] of found) {
-      expect(typeof dismiss, label).toBe('function');
-    }
+    expect(labels).toEqual(['The publish offer']);
   });
 });
 
-describe('the dismissal closes the modal underneath, in the store', () => {
-  function dismiss(label: string): void {
-    const close = dismissals().get(label);
-    if (!close) throw new Error(`no boundary labelled ${label}`);
-    close();
-  }
+describe('a run leaves paper on the desk', () => {
+  test('a pass issues a certificate of closure and closes the store report', () => {
+    runFinished('w1-05', true, 78);
+    deliver();
 
-  test('the run report', () => {
-    useGame.setState({ screen: 'workspace', currentLevelId: 'w1-01', showResults: true });
-    expect(drawn(Results)).toBe(true);
-
-    dismiss('The run report');
-
-    expect(drawn(Results)).toBe(false);
+    expect(ofKind('certificate')).toHaveLength(1);
+    expect(useGame.getState().showResults).toBe(false);
   });
 
-  test('the publish offer', () => {
-    useLibrary.setState({ save: { ...emptyLibrary(), unlocked: true, briefed: true } });
-    useLibrary.getState().offerPublish('w1-01', 'function leg() {\n  move();\n}\n\nleg();\n', []);
-    expect(drawn(PublishDialog)).toBe(true);
+  test('a failure issues a HALT notice', () => {
+    runFinished('w1-05', false, 900);
+    deliver();
 
-    dismiss('The publish offer');
-
-    expect(drawn(PublishDialog)).toBe(false);
+    expect(ofKind('halt')).toHaveLength(1);
+    expect(ofKind('certificate')).toHaveLength(0);
   });
 
-  test('the Repository note', () => {
-    useGame.setState({ screen: 'workspace', currentLevelId: 'w3-01' });
-    useLibrary.setState({ save: { ...emptyLibrary(), unlocked: true, briefed: false } });
-    expect(drawn(RepositoryIssue)).toBe(true);
+  test('the work order is on the desk the moment the level is open', () => {
+    useGame.setState({ screen: 'workspace', currentLevelId: 'w1-05' });
+    deliver();
 
-    dismiss('The Repository note');
-
-    expect(drawn(RepositoryIssue)).toBe(false);
+    expect(ofKind('order')).toHaveLength(1);
   });
 
-  test('the delivery note', () => {
-    useGame.setState({
-      screen: 'workspace',
-      currentLevelId: 'w1-01',
-      requisition: { levelId: 'w1-01', hardware: ['move'] },
-    });
-    expect(drawn(Requisition)).toBe(true);
+  test('the standing sheet is always there, and it is the sheet with no way off the desk', () => {
+    deliver();
 
-    dismiss('The delivery note');
+    const standing = ofKind('standing');
+    expect(standing).toHaveLength(1);
+    expect(standing[0]?.filed).toBe(false);
+  });
+});
 
-    expect(drawn(Requisition)).toBe(false);
+describe('the paper stays', () => {
+  test('nothing in the store closes it, and re-delivering does not duplicate it', () => {
+    runFinished('w1-05', true, 78);
+    deliver();
+    const issued = ofKind('certificate')[0]?.id;
+
+    deliver();
+    deliver();
+
+    expect(ofKind('certificate').map((doc) => doc.id)).toEqual([issued]);
   });
 
-  test('the performance memo', () => {
-    closeLevel('w1-05', Medal.Gold);
-    expect(drawn(ReviewMemo)).toBe(true);
+  test('it survives opening another work order', () => {
+    runFinished('w1-05', true, 78);
+    deliver();
+    const issued = ofKind('certificate')[0]?.id;
 
-    dismiss('The performance memo');
+    useGame.setState({ currentLevelId: 'w1-04', showResults: false });
+    usePapers.getState().clearLevelPaper();
+    deliver();
 
-    expect(drawn(ReviewMemo)).toBe(false);
+    expect(ofKind('certificate').map((doc) => doc.id)).toEqual([issued]);
+  });
+});
+
+describe('the certificate is a snapshot, so the second run cannot rewrite the first', () => {
+  test('two runs leave two sheets, and the first still says what it said', () => {
+    runFinished('w1-05', true, 78);
+    deliver();
+    const first = ofKind('certificate')[0];
+    const firstTicks = first?.payload.kind === 'certificate' ? first.payload.report.ticks : null;
+
+    runFinished('w1-05', true, 140);
+    deliver();
+
+    const certificates = ofKind('certificate');
+    expect(certificates).toHaveLength(2);
+    const kept = certificates.find((doc) => doc.id === first?.id);
+    expect(kept?.payload.kind === 'certificate' ? kept.payload.report.ticks : null).toBe(firstTicks);
+    expect(firstTicks).toBe(78);
+  });
+
+  test('a pass then a failure leaves both, not one overwriting the other', () => {
+    runFinished('w1-05', true, 78);
+    deliver();
+    runFinished('w1-05', false, 900);
+    deliver();
+
+    expect(ofKind('certificate')).toHaveLength(1);
+    expect(ofKind('halt')).toHaveLength(1);
+  });
+});
+
+describe('filing is the only way off the desk, and it is not deletion', () => {
+  test('a stamped certificate leaves the desk and is in the record with its mark', () => {
+    runFinished('w1-05', true, 78);
+    deliver();
+    const id = ofKind('certificate')[0]?.id as string;
+
+    usePapers.getState().file(id, 'gold');
+
+    expect(loose().some((doc) => doc.id === id)).toBe(false);
+    const filed = filedDocs(usePapers.getState()).find((doc) => doc.id === id);
+    expect(filed).toBeDefined();
+    expect(filed?.mark).toBe('gold');
+  });
+
+  test('an ungraded work order is stamped CLOSED and files the same way (DESIGN.md §11 A7)', () => {
+    runFinished('w1-01', true, 78);
+    deliver();
+    const certificate = ofKind('certificate')[0];
+    expect(certificate?.payload.kind === 'certificate' ? certificate.payload.report.medal : 'x').toBe(
+      null,
+    );
+
+    usePapers.getState().file(certificate?.id as string, 'closed');
+
+    expect(filedDocs(usePapers.getState())[0]?.mark).toBe('closed');
+  });
+
+  test('filing a sheet takes it off the copy stand rather than leaving a ghost pinned', () => {
+    useGame.setState({ screen: 'workspace', currentLevelId: 'w1-05' });
+    deliver();
+    const order = ofKind('order')[0]?.id as string;
+    usePapers.getState().pin(order);
+    expect(usePapers.getState().pinned).toBe(order);
+
+    usePapers.getState().file(order, 'read');
+
+    expect(usePapers.getState().pinned).toBeNull();
   });
 });
 
 /**
- * The memo is the one whose close is not a single store call: it is filed by rank, so a boundary
- * that guessed a rank would file the wrong memo and withhold one the player has never read
- * (DESIGN.md §11 A12). This checks it files the rank the player is actually owed.
+ * The rule that came out of a player opening `w1-03` and being handed five documents at once,
+ * stacked over the terminal: *"I literally can't see anything anymore. It used to be one small
+ * sheet. Now there is like an explosion of paper."*
+ *
+ * Ceremonies queue, they do not pile. The program is the largest thing on this desk while it is
+ * being written, and the only sheet that lies across it is the one describing the work.
  */
-describe('the memo is filed under the rank it was owed', () => {
-  test('the rank the player reached is the rank recorded', async () => {
-    const { reviewOwed } = await import('../screens/review.ts');
-    closeLevel('w1-05', Medal.Gold);
-    const owed = reviewOwed(useGame.getState().save);
-    expect(owed).not.toBeNull();
+describe('the desk holds one sheet at a time', () => {
+  test('everything the company sends arrives in the tray, not on the desk', () => {
+    runFinished('w1-03', false, 900);
+    deliver();
 
-    dismissals().get('The performance memo')?.();
+    const out = looseDocs(usePapers.getState());
+    expect(out.length, `on the desk: ${out.map((doc) => doc.kind).join(', ')}`).toBeLessThanOrEqual(
+      1,
+    );
+    expect(out.every((doc) => doc.kind === 'order')).toBe(true);
+    expect(trayDocs(usePapers.getState()).length).toBeGreaterThan(0);
+  });
 
-    expect(useGame.getState().save.reviewedRanks).toEqual([owed?.rank]);
-    expect(reviewOwed(useGame.getState().save)).toBeNull();
+  test('taking one out puts the other one away, and nothing is destroyed', () => {
+    runFinished('w1-03', false, 900);
+    deliver();
+
+    const before = loose().length;
+    const waiting = trayDocs(usePapers.getState());
+    expect(waiting.length).toBeGreaterThan(0);
+
+    usePapers.getState().takeOut((waiting[0] as Doc).id);
+
+    const out = looseDocs(usePapers.getState());
+    expect(out.map((doc) => doc.id)).toEqual([(waiting[0] as Doc).id]);
+    expect(loose().length, 'nothing was lost putting one away').toBe(before);
   });
 });

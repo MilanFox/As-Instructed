@@ -19,7 +19,8 @@ import {
 } from '../../game/score.ts';
 import { isLevelUnlocked, useGame } from '../../game/store.ts';
 import { campaignOrder, levelsByWorld } from '../../levels/index.ts';
-import { CommendationShelf } from '../components/CommendationShelf.tsx';
+import { CommendationShelf, SHELF_ID } from '../components/CommendationShelf.tsx';
+import { MedalBadge } from '../components/MedalBadge.tsx';
 import type { LevelDef, WorldMeta } from '../../levels/index.ts';
 import '../styles/screens.css';
 
@@ -317,9 +318,18 @@ export function LevelSelect(): JSX.Element {
             <dt>STARS</dt>
             <dd>{tally.stars}</dd>
           </div>
+          {/*
+            The count is the door to the shelf. It used to be a `<dd>` printing a number against a
+            record 2,900px further down the scroll with no link, no tab and no anchor to it
+            (AUDIT-UI F14) — a control proportionate to what is behind it costs one anchor.
+          */}
           <div className="screen-stat">
             <dt>COMMENDATIONS</dt>
-            <dd>{commendations}</dd>
+            <dd>
+              <a className="screen-stat__link" href={`#${SHELF_ID}`}>
+                {commendations}
+              </a>
+            </dd>
           </div>
         </dl>
 
@@ -459,6 +469,20 @@ export function LevelSelect(): JSX.Element {
                         <span
                           className={`node__status status--${node.status.replace(' ', '-').toLowerCase()}`}
                         >
+                          {/*
+                            The grade in a glyph, beside the word. Colour was the sole channel
+                            across 33 discs at 44px (AUDIT-UI F1), and a legend does not help you
+                            tell two warm rings apart. `MedalBadge` prints `I / II / III / ✓`,
+                            which survives greyscale and survives Signal. `✓` is the ungraded
+                            close — the mark of finished work, not a fourth medal (DESIGN.md §11
+                            A7). The button above already announces the grade, so this is for the
+                            eye only.
+                          */}
+                          {node.progress.completed ? (
+                            <span className="node__medal" aria-hidden="true">
+                              <MedalBadge medal={medalOf(node.level, node.progress)} />
+                            </span>
+                          ) : null}
                           {node.status}
                         </span>
                       </li>

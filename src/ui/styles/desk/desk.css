@@ -1,0 +1,151 @@
+/* desk.css — ported from docs/prototypes/desk/desk.css:
+   the :root custom-property block, the * / html,body resets, THE ROOM,
+   STAGE and MOTION. This is the shared file everyone reads. */
+
+.desk {
+  --u: 1px;    /* set by desk.js: the whole layout scales on it */
+  --ts: 1;     /* SIZE: the character-size knob on the terminal bezel.
+                  It scales type and line boxes, not the station geometry —
+                  the station is already fitted to the viewport, and scaling
+                  it up would only crop the desk. See DESK-CONCEPT.md §6. */
+
+  --room:      #05070a;
+  --desk:      #23261f;
+  --desk-lit:  #3a3e32;
+  --desk-dark: #14160f;
+
+  --case:      #9d9a90;
+  --case-lit:  #c6c3b7;
+  --case-dark: #6e6b62;
+  --case-deep: #45433d;
+  --legend:    #3f3e39;
+  --legend-lit:#efece1;
+
+  --scr:       #070a0c;
+  --scr-panel: #0d1216;
+  --ink:       #d2dde8;
+  --ink-dim:   #97a5b3;
+  --accent:    #35e0c8;
+  --amber:     #ffb020;
+  --danger:    #ff6a5d;
+  --ok:        #7ee06a;
+
+  --paper:     #e9e3d3;
+  --paper-lo:  #d8d1be;
+  --paper-2:   #ded7c4;
+  --pink:      #ecd9d2;   /* the pink copy: notices and halts */
+  --p-ink:     #1b1d1e;
+  --p-dim:     #63615a;
+  --p-rule:    #b8b1a0;
+
+  --ink-red:   #933024;
+  --ink-blue:  #26365e;
+  --i-gold:    #9a7420;
+  --i-silver:  #6d7783;
+  --i-bronze:  #86562f;
+
+  --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --prose: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* docs/LIGHT.md — one lamp, due north-west, and the desk obeys it too */
+  --key:    219 232 240;   /* #dbe8f0 */
+  --ink-sh:   4   9  15;   /* #04090f */
+  --arris-n: inset 0 calc(2 * var(--u)) 0 rgb(var(--key) / .46);
+  --arris-w: inset calc(2 * var(--u)) 0 0 rgb(var(--key) / .30);
+  --arris-e: inset calc(-2 * var(--u)) 0 0 rgb(0 0 0 / .32);
+  --arris-s: inset 0 calc(-3 * var(--u)) 0 rgb(0 0 0 / .38);
+
+  --settle: cubic-bezier(.16,.86,.28,1.02);
+  --drop:   cubic-bezier(.28,.9,.34,1);
+
+  position: fixed;
+  inset: 0;
+  background: var(--room);
+  font-family: var(--prose);
+  color: var(--ink);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.desk, .desk * { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ============================== THE ROOM ========================== */
+
+.desk .room { position: fixed; inset: 0; z-index: 0; }
+
+.desk .wall {
+  position: absolute; inset: 0 0 56% 0;
+  background:
+    linear-gradient(#151a20 0%, #0e1319 46%, #080b0f 100%);
+}
+/* a shelf rail on the back wall. institutional, empty, correct. */
+.desk .wall-rail {
+  position: absolute; left: 0; right: 0; top: 27%;
+  height: calc(10 * var(--u));
+  background: linear-gradient(#3c3b36, #24231f 40%, #131210);
+  box-shadow: calc(3 * var(--u)) calc(3 * var(--u)) calc(2 * var(--u)) rgb(var(--ink-sh) / .32);
+  opacity: .8;
+}
+
+.desk .desk-surface { position: absolute; inset: 42% 0 0 0; }
+.desk .desk-top {
+  position: absolute; inset: 0;
+  background:
+    /* the lamp's own falloff, baked into the surface */
+    linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.14) 58%, rgba(0,0,0,.44) 100%),
+    radial-gradient(120% 132% at 50% -6%, #45443e 0%, #3a3934 26%, #2e2d29 54%, #232220 80%, #171614 100%);
+}
+.desk .desk-top::after {
+  /* linoleum tooth. one texture, deterministic, never noisy. */
+  content: ''; position: absolute; inset: 0; opacity: .5;
+  background-image:
+    repeating-linear-gradient(0deg, rgba(255,255,255,.018) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(0,0,0,.05) 0 1px, transparent 1px 4px);
+}
+.desk .desk-edge {
+  position: absolute; left: 0; right: 0; top: 0; height: calc(5 * var(--u));
+  background: linear-gradient(#63615a, #38362f 55%, #1c1b17);
+}
+
+.desk .lamp {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(58% 52% at 50% 62%,
+      rgba(255,218,166,.22) 0%, rgba(255,208,152,.10) 44%, transparent 76%);
+  transition: opacity .5s ease;
+}
+.desk .spill {
+  /* light thrown back onto the desk by the site feed while it is live */
+  position: absolute; left: 50%; top: 30%; width: 78%; height: 62%;
+  transform: translateX(-50%);
+  pointer-events: none; opacity: 0;
+  background: radial-gradient(50% 50% at 62% 20%,
+      rgba(120,210,200,.10) 0%, rgba(90,180,180,.04) 45%, transparent 72%);
+  transition: opacity .55s ease;
+}
+.desk[data-mode='watch'] .spill { opacity: 1; }
+.desk[data-mode='watch'] .lamp { opacity: .78; }
+
+.desk .vignette {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(84% 80% at 50% 46%, transparent 48%, rgba(0,0,0,.28) 82%, rgba(0,0,0,.58) 100%);
+}
+.desk.flat .lamp { opacity: 1; }
+.desk.flat .vignette { opacity: .25; }
+
+/* ============================== STAGE ============================= */
+/* Everything is positioned inside a 1560 x 1000 unit stage centred in
+   the viewport. Extra viewport width becomes more desk, which is where
+   the paperwork lives. */
+
+.desk .station, .desk .slot, .desk .tray, .desk .dispatch, .desk .binder, .desk .stampblock, .desk .pen, .desk .mug, .desk .keyboard, .desk .copystand,
+.desk .paper-layer, .desk .binder-open { position: fixed; z-index: 5; }
+
+/* ============================== MOTION ============================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .desk *, .desk *::before, .desk *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}

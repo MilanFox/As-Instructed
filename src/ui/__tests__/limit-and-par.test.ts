@@ -44,8 +44,9 @@ vi.mock('zustand', async () => {
   };
 });
 
-const { ObjectiveRail } = await import('../panels/ObjectiveRail.tsx');
-const { Results } = await import('../screens/Results.tsx');
+const { Rail: ObjectiveRail } = await import('../desk/terminal/Rail.tsx');
+const { ReportSheet } = await import('../desk/paper/ReportSheet.tsx');
+const { snapshotReport } = await import('../desk/paper/report.ts');
 const { useGame } = await import('../../game/store.ts');
 const { emptySave } = await import('../../game/save.ts');
 const { getLevel, campaignOrder } = await import('../../levels/index.ts');
@@ -53,6 +54,16 @@ const { isGraded } = await import('../../game/score.ts');
 
 type LevelDef = NonNullable<ReturnType<typeof getLevel>>;
 type Objective = LevelDef['objectives'][number];
+
+/**
+ * The run report as the desk draws it: a snapshot, on a certificate of closure or a HALT notice.
+ * `Results` was a modal that destroyed itself (`docs/AUDIT-UI.md` §6.6); the sheet is the same
+ * report on paper, and it is read off `snapshotReport` exactly as `usePaperwork` reads it.
+ */
+function Results(): unknown {
+  const report = snapshotReport(useGame.getState() as never);
+  return report ? ReportSheet({ report } as never) : null;
+}
 
 type Props = Record<string, unknown>;
 

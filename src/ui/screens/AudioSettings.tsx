@@ -53,24 +53,21 @@ export function AudioSettings({ onClose }: { onClose: () => void }): React.JSX.E
 
         <div className="modal__body">
           <div className="settings">
+            {/*
+              One control for one outcome (docs/AUDIT-UI.md F19). `enabled` and `muted` are two
+              fields for two implementations of silence — one tears the graph down, one holds it —
+              and `masterGain` returns 0 for either, so nothing a player can hear ever told them
+              apart, while the two could be left disagreeing. The switch owns both: on means built
+              and unmuted, off means no audio graph is held at all.
+            */}
             <label className="settings__toggle">
               <input
                 type="checkbox"
-                checked={settings.enabled}
-                onChange={(event) => apply({ enabled: event.target.checked })}
+                checked={settings.enabled && !settings.muted}
+                onChange={(event) => apply({ enabled: event.target.checked, muted: false })}
               />
-              <span>sound enabled</span>
+              <span>sound</span>
               <span className="settings__note">off builds no audio graph at all</span>
-            </label>
-
-            <label className="settings__toggle">
-              <input
-                type="checkbox"
-                checked={settings.muted}
-                onChange={(event) => apply({ muted: event.target.checked })}
-              />
-              <span>mute</span>
-              <span className="settings__note">silence, without tearing anything down</span>
             </label>
 
             {BUSES.map((bus) => (

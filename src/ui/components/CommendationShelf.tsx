@@ -1,6 +1,38 @@
 import type { JSX } from 'react';
 import { ACHIEVEMENTS } from '../../game/achievements.ts';
 
+/** The anchor the header's count points at (docs/AUDIT-UI.md F14). */
+export const SHELF_ID = 'commendations';
+
+const MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sept',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+/**
+ * When it was noticed.
+ *
+ * `save.achievements[id]` has held the epoch ms each commendation was earned since the day it was
+ * written, and nothing has ever printed it, so one earned in the first hour and one earned last
+ * week read identically. The date is the whole difference between a list of five things and a
+ * record of what you did.
+ */
+export function earnedOn(at: number): string {
+  const when = new Date(at);
+  if (Number.isNaN(when.getTime())) return 'earned';
+  return `earned ${when.getDate()} ${MONTHS[when.getMonth()] ?? ''}`.trimEnd();
+}
+
 /**
  * Every commendation, earned and unearned, in one place.
  *
@@ -19,7 +51,7 @@ export function CommendationShelf({
   achievements: Record<string, number>;
 }): JSX.Element {
   return (
-    <section className="shelf" aria-label="Commendations">
+    <section className="shelf" id={SHELF_ID} aria-label="Commendations" tabIndex={-1}>
       <header className="shelf__head">
         <h2 className="shelf__title">COMMENDATIONS</h2>
         <p className="shelf__aside">
@@ -42,6 +74,7 @@ export function CommendationShelf({
               <div className="commend__text">
                 <p className="commend__title">{achievement.title}</p>
                 <p className="commend__note">{has ? achievement.note : achievement.requirement}</p>
+                {has ? <p className="commend__when numeric">{earnedOn(at)}</p> : null}
               </div>
               <span className="sr-only">{has ? 'earned' : 'not yet earned'}</span>
             </li>

@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
 import { useGame } from '../../game/store.ts';
 import { useLibrary } from '../../meta/index.ts';
+import { usePapers } from '../desk/paper/papers.ts';
+import { KEY_LIST, type KeyId } from '../desk/terminal/keys.ts';
 import { closeOverlay, overlayState, toggleOverlay } from './useOverlay.ts';
-import { toggleRail } from './useRail.ts';
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -15,73 +16,80 @@ function isTypingTarget(target: EventTarget | null): boolean {
 /**
  * Global shortcuts. DESIGN.md §10.5 — the game is playable without a mouse.
  *
- * Anything that would steal a character from a text field is gated behind `isTypingTarget`;
- * Ctrl/Cmd+Enter deliberately is not, because Run must work from anywhere including the editor.
+ * The bindings themselves are `src/ui/desk/terminal/keys.ts`, which is also what the REFERENCE
+ * manual prints: a key the manual announces and a key the listener binds cannot be two different
+ * facts (docs/AUDIT-UI.md F17). This file owns only what each one *does*, and the
+ * `Record<KeyId, …>` below is what makes the two lists the same length — an unbound listed key and
+ * an unlisted bound key are both compile errors.
+ *
+ * Anything that would steal a character from a text field is gated behind `isTypingTarget`; the
+ * two bindings marked `always` deliberately are not, because Run and the way out must work from
+ * anywhere including the editor.
  */
 export function useKeyboard(): void {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
       const state = useGame.getState();
-      const typing = isTypingTarget(event.target);
 
-      if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-        event.preventDefault();
-        state.run();
-        return;
-      }
+      const actions: Record<KeyId, () => void> = {
+        run: () => {
+          state.run();
+        },
 
-      if (event.key === 'Escape') {
-        // Innermost thing first. The publish offer is a modal, and Escape on a modal closes the
-        // modal — it does not walk out of the work order underneath it. A sheet over the board is
-        // the same rule one level further in: it is dismissed before the work order is.
-        if (useLibrary.getState().offer) useLibrary.getState().skipPublish(false);
-        else if (state.showResults) state.dismissResults();
-        else if (state.screen === 'workspace' && overlayState().open !== null) closeOverlay();
-        else if (state.screen !== 'levels') state.goto('levels');
-        event.preventDefault();
-        return;
-      }
+        /*
+         * The way out, innermost thing first — and it destroys nothing on the way.
+         *
+         * A sheet held up to the lamp goes back on the desk. The publish offer is a real modal and
+         * closes as one. Then the open book. Then the work order itself.
+         *
+         * It deliberately does not dismiss the run report. On the desk the report is paper and it
+         * lies there until it is filed (docs/AUDIT-UI.md §6.2, §6.6): a key that made a player's
+         * grade unreachable would be the same data loss the desk exists to remove, with a keyboard
+         * instead of a stray click.
+         */
+        escape: () => {
+          const papers = usePapers.getState();
+          if (papers.lifted) papers.putDown();
+          else if (useLibrary.getState().offer) useLibrary.getState().skipPublish(false);
+          else if (overlayState().open === 'docs') closeOverlay();
+          else if (state.screen !== 'levels') state.goto('levels');
+        },
 
-      if (typing || event.metaKey || event.ctrlKey || event.altKey) return;
-      if (state.screen !== 'workspace') return;
-
-      switch (event.key) {
-        case ' ':
+        play: () => {
           state.togglePlay();
-          break;
-        case 'ArrowLeft':
-        case ',':
+        },
+        back: () => {
           state.step(event.shiftKey ? -10 : -1);
-          break;
-        case 'ArrowRight':
-        case '.':
+        },
+        forward: () => {
           state.step(event.shiftKey ? 10 : 1);
-          break;
-        case 'Home':
+        },
+        first: () => {
           state.pause();
           state.seek(0);
-          break;
-        case 'End':
+        },
+        last: () => {
           state.pause();
           state.seek(state.endTick);
-          break;
-        case 'b':
-          toggleOverlay('brief');
-          break;
-        case 'c':
-          toggleOverlay('console');
-          break;
-        case 'o':
-          toggleRail();
-          break;
-        case '?':
-        case 'F1':
+        },
+        reference: () => {
           toggleOverlay('docs');
-          break;
-        default:
-          return;
+        },
+      };
+
+      const typing = isTypingTarget(event.target);
+      const modified = event.metaKey || event.ctrlKey || event.altKey;
+
+      for (const binding of KEY_LIST) {
+        if (!binding.matches(event)) continue;
+        if (!binding.always) {
+          if (typing || modified) return;
+          if (state.screen !== 'workspace') return;
+        }
+        event.preventDefault();
+        actions[binding.id]();
+        return;
       }
-      event.preventDefault();
     };
 
     window.addEventListener('keydown', onKeyDown);

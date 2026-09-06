@@ -1,0 +1,945 @@
+/* paper.css — ported from docs/prototypes/desk/desk.css:
+   PAPER, COPY STAND, PICKING IT UP. */
+
+/* ============================== PAPER ============================= */
+
+.desk .paper-layer { inset: 0; pointer-events: none; z-index: 20; }
+.desk .paper-layer > * { pointer-events: auto; }
+
+.desk .doc {
+  --rest: .9;
+  position: absolute;
+  background: var(--paper);
+  color: var(--p-ink);
+  font-family: var(--prose);
+  box-shadow:
+    calc(1 * var(--u)) calc(1 * var(--u)) calc(2 * var(--u)) rgb(var(--ink-sh) / .32),
+    calc(12 * var(--u)) calc(12 * var(--u)) calc(4 * var(--u)) rgb(var(--ink-sh) / .32);
+  padding: calc(22 * var(--u)) calc(26 * var(--u));
+  transform-origin: 50% 0;
+  cursor: grab;
+  will-change: transform;
+}
+.desk .doc::before {
+  /* paper stock: laid grain, plus the lamp falling across it from the NW */
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background:
+    linear-gradient(135deg, rgba(255,250,235,.5) 0%, rgba(255,250,235,0) 34%),
+    linear-gradient(315deg, rgb(var(--ink-sh) / .17) 0%, rgb(var(--ink-sh) / 0) 42%),
+    repeating-linear-gradient(90deg, rgba(0,0,0,.014) 0 1px, transparent 1px 3px);
+}
+.desk .doc.pink { background: var(--pink); }
+.desk .doc.card { background: var(--paper-2); }
+.desk .doc:active { cursor: grabbing; }
+
+.desk .doc-arrive { animation: desk-arrive .62s var(--drop) both; }
+@keyframes desk-arrive {
+  0%   { transform: translate(calc(120 * var(--u)), calc(-190 * var(--u))) rotate(9deg) scale(.94); opacity: 0; }
+  38%  { opacity: 1; }
+  72%  { transform: translate(0,0) rotate(var(--rot, -1.6deg)) scale(1.012); }
+  88%  { transform: translate(0, calc(2 * var(--u))) rotate(var(--rot, -1.6deg)) scale(.998); }
+  100% { transform: translate(0,0) rotate(var(--rot, -1.6deg)) scale(1); }
+}
+
+.desk .doc h1 {
+  font-family: var(--mono); font-size: calc(9.5 * var(--u) * var(--ts));
+  letter-spacing: .34em; font-weight: 500; color: var(--p-dim);
+  padding-bottom: calc(7 * var(--u)); border-bottom: calc(2 * var(--u)) solid var(--p-ink);
+  display: flex; justify-content: space-between; align-items: baseline;
+}
+.desk .doc h1 b { color: var(--p-ink); letter-spacing: .2em; }
+.desk .doc h2 {
+  font-family: var(--mono); font-size: calc(20 * var(--u) * var(--ts)); font-weight: 500;
+  letter-spacing: .02em; margin: calc(12 * var(--u)) 0 calc(3 * var(--u));
+}
+.desk .doc .kicker {
+  font-family: var(--mono); font-size: calc(9 * var(--u) * var(--ts)); letter-spacing: .26em;
+  color: var(--p-dim); margin-bottom: calc(12 * var(--u));
+}
+.desk .doc dl.meta {
+  display: grid; grid-template-columns: calc(56 * var(--u)) 1fr;
+  gap: calc(1 * var(--u)) calc(10 * var(--u));
+  font-family: var(--mono); font-size: calc(9.5 * var(--u) * var(--ts));
+  color: var(--p-dim); margin: calc(10 * var(--u)) 0 calc(14 * var(--u));
+  padding-bottom: calc(12 * var(--u)); border-bottom: 1px solid var(--p-rule);
+}
+.desk .doc dl.meta dt { letter-spacing: .2em; }
+.desk .doc dl.meta dd { color: var(--p-ink); }
+.desk .doc p {
+  font-size: calc(12.5 * var(--u) * var(--ts)); line-height: 1.62;
+  margin-bottom: calc(10 * var(--u)); max-width: 46ch;
+}
+.desk .doc p.ask { font-weight: 600; }
+.desk .doc .quiet { color: var(--p-dim); }
+.desk .doc code {
+  font-family: var(--mono); font-size: calc(11.5 * var(--u) * var(--ts));
+  background: rgba(0,0,0,.055); padding: 0 calc(3 * var(--u));
+}
+.desk .doc .facts { border-top: 1px solid var(--p-rule); padding-top: calc(10 * var(--u)); margin-top: calc(4 * var(--u)); }
+.desk .doc .facts div {
+  display: grid; grid-template-columns: calc(112 * var(--u)) 1fr; gap: calc(12 * var(--u));
+  padding: calc(4 * var(--u)) 0; font-size: calc(11.5 * var(--u) * var(--ts)); line-height: 1.5;
+  border-bottom: 1px solid rgba(0,0,0,.07);
+}
+.desk .doc .facts dt, .desk .doc .facts b {
+  font-family: var(--mono); font-size: calc(9.5 * var(--u) * var(--ts)); letter-spacing: .1em;
+  color: var(--p-dim); font-weight: 500; padding-top: calc(2 * var(--u));
+}
+.desk .doc .foot {
+  margin-top: calc(14 * var(--u)); padding-top: calc(8 * var(--u));
+  border-top: 1px solid var(--p-rule);
+  font-size: calc(10 * var(--u) * var(--ts)); color: var(--p-dim); line-height: 1.5;
+}
+.desk .doc .dot {
+  font-family: var(--mono); font-size: calc(11 * var(--u) * var(--ts)); line-height: 1.55;
+  color: #3d4a3a; border-left: calc(2 * var(--u)) solid #98a68e;
+  padding-left: calc(10 * var(--u)); margin: calc(12 * var(--u)) 0;
+}
+.desk .doc .onboard {
+  font-family: var(--mono); font-size: calc(10.5 * var(--u) * var(--ts)); letter-spacing: .06em;
+  color: #6a5f2e; background: rgba(200,170,60,.10);
+  padding: calc(8 * var(--u)) calc(10 * var(--u)); margin: calc(10 * var(--u)) 0;
+  line-height: 1.5;
+}
+.desk .doc .ref {
+  position: absolute; right: calc(26 * var(--u)); bottom: calc(14 * var(--u));
+  font-family: var(--mono); font-size: calc(8 * var(--u) * var(--ts)); letter-spacing: .22em; color: #9a9385;
+}
+.desk .doc .perf {
+  position: absolute; left: 0; top: 0; bottom: 0; width: calc(9 * var(--u));
+  background: radial-gradient(circle at 50% 50%, #cbc4b1 calc(1.4 * var(--u)), transparent calc(1.6 * var(--u))) 0 0 / 100% calc(9 * var(--u));
+}
+
+/* the stamp box on a closure certificate */
+.desk .stampbox {
+  margin-top: calc(16 * var(--u)); height: calc(96 * var(--u));
+  border: calc(1.5 * var(--u)) dashed #a9a292;
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+}
+.desk .stampbox span {
+  font-family: var(--mono); font-size: calc(8.5 * var(--u) * var(--ts));
+  letter-spacing: .3em; color: #a9a292;
+}
+.desk .stampbox.filled span { display: none; }
+
+.desk .inked {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%,-50%) rotate(var(--sr, -7deg)) scale(1);
+  font-family: var(--mono); font-weight: 700;
+  font-size: calc(23 * var(--u) * var(--ts)); letter-spacing: .2em;
+  padding: calc(9 * var(--u)) calc(18 * var(--u));
+  border: calc(3 * var(--u)) solid currentColor;
+  border-radius: calc(3 * var(--u));
+  opacity: .88;
+  color: var(--i-bronze);
+  animation: desk-thud .34s var(--drop) both;
+  mix-blend-mode: multiply;
+}
+.desk .inked.gold { color: var(--i-gold); }
+.desk .inked.silver { color: var(--i-silver); }
+.desk .inked.closed, .desk .inked.halt { color: var(--ink-red); }
+.desk .inked small {
+  display: block; font-size: calc(8 * var(--u) * var(--ts)); letter-spacing: .26em;
+  text-align: center; margin-top: calc(3 * var(--u)); font-weight: 500; opacity: .85;
+}
+@keyframes desk-thud {
+  0%   { transform: translate(-50%,-50%) rotate(var(--sr,-7deg)) scale(2.6); opacity: 0; filter: blur(calc(2 * var(--u))); }
+  55%  { opacity: .95; }
+  72%  { transform: translate(-50%,-50%) rotate(var(--sr,-7deg)) scale(.955); opacity: .95; filter: blur(0); }
+  100% { transform: translate(-50%,-50%) rotate(var(--sr,-7deg)) scale(1); opacity: .88; }
+}
+.desk .doc.shook { animation: desk-shook .3s var(--drop); }
+@keyframes desk-shook {
+  0%,100% { }
+  30% { transform: translate(0, calc(3 * var(--u))) rotate(var(--rot,-1.6deg)) scale(.997); }
+}
+
+/* signature line on a requisition */
+.desk .sigline { margin-top: calc(18 * var(--u)); position: relative; }
+.desk .sigline .rule { border-bottom: 1px solid var(--p-ink); height: calc(44 * var(--u)); position: relative; }
+.desk .sigline .cap {
+  font-family: var(--mono); font-size: calc(8.5 * var(--u) * var(--ts));
+  letter-spacing: .26em; color: var(--p-dim); margin-top: calc(5 * var(--u));
+  display: flex; justify-content: space-between;
+}
+.desk .sigline svg { position: absolute; left: 0; bottom: calc(-2 * var(--u)); overflow: visible; }
+.desk .sigline path { fill: none; stroke: var(--ink-blue); stroke-width: calc(2.2 * var(--u)); stroke-linecap: round; stroke-linejoin: round; }
+.desk .sigline .hint {
+  position: absolute; left: calc(6 * var(--u)); top: calc(14 * var(--u));
+  font-family: var(--mono); font-size: calc(9.5 * var(--u) * var(--ts)); color: #b3ab99;
+  letter-spacing: .1em; pointer-events: none;
+}
+.desk .sigline.signed .hint { display: none; }
+
+/* crates on a requisition */
+.desk .crate {
+  display: grid; grid-template-columns: calc(96 * var(--u)) 1fr; gap: calc(12 * var(--u));
+  padding: calc(9 * var(--u)) 0; border-bottom: 1px solid rgba(0,0,0,.08);
+}
+.desk .crate .nm { font-family: var(--mono); font-size: calc(13 * var(--u) * var(--ts)); }
+.desk .crate .sp { font-size: calc(11 * var(--u) * var(--ts)); line-height: 1.5; }
+.desk .crate .op { font-size: calc(11 * var(--u) * var(--ts)); line-height: 1.5; color: var(--p-dim); margin-top: calc(3 * var(--u)); }
+
+.desk .doc .acts { display: flex; gap: calc(9 * var(--u)); margin-top: calc(16 * var(--u)); }
+.desk .doc button.act {
+  font-family: var(--mono); font-size: calc(10 * var(--u) * var(--ts)); letter-spacing: .18em;
+  padding: calc(8 * var(--u)) calc(14 * var(--u));
+  background: #cfc8b5; color: var(--p-ink); border: 1px solid #a49c8a;
+  cursor: pointer;
+}
+.desk .doc button.act:hover { background: #bfb8a4; }
+.desk .doc button.act.ghost { background: transparent; color: var(--p-dim); }
+
+/* ============================== COPY STAND ======================== */
+/* A typist's copyholder. Pinning is not "zoom" — it is putting the page
+   where you can keep reading it while your hands are on the keyboard.
+   What gets pinned is the ASK and the SITE DATA, at a larger size than
+   the sheet itself carries. The flavour paragraph stays on the paper. */
+
+.desk .copystand {
+  left: calc(50% + 470 * var(--u)); top: calc(50% + 66 * var(--u));
+  width: calc(306 * var(--u)); height: calc(414 * var(--u));
+  z-index: 10;
+}
+.desk .cs-foot {
+  position: absolute; left: calc(46 * var(--u)); right: calc(46 * var(--u));
+  bottom: 0; height: calc(14 * var(--u)); border-radius: calc(6 * var(--u));
+  background: linear-gradient(#6d6a62, #3f3d37 55%, #23221e);
+  box-shadow: calc(7 * var(--u)) calc(7 * var(--u)) calc(2 * var(--u)) rgb(var(--ink-sh) / .32),
+              inset 0 1px 0 rgba(255,255,255,.32);
+}
+.desk .cs-post {
+  position: absolute; left: 50%; bottom: calc(8 * var(--u));
+  width: calc(15 * var(--u)); height: calc(64 * var(--u));
+  transform: translateX(-50%);
+  background: linear-gradient(90deg, #5d5a53, #86837a 42%, #43413b);
+  box-shadow: calc(4 * var(--u)) calc(4 * var(--u)) calc(2 * var(--u)) rgb(var(--ink-sh) / .32);
+}
+.desk .cs-board {
+  position: absolute; inset: 0 0 calc(58 * var(--u)) 0;
+  background: linear-gradient(158deg, #6b6860 0%, #4f4d46 30%, #35342f 100%);
+  border-radius: calc(3 * var(--u));
+  padding: calc(15 * var(--u)) calc(13 * var(--u)) calc(20 * var(--u));
+  box-shadow: inset 0 calc(1.5 * var(--u)) 0 rgba(255,255,255,.3),
+              calc(14 * var(--u)) calc(14 * var(--u)) calc(5 * var(--u)) rgb(var(--ink-sh) / .32);
+}
+.desk .cs-clip {
+  position: absolute; left: 50%; top: calc(-9 * var(--u));
+  transform: translateX(-50%);
+  width: calc(96 * var(--u)); height: calc(20 * var(--u));
+  border-radius: calc(3 * var(--u));
+  background: linear-gradient(#c8c4b6, #8f8c83 46%, #5a5851);
+  box-shadow: calc(4 * var(--u)) calc(4 * var(--u)) calc(2 * var(--u)) rgb(var(--ink-sh) / .32),
+              inset 0 1px 0 rgba(255,255,255,.6);
+  z-index: 3;
+}
+.desk .cs-page {
+  position: relative; height: 100%; overflow: hidden;
+  background: var(--paper); color: var(--p-ink);
+  padding: calc(16 * var(--u)) calc(15 * var(--u));
+  box-shadow: calc(3 * var(--u)) calc(3 * var(--u)) calc(2 * var(--u)) rgb(var(--ink-sh) / .32);
+}
+.desk .cs-page::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background:
+    linear-gradient(135deg, rgba(255,250,235,.46) 0%, rgba(255,250,235,0) 32%),
+    linear-gradient(315deg, rgb(var(--ink-sh) / .16) 0%, rgb(var(--ink-sh) / 0) 40%);
+}
+.desk .cs-empty {
+  height: 100%; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: calc(5 * var(--u));
+  color: #a49d8c; text-align: center;
+}
+.desk .cs-empty b { font-family: var(--mono); font-size: calc(11 * var(--u) * var(--ts)); letter-spacing: .3em; }
+.desk .cs-empty span { font-size: calc(11.5 * var(--u) * var(--ts)); }
+.desk .cs-empty small { font-family: var(--mono); font-size: calc(8 * var(--u) * var(--ts)); letter-spacing: .2em; margin-top: calc(8 * var(--u)); }
+
+.desk .cs-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-family: var(--mono); font-size: calc(9.5 * var(--u) * var(--ts));
+  letter-spacing: .24em; color: var(--p-dim);
+  border-bottom: calc(2 * var(--u)) solid var(--p-ink); padding-bottom: calc(6 * var(--u));
+}
+.desk .cs-head b { color: var(--p-ink); }
+.desk .cs-ask {
+  font-size: calc(15 * var(--u) * var(--ts)); line-height: 1.45; font-weight: 600;
+  margin: calc(11 * var(--u)) 0 calc(12 * var(--u));
+}
+.desk .cs-facts div {
+  padding: calc(6 * var(--u)) 0; border-bottom: 1px solid rgba(0,0,0,.09);
+  font-size: calc(13 * var(--u) * var(--ts)); line-height: 1.45;
+}
+.desk .cs-facts b {
+  display: block; font-family: var(--mono);
+  font-size: calc(10 * var(--u) * var(--ts)); letter-spacing: .1em;
+  color: var(--p-dim); font-weight: 500; margin-bottom: calc(2 * var(--u));
+}
+.desk .cs-unpin {
+  position: absolute; right: calc(8 * var(--u)); bottom: calc(6 * var(--u));
+  font-family: var(--mono); font-size: calc(8.5 * var(--u) * var(--ts));
+  letter-spacing: .18em; color: #a49d8c;
+  background: none; border: 0; cursor: pointer;
+}
+.desk .cs-page.landing { animation: desk-pinned .42s var(--drop) both; }
+@keyframes desk-pinned {
+  0%   { transform: translateY(calc(30 * var(--u))) rotate(2.4deg); opacity: 0; }
+  70%  { transform: translateY(calc(-3 * var(--u))) rotate(0deg); opacity: 1; }
+  100% { transform: none; }
+}
+
+/* ============================== PICKING IT UP ===================== */
+/* Not a zoom control. You pick the sheet up off the desk, closer to the
+   lamp, and it gets brighter as well as bigger — which is the whole cue. */
+
+.desk .doc.up {
+  cursor: zoom-out;
+  transition: transform .3s var(--settle), box-shadow .3s var(--settle), filter .3s ease;
+  filter: brightness(1.1);
+  box-shadow:
+    calc(2 * var(--u)) calc(2 * var(--u)) calc(2 * var(--u)) rgb(var(--ink-sh) / .32),
+    calc(30 * var(--u)) calc(46 * var(--u)) calc(64 * var(--u)) rgba(0,0,0,.66);
+  z-index: 50 !important;
+}
+.desk .doc .putdown {
+  position: absolute; right: calc(22 * var(--u)); top: calc(10 * var(--u));
+  font-family: var(--mono); font-size: calc(8.5 * var(--u) * var(--ts));
+  letter-spacing: .2em; color: #a49d8c; display: none;
+}
+.desk .doc.up .putdown { display: block; }
+
+.desk .doc .pin {
+  position: absolute; left: calc(-13 * var(--u)); top: calc(16 * var(--u));
+  width: calc(26 * var(--u)); height: calc(26 * var(--u));
+  border: 0; padding: 0; cursor: pointer; border-radius: 50%;
+  background: radial-gradient(circle at 34% 28%, #d8d4c6, #9d9a90 52%, #55534c);
+  box-shadow: calc(4 * var(--u)) calc(4 * var(--u)) calc(2 * var(--u)) rgb(var(--ink-sh) / .32),
+              inset calc(1.5 * var(--u)) calc(1.5 * var(--u)) 0 rgb(var(--key) / .6);
+}
+.desk .doc .pin::after {
+  content: ''; position: absolute; left: 50%; top: 50%;
+  width: calc(8 * var(--u)); height: calc(8 * var(--u));
+  transform: translate(-50%,-50%); border-radius: 50%;
+  background: radial-gradient(circle at 36% 30%, #8c1f18, #5c110c);
+}
+.desk .doc .pin:hover { filter: brightness(1.16); }
+
+/* ============================== THE SHEETS ======================== */
+/* Added for the port: the prototype's documents were static markup, so
+   these are the rules the real ones need and the prototype had no
+   element for. Nothing above this line is re-tuned. */
+
+/* Paper is a fixed size. Widths are the prototype's, per document. */
+.desk .doc--order       { width: calc(452 * var(--u)); }
+.desk .doc--certificate { width: calc(424 * var(--u)); background: var(--paper-2); }
+.desk .doc--halt        { width: calc(404 * var(--u)); background: var(--pink); }
+.desk .doc--requisition { width: calc(462 * var(--u)); background: var(--paper-2); }
+.desk .doc--issue       { width: calc(440 * var(--u)); }
+.desk .doc--memo        { width: calc(470 * var(--u)); }
+.desk .doc--standing    { width: calc(336 * var(--u)); }
+
+.desk .doc:focus-visible { outline: calc(2 * var(--u)) solid var(--amber); outline-offset: calc(2 * var(--u)); }
+
+/*
+ * The report was written against the dark UI's tokens. Remapping them once here is what lets the
+ * cause block, the objective rows and the budget bars come across unchanged — `docs/AUDIT-UI.md`
+ * F5 says the `cause__diff` block is the best in the game and should not be touched, and this is
+ * how it is not touched.
+ */
+.desk .doc {
+  --ink: var(--p-ink);
+  --ink-dim: var(--p-dim);
+  --border: var(--p-rule);
+  --border-strong: #a9a292;
+  --bg-void: var(--paper);
+  --surface: rgba(0,0,0,.045);
+  --ok: #3f6b34;
+  --danger: var(--ink-red);
+  --accent: #6a5f2e;
+  --accent-2: var(--i-gold);
+  --font-mono: var(--mono);
+  --space-1: calc(4 * var(--u));
+  --space-2: calc(7 * var(--u));
+  --space-3: calc(11 * var(--u));
+  --space-4: calc(16 * var(--u));
+}
+
+/* Type on paper scales with the SIZE dial. Everything the report draws, in one place. */
+.desk .doc .objective { font-size: calc(11.5 * var(--u) * var(--ts)); padding: calc(2 * var(--u)) 0; }
+.desk .doc .objective__mark {
+  width: calc(12 * var(--u)); height: calc(12 * var(--u));
+  margin-top: calc(2 * var(--u)); font-size: calc(9 * var(--u) * var(--ts));
+  line-height: calc(10 * var(--u));
+}
+.desk .doc .objective__gate,
+.desk .doc .objective__progress,
+.desk .doc .seed-chip { font-size: calc(9.5 * var(--u) * var(--ts)); }
+.desk .doc .seed-chip { min-width: calc(13 * var(--u)); height: calc(12 * var(--u)); line-height: calc(10 * var(--u)); }
+.desk .doc .budget-bar { height: calc(4 * var(--u)); margin: calc(3 * var(--u)) 0 calc(2 * var(--u)) calc(19 * var(--u)); }
+.desk .doc .seed-row__outstanding { font-size: calc(10 * var(--u) * var(--ts)); }
+
+.desk .doc .report__section { margin-top: calc(12 * var(--u)); }
+.desk .doc .report__label {
+  font-family: var(--mono); font-size: calc(9 * var(--u) * var(--ts));
+  letter-spacing: .22em; text-transform: uppercase; color: var(--p-dim);
+  margin-bottom: calc(5 * var(--u));
+}
+.desk .doc .report__head {
+  display: flex; gap: calc(12 * var(--u)); align-items: center;
+  margin: calc(12 * var(--u)) 0 calc(4 * var(--u));
+}
+.desk .doc .report__verdict h2 { margin: 0; font-size: calc(17 * var(--u) * var(--ts)); }
+.desk .doc .report__verdict .quiet { font-size: calc(11.5 * var(--u) * var(--ts)); line-height: 1.5; }
+
+.desk .doc .medal {
+  width: calc(26 * var(--u)); height: calc(26 * var(--u));
+  font-size: calc(11 * var(--u) * var(--ts)); line-height: calc(24 * var(--u));
+}
+.desk .doc .medal--lg {
+  width: calc(46 * var(--u)); height: calc(46 * var(--u));
+  font-size: calc(17 * var(--u) * var(--ts)); line-height: calc(43 * var(--u));
+}
+
+.desk .doc .cause {
+  border: calc(1.5 * var(--u)) solid rgb(147 48 36 / .5);
+  background: rgb(147 48 36 / .07);
+  padding: calc(10 * var(--u)); margin: calc(12 * var(--u)) 0;
+}
+.desk .doc .cause__head {
+  font-family: var(--mono); font-size: calc(9 * var(--u) * var(--ts));
+  letter-spacing: .2em; text-transform: uppercase; color: var(--ink-red);
+  margin-bottom: calc(6 * var(--u));
+}
+.desk .doc .cause__label { font-size: calc(11.5 * var(--u) * var(--ts)); }
+.desk .doc .cause__detail,
+.desk .doc .cause__readout { font-size: calc(10.5 * var(--u) * var(--ts)); }
+.desk .doc .cause__diff {
+  border: 1px solid rgb(147 48 36 / .45); background: rgba(0,0,0,.035);
+  padding: calc(6 * var(--u)) calc(8 * var(--u)); margin-top: calc(6 * var(--u));
+  font-size: calc(10.5 * var(--u) * var(--ts));
+}
+.desk .doc .cause__diff-where { color: var(--p-dim); }
+.desk .doc .cause__diff-tag { color: var(--p-dim); font-size: calc(9 * var(--u) * var(--ts)); }
+
+.desk .doc .record {
+  display: flex; gap: calc(10 * var(--u)); align-items: baseline; flex-wrap: wrap;
+  border-left: calc(3 * var(--u)) solid var(--i-gold);
+  padding: calc(7 * var(--u)) calc(10 * var(--u)); margin: calc(12 * var(--u)) 0;
+  background: rgba(154,116,32,.10);
+}
+.desk .doc .record__tag {
+  font-family: var(--mono); font-size: calc(9 * var(--u) * var(--ts));
+  letter-spacing: .24em; color: #6a5320;
+}
+.desk .doc .record__numbers { font-family: var(--mono); font-size: calc(15 * var(--u) * var(--ts)); }
+.desk .doc .record__was { color: var(--p-dim); font-size: calc(10.5 * var(--u) * var(--ts)); }
+.desk .doc .record__line { flex: 1 0 100%; font-size: calc(10.5 * var(--u) * var(--ts)); color: var(--p-dim); }
+
+.desk .doc .commend { display: flex; gap: calc(8 * var(--u)); padding: calc(4 * var(--u)) 0; }
+.desk .doc .commend__seal { color: var(--i-gold); font-size: calc(13 * var(--u) * var(--ts)); }
+.desk .doc .commend__title { font-size: calc(11.5 * var(--u) * var(--ts)); margin: 0; font-weight: 600; }
+.desk .doc .commend__note { font-size: calc(10.5 * var(--u) * var(--ts)); margin: 0; color: var(--p-dim); }
+.desk .doc .commend--out { opacity: 0; }
+.desk .doc .commend--in { animation: desk-land .34s var(--settle) both; }
+.desk .doc .facts--out { opacity: 0; }
+.desk .doc .facts--in { animation: desk-land .34s var(--settle) both; }
+@keyframes desk-land {
+  from { opacity: 0; transform: translateY(calc(5 * var(--u))); }
+  to   { opacity: 1; transform: none; }
+}
+
+.desk .doc .failure-box {
+  border-left: calc(3 * var(--u)) solid var(--ink-red);
+  padding: calc(8 * var(--u)) calc(10 * var(--u)); margin: calc(12 * var(--u)) 0;
+  background: rgba(147,48,36,.06);
+}
+.desk .doc .failure-box__code {
+  font-family: var(--mono); font-size: calc(9.5 * var(--u) * var(--ts));
+  letter-spacing: .14em; color: var(--ink-red);
+}
+.desk .doc .failure-box__message { font-size: calc(11 * var(--u) * var(--ts)); margin: calc(4 * var(--u)) 0 0; }
+.desk .doc .failure-box__note { font-size: calc(10 * var(--u) * var(--ts)); color: var(--p-dim); margin: calc(5 * var(--u)) 0 0; }
+
+.desk .doc .seed-row {
+  display: flex; gap: calc(8 * var(--u)); align-items: baseline; flex-wrap: wrap;
+  font-size: calc(10.5 * var(--u) * var(--ts)); margin-top: calc(3 * var(--u));
+}
+.desk .doc .seed-row--ok  { color: #3f6b34; }
+.desk .doc .seed-row--bad { color: var(--ink-red); }
+.desk .doc .tag {
+  font-family: var(--mono); font-size: calc(9 * var(--u) * var(--ts));
+  letter-spacing: .1em; color: var(--p-dim);
+}
+
+/* Field notes, at the top of the work order. docs/AUDIT-UI.md F4. */
+.desk .doc .notes {
+  border: 1px dashed var(--p-rule); background: rgba(0,0,0,.028);
+  padding: calc(9 * var(--u)) calc(11 * var(--u)); margin: calc(4 * var(--u)) 0 calc(14 * var(--u));
+}
+.desk .doc .notes__head {
+  display: flex; gap: calc(8 * var(--u)); align-items: baseline; flex-wrap: wrap;
+  font-family: var(--mono); font-size: calc(9 * var(--u) * var(--ts));
+  letter-spacing: .2em; color: var(--p-dim); margin-bottom: calc(6 * var(--u));
+}
+.desk .doc .notes__head b { color: var(--p-ink); }
+.desk .doc .notes__head span { letter-spacing: .04em; }
+.desk .doc .notes__list { list-style: none; margin: 0 0 calc(8 * var(--u)); }
+.desk .doc .notes__list li { display: flex; gap: calc(9 * var(--u)); padding: calc(3 * var(--u)) 0; }
+.desk .doc .notes__mark {
+  flex: none; font-family: var(--mono); font-size: calc(9 * var(--u) * var(--ts));
+  letter-spacing: .1em; color: var(--p-dim); padding-top: calc(2 * var(--u));
+}
+
+/* Markdown as it comes out of src/ui/components/Markdown.tsx, printed on paper. */
+.desk .doc .md-p {
+  font-size: calc(12.5 * var(--u) * var(--ts)); line-height: 1.62;
+  margin-bottom: calc(10 * var(--u)); max-width: 46ch;
+}
+.desk .doc .md-p:last-child { margin-bottom: 0; }
+.desk .doc .md-code {
+  font-family: var(--mono); font-size: calc(11 * var(--u) * var(--ts));
+  background: rgba(0,0,0,.055); padding: 0 calc(3 * var(--u));
+}
+.desk .doc .md-quote {
+  font-family: var(--mono); font-size: calc(10.5 * var(--u) * var(--ts)); line-height: 1.55;
+  color: #3d4a3a; border-left: calc(2 * var(--u)) solid #98a68e;
+  padding-left: calc(10 * var(--u)); margin: calc(12 * var(--u)) 0;
+}
+.desk .doc .md-quote .md-p { font-size: inherit; margin-bottom: calc(4 * var(--u)); }
+.desk .doc .md-list { margin: calc(8 * var(--u)) 0 calc(10 * var(--u)) calc(18 * var(--u)); }
+.desk .doc .md-list li { font-size: calc(12 * var(--u) * var(--ts)); line-height: 1.55; }
+.desk .doc .md-h {
+  font-family: var(--mono); font-size: calc(11 * var(--u) * var(--ts));
+  letter-spacing: .16em; text-transform: uppercase; color: var(--p-dim);
+  margin: calc(12 * var(--u)) 0 calc(5 * var(--u));
+}
+.desk .doc .md-pre {
+  font-family: var(--mono); font-size: calc(10.5 * var(--u) * var(--ts));
+  background: rgba(0,0,0,.05); padding: calc(7 * var(--u)) calc(9 * var(--u));
+  margin: calc(8 * var(--u)) 0; overflow-x: auto;
+}
+.desk .doc .md-rule { border: 0; border-top: 1px solid var(--p-rule); margin: calc(10 * var(--u)) 0; }
+.desk .doc sup { font-size: calc(8 * var(--u) * var(--ts)); vertical-align: super; }
+.desk .doc .crate .nm { display: flex; gap: calc(8 * var(--u)); align-items: baseline; }
+.desk .doc h2 .quiet { font-size: calc(11 * var(--u) * var(--ts)); letter-spacing: .1em; }
+.desk .doc .facts b, .desk .doc .facts dt { text-transform: uppercase; }
+.desk .doc .stampbox--auto { height: calc(72 * var(--u)); border-style: solid; border-color: #c3bba9; }
+
+/* ============================== FILING ============================ */
+/* Filing is a real act with a real object behind it — the stamp block,
+   the pen — and the sheet leaves for the Repository rather than being
+   deleted. This is the leaving. */
+.desk .doc--filing {
+  pointer-events: none;
+  animation: desk-filed .62s var(--drop) both;
+}
+@keyframes desk-filed {
+  0%   { opacity: 1; transform: rotate(var(--rot, -1.6deg)) scale(1); }
+  100% { opacity: 0; transform: translate(calc(-170 * var(--u)), calc(210 * var(--u))) rotate(-9deg) scale(.72); }
+}
+
+/* ============================== READING IT ======================== */
+/*
+ * `docs/AUDIT-UI.md` F15: no reading surface may be capped below its own content while the window
+ * has room to spare. The lift is sized to the window, so at 2560x1440 the whole work order fits
+ * and there is no scrollbar. Where it cannot — a long order at `--ts: 1.5` on a 13" laptop, which
+ * is the case measured in the prototype at 803px of sheet in a 778px window — the sheet scrolls
+ * rather than running off the bottom of the screen. That is the window being out of room, not a
+ * cap in a third costume.
+ */
+.desk .doc.up {
+  scrollbar-width: thin;
+  scrollbar-color: #a9a292 transparent;
+}
+.desk .doc.up::-webkit-scrollbar { width: calc(9 * var(--u)); }
+.desk .doc.up::-webkit-scrollbar-thumb { background: #a9a292; border-radius: calc(4 * var(--u)); }
+.desk .doc.up::-webkit-scrollbar-track { background: transparent; }
+
+/* The same rule for the copy stand's page, which loses 60% of a pinned order at --ts 1.5. */
+.desk .cs-page {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #a9a292 transparent;
+}
+.desk .cs-page::-webkit-scrollbar { width: calc(8 * var(--u)); }
+.desk .cs-page::-webkit-scrollbar-thumb { background: #a9a292; border-radius: calc(4 * var(--u)); }
+.desk .cs-ask p { margin-bottom: calc(6 * var(--u)); }
+.desk .cs-ask p:last-child { margin-bottom: 0; }
+
+/* ============================== THE CONTROLS ====================== */
+/*
+ * A document has one gesture and two controls. Drag is the gesture; enlarging and pinning are
+ * printed on the sheet, because an overloaded gesture is a gesture nobody discovers — a player
+ * looking for a way to pin something to the copy stand could not find one, and a player pressing a
+ * sheet to move it got it enlarged instead.
+ *
+ * Sticky, so a sheet taller than the window still carries the control that closes it.
+ */
+.desk .doc__tools {
+  position: sticky; top: calc(-10 * var(--u)); z-index: 4;
+  display: flex; gap: calc(6 * var(--u)); align-items: center;
+  margin: calc(-6 * var(--u)) 0 calc(12 * var(--u));
+}
+.desk .doc .tool {
+  display: inline-flex; align-items: center; gap: calc(6 * var(--u));
+  font-family: var(--mono); font-size: calc(8.5 * var(--u) * var(--ts));
+  letter-spacing: .18em; text-transform: uppercase;
+  padding: calc(5 * var(--u)) calc(9 * var(--u));
+  background: #cfc8b5; color: var(--p-ink);
+  border: 1px solid #a49c8a; border-radius: calc(2 * var(--u));
+  cursor: pointer;
+  box-shadow: calc(1 * var(--u)) calc(1 * var(--u)) 0 rgb(var(--ink-sh) / .18);
+}
+.desk .doc .tool:hover { background: #bfb8a4; }
+.desk .doc .tool:focus-visible { outline: calc(2 * var(--u)) solid var(--ink-red); outline-offset: calc(1 * var(--u)); }
+.desk .doc .tool__pin {
+  width: calc(11 * var(--u)); height: calc(11 * var(--u)); border-radius: 50%;
+  background: radial-gradient(circle at 34% 28%, #b8352a, #5c110c);
+  box-shadow: inset calc(1 * var(--u)) calc(1 * var(--u)) 0 rgb(var(--key) / .5);
+}
+.desk .doc .tool--set { background: #b9c3ae; border-color: #8a9a80; }
+.desk .doc .tool--set .tool__pin { background: radial-gradient(circle at 34% 28%, #4d7a40, #24401f); }
+
+.desk .doc.up {
+  cursor: zoom-out;
+  transition: transform .3s var(--settle), box-shadow .3s var(--settle), filter .3s ease;
+  filter: brightness(1.1);
+  box-shadow:
+    calc(2 * var(--u)) calc(2 * var(--u)) calc(2 * var(--u)) rgb(var(--ink-sh) / .32),
+    calc(30 * var(--u)) calc(46 * var(--u)) calc(64 * var(--u)) rgba(0,0,0,.66);
+  z-index: 50 !important;
+}
+.desk .doc .putdown {
+  position: absolute; right: calc(22 * var(--u)); top: calc(10 * var(--u));
+  font-family: var(--mono); font-size: calc(8.5 * var(--u) * var(--ts));
+  letter-spacing: .2em; color: #a49d8c; display: none;
+}
+.desk .doc.up .putdown { display: block; }
+
+.desk .doc .pin {
+  position: absolute; left: calc(-13 * var(--u)); top: calc(16 * var(--u));
+  width: calc(26 * var(--u)); height: calc(26 * var(--u));
+  border: 0; padding: 0; cursor: pointer; border-radius: 50%;
+  background: radial-gradient(circle at 34% 28%, #d8d4c6, #9d9a90 52%, #55534c);
+  box-shadow: calc(4 * var(--u)) calc(4 * var(--u)) calc(2 * var(--u)) rgb(var(--ink-sh) / .32),
+              inset calc(1.5 * var(--u)) calc(1.5 * var(--u)) 0 rgb(var(--key) / .6);
+}
+.desk .doc .pin::after {
+  content: ''; position: absolute; left: 50%; top: 50%;
+  width: calc(8 * var(--u)); height: calc(8 * var(--u));
+  transform: translate(-50%,-50%); border-radius: 50%;
+  background: radial-gradient(circle at 36% 30%, #8c1f18, #5c110c);
+}
+.desk .doc .pin:hover { filter: brightness(1.16); }
+
+/* ============================== THE SHEETS ======================== */
+/* Added for the port: the prototype's documents were static markup, so
+   these are the rules the real ones need and the prototype had no
+   element for. Nothing above this line is re-tuned. */
+
+/* Paper is a fixed size. Widths are the prototype's, per document. */
+.desk .doc--order       { width: calc(452 * var(--u)); }
+.desk .doc--certificate { width: calc(424 * var(--u)); background: var(--paper-2); }
+.desk .doc--halt        { width: calc(404 * var(--u)); background: var(--pink); }
+.desk .doc--requisition { width: calc(462 * var(--u)); background: var(--paper-2); }
+.desk .doc--issue       { width: calc(440 * var(--u)); }
+.desk .doc--memo        { width: calc(470 * var(--u)); }
+.desk .doc--standing    { width: calc(336 * var(--u)); }
+
+.desk .doc:focus-visible { outline: calc(2 * var(--u)) solid var(--amber); outline-offset: calc(2 * var(--u)); }
+
+/*
+ * The report was written against the dark UI's tokens. Remapping them once here is what lets the
+ * cause block, the objective rows and the budget bars come across unchanged — `docs/AUDIT-UI.md`
+ * F5 says the `cause__diff` block is the best in the game and should not be touched, and this is
+ * how it is not touched.
+ */
+.desk .doc {
+  --ink: var(--p-ink);
+  --ink-dim: var(--p-dim);
+  --border: var(--p-rule);
+  --border-strong: #a9a292;
+  --bg-void: var(--paper);
+  --surface: rgba(0,0,0,.045);
+  --ok: #3f6b34;
+  --danger: var(--ink-red);
+  --accent: #6a5f2e;
+  --accent-2: var(--i-gold);
+  --font-mono: var(--mono);
+  --space-1: calc(4 * var(--u));
+  --space-2: calc(7 * var(--u));
+  --space-3: calc(11 * var(--u));
+  --space-4: calc(16 * var(--u));
+}
+
+/* Type on paper scales with the SIZE dial. Everything the report draws, in one place. */
+.desk .doc .objective { font-size: calc(11.5 * var(--u) * var(--ts)); padding: calc(2 * var(--u)) 0; }
+.desk .doc .objective__mark {
+  width: calc(12 * var(--u)); height: calc(12 * var(--u));
+  margin-top: calc(2 * var(--u)); font-size: calc(9 * var(--u) * var(--ts));
+  line-height: calc(10 * var(--u));
+}
+.desk .doc .objective__gate,
+.desk .doc .objective__progress,
+.desk .doc .seed-chip { font-size: calc(9.5 * var(--u) * var(--ts)); }
+.desk .doc .seed-chip { min-width: calc(13 * var(--u)); height: calc(12 * var(--u)); line-height: calc(10 * var(--u)); }
+.desk .doc .budget-bar { height: calc(4 * var(--u)); margin: calc(3 * var(--u)) 0 calc(2 * var(--u)) calc(19 * var(--u)); }
+.desk .doc .seed-row__outstanding { font-size: calc(10 * var(--u) * var(--ts)); }
+
+.desk .doc .report__section { margin-top: calc(12 * var(--u)); }
+.desk .doc .report__label {
+  font-family: var(--mono); font-size: calc(9 * var(--u) * var(--ts));
+  letter-spacing: .22em; text-transform: uppercase; color: var(--p-dim);
+  margin-bottom: calc(5 * var(--u));
+}
+.desk .doc .report__head {
+  display: flex; gap: calc(12 * var(--u)); align-items: center;
+  margin: calc(12 * var(--u)) 0 calc(4 * var(--u));
+}
+.desk .doc .report__verdict h2 { margin: 0; font-size: calc(17 * var(--u) * var(--ts)); }
+.desk .doc .report__verdict .quiet { font-size: calc(11.5 * var(--u) * var(--ts)); line-height: 1.5; }
+
+.desk .doc .medal {
+  width: calc(26 * var(--u)); height: calc(26 * var(--u));
+  font-size: calc(11 * var(--u) * var(--ts)); line-height: calc(24 * var(--u));
+}
+.desk .doc .medal--lg {
+  width: calc(46 * var(--u)); height: calc(46 * var(--u));
+  font-size: calc(17 * var(--u) * var(--ts)); line-height: calc(43 * var(--u));
+}
+
+.desk .doc .cause {
+  border: calc(1.5 * var(--u)) solid rgb(147 48 36 / .5);
+  background: rgb(147 48 36 / .07);
+  padding: calc(10 * var(--u)); margin: calc(12 * var(--u)) 0;
+}
+.desk .doc .cause__head {
+  font-family: var(--mono); font-size: calc(9 * var(--u) * var(--ts));
+  letter-spacing: .2em; text-transform: uppercase; color: var(--ink-red);
+  margin-bottom: calc(6 * var(--u));
+}
+.desk .doc .cause__label { font-size: calc(11.5 * var(--u) * var(--ts)); }
+.desk .doc .cause__detail,
+.desk .doc .cause__readout { font-size: calc(10.5 * var(--u) * var(--ts)); }
+.desk .doc .cause__diff {
+  border: 1px solid rgb(147 48 36 / .45); background: rgba(0,0,0,.035);
+  padding: calc(6 * var(--u)) calc(8 * var(--u)); margin-top: calc(6 * var(--u));
+  font-size: calc(10.5 * var(--u) * var(--ts));
+}
+.desk .doc .cause__diff-where { color: var(--p-dim); }
+.desk .doc .cause__diff-tag { color: var(--p-dim); font-size: calc(9 * var(--u) * var(--ts)); }
+
+.desk .doc .record {
+  display: flex; gap: calc(10 * var(--u)); align-items: baseline; flex-wrap: wrap;
+  border-left: calc(3 * var(--u)) solid var(--i-gold);
+  padding: calc(7 * var(--u)) calc(10 * var(--u)); margin: calc(12 * var(--u)) 0;
+  background: rgba(154,116,32,.10);
+}
+.desk .doc .record__tag {
+  font-family: var(--mono); font-size: calc(9 * var(--u) * var(--ts));
+  letter-spacing: .24em; color: #6a5320;
+}
+.desk .doc .record__numbers { font-family: var(--mono); font-size: calc(15 * var(--u) * var(--ts)); }
+.desk .doc .record__was { color: var(--p-dim); font-size: calc(10.5 * var(--u) * var(--ts)); }
+.desk .doc .record__line { flex: 1 0 100%; font-size: calc(10.5 * var(--u) * var(--ts)); color: var(--p-dim); }
+
+.desk .doc .commend { display: flex; gap: calc(8 * var(--u)); padding: calc(4 * var(--u)) 0; }
+.desk .doc .commend__seal { color: var(--i-gold); font-size: calc(13 * var(--u) * var(--ts)); }
+.desk .doc .commend__title { font-size: calc(11.5 * var(--u) * var(--ts)); margin: 0; font-weight: 600; }
+.desk .doc .commend__note { font-size: calc(10.5 * var(--u) * var(--ts)); margin: 0; color: var(--p-dim); }
+.desk .doc .commend--out { opacity: 0; }
+.desk .doc .commend--in { animation: desk-land .34s var(--settle) both; }
+.desk .doc .facts--out { opacity: 0; }
+.desk .doc .facts--in { animation: desk-land .34s var(--settle) both; }
+@keyframes desk-land {
+  from { opacity: 0; transform: translateY(calc(5 * var(--u))); }
+  to   { opacity: 1; transform: none; }
+}
+
+.desk .doc .failure-box {
+  border-left: calc(3 * var(--u)) solid var(--ink-red);
+  padding: calc(8 * var(--u)) calc(10 * var(--u)); margin: calc(12 * var(--u)) 0;
+  background: rgba(147,48,36,.06);
+}
+.desk .doc .failure-box__code {
+  font-family: var(--mono); font-size: calc(9.5 * var(--u) * var(--ts));
+  letter-spacing: .14em; color: var(--ink-red);
+}
+.desk .doc .failure-box__message { font-size: calc(11 * var(--u) * var(--ts)); margin: calc(4 * var(--u)) 0 0; }
+.desk .doc .failure-box__note { font-size: calc(10 * var(--u) * var(--ts)); color: var(--p-dim); margin: calc(5 * var(--u)) 0 0; }
+
+.desk .doc .seed-row {
+  display: flex; gap: calc(8 * var(--u)); align-items: baseline; flex-wrap: wrap;
+  font-size: calc(10.5 * var(--u) * var(--ts)); margin-top: calc(3 * var(--u));
+}
+.desk .doc .seed-row--ok  { color: #3f6b34; }
+.desk .doc .seed-row--bad { color: var(--ink-red); }
+.desk .doc .tag {
+  font-family: var(--mono); font-size: calc(9 * var(--u) * var(--ts));
+  letter-spacing: .1em; color: var(--p-dim);
+}
+
+/* Field notes, at the top of the work order. docs/AUDIT-UI.md F4. */
+.desk .doc .notes {
+  border: 1px dashed var(--p-rule); background: rgba(0,0,0,.028);
+  padding: calc(9 * var(--u)) calc(11 * var(--u)); margin: calc(4 * var(--u)) 0 calc(14 * var(--u));
+}
+.desk .doc .notes__head {
+  display: flex; gap: calc(8 * var(--u)); align-items: baseline; flex-wrap: wrap;
+  font-family: var(--mono); font-size: calc(9 * var(--u) * var(--ts));
+  letter-spacing: .2em; color: var(--p-dim); margin-bottom: calc(6 * var(--u));
+}
+.desk .doc .notes__head b { color: var(--p-ink); }
+.desk .doc .notes__head span { letter-spacing: .04em; }
+.desk .doc .notes__list { list-style: none; margin: 0 0 calc(8 * var(--u)); }
+.desk .doc .notes__list li { display: flex; gap: calc(9 * var(--u)); padding: calc(3 * var(--u)) 0; }
+.desk .doc .notes__mark {
+  flex: none; font-family: var(--mono); font-size: calc(9 * var(--u) * var(--ts));
+  letter-spacing: .1em; color: var(--p-dim); padding-top: calc(2 * var(--u));
+}
+
+/* Markdown as it comes out of src/ui/components/Markdown.tsx, printed on paper. */
+.desk .doc .md-p {
+  font-size: calc(12.5 * var(--u) * var(--ts)); line-height: 1.62;
+  margin-bottom: calc(10 * var(--u)); max-width: 46ch;
+}
+.desk .doc .md-p:last-child { margin-bottom: 0; }
+.desk .doc .md-code {
+  font-family: var(--mono); font-size: calc(11 * var(--u) * var(--ts));
+  background: rgba(0,0,0,.055); padding: 0 calc(3 * var(--u));
+}
+.desk .doc .md-quote {
+  font-family: var(--mono); font-size: calc(10.5 * var(--u) * var(--ts)); line-height: 1.55;
+  color: #3d4a3a; border-left: calc(2 * var(--u)) solid #98a68e;
+  padding-left: calc(10 * var(--u)); margin: calc(12 * var(--u)) 0;
+}
+.desk .doc .md-quote .md-p { font-size: inherit; margin-bottom: calc(4 * var(--u)); }
+.desk .doc .md-list { margin: calc(8 * var(--u)) 0 calc(10 * var(--u)) calc(18 * var(--u)); }
+.desk .doc .md-list li { font-size: calc(12 * var(--u) * var(--ts)); line-height: 1.55; }
+.desk .doc .md-h {
+  font-family: var(--mono); font-size: calc(11 * var(--u) * var(--ts));
+  letter-spacing: .16em; text-transform: uppercase; color: var(--p-dim);
+  margin: calc(12 * var(--u)) 0 calc(5 * var(--u));
+}
+.desk .doc .md-pre {
+  font-family: var(--mono); font-size: calc(10.5 * var(--u) * var(--ts));
+  background: rgba(0,0,0,.05); padding: calc(7 * var(--u)) calc(9 * var(--u));
+  margin: calc(8 * var(--u)) 0; overflow-x: auto;
+}
+.desk .doc .md-rule { border: 0; border-top: 1px solid var(--p-rule); margin: calc(10 * var(--u)) 0; }
+.desk .doc sup { font-size: calc(8 * var(--u) * var(--ts)); vertical-align: super; }
+.desk .doc .crate .nm { display: flex; gap: calc(8 * var(--u)); align-items: baseline; }
+.desk .doc h2 .quiet { font-size: calc(11 * var(--u) * var(--ts)); letter-spacing: .1em; }
+.desk .doc .facts b, .desk .doc .facts dt { text-transform: uppercase; }
+.desk .doc .stampbox--auto { height: calc(72 * var(--u)); border-style: solid; border-color: #c3bba9; }
+
+/* ============================== FILING ============================ */
+/* Filing is a real act with a real object behind it — the stamp block,
+   the pen — and the sheet leaves for the Repository rather than being
+   deleted. This is the leaving. */
+.desk .doc--filing {
+  pointer-events: none;
+  animation: desk-filed .62s var(--drop) both;
+}
+@keyframes desk-filed {
+  0%   { opacity: 1; transform: rotate(var(--rot, -1.6deg)) scale(1); }
+  100% { opacity: 0; transform: translate(calc(-170 * var(--u)), calc(210 * var(--u))) rotate(-9deg) scale(.72); }
+}
+
+/* ============================== READING IT ======================== */
+/*
+ * `docs/AUDIT-UI.md` F15: no reading surface may be capped below its own content while the window
+ * has room to spare. The lift is sized to the window, so at 2560x1440 the whole work order fits
+ * and there is no scrollbar. Where it cannot — a long order at `--ts: 1.5` on a 13" laptop, which
+ * is the case measured in the prototype at 803px of sheet in a 778px window — the sheet scrolls
+ * rather than running off the bottom of the screen. That is the window being out of room, not a
+ * cap in a third costume.
+ */
+.desk .doc.up {
+  scrollbar-width: thin;
+  scrollbar-color: #a9a292 transparent;
+}
+.desk .doc.up::-webkit-scrollbar { width: calc(9 * var(--u)); }
+.desk .doc.up::-webkit-scrollbar-thumb { background: #a9a292; border-radius: calc(4 * var(--u)); }
+.desk .doc.up::-webkit-scrollbar-track { background: transparent; }
+
+/* The same rule for the copy stand's page, which loses 60% of a pinned order at --ts 1.5. */
+.desk .cs-page {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #a9a292 transparent;
+}
+.desk .cs-page::-webkit-scrollbar { width: calc(8 * var(--u)); }
+.desk .cs-page::-webkit-scrollbar-thumb { background: #a9a292; border-radius: calc(4 * var(--u)); }
+.desk .cs-ask p { margin-bottom: calc(6 * var(--u)); }
+.desk .cs-ask p:last-child { margin-bottom: 0; }
+
+/* ============================== THE PIN, LABELLED ================= */
+/*
+ * The prototype's red pin head is the approved affordance and it stays. What it did not have is a
+ * word: a player looked for a way to pin something to the copy stand and did not find one, so the
+ * pin now carries its own label at rest, without hover, and the sheet reserves the band for it.
+ */
+.desk .doc--order,
+.desk .doc--requisition { padding-top: calc(40 * var(--u)); }
+
+.desk .doc .pin { top: calc(13 * var(--u)); overflow: visible; }
+.desk .doc .pin__label {
+  position: absolute; left: calc(22 * var(--u)); top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--mono); font-size: calc(8.5 * var(--u) * var(--ts));
+  letter-spacing: .18em; text-transform: uppercase; color: var(--p-dim);
+  white-space: nowrap; pointer-events: none;
+}
+.desk .doc .pin:hover .pin__label { color: var(--p-ink); }
+.desk .doc .pin--set::after { background: radial-gradient(circle at 36% 30%, #3f6b34, #24401f); }
+.desk .doc .pin--set .pin__label { color: #3f6b34; }
+
+/* ============================== PUTTING IT DOWN =================== */
+/*
+ * Sticky rather than absolute. A lifted sheet taller than the window scrolls, and a hint that
+ * scrolls out of the top of it is a hint nobody has. Whatever opens on the desk closes without
+ * scrolling — and clicking anywhere on the sheet, or anywhere on the desk, also puts it down.
+ */
+.desk .doc .putdown {
+  position: sticky; right: auto; top: calc(-8 * var(--u));
+  float: right; margin-left: calc(12 * var(--u));
+  z-index: 3; pointer-events: none;
+}
+.desk .doc.up .putdown { display: block; }
+
+/*
+ * The stand's page is ~250 CSS px tall at a 1440x783 window and a five-fact projection is ~420,
+ * so it scrolls even at `--ts: 1`. The scrollbar is thin and the page is cream, so this says
+ * there is more below without a control: paper continuing past the edge of the board.
+ */
+.desk .cs-board::after {
+  content: ''; position: absolute; z-index: 2; pointer-events: none;
+  left: calc(13 * var(--u)); right: calc(13 * var(--u));
+  bottom: calc(20 * var(--u)); height: calc(20 * var(--u));
+  background: linear-gradient(rgb(233 227 211 / 0), var(--paper));
+}
+.desk .cs-empty span { line-height: 1.5; }
+
+.desk .doc .report__die {
+  display: inline-block; font-family: var(--mono);
+  font-size: calc(10 * var(--u) * var(--ts)); letter-spacing: .3em;
+  color: var(--p-dim); margin-top: calc(2 * var(--u));
+}
+
+.desk .doc .stampbox__ask {
+  display: block; text-align: center; max-width: calc(250 * var(--u));
+  font-family: var(--prose); font-size: calc(10.5 * var(--u) * var(--ts));
+  letter-spacing: 0; line-height: 1.5; color: #8d8676;
+}
+.desk .doc .stampbox__ask b {
+  display: block; font-family: var(--mono); font-size: calc(9 * var(--u) * var(--ts));
+  letter-spacing: .3em; color: #a9a292; margin-bottom: calc(5 * var(--u));
+}
+
+/* Prose is what a sheet is made of, so selection has to lose to the drag — but only while the
+   sheet is draggable. A lifted sheet is being read, and a want/got pair is exactly the thing you
+   copy out of one. */
+.desk .doc { user-select: none; touch-action: none; }
+.desk .doc.up { cursor: default; user-select: text; touch-action: auto; }
+.desk .doc .tool { user-select: none; }

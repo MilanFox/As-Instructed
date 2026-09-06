@@ -1,0 +1,122 @@
+/**
+ * Closing a work order, end to end, on a real passing run.
+ *
+ * This is the ceremony the desk exists for. `docs/AUDIT-UI.md` §6.6: the run report used to be a
+ * modal destroyed by a stray backdrop click with no reopen path, so the medal, the cause, the
+ * objectives, the record and the seeds were one misclick from gone. On the desk it is a
+ * **certificate of closure** that lies there until the player stamps it, and stamping files it
+ * into the Repository rather than deleting it.
+ *
+ * Driven from a reference solution rather than from a browser, so the assertion is about the
+ * mechanism and not about a screenshot: run the real level, snapshot the real verdict, issue the
+ * paper, stamp it, and check where it went.
+ */
+import { beforeEach, describe, expect, it } from 'vitest';
+
+import { runReference } from '../../levels/harness.ts';
+import { campaignOrder } from '../../levels/index.ts';
+import { solution as w2_05 } from '../../levels/world-2/__solutions__/w2-05.ts';
+import { useGame } from '../../game/store.ts';
+import { DOC_HOME, filedDocs, looseDocs, usePapers } from '../desk/paper/papers.ts';
+import { snapshotReport } from '../desk/paper/report.ts';
+
+const level = campaignOrder().find((each) => each.id === 'w2-05');
+
+beforeEach(() => {
+  usePapers.setState({ docs: [], lifted: null, pinned: null, top: 20 });
+});
+
+describe('closing a work order', () => {
+  it('a reference solution actually passes, or the rest of this proves nothing', () => {
+    expect(level, 'w2-05 is in the campaign').toBeDefined();
+    if (!level) return;
+    const seed = level.seeds[0] as number;
+    expect(runReference(level, seed, w2_05).verdict.passed).toBe(true);
+  });
+
+  it('issues a certificate carrying the run, stamps it, and files it', () => {
+    if (!level) return;
+    const seed = level.seeds[0] as number;
+    const { trace, verdict } = runReference(level, seed, w2_05);
+
+    useGame.setState({
+      screen: 'workspace',
+      currentLevelId: level.id,
+      trace,
+      verdict,
+      traceSeed: seed,
+      seedResults: [],
+      failure: null,
+      showResults: true,
+    });
+
+    const report = snapshotReport(useGame.getState());
+    expect(report, 'a passing run produces a report').not.toBeNull();
+    if (!report) return;
+
+    // The certificate says the work order closed, and it carries the run rather than a promise.
+    expect(report.passed).toBe(true);
+    expect(report.levelId).toBe(level.id);
+    expect(report.ticks).toBe(verdict.stats.ticks);
+    expect(report.objectives.length).toBeGreaterThan(0);
+    expect(report.at).toBeGreaterThan(0);
+
+    const id = `certificate:${report.levelId}:1`;
+    usePapers.getState().issue({
+      id,
+      kind: 'certificate',
+      home: DOC_HOME.certificate,
+      payload: { kind: 'certificate', report },
+    });
+
+    // It is on the desk, unstamped. Nothing has destroyed it and nothing can dismiss it.
+    const loose = looseDocs(usePapers.getState());
+    expect(loose.map((doc) => doc.id)).toContain(id);
+    expect(loose.find((doc) => doc.id === id)?.mark).toBeNull();
+
+    // The player picks up the CLOSED die and presses it. That is the whole of filing.
+    usePapers.getState().file(id, 'closed');
+
+    const after = usePapers.getState();
+    expect(looseDocs(after).map((doc) => doc.id)).not.toContain(id);
+
+    const filed = filedDocs(after).find((doc) => doc.id === id);
+    expect(filed, 'a stamped certificate is filed, never deleted').toBeDefined();
+    expect(filed?.mark).toBe('closed');
+    expect(filed?.payload.kind).toBe('certificate');
+  });
+
+  it('keeps the report after the desk is reloaded, which is the whole ruling', () => {
+    if (!level) return;
+    const { trace, verdict } = runReference(level, level.seeds[0] as number, w2_05);
+    useGame.setState({
+      screen: 'workspace',
+      currentLevelId: level.id,
+      trace,
+      verdict,
+      showResults: true,
+    });
+    const report = snapshotReport(useGame.getState());
+    if (!report) return;
+
+    usePapers.getState().issue({
+      id: 'certificate:reopen',
+      kind: 'certificate',
+      home: DOC_HOME.certificate,
+      payload: { kind: 'certificate', report },
+    });
+
+    /*
+     * The snapshot is the point. A later run overwrites `verdict`, `failureCursor` and
+     * `personalBest` in the store; a certificate that changed when you ran again would not be a
+     * record of anything.
+     */
+    useGame.setState({ verdict: null, trace: null, showResults: false });
+
+    const kept = looseDocs(usePapers.getState()).find((doc) => doc.id === 'certificate:reopen');
+    expect(kept, 'the certificate outlives the run that produced it').toBeDefined();
+    expect(kept?.payload.kind === 'certificate' && kept.payload.report.ticks).toBe(
+      verdict.stats.ticks,
+    );
+  });
+});
