@@ -617,11 +617,6 @@
   font-size: 11px;
 }
 
-.sitemap .screen-stat__best {
-  color: var(--ink-dim);
-  font-size: 10px;
-}
-
 .world--complete .world__num {
   color: var(--world-accent, var(--accent));
   opacity: 1;

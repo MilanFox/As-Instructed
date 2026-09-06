@@ -389,7 +389,7 @@ function ResultsReport(): JSX.Element | null {
               <div className="score-cell__label">ticks</div>
               <div className="score-cell__value">{ticks}</div>
               <div className="score-cell__note">
-                par {level.par.ticks}
+                {level.graded === false ? '' : `par ${level.par.ticks}`}
                 {progress?.bestTicks !== undefined ? ` · best ${progress.bestTicks}` : ''}
               </div>
             </div>
