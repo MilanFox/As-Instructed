@@ -23,6 +23,19 @@ export const solution: ReferenceSolution = {
       }
     } while (sim.canMove(botId, along) && sim.move(botId, along));
 
+    // Filed here rather than at the end: the field stops being able to answer this the moment
+    // the first crop comes out of it.
+    const perRow = new Map<number, number>();
+    for (const at of ripe) perRow.set(at.y, (perRow.get(at.y) ?? 0) + 1);
+    let bestRow = 0;
+    let bestCount = -1;
+    for (const [y, held] of perRow) {
+      if (held <= bestCount) continue;
+      bestCount = held;
+      bestRow = y;
+    }
+    sim.print(botId, `row ${String(bestRow)} ${String(bestCount)}`);
+
     const gap = (a: Vec, b: Vec): number => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
     const go = (to: Vec): void => {
       while (sim.pos(botId).x !== to.x) {
@@ -55,6 +68,11 @@ export const solution: ReferenceSolution = {
     'do {',
     '  for (const v of look(across, 14)) if (v.crop && v.growth >= v.maxGrowth) ripe.push(v.at);',
     '} while (canMove(along) && move(along));',
+    'const perRow = new Map();',
+    'for (const t of ripe) perRow.set(t.y, (perRow.get(t.y) || 0) + 1);',
+    'let bestRow = 0, bestCount = -1;',
+    'for (const [y, held] of perRow) if (held > bestCount) { bestCount = held; bestRow = y; }',
+    'print(`row ${bestRow} ${bestCount}`);',
     'const gap = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);',
     'const go = (t) => {',
     '  while (pos().x !== t.x) move(pos().x < t.x ? Dir.East : Dir.West);',

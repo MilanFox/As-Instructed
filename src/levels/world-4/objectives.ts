@@ -3,11 +3,10 @@ import type {
   Divergence,
   ObjectiveContext,
   Terrain,
-  TraceEvent,
   Vec,
   World,
 } from '../../engine/index.ts';
-import { FUEL_BURNING, NOTHING, tileAt } from '../../engine/index.ts';
+import { NOTHING, tileAt } from '../../engine/index.ts';
 import { keyOf } from './caves.ts';
 
 /**
@@ -53,22 +52,6 @@ export function firstVisitOrder(ctx: ObjectiveContext, targets: readonly Vec[]):
     order.push(hit);
   }
   return order;
-}
-
-export function markCount(ctx: ObjectiveContext, botId = 0): number {
-  return ctx.trace.events.filter(
-    (event: TraceEvent) => event.kind === 'mark' && event.botId === botId,
-  ).length;
-}
-
-/** Total fuel burned across the run. Mirrors the ledger `Sim.charge` keeps. DESIGN.md §11 A1. */
-export function fuelBurned(ctx: ObjectiveContext, botId = 0): number {
-  let burned = 0;
-  for (const event of ctx.trace.events) {
-    if (!FUEL_BURNING.has(event.kind)) continue;
-    if ('botId' in event && event.botId === botId && 'dt' in event) burned += event.dt;
-  }
-  return burned;
 }
 
 export function botEndsOn(ctx: ObjectiveContext, terrain: Terrain, botId = 0): boolean {

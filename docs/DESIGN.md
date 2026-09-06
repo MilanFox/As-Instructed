@@ -266,9 +266,11 @@ had one still loads; the retired field is dropped on read and everything beside 
 - **Everything that plays on completion is skippable**: `prefers-reduced-motion` collapses it,
   `settings.celebrations` turns it off permanently, and a click finishes it immediately.
 
-Medal totals earn a memo from management, escalating in passive aggression across five grades
+Medal totals earn a memo from management, escalating in passive aggression across four grades
 and delivered once per grade on the site map. It had a whole screen until 2026-09-05; the screen
-restated the site map and neither playtester opened it, so only the memo survives (§11 A8).
+restated the site map and neither playtester opened it, so only the memo survives (§11 A8). The
+grades are numbered 2–5 because the first was deleted once it was measured as unreachable and the
+numbers are persisted (§11 A12).
 
 ## 8. Visual Language
 
@@ -434,3 +436,38 @@ notice and are named in `docs/FIX-INCENTIVES.md` §4. A binary all-or-nothing re
 *non-occurrence* of an error signal is jointly satisfiable with an information budget only by
 already knowing the layout, which is hardcoding — the exact behaviour multi-seed levels exist to
 prevent.
+
+**A12 — The Performance Review is four grades, numbered 2 to 5.** Ruled 2026-09-06. Tier 1
+`DEVELOPING` (0–24%) was deleted because it was measured unreachable: `reportFor` divides by three
+points per graded work order and the cheapest close is a bronze at one of three, so **33.3% is the
+exact floor** of any graded record and nothing could ever land below 25. Tier 2 was checked as well
+and is *not* unreachable — all-bronze is 33.3%, inside its band, and it is where every player who
+scrapes a pass begins — so the honest ladder is four, not three. `CONSISTENT WITH EXPECTATION`'s
+`min` went 25 → 0 and **no band moved for any reachable percentage**.
+
+**The surviving ranks keep the numbers 2, 3, 4, 5, and renumbering them 1–4 is a bug, not a
+tidy-up.** `save.reviewedRanks` persists which memos have been sent. Renumbering re-points every
+existing save at the wrong memo and withholds one the player has never read, which is a worse
+outcome than a gap in a sequence no player ever sees. `rescueRanks` accepts any integer ≥ 1, so no
+save shape changes and no migration is needed.
+
+**A13 — A budget declares its unit; it is not parsed back out of its own prose.** Ruled 2026-09-06.
+`Objective.meter` and `Objective.unit` exist in `src/engine/objectives.ts`, `BudgetMeter` is
+declared there once and aliased by `src/game/budgets.ts`, and `meterFor` / `budgetFor` prefer a
+declaration over the label. Label parsing survives only as a fallback for objectives that have not
+declared. **A new objective whose progress counts anything must declare its meter**, so that its
+label is free to say whatever reads best; `src/game/__tests__/budget-declarations.test.ts` pins the
+set that still infers, and the correct direction for that set is down.
+
+**`Objectives.custom` cannot declare one yet, and that is the gap to close first.** `CustomReport`
+is `{ progress?, divergence }`, and `custom()` passes `{ id, label }` as its options, so there is no
+path for a meter to reach the objective. Nearly every bonus in the campaign is a `custom`, so in
+practice the rule above binds only the engine-minted objectives until `CustomReport` gains
+`meter?` / `unit?` and `custom()` forwards them. Until then, two interim rules, and both are better
+practice than the thing they stand in for:
+
+- **Keep a new label clear of the words the fallback parses** — `tick`, `op`, any sense name, any
+  trace event kind — so that nothing is inferred rather than something wrong being inferred.
+- **Omit `progress()` rather than ship a bar pointed at the wrong meter.** Where the honest quantity
+  is not a run-wide total — `w7-02`'s heaviest single bot's share, for instance — a progress bar the
+  readout attributes to a run-wide meter is the `6 / 1 pickups` bug, and no bar beats a wrong bar.

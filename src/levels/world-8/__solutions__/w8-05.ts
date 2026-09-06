@@ -393,6 +393,9 @@ export const solution: ReferenceSolution = {
     /** The cycle wraps, so a station that is already on is left alone: using it twice is off. */
     const lit = (station: Station): boolean =>
       sim.probe(anyBot, station.id)?.state === 'on';
+    // The tick each station was thrown on, read off the thrower's own clock before the use.
+    // Nothing else in the run remembers it and the final world cannot reconstruct it.
+    const thrown = new Map<string, number>();
     const light = (station: Station): boolean => {
       if (lit(station)) return true;
       const order = fleet
@@ -400,8 +403,12 @@ export const solution: ReferenceSolution = {
         .sort((a, b) => manhattan(spot(a), station.at) - manhattan(spot(b), station.at));
       for (const id of order) {
         if (!ready(id) || !reach(id, station.at)) continue;
+        const at = sim.clock(id);
         sim.use(id);
-        if (lit(station)) return true;
+        if (lit(station)) {
+          thrown.set(station.id, at);
+          return true;
+        }
       }
       return false;
     };
@@ -616,6 +623,22 @@ export const solution: ReferenceSolution = {
       }
       if (!shifted) break;
     }
+
+    let heldId = '';
+    let heldFor = -1;
+    for (const station of stations) {
+      const start = thrown.get(station.id);
+      if (start === undefined) continue;
+      let fed = -1;
+      for (const dep of station.deps) {
+        const at = thrown.get(dep);
+        if (at !== undefined && at + 1 > fed) fed = at + 1;
+      }
+      if (fed < 0 || start - fed <= heldFor) continue;
+      heldFor = start - fed;
+      heldId = station.id;
+    }
+    if (heldId !== '') sim.print(anyBot, `held ${heldId} ${String(heldFor)}`);
   },
   source: [
     '// Roles, not a rota: one electrician, one clerk, everybody else on crates.',
@@ -915,13 +938,16 @@ export const solution: ReferenceSolution = {
     '',
     '// A station is thrown by whoever is nearest and can still get there. The cycle wraps, so a',
     '// station that is already on is left alone: using it twice would turn it back off.',
+    '// The tick a station was thrown on, off the thrower\'s own clock. Nothing else keeps it.',
+    'const thrown = new Map();',
     'const light = (s) => {',
     "  if (probe(s.id).state === 'on') return true;",
     '  const order = fleet.slice().sort((a, b) => gap(spot(a), s.at) - gap(spot(b), s.at));',
     '  for (const id of order) {',
     '    if (!ready(id) || !reach(id, s.at)) continue;',
+    '    const at = bot(id).clock();',
     '    bot(id).use();',
-    "    if (probe(s.id).state === 'on') return true;",
+    "    if (probe(s.id).state === 'on') { thrown.set(s.id, at); return true; }",
     '  }',
     '  return false;',
     '};',
@@ -1105,5 +1131,21 @@ export const solution: ReferenceSolution = {
     '  }',
     '  if (!shifted) break;',
     '}',
+    '',
+    "let heldId = '';",
+    'let heldFor = -1;',
+    'for (const s of subs) {',
+    '  const start = thrown.get(s.id);',
+    '  if (start === undefined) continue;',
+    '  let fed = -1;',
+    '  for (const dep of s.deps) {',
+    '    const at = thrown.get(dep);',
+    '    if (at !== undefined && at + 1 > fed) fed = at + 1;',
+    '  }',
+    '  if (fed < 0 || start - fed <= heldFor) continue;',
+    '  heldFor = start - fed;',
+    '  heldId = s.id;',
+    '}',
+    "if (heldId !== '') print(`held ${heldId} ${heldFor}`);",
   ].join('\n'),
 };

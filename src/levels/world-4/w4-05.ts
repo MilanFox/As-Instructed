@@ -1,9 +1,11 @@
-import type { ObjectiveContext, Rng, Vec, World } from '../../engine/index.ts';
+import type { Divergence, ObjectiveContext, Rng, Vec, World } from '../../engine/index.ts';
 import {
   ItemKind,
+  NOTHING,
   Objectives,
   Terrain,
   addBot,
+  clipValue,
   createWorld,
   opposite,
   setTerrain,
@@ -23,7 +25,7 @@ import {
   linkDirs,
   paintCave,
 } from './caves.ts';
-import { botEndsOn, died, endedOn, fuelBurned } from './objectives.ts';
+import { botEndsOn, died, endedOn } from './objectives.ts';
 
 const CELLS = 19;
 const SIZE = 40;
@@ -101,9 +103,99 @@ function build(seed: number): World {
   return world;
 }
 
-function tankSize(ctx: ObjectiveContext): number {
-  return ctx.initialWorld.bots[0]?.fuelMax ?? 0;
+/** What the run said the way back would cost, what it actually cost, and whether it said it. */
+interface TripHome {
+  /** The line filed after the quota was complete and before the bot moved again. */
+  filed?: string;
+  /** Moves spent after that line — or after the last cut, when nothing was filed. */
+  paid: number;
+  /** The quota was never made, so there was no trip home to price. */
+  short: boolean;
+  /** The bot drove away from the vein before saying what the trip would cost. */
+  droveFirst: boolean;
 }
+
+/**
+ * Reads the last leg of the shift out of the trace.
+ *
+ * The anchor is the cut that completes the quota, because that is the moment the run stops having
+ * a choice: everything after it is the way back, and the fuel to pay for it either was reserved or
+ * was not. A price filed *after* the first move home is a description of a trip already underway,
+ * which is the one thing this star is not asking for, so that case is separated from filing
+ * nothing at all.
+ */
+function tripHome(ctx: ObjectiveContext): TripHome {
+  const events = ctx.trace.events;
+  let carried = 0;
+  let anchor = -1;
+  for (let i = 0; i < events.length && anchor < 0; i++) {
+    const event = events[i];
+    if (event === undefined || event.kind !== 'mine' || !event.ok) continue;
+    carried += event.count;
+    if (carried >= ORE_QUOTA) anchor = i;
+  }
+  if (anchor < 0) return { paid: 0, short: true, droveFirst: false };
+
+  let filedAt = -1;
+  let filed: string | undefined;
+  let droveFirst = false;
+  for (let i = anchor + 1; i < events.length; i++) {
+    const event = events[i];
+    if (event === undefined) continue;
+    if (event.kind === 'move' && event.ok) {
+      droveFirst = true;
+      break;
+    }
+    if (event.kind === 'print' && event.text.startsWith('home ')) {
+      filedAt = i;
+      filed = event.text;
+      break;
+    }
+  }
+
+  let paid = 0;
+  for (let i = (filedAt < 0 ? anchor : filedAt) + 1; i < events.length; i++) {
+    const event = events[i];
+    if (event?.kind === 'move' && event.ok) paid++;
+  }
+  return filed === undefined
+    ? { paid, short: false, droveFirst }
+    : { filed, paid, short: false, droveFirst };
+}
+
+/**
+ * Where the filed price and the trip parted company, without ever naming the number of moves.
+ *
+ * The figure is the whole star, so a wrong one comes back as the run's own line and the word
+ * "different". The three ways of not answering — never cutting the quota, driving off first, and
+ * saying nothing — are separated, because each one is a different mistake and "no star" says none
+ * of them.
+ */
+const unfiled = (ctx: ObjectiveContext): Divergence | undefined => {
+  const trip = tripHome(ctx);
+  if (trip.short) {
+    return {
+      where: 'the last vein',
+      expected: `${String(ORE_QUOTA)} ore cut`,
+      received: 'the quota was never made',
+    };
+  }
+  if (trip.droveFirst) {
+    return {
+      where: 'the trip home',
+      expected: 'a price filed before the first move back',
+      received: 'the bot drove off first',
+    };
+  }
+  if (trip.filed === undefined) {
+    return {
+      where: 'the trip home',
+      expected: 'a line saying what the way back costs',
+      received: NOTHING,
+    };
+  }
+  return { where: 'the trip home', expected: 'a different figure', received: clipValue(trip.filed) };
+};
 
 /**
  * The synthesis level. Fuel pays for both halves of the job — finding the veins and getting back
@@ -144,6 +236,10 @@ export const w4_05: LevelDef = {
       label: 'A `look` ray',
       value: 'Stops at the first thing it cannot see through, and tells you what that thing was.',
     },
+    {
+      label: 'The return note',
+      value: `For the star: the moment the ${String(ORE_QUOTA)}th ore is cut, and before the bot moves again, file one line \`home <n>\` — the number of moves the trip back is going to take. Then take exactly that many.`,
+    },
   ],
   seeds: [1, 2, 3, 4, 5],
   par: { ticks: 700 },
@@ -168,17 +264,26 @@ export const w4_05: LevelDef = {
     ),
   ],
   bonus: [
+    /*
+     * `fuel-reserve` — burn no more than four fifths of the tank — was measured met on all five
+     * seeds with 27% to 59% of the allowance still to spare, and it is not a second axis anyway:
+     * on this level fuel is spent tick for tick, so a fuel budget and the clock are the same
+     * number twice. It was also satisfied by a bot that never started; a fifth of the tank is
+     * trivially unused if none of it is used.
+     *
+     * The level's fourth hint is the question worth grading — *"before each step, ask what it
+     * would take to get home from where that step lands you"* — and nothing anywhere asked the
+     * program to say the answer out loud. Filing it is free (`print` costs no tick) and it cannot
+     * be produced by a bot that is driving home and hoping.
+     */
     Objectives.custom(
-      'fuel-reserve',
-      'Finish the job on one tank with a fifth of it unused',
-      (ctx) => fuelBurned(ctx) <= tankSize(ctx) * 0.8,
-      {
-        divergence: (ctx) => ({
-          where: 'fuel burned',
-          expected: `${String(Math.floor(tankSize(ctx) * 0.8))} of ${String(tankSize(ctx))}`,
-          received: `${String(fuelBurned(ctx))} of ${String(tankSize(ctx))}`,
-        }),
+      'filed-return',
+      'File what the trip home will cost before driving it',
+      (ctx) => {
+        const trip = tripHome(ctx);
+        return trip.filed === `home ${String(trip.paid)}`;
       },
+      { divergence: unfiled },
     ),
   ],
   starter: [
@@ -193,6 +298,7 @@ export const w4_05: LevelDef = {
     'A corridor you have not walked down is not a mystery. Look down it first and see what the far end is made of.',
     'The bot can work out how far it is from the lift at any moment, as long as it wrote down how it got there.',
     'Before each step, ask what it would take to get home from where that step lands you. When the answer is more than the tank holds, you went too far one step ago.',
+    'A program that can answer that question can also write the answer down. Work the route back out of the map you kept, count it, say it, and then drive it — in that order.',
   ],
   docs: ['look', 'mine', 'refuel', 'memory'],
 };

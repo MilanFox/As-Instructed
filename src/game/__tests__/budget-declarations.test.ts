@@ -13,8 +13,8 @@
  *
  *  - **The declaration wins**, even against a label that says the opposite. That is the whole
  *    point; an objective that has said what it counts must not be re-read out of its prose.
- *  - **The set that has not declared is pinned exactly.** Six objectives across the campaign still
- *    get their meter from their words. Reword one so the inference changes — or add a seventh —
+ *  - **The set that has not declared is pinned exactly.** Two objectives across the campaign still
+ *    get their meter from their words. Reword one so the inference changes — or add a third —
  *    and this fails, which is the notice nobody got last time.
  *
  * The inference *outcome* is what is asserted, not the label text. A reword that leaves the
@@ -40,17 +40,18 @@ interface Inferred {
 /**
  * Every campaign objective whose meter comes from nowhere but its label.
  *
- * All six are tick deadlines phrased as shift deadlines. Each would be one line better off
- * declaring `meter: { kind: 'ticks' }` — the diff is in `docs/FIX-INVARIANTS.md` — after which it
- * drops out of this list and the list gets shorter, which is the direction it is allowed to move.
+ * Both are tick deadlines phrased as shift deadlines, and both are *required* objectives — the four
+ * bonuses that used to be here went with the bonus rework (`docs/FIX-BONUSES.md`), which is the
+ * list getting shorter for the best possible reason: the objectives stopped existing.
+ *
+ * These last two cannot be converted yet. Both are `Objectives.custom`, and `CustomReport` is
+ * `{ progress?, divergence }` with no path for a meter to reach the objective — DESIGN.md §11 A13
+ * records the gap and `docs/FIX-INVARIANTS.md` carries the engine diff that closes it. Until it
+ * lands, the fallback parse is what keeps their readouts honest, which is what the fallback is for.
  */
 const INFERRED_FROM_LABEL: readonly Inferred[] = [
-  { level: 'w3-01', objective: 'clean-run', kind: 'ticks', unit: null },
-  { level: 'w8-01', objective: 'audit-tight', kind: 'ticks', unit: null },
   { level: 'w8-03', objective: 'within-shift', kind: 'ticks', unit: 'ticks' },
-  { level: 'w8-03', objective: 'tight-shift', kind: 'ticks', unit: 'ticks' },
   { level: 'w8-05', objective: 'deadline', kind: 'ticks', unit: 'ticks' },
-  { level: 'w8-05', objective: 'under-budget', kind: 'ticks', unit: 'ticks' },
 ];
 
 function inferredFromLabel(): Inferred[] {
@@ -77,7 +78,7 @@ function inferredFromLabel(): Inferred[] {
 }
 
 describe('budgets that are still read out of their own English', () => {
-  test('are exactly the six on record, inferring exactly what is on record', () => {
+  test('are exactly the two on record, inferring exactly what is on record', () => {
     expect(inferredFromLabel()).toEqual([...INFERRED_FROM_LABEL]);
   });
 

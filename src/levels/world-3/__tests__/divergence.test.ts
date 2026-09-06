@@ -61,28 +61,42 @@ describe('w3-01 — the pad the shift walked past', () => {
     expect(divergence).toEqual({ where: at(first), expected: 'a crate', received: '(nothing)' });
   });
 
-  test('clean-run names the tick and tile of the grab that came up empty', () => {
-    const start = must(w3_01.build(1).bots[0], 'the bot').at;
-    const { met, divergence } = diverge(w3_01, 1, 'clean-run', (sim, botId) => {
-      sim.pickup(botId, 'crate', 1);
+  test('straight-runs says a report was wanted when none was filed', () => {
+    const { met, divergence } = diverge(w3_01, 1, 'straight-runs', (sim, botId) => {
+      sim.wait(botId, 1);
     });
     expect(met).toBe(false);
     expect(divergence).toEqual({
-      where: `tick 0 · ${at(start)}`,
-      expected: 'a grab that takes a crate',
-      received: 'took nothing, and cost a tick',
+      where: 'the shift report',
+      expected: 'a line saying how many trips run flat',
+      received: '(nothing)',
     });
   });
 
-  test('a run with no empty grab is told the clock instead', () => {
-    const { met, divergence } = diverge(w3_01, 1, 'clean-run', (sim, botId) => {
-      sim.wait(botId, 400);
+  test('a wrong figure comes back as the run’s own line, never as the answer', () => {
+    const { met, divergence } = diverge(w3_01, 1, 'straight-runs', (sim, botId) => {
+      sim.print(botId, 'straight 0');
     });
     expect(met).toBe(false);
     const shown = must(divergence, 'a divergence');
-    expect(shown.where).toBe('the whole run');
-    expect(shown.expected).toBe('157 ticks');
-    expect(Number.parseInt(shown.received, 10)).toBeGreaterThan(157);
+    expect(shown).toEqual({
+      where: 'the shift report',
+      expected: 'a different figure',
+      received: 'straight 0',
+    });
+    expect(shown.expected).not.toMatch(/\d/);
+  });
+
+  test('filing every candidate instead of one answer is refused', () => {
+    const { met, divergence } = diverge(w3_01, 1, 'straight-runs', (sim, botId) => {
+      for (let n = 0; n <= 6; n++) sim.print(botId, `straight ${String(n)}`);
+    });
+    expect(met).toBe(false);
+    expect(divergence).toEqual({
+      where: 'the shift report',
+      expected: 'one line about the shift',
+      received: '7 of them',
+    });
   });
 });
 

@@ -142,11 +142,6 @@ function deadlineFor(world: World): number {
   return (criticalChain(world) + lanes(world)) * (USE_COST + hop) + hop;
 }
 
-/** The energising itself, plus the walking the busiest bot cannot avoid doing. */
-function targetFor(world: World): number {
-  return criticalChain(world) * USE_COST + (lanes(world) + 2) * meanHop(world);
-}
-
 /** The first station the audit will not sign off, and why. */
 function darkStation(ctx: ObjectiveContext): { id: string; at: Vec; reason: string } | undefined {
   const switched = usedMachines(ctx);
@@ -394,15 +389,6 @@ export const w8_03: LevelDef = {
     ),
   ],
   bonus: [
-    Objectives.custom(
-      'tight-shift',
-      "Beat the shift's theoretical minimum plus travel, in ticks",
-      (ctx) => ctx.trace.endTick <= targetFor(ctx.initialWorld),
-      {
-        progress: (ctx) => [ctx.trace.endTick, targetFor(ctx.initialWorld)],
-        divergence: (ctx) => overranBy(ctx, targetFor(ctx.initialWorld)),
-      },
-    ),
     Objectives.withinSenses('probe', SURVEY_BUDGET, {
       label: `Plan the restart on ${String(SURVEY_BUDGET)} reads or fewer`,
     }),

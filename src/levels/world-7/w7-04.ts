@@ -2,6 +2,7 @@ import type { Divergence, Machine, ObjectiveContext, Vec, World } from '../../en
 import {
   Dir,
   MachineKind,
+  NOTHING,
   Objectives,
   Rng,
   Terrain,
@@ -13,7 +14,7 @@ import {
   vec,
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
-import { localSeed } from './shared.ts';
+import { localSeed, reportedLines } from './shared.ts';
 
 const WIDTH = 28;
 const HEIGHT = 20;
@@ -134,11 +135,6 @@ export function boundOf(jobCosts: readonly number[], fleet: number): number {
   return Math.max(longest, Math.ceil(total / Math.max(1, fleet))) + WALK_OUT;
 }
 
-export function loadBound(world: World): number {
-  const costs = jobMachines(world).map((job) => job.vars.cost ?? 0);
-  return boundOf(costs, world.bots.filter((bot) => bot.alive).length);
-}
-
 function progress(ctx: ObjectiveContext): [number, number] {
   return [doneCount(ctx.world), jobMachines(ctx.initialWorld).length];
 }
@@ -164,12 +160,95 @@ function unfinishedJob(ctx: ObjectiveContext): Divergence | undefined {
   };
 }
 
-/** The allowance the label promises, against the clock the last bot actually stopped on. */
-function overBound(ctx: ObjectiveContext): Divergence {
+/**
+ * The tick each job's own clock stopped on: the reading the bot that closed it had straight
+ * after its last `use`. A job nobody finished is absent.
+ */
+function closedAt(ctx: ObjectiveContext): Map<string, number> {
+  const closed = new Map<string, number>();
+  for (const event of ctx.trace.events) {
+    if (event.kind !== 'use' || !event.ok) continue;
+    const id = event.machineId;
+    if (id === null || !id.startsWith(JOB_PREFIX)) continue;
+    closed.set(id, Math.max(closed.get(id) ?? 0, event.t + event.dt));
+  }
+  for (const job of jobMachines(ctx.world)) {
+    if (job.state !== 'done') closed.delete(job.id);
+  }
+  return closed;
+}
+
+/** The tick the board went clear, and every job that could be said to have decided it. */
+function deciders(ctx: ObjectiveContext): { tick: number; jobs: Set<string> } {
+  const closed = closedAt(ctx);
+  const tick = Math.max(0, ...closed.values());
+  const jobs = new Set<string>();
+  for (const [id, at] of closed) if (at === tick) jobs.add(id);
+  return { tick, jobs };
+}
+
+/** `last <job> <tick>` split back into its two halves, or null when it is not that shape. */
+function readDecider(line: string): { job: string; tick: number } | null {
+  const parts = line.split(' ');
+  if (parts.length !== 3) return null;
+  const tick = Number(parts[2]);
+  if (!Number.isInteger(tick)) return null;
+  return { job: parts[1] as string, tick };
+}
+
+/**
+ * Where the shift report and the run part company, without naming the job.
+ *
+ * Naming it is the whole bonus. What comes back instead is the run's own answer priced against
+ * the run's own makespan — a tick the player can already read off their own clock — so a wrong
+ * guess rules that job out and leaves the bookkeeping that finds the right one exactly where it
+ * was.
+ */
+function misreadDecider(ctx: ObjectiveContext): Divergence | undefined {
+  const said = reportedLines(ctx.trace.events, 'last');
+  const { tick, jobs } = deciders(ctx);
+  const line = said[0];
+  if (line === undefined) {
+    return {
+      where: 'the shift report',
+      expected: 'a line naming the job that finished last',
+      received: NOTHING,
+    };
+  }
+  if (said.length > 1) {
+    return {
+      where: 'the shift report',
+      expected: 'one line',
+      received: `${String(said.length)} lines`,
+    };
+  }
+  const claim = readDecider(line);
+  if (claim === null) {
+    return {
+      where: 'the shift report',
+      expected: 'a line reading `last <job> <tick>`',
+      received: clipValue(line),
+    };
+  }
+  const closed = closedAt(ctx).get(claim.job);
+  if (closed === undefined) {
+    return {
+      where: claim.job,
+      expected: 'a job this run finished',
+      received: 'never reached done',
+    };
+  }
+  if (!jobs.has(claim.job)) {
+    return {
+      where: claim.job,
+      expected: `a job that closed at tick ${String(tick)}`,
+      received: `closed at tick ${String(closed)}`,
+    };
+  }
   return {
-    where: 'the whole run',
-    expected: `${String(Math.floor((loadBound(ctx.initialWorld) * 4) / 3))} ticks`,
-    received: `${String(ctx.trace.endTick)} ticks`,
+    where: claim.job,
+    expected: 'the tick its bot read after the last use',
+    received: `tick ${String(claim.tick)}`,
   };
 }
 
@@ -216,6 +295,11 @@ export const w7_04: LevelDef = {
       label: 'Load bound',
       value:
         "`probe('board').vars.bound` — the longer of the longest single job, or every job plus two ticks of walking shared out across the fleet, plus the walk out from Depot 0.",
+    },
+    {
+      label: 'Shift report',
+      value:
+        'One line, `last <job> <tick>`: the job whose final `use()` landed latest, and the clock reading of the bot that closed it, straight after that use.',
     },
   ],
   seeds: [1, 2, 3, 4, 5],
@@ -278,10 +362,17 @@ export const w7_04: LevelDef = {
   ],
   bonus: [
     Objectives.custom(
-      'within-bound',
-      'Finish within a third of the load bound',
-      (ctx) => ctx.trace.endTick <= Math.floor((loadBound(ctx.initialWorld) * 4) / 3),
-      { divergence: overBound },
+      'name-the-decider',
+      'Report the job that decided the shift',
+      (ctx) => {
+        const said = reportedLines(ctx.trace.events, 'last');
+        if (said.length !== 1) return false;
+        const claim = readDecider(said[0] as string);
+        if (claim === null) return false;
+        const { tick, jobs } = deciders(ctx);
+        return jobs.has(claim.job) && claim.tick === tick;
+      },
+      { divergence: misreadDecider },
     ),
   ],
   starter: [

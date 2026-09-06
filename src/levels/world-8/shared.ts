@@ -4,7 +4,6 @@ import type {
   Divergence,
   ItemKind,
   Machine,
-  MoveEvent,
   ObjectiveContext,
   Sim,
   TileView,
@@ -31,7 +30,7 @@ import {
  *
  * - **Authoring** (`localRng`, `carveCaves`, `encodeCaesar`, `checksum`) runs inside `build(seed)`
  *   and may read the world freely.
- * - **Adjudication** (`blockedMoves`, `sightingTick`, `useLog`, ...) runs inside objectives, which
+ * - **Adjudication** (`sightingTick`, `useLog`, `criticalChain`, ...) runs inside objectives, which
  *   see `world`, `initialWorld` and `trace` and nothing else.
  * - **Piloting** (`KnownMap`, `follow`) is what the reference solutions use. It deliberately
  *   reads *only* what the player's API exposes — `scan`, `look`, `probe`, `canMove` — so a
@@ -508,15 +507,6 @@ export function followPath(sim: Sim, botId: number, path: readonly Dir[], patien
 // Adjudication: reading the trace
 // ---------------------------------------------------------------------------
 
-export function blockedMoves(ctx: ObjectiveContext): number {
-  return ctx.trace.events.filter((event) => event.kind === 'move' && !event.ok).length;
-}
-
-/** The earliest move that went nowhere and still cost a tick. */
-export function firstBlockedMove(ctx: ObjectiveContext): MoveEvent | undefined {
-  return ctx.trace.events.find((event): event is MoveEvent => event.kind === 'move' && !event.ok);
-}
-
 /** The bot whose own clock ran longest: on a fleet level it is the one that set the end tick. */
 export function lastBotStanding(ctx: ObjectiveContext): Bot | undefined {
   return ctx.world.bots.reduce<Bot | undefined>(
@@ -657,43 +647,6 @@ export function sightingTick(ctx: ObjectiveContext, targets: readonly Vec[], ran
     note(event.to, event.t + event.dt);
   }
   return wanted.size === 0 ? latest : Number.POSITIVE_INFINITY;
-}
-
-/**
- * Per-bot idle time as a fraction of the makespan: waiting, syncing, and the tail a bot spends
- * finished while the rest of the fleet is still out. The fleet-utilisation measure.
- */
-function idleTicks(ctx: ObjectiveContext): Map<number, number> {
-  const span = ctx.trace.endTick;
-  const idle = new Map<number, number>();
-  for (const bot of ctx.world.bots) idle.set(bot.id, span - bot.clock);
-  for (const event of ctx.trace.events) {
-    if (event.kind !== 'wait' && event.kind !== 'sync') continue;
-    idle.set(event.botId, (idle.get(event.botId) ?? 0) + event.dt);
-  }
-  return idle;
-}
-
-export function worstIdleFraction(ctx: ObjectiveContext): number {
-  const span = ctx.trace.endTick;
-  if (span <= 0) return 0;
-  let worst = 0;
-  for (const value of idleTicks(ctx).values()) worst = Math.max(worst, value / span);
-  return worst;
-}
-
-/** The idlest bot by name and the share of the shift it spent that way. */
-export function worstIdler(ctx: ObjectiveContext): { name: string; fraction: number } | undefined {
-  const span = ctx.trace.endTick;
-  if (span <= 0) return undefined;
-  let worst: { name: string; fraction: number } | undefined;
-  for (const [botId, ticks] of idleTicks(ctx)) {
-    const fraction = ticks / span;
-    if (worst !== undefined && fraction <= worst.fraction) continue;
-    const bot = ctx.world.bots.find((candidate) => candidate.id === botId);
-    worst = { name: bot?.name ?? `bot #${String(botId)}`, fraction };
-  }
-  return worst;
 }
 
 // ---------------------------------------------------------------------------

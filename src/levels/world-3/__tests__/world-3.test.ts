@@ -404,7 +404,7 @@ describe('w3-01 — one clamp', () => {
     }
   });
 
-  test('the reference finishes inside par with nothing grabbed twice', () => {
+  test('the reference finishes inside par and files the shift report', () => {
     for (const seed of w3_01.seeds) {
       expect(bonusMet(w3_01, runReference(w3_01, seed, w3_01Solution))).toBe(true);
     }
@@ -413,19 +413,15 @@ describe('w3-01 — one clamp', () => {
   /*
    * PLAYTEST-BEGINNER.md §10 item 3: the old label said "pickup", which is a trace event kind, so
    * the readout counted every pickup in the run against a limit taken from a 0-or-1 flag and
-   * rendered `6 / 1 pickups`. The limit this star actually spends against is the tick par, and the
-   * label and the progress now both say so.
+   * rendered `6 / 1 pickups`. The star that replaced it counts nothing at all — it is one line,
+   * right or wrong — so the honest shape is no progress bar and a label that names no meter,
+   * which is what DESIGN.md §11 A13 asks for while `Objectives.custom` still cannot declare one.
    */
-  test('the star is metered in ticks, not in pickups', () => {
+  test('the star names no meter and offers no bar to point at the wrong one', () => {
     const star = (w3_01.bonus ?? [])[0] as Objective;
-    expect(star.label).toContain('ticks');
-    expect(star.label).not.toContain('pickup');
-    for (const seed of w3_01.seeds) {
-      const result = runReference(w3_01, seed, w3_01Solution);
-      expect(star.progress?.(result)).toEqual([
-        Math.min(result.ticks, w3_01.par.ticks),
-        w3_01.par.ticks,
-      ]);
+    expect(star.progress).toBeUndefined();
+    for (const word of ['tick', 'op', 'pickup', 'drop', 'scan', 'move']) {
+      expect(star.label.toLowerCase()).not.toContain(word);
     }
   });
 
@@ -440,11 +436,11 @@ describe('w3-01 — one clamp', () => {
   });
 
   /*
-   * Why this level carries a tick star and not a resource one. The only freedom the shed offers is
-   * which crate is paired with which pad and in what order, and it is small enough to solve
+   * Why this level carries a report star and no budget at all. The only freedom the shed offers
+   * is which crate is paired with which pad and in what order, and it is small enough to solve
    * exactly: nearest-crate-then-nearest-pad is already the best pairing on seed 2 and seed 3, and
    * is two ticks off it on seed 1. There is no budget that separates a better idea from a worse
-   * one, so there is no honest resource bonus to write here.
+   * one, so the star asks a question about the shift instead of a smaller number about the route.
    */
   test('greedy pairing is within two ticks of the best pairing on every declared seed', () => {
     const permutations = (items: Vec[]): Vec[][] => {

@@ -98,18 +98,29 @@ describe('w7-01 names the bot rather than counting them', () => {
     });
   });
 
-  test('a fleet that walked into the dead end is told the bot, the tick and the tile', () => {
-    const { report } = diverge(w7_01, 1, 'no-slack', (sim) => {
-      for (let n = 0; n < 8; n++) sim.move(0, Dir.East);
-      for (let n = 0; n < 8; n++) sim.move(1, Dir.East);
-    });
+  test('a fleet that filed no idle report is told which bot is missing from it', () => {
+    const { report } = diverge(w7_01, 1, 'name-the-idle', () => undefined);
 
     expect(report.met).toBe(false);
     expect(report.divergence).toEqual({
-      where: 'bot #0 · tick 6',
-      expected: 'a clear tile at (8, 1)',
-      received: 'a wall',
+      where: 'bot #0',
+      expected: 'a line saying how long it stood still',
+      received: '(nothing)',
     });
+  });
+
+  test('a wrong idle figure is answered with the run own line, never with the answer', () => {
+    const { report } = diverge(w7_01, 2, 'name-the-idle', (sim) => {
+      for (let n = 0; n < 5; n++) sim.move(1, Dir.East);
+      sim.sync();
+      for (const id of sim.botIds()) sim.print(id, `idle ${String(id)} 0`);
+    });
+    const shown = must(report.divergence, 'a divergence');
+
+    expect(report.met).toBe(false);
+    expect(shown.where).toBe('bot #0');
+    expect(shown.expected).toBe('a different figure');
+    expect(shown.received).toBe('idle 0 0');
   });
 });
 
@@ -129,21 +140,27 @@ describe('w7-02 names a crop rather than counting them', () => {
     });
   });
 
-  test('a fleet that took its time is priced against the floor the label promises', () => {
-    const { report, ticks } = diverge(w7_02, 1, 'within-ten-percent', (sim, botId) => {
-      for (let n = 0; n < 100; n++) {
-        sim.move(botId, Dir.East);
-        sim.move(botId, Dir.West);
+  test('a fleet that let one bot do everything is told which bot, and by how much', () => {
+    const { report } = diverge(w7_02, 1, 'even-share', (sim, botId) => {
+      for (let row = 3; row <= 10; row++) {
+        for (let column = 3; column <= 6; column++) {
+          for (let guard = 0; guard < 32 && sim.pos(botId).y !== row; guard++) {
+            sim.move(botId, sim.pos(botId).y < row ? Dir.South : Dir.North);
+          }
+          for (let guard = 0; guard < 32 && sim.pos(botId).x !== column; guard++) {
+            sim.move(botId, sim.pos(botId).x < column ? Dir.East : Dir.West);
+          }
+          sim.harvest(botId);
+        }
       }
     });
-    const shown = must(report.divergence, 'a divergence');
 
     expect(report.met).toBe(false);
-    expect(shown.where).toBe('the whole run');
-    expect(shown.received).toBe(`${String(ticks)} ticks`);
-    expect(Number.parseInt(shown.received, 10)).toBeGreaterThan(
-      Number.parseInt(shown.expected, 10),
-    );
+    expect(report.divergence).toEqual({
+      where: 'bot #0',
+      expected: '8 crops or fewer',
+      received: '32 crops',
+    });
   });
 });
 
@@ -211,18 +228,31 @@ describe('w7-04 names the job and how far into it the fleet got', () => {
     expect(shown.received).toMatch(/^\d+ of \d+ uses$/);
   });
 
-  test('the round-robin deal is priced against the bound the board publishes', () => {
-    const { report, ticks } = diverge(w7_04, 3, 'within-bound', (sim, botId) => {
+  test('a shift report that files no line at all is told what is missing', () => {
+    const { report } = diverge(w7_04, 1, 'name-the-decider', (sim, botId) => {
       roundRobinDispatch.run(sim, botId);
+    });
+
+    expect(report.met).toBe(false);
+    expect(report.divergence).toEqual({
+      where: 'the shift report',
+      expected: 'a line naming the job that finished last',
+      received: '(nothing)',
+    });
+  });
+
+  /** Naming the wrong job gives back that job's own closing tick, never the right job. */
+  test('naming a job that closed earlier is priced against the run own makespan', () => {
+    const { report } = diverge(w7_04, 1, 'name-the-decider', (sim, botId) => {
+      roundRobinDispatch.run(sim, botId);
+      sim.print(botId, 'last job-0 1');
     });
     const shown = must(report.divergence, 'a divergence');
 
     expect(report.met).toBe(false);
-    expect(shown.where).toBe('the whole run');
-    expect(shown.received).toBe(`${String(ticks)} ticks`);
-    expect(Number.parseInt(shown.received, 10)).toBeGreaterThan(
-      Number.parseInt(shown.expected, 10),
-    );
+    expect(shown.where).toBe('job-0');
+    expect(shown.expected).toMatch(/^a job that closed at tick \d+$/);
+    expect(shown.received).toMatch(/^closed at tick \d+$/);
   });
 });
 
