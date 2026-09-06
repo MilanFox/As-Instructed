@@ -1741,6 +1741,54 @@ function drawCropRipe(paint: CropPaint, px: number, py: number): void {
 }
 
 /**
+ * Ice-scrub, and the whole of `w2-05`. Two things grow on that soil and only one is the harvest.
+ *
+ * Every crop rung above stands on the soil rule, in the centre column, tapering upward, and the
+ * ripe one is enclosed in a bracket. That is a *cultivated* grammar: worked ground, one plant per
+ * row, a mark that says take this. Scrub gets none of it. **No soil rule** — nobody turned this
+ * ground, and "sown but bare" and "a weed came up here" are different facts a player acts on
+ * differently. No column, no stalk, no bracket, and never the hot phosphor, which on this
+ * direction is reserved for the one thing worth stopping for.
+ *
+ * What is left is low, wide and uneven: runs scattered across the bottom half of the tile at no
+ * pitch and on no baseline. Against a centred vertical tally that is a different silhouette
+ * rather than a different value, so it holds at the floor and holds with the hue gone.
+ */
+const SCRUB_INK = alpha(INK, 0.4);
+
+/** `x`, `w`, `y` as tile fractions. Uneven on purpose: a pitch is what a planted row has. */
+const SCRUB_RUNS: readonly (readonly [number, number, number])[] = [
+  [0.08, 0.26, 0.76],
+  [0.44, 0.34, 0.72],
+  [0.22, 0.2, 0.6],
+  [0.58, 0.28, 0.56],
+  [0.1, 0.16, 0.44],
+  [0.66, 0.22, 0.4],
+];
+
+/** Weeds spread sideways. Maturity is how much of the tile it has taken, never how tall it is. */
+const SCRUB_COUNT: readonly number[] = [1, 2, 3, 4, 5, 6];
+
+function drawScrub(paint: CropPaint): void {
+  const { ctx, tilePx } = paint;
+  const px = paint.x * tilePx;
+  const py = paint.y * tilePx;
+  const runs = SCRUB_COUNT[Math.max(0, Math.min(5, paint.stage))] ?? 6;
+  const h = Math.max(1, Math.round(tilePx * 0.07));
+
+  ctx.fillStyle = SCRUB_INK;
+  for (let i = 0; i < runs; i++) {
+    const run = SCRUB_RUNS[i] as readonly [number, number, number];
+    ctx.fillRect(
+      px + Math.round(tilePx * run[0]),
+      py + Math.round(tilePx * run[2]),
+      Math.max(1, Math.round(tilePx * run[1])),
+      h,
+    );
+  }
+}
+
+/**
  * One crop tile.
  *
  * The soil rule is drawn at every stage including the first, so a sown-but-bare tile is never an
@@ -1748,6 +1796,10 @@ function drawCropRipe(paint: CropPaint, px: number, py: number): void {
  * and a player acts on them differently.
  */
 function drawCrop(paint: CropPaint): void {
+  if (paint.kind === 'ice') {
+    drawScrub(paint);
+    return;
+  }
   const { ctx, tilePx, stage, stages } = paint;
   const px = paint.x * tilePx;
   const py = paint.y * tilePx;

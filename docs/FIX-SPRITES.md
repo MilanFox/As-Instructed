@@ -724,3 +724,133 @@ were never counted, and `survey` itself was read by the registry. No ratchet edi
 `src/ui/` was not touched, as scoped. A stale `import './styles/art/survey.css';` in `src/ui/App.tsx`
 and the ~550-line stylesheet it names are the desk lane's half; nothing in `src/render/` refers to
 either, and the build is green with them present or absent.
+
+---
+
+## 16. The crop and the ice-scrub
+
+`w2-05` is one reading: *"two things grow in the west field. one of them is the crop. the other is
+ice-scrub, which likes the same soil and is worth nothing to anybody."* Both grow on `Terrain.Soil`,
+both carry `growth`/`maxGrowth`, and the level is a shift too short to visit the whole field — so
+the player has to decide from the board and the sensor which tiles are worth the wheels.
+
+**They were the same picture.** Not a near miss, not a weak tell: the same picture.
+
+### 16.1 The defect, traced rather than grepped
+
+The kind lives on the tile. `src/engine/types.ts:89` is `crop?: ItemKind`, and `w2-05.ts` sows
+`ItemKind.Crop` at lines 79 and 92 and `ItemKind.Ice` at line 104 — sixteen scrub tiles against
+twelve or thirteen crop ones, on the same soil, per seed. It is on the sensor: `Sim` copies it into
+`TileView.crop` at `src/engine/sim.ts:1083`, `scan().crop` returns `"crop"` or `"ice"`, and the
+level's own facts table sells that as the instrument the level teaches.
+
+It stopped at the renderer. `Renderer.indexSnapshot` selects crop cells on `maxGrowth > 0` alone
+(`renderer.ts:1165`), which is correct — both kinds grow. `drawCrops` then filled `CropPaint` with
+`x`, `y`, `growth`, `max`, `stage` and `ripe` and **nothing else**: `CropPaint` had no field for the
+kind at all, so `tile.crop` was read nowhere on the draw path in any direction. Both authored
+painters were therefore correct and both were blind. `deepsite.paintCrop` and `signal.drawCrop` drew
+the same six-rung ladder for a crop and for a weed, and no amount of art direction could have fixed
+it, because the distinguishing fact never arrived.
+
+`marks.test.ts` could not have caught it either. Its `cropStream` fixture built a `CropPaint` by
+hand from the same six fields, so the guard that exists to prove two different things draw two
+different marks had no way to express these two things.
+
+### 16.2 What changed about the form
+
+`CropPaint` gained `kind`, and `drawCrops` sets it from `tile.crop ?? 'crop'`. Then both directions
+were given a second form — **not a recolour and not a smaller plant**.
+
+The argument is what the two things *are*. A crop is cultivated: it stands in ground somebody
+turned, its stems are vertical, its plants sit at an even pitch down a row, and when it is ready it
+wears the harvest brackets. Ice-scrub is volunteer growth. It sprawls, it has no stem, it is not on
+the row, it turns no ground, and **it never wears the brackets however ripe the tile says it is** —
+a bracket means "worth the two ticks" and a weed never is, even though `harvest()` will happily
+spend a hopper slot on one.
+
+**Deep Site** spends the tell `docs/LIGHT.md` §2 already spends on the three obstacle classes:
+height, and the light that comes with it. A crop is a volume — mound, lit west shoulder, dark east
+flank, a shadow cast south-east. Scrub lies flat on the plate, so it has no shoulder, no flank and
+nothing to cast: one flat value, a low off-centre node, and two to five arms splayed out of it,
+none of them the vertical every crop stem is. Beside a thing that stands up it reads as scribble on
+the floor. Maturity is arms and reach, never height and never a head.
+
+**Signal** makes the same claim in its own grammar. Every crop rung stands on the soil rule, in the
+centre column, tapering upward, and the ripe one is enclosed in a bracket on the hot phosphor. Scrub
+draws **no soil rule** — nobody worked this ground, and "sown but bare" and "a weed came up here"
+are different facts a player acts on differently — no column, no stalk, no bracket, and never the
+hot phosphor. What is left is one to six short runs scattered low across the tile at no pitch and on
+no baseline: wide and ragged against centred and vertical.
+
+### 16.3 Hue removed
+
+Deep Site's scrub is `#55707d`. Its relative luminance is **0.1500** against the crop leaf's
+`#5f7247` at **0.1492** — contrast against the floor plate `#4c5661` is **1.423** for the scrub and
+**1.417** for the leaf. The two are the same value to three decimal places, deliberately: there is
+no room left for this mark to be passing on hue while looking like form, and the scrub sits at the
+same contrast against the floor that the crop's own mid leaf does. Ripe stays the brightest thing on
+the tile at 6.07 against the floor, untouched.
+
+`signal` is one phosphor and never had a hue to lean on; its scrub differs by alpha *and* by
+structure.
+
+### 16.4 The floor, in call streams and in pixels
+
+`marks.test.ts` gained a `crop against scrub` block over the two directions that author a crop —
+`standard` reads one plant out of the atlas and has no second frame to reach for, the same line the
+cost section draws. It is a collision check over the **union of the two ladders**, hue removed,
+at 16/20/24/32/48 px, plus a no-motion no-type run at the floor, plus ripe-crop against every scrub
+rung. The union matters: a scrub that draws what a crop three rungs down draws is the same defect
+wearing a different number, and it is the shape a "make the weed smaller" fix produces.
+
+Checked in **actual pixels** as well as in call streams, by rasterising every rung of both kinds
+into a tile buffer at 16/20/24/32/48 px, both `dpr`, both directions: **no crop rung is
+pixel-identical to any scrub rung**, anywhere on that grid.
+
+### 16.5 Cost, both halves of §7
+
+Per element and per layer, draw calls, at the floor and at 48 px:
+
+| | 16 px | 24 px | 48 px |
+|---|---|---|---|
+| `deepsite` scrub layer (six rungs) | 50 | 71 | 91 |
+| `deepsite` scrub, per rung | 3–15 | — | 5–27 |
+| `signal` scrub layer | 21 | 21 | 21 |
+
+Deep Site's scrub falls with the tile by shape: the arms are stepped lines whose weight never drops
+below **two device pixels**, which is §7's bound, so the step count is `reach / w` and shrinks with
+the tile rather than flooring at a hairline. Signal's is flat — bounded by a part count, which is
+what §7 calls safe by shape, and one to six `fillRect`s is already the cheapest a run can be drawn.
+Neither loops per tile per frame, so neither needed baking.
+
+The whole-board half: `w2-05`'s crop layer across all five seeds and all five rungs peaks at **901**
+calls (`deepsite`) and **172** (`signal`), against the standing per-frame ceiling of 6,000 that the
+guard applies to every level in the campaign. The campaign peak is unchanged — `w2-05` is the only
+level that sows anything but crop, and `boardStream` now passes the tile's kind so the ice tiles are
+measured rather than counted as crops.
+
+The guard is **145 cases** where it was 123.
+
+### 16.6 The shot
+
+`docs/shots/sprites/crop-vs-scrub-24px.png`. Bare, unripe, nearly-ripe and ripe crop beside young
+and spread scrub, at **24 device px** — the legibility floor the campaign plays at — magnified 4x
+nearest-neighbour, in both shipping directions and at both `dpr`, because Deep Site's detail gate is
+a *screen*-pixel threshold and 24 device px is the near form on a 1x panel and the far form on a 2x
+one. Both are real and both are shown. The right half is the same sheet with every pixel collapsed
+to its luminance.
+
+Rasterised straight out of the painters rather than captured from a browser: a capture pipeline
+resamples, and the claim being made is about the pixel structure at the floor.
+
+### 16.7 Ratchets
+
+Neither moved. `src/__tests__/unused-exports.test.ts` is unchanged — `kind` is a field on an
+existing exported interface, not a new export — and `confessed-invariants.test.ts` is unchanged.
+Full suite 2,056 tests over 96 files, from 2,034.
+
+### 16.8 Not done
+
+Nothing outside `src/render/`. In particular `standard` still draws one plant for both kinds; it is
+the guard's atlas control and never reaches a player (§15), and giving the atlas a second frame
+would be an asset change rather than a rendering one.
