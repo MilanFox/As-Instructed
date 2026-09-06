@@ -1553,3 +1553,87 @@ it — and that the deliverable is **the list of which bonuses across all forty 
 because that list measures how much of the layer was being won on seed one alone.
 
 **Four agents live:** art direction, bonuses-and-par, discrepancy, bonus-seed-grading.
+
+---
+
+## 2026-09-06 — the art spike landed; the window reset killed four agents mid-work
+
+**Merged: the discrepancy layout goes on the run set** (`183e43c`). Main green at
+**1735 tests / 75 files**. A player can now press Run on the work order a Discrepancy names and
+watch it fail on the layout the card is talking about, then fix it and watch the card clear —
+verified end to end in a browser, not reasoned about.
+
+Three decisions in it worth keeping. **Own seeds run first**, because the runtime reports the
+*first* failing seed, so an audit layout can only become the reported failure once everything the
+level always asked for already passes — the player is never shown a layout they were not told about
+while they still have an ordinary bug. **A `note` travels with the seeds** and `run()` prints the
+raiser's sentence to the console, because the campaign has no vocabulary for *why* an extra layout
+is on a schedule and inventing one in `store.ts` would be the leak the import ban exists to prevent
+— and the console is the one surface that stays legible while the art rebuild is live. **The write
+lives in `src/meta/campaign.ts`**, not on `MetaHost`, because `MetaHost` is implemented by a React
+integration and so is live too late for something that must hold from the moment the save is read.
+
+`MIN_CLOSED_BEFORE_FIRST` 6 → **4** and `COMPLETIONS_PER_DISCREPANCY` 5 → **3**, both from
+measurement rather than taste: the first never gated anything (the Repository is provisioned by the
+tenth close anyway), and the second was sized against the campaign when the real ceiling is the
+**candidate pool** — only ~10 of 34 work orders import `lib`, and one raise per order caps it there.
+Frequency should follow how often the player's code is brittle, not a counter.
+
+The handed-over `SILVER_FACTOR` bug is fixed, imported from `engine/index.ts` rather than
+`game/score.ts` — meta→game would have been a new worse edge. Removing the `KNOWN_OPEN` entry took
+**four** sites, not one, and the agent flagged that rather than editing quietly: it **flipped** the
+last assertion instead of deleting it, so `medalThresholds()` is now the fourth prose copy held to
+the same standard. I reviewed that diff. It strengthens the guard.
+
+### The art direction landed — three bets, and the pick is the user's
+
+**Not three shades of one look. Three mark-making systems**, each a self-contained pair under
+`src/render/art/`, with `standard` kept as a fourth selectable baseline.
+
+- **SURVEY** — the fiction does the work: Kessler & Daughters never sent anyone to the planet, so
+  the board is not a window onto the site, it is Survey's *plot* of it. Paper, hatching, stipple,
+  ruled line; one ink at three weights; no gradients, glow, bevels or rounded corners anywhere.
+- **SIGNAL** — one phosphor, no second hue, board built from raster lines because that is what the
+  device physically draws. Terrains become raster *patterns* rather than colours, and the trail
+  stops being an overlay and becomes persistence.
+- **DEEP SITE** — one fixed north-west key light for the whole game, so shading becomes a language
+  rather than an effect; everything on a four-step Bayer ramp, which is a **legibility** decision:
+  at 24px a checker resolves honestly where a smooth ramp turns to mud.
+
+**Shots sent to the user; the direction is theirs to pick and I am not picking it.** Everything
+else about the branch I decided: it merges as four selectable modules, so nothing about the merge
+forecloses the choice.
+
+**Three things came free with it.** The empty board is fixed — `setPreview` draws the level before
+the first Run, which was the UI audit's worst finding. Tiles doubled on `w4-05` and `w8-05`, with a
+test that no level shrinks at any size. And **all three directions render faster than the shipped
+look** (0.30–0.39ms against 0.54ms; terrain rebuild 1.2–1.7ms against 3.4ms) — performance was the
+risk I expected to trade against and it evaporated. All three clear the `--ink-dim` contrast bar
+that `standard` fails on every surface.
+
+The agent **argued with `FIX-TRAIL` §7 and changed its test**, correctly: "the cold end is a
+darkening" is right for three directions and meaningless against Signal's near-black floor. The
+invariant is now contrast against each direction's own `referenceFloor`. That is a strengthening,
+not a route around. **Known gap, deliberately left:** machines, crops and items still come off the
+tile atlas — it refused to skip those passes to make the boards prettier, because crop maturity is
+required to solve `w2-02`.
+
+### The window reset killed four agents mid-work; all state survived
+
+Bonus-seed grading, bonuses-and-par, and its two sub-agents all died on the same 429, none on an
+error. Every worktree was intact and uncommitted. All resumed with a brief naming exactly where
+they stopped, and the parent told to **re-spawn its sub-agents to continue** rather than redo their
+work.
+
+### The guards fired on the art branch, which is them working
+
+Five failures: new exports nothing reads yet, new prose matching the confessed-invariant index, and
+`TIMELINE_H` — whose **premise is gone rather than violated**, since the board is now the full
+height of the workspace and the timeline floats over it. That is a judgement call, so it went to an
+agent rather than getting a mechanical patch. **Main was kept green throughout** by having that
+agent absorb the art branch into its own worktree instead of merging the art branch red.
+
+It was told the thing that matters about these guards: the original index was 24 hits holding nine
+real invariants and eleven ordinary English uses of the word "mirrors", and **that ratio must not
+come back** — reword the prose, do not register the false positive. And that deleting a dead export
+beats listing it.
