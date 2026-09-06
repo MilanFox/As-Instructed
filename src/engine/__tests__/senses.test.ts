@@ -334,6 +334,7 @@ describe('information budget objectives', () => {
         label: 'Use probe at most 10 times',
         met: true,
         progress: [7, 10],
+        meter: { kind: 'sense', name: 'probe' },
       },
     ]);
   });

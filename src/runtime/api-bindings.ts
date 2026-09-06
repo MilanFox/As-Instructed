@@ -267,12 +267,12 @@ const BINDERS: Record<string, Binder> = {
   link:
     (sim, botId) =>
     (fromId, toId): boolean =>
-      linkMachines(sim, botId, String(fromId), String(toId), costOf('link')),
+      linkMachines(sim, botId, String(fromId), String(toId), sim.costs.link),
   receive: (sim, botId) => (): string | null => receivePacket(sim, botId),
   transmit:
     (sim, botId) =>
     (text): boolean =>
-      transmitPayload(sim, botId, stringify(text), costOf('transmit')),
+      transmitPayload(sim, botId, stringify(text), sim.costs.transmit),
   decode:
     (sim, botId) =>
     (text, key): string => {
@@ -296,11 +296,6 @@ const BINDERS: Record<string, Binder> = {
     (dir, options): number =>
       sim.spawn(botId, dir as Dir, (options ?? {}) as { name?: string; capacity?: number }),
 };
-
-function costOf(name: string): number {
-  const cost = PLAYER_API.functions.find((fn) => fn.name === name)?.cost;
-  return typeof cost === 'number' ? cost : 0;
-}
 
 function stringify(value: unknown): string {
   if (typeof value === 'string') return value;

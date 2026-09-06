@@ -78,7 +78,13 @@ describe('running the reference solution', () => {
     const { result } = run(w1_01Solution.source);
     expect(result.objectives).toEqual([
       { id: 'reach-pad', label: 'Park the bot on the landing pad', met: true },
-      { id: 'bay-booking', label: 'Clear the bay within 90 ticks', met: true, progress: [78, 90] },
+      {
+        id: 'bay-booking',
+        label: 'Clear the bay within 90 ticks',
+        met: true,
+        progress: [78, 90],
+        meter: { kind: 'ticks' },
+      },
     ]);
   });
 });

@@ -15,6 +15,8 @@ import {
   writeLibrary,
 } from '../save.ts';
 import {
+  COMPLETIONS_PER_DISCREPANCY,
+  MIN_CLOSED_BEFORE_FIRST,
   offScheduleSeeds,
   patchDiscrepancy,
   pickCandidate,
@@ -229,7 +231,9 @@ describe('discrepancies', () => {
 
     /* Closing it re-opens the door, but only once enough has happened since. */
     const closed = patchDiscrepancy(raised, 'D1', { closed: true });
-    expect(shouldProbe(closed, 7)).toBe(false);
+    expect(shouldProbe(closed, MIN_CLOSED_BEFORE_FIRST + COMPLETIONS_PER_DISCREPANCY - 1)).toBe(
+      false,
+    );
     expect(shouldProbe(closed, 20)).toBe(true);
   });
 

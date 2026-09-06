@@ -113,7 +113,7 @@ export function RefactorScreen(): React.JSX.Element {
   const reports = useLibrary((state) => state.reports());
 
   if (reports.length === 0) {
-    return <p className="lib__empty">{REFACTOR.empty}</p>;
+    return <p className="lib__empty">{REFACTOR.nothingToCost}</p>;
   }
 
   return (

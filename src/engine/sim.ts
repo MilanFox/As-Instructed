@@ -1142,7 +1142,10 @@ export class Sim {
     throw new OutOfFuelError(bot.id, bot.name, action, dt, bot.fuel);
   }
 
-  /** Advances the clock and burns `dt` fuel. Mirrors `FUEL_BURNING` in trace.ts. */
+  /**
+   * Advances the clock and burns `dt` fuel. `FUEL_BURNING` in trace.ts mirrors this: it lists the
+   * event kinds this is called for, so a replay burns exactly what the live run burned.
+   */
   private charge(bot: Bot, dt: number): void {
     bot.fuel -= dt;
     this.advance(bot, dt);

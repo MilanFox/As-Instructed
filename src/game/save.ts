@@ -9,6 +9,7 @@
  */
 import { Medal } from '../engine/index.ts';
 import { levelIsGraded } from '../levels/index.ts';
+import { RETIRED_ACHIEVEMENTS } from './achievements.ts';
 
 export const SAVE_KEY = 'bootstrap.save';
 export const SAVE_VERSION = 2;
@@ -70,7 +71,6 @@ export interface CampaignStats {
   runs: number;
   passes: number;
   fails: number;
-  /** Work orders closed in a row with no failed run in between. Reset by a failure, never by time. */
 }
 
 export interface SaveFile {
@@ -144,36 +144,20 @@ const MIGRATIONS: Record<number, Migration> = {
   /*
    * Commendations and requisition history arrive in version 2.
    *
-   * A version 1 save has closed work orders but no record of *how* they were closed, so the
-   * commendations that can be reconstructed honestly are reconstructed and the rest are simply not
-   * awarded. Handing a returning player fifteen commendations for runs nobody watched would be
-   * worth less than earning one.
+   * A version 1 save records that a work order closed and what medal it took, and nothing about
+   * *how* — not which run closed it, not whether an information budget was met, not whether the
+   * player went back for a star. None of the five commendations this build issues follows from
+   * what survived, so none is reconstructed. Handing a returning player an award for a run nobody
+   * watched would be worth less than earning one.
    */
   1: (raw) => ({
     ...raw,
     version: 2,
-    achievements: reconstructAchievements(rescueLevels(raw)),
+    achievements: {},
     stats: reconstructStats(rescueLevels(raw)),
     seenRequisitions: [],
   }),
 };
-
-/**
- * The commendations a version 1 save can prove. `medal` and `clearedAt` are the only two fields
- * that survived, so this awards exactly the two that follow from them and nothing else.
- */
-function reconstructAchievements(levels: Record<string, LevelProgress>): Record<string, number> {
-  const earned: Record<string, number> = {};
-  for (const progress of Object.values(levels)) {
-    if (!progress.completed) continue;
-    const at = progress.clearedAt ?? Date.now();
-    earned['filed'] = Math.min(earned['filed'] ?? at, at);
-    if (progress.medal === Medal.Gold) {
-      earned['within-budget'] = Math.min(earned['within-budget'] ?? at, at);
-    }
-  }
-  return earned;
-}
 
 function reconstructStats(levels: Record<string, LevelProgress>): CampaignStats {
   const stats = emptyStats();
@@ -275,12 +259,23 @@ export function migrate(raw: unknown): SaveFile {
   };
 }
 
-/** Commendations are timestamps. A junk value still counts as earned, dated now. */
+/**
+ * Commendations are timestamps. A junk value still counts as earned, dated now.
+ *
+ * Retired ids are dropped here and nowhere else, the same way a medal on a level that no longer
+ * carries one is dropped in `rescueLevels`: one whitelist on read, so no screen has to know which
+ * commendations this build stopped issuing. Everything beside a dropped id survives — a save that
+ * held ten of the old fifteen keeps whichever of them this build still issues.
+ *
+ * An id that is merely *unrecognised* is kept. It was written by a build that is not this one, and
+ * a player who opens an older binary must not have their record eaten by it.
+ */
 function rescueAchievements(raw: unknown): Record<string, number> {
   if (!isRecord(raw)) return {};
   const earned: Record<string, number> = {};
   for (const [id, at] of Object.entries(raw)) {
     if (typeof id !== 'string' || id.length === 0) continue;
+    if (RETIRED_ACHIEVEMENTS.has(id)) continue;
     earned[id] = isPositive(at) ? at : Date.now();
   }
   return earned;

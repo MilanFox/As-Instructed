@@ -48,7 +48,7 @@ export type CelebrationKind = 'gold' | 'silver' | 'bronze' | 'pass' | 'fail';
  * Draws a trace into a canvas and owns the playback clock.
  *
  * The renderer runs the frame loop, because it is the thing that has to interpolate; the shell
- * mirrors the position through `onTick` and pushes the player's intent back down through
+ * follows the position through `onTick` and pushes the player's intent back down through
  * `seek`/`play`/`pause`. Speeds are in engine ticks per wall-clock second.
  */
 export interface RendererPort {
@@ -78,7 +78,7 @@ export interface RendererPort {
    */
   celebrate(kind: CelebrationKind): void;
   pulse(kind?: 'objective' | 'commend'): void;
-  /** Mirrors `save.settings.celebrations`. Off means no-op, not quieter. */
+  /** Set from `save.settings.celebrations`. Off means no-op, not quieter. */
   setCelebrationsEnabled(enabled: boolean): void;
   /** Cuts a flourish dead, for the click or key that finishes the reveal early. */
   skipCelebration(): void;

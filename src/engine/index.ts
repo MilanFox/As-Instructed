@@ -127,6 +127,7 @@ export {
 } from './sim.ts';
 
 export type {
+  BudgetMeter,
   Comparison,
   CustomReport,
   Divergence,
@@ -150,13 +151,7 @@ export {
 export * as Objectives from './objectives.ts';
 
 export type { Verdict, VerdictInput } from './verdict.ts';
-export {
-  MEDAL_WEIGHT,
-  Medal,
-  SILVER_FACTOR,
-  buildVerdict,
-  medalFor,
-} from './verdict.ts';
+export { MEDAL_WEIGHT, Medal, SILVER_FACTOR, buildVerdict, medalFor } from './verdict.ts';
 
 export {
   FailureCode,

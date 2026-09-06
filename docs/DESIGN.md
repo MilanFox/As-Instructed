@@ -245,13 +245,22 @@ the same number of ticks get the same medal, deliberately.
 ### 7.1 Rewards
 
 The reward systems are `src/game/achievements.ts` (commendations) and the `stats` block in
-`src/game/save.ts` (runs, passes, fails, streak, best streak).
+`src/game/save.ts` (runs, passes, fails).
+
+**There is no streak.** There is no streak counter, no best streak, no field for either in
+`CampaignStats`, and nothing anywhere that resets on a failed run. It is not scored, not ranked,
+not stored, and not displayed. A reward whose only route is to stop pressing Run is a tax on the
+loop this game is made of, and it is not coming back — see §11 A9. A save written by a build that
+had one still loads; the retired field is dropped on read and everything beside it survives.
 
 - **Nothing is gated behind a commendation**, ever. No level, hint, doc page, or hardware.
 - **Requirements are public before they are met.** No secret achievements.
-- **Failure costs nothing but time.** No penalty, no lost progress, no downgraded medal. A failed
-  run resets the streak and increments a counter that exists only to reward persistence. A
-  program that did not compile was never dispatched and does not even do that.
+- **There are five commendations, and the bar for a sixth is high** (§11 A9). Each names something
+  the player did that they would be pleased to have noticed. Attendance, completion, and any
+  restatement of a medal already on the screen are not commendations.
+- **Failure costs nothing but time.** No penalty, no lost progress, no downgraded medal, no
+  commendation taken back. A failed run increments a counter that exists only to reward
+  persistence. A program that did not compile was never dispatched and does not even do that.
 - **Hardware unlocks are a ceremony.** `Requisition` shows each new command once, with what it
   does and what it opens up. `seenRequisitions` in the save makes it once, ever.
 - **Everything that plays on completion is skippable**: `prefers-reduced-motion` collapses it,
@@ -369,3 +378,59 @@ waiting, so the clock cannot see the lesson — but it still graded both testers
 52, and the veteran's silver-to-gold rewrite was the best moment of his first ninety minutes.
 **"The clock cannot see the lesson" is not "the clock cannot grade."** Only the second ungrades a
 level.
+
+**A9 — The streak is deleted, and the commendation list is five.** Ruled 2026-09-06.
+
+The streak was removed earlier and §7.1 went on describing it, which left the binding document
+instructing the next agent to rebuild the anti-feature. This amendment is the record, because §11
+is what agents are told overrides everything: **there is no streak, and nothing in this game may
+reward a player for not pressing Run.**
+
+The commendation list was fifteen and is now five: `second-look`, `raised-again`,
+`came-back-for-it`, `minimal-observation`, `repository`. Both playtesters reported the layer
+changed their behaviour zero times, and a reward nobody responds to is a list with a maintenance
+cost. The test each survivor passes, and any proposed sixth must pass:
+
+> **Does it name a specific thing the player did, that they would be pleased to have noticed?**
+
+Attendance ("close your first work order"), completion ("close every order in a world") and any
+restatement of something already on the screen (a gold, a star, a personal best) fail it. Two of
+the five pay for the loop the game is made of — run, fail, read, revise — and that is deliberate:
+they replaced the streak and they point the other way.
+
+**No commendation reads a medal.** `RunFacts` carries no medal, no ticks and no par, so an ungraded
+work order (A7) cannot break one. Reintroducing a medal-keyed commendation reintroduces that bug.
+
+**Retired commendation ids are dropped on read** by `rescueAchievements` in `save.ts`, the same
+whitelist pattern that drops a medal from a level that no longer carries one. An id this build does
+not recognise is *kept*, not dropped — it belongs to a newer build, and a downgrade must not eat a
+player's record.
+
+**A11 — The campaign is not a single file.** Ruled 2026-09-06. Closing a work order opens the
+**next two**, and closing a world opens the whole of the next world. `isLevelUnlocked` in
+`src/game/store.ts` is the one place that decides it.
+
+Strictly N−1 made all 33 joins single points of failure. A stuck player's only legal action was to
+keep grinding the same order; the hint ladder is the only other escape and it ends. Both playtests
+land on this from opposite directions — the veteran asked for a skip door, the beginner spent 55
+minutes and 11 runs on one order and stopped. **Not yet succeeding must never be able to close a
+door.**
+
+The teaching order survives because the entitlement is bought with closes: reaching World 5 still
+means closing most of World 4. What the gate is *not* allowed to do is be the campaign's only
+failure mode.
+
+The requisition ceremony is delivered cumulatively for this reason — `openLevel` offers every
+unsigned command in the order's API surface, not only the ones the order itself adds. A player who
+skipped the level that granted `scan` still gets the card, because the scope they run against was
+cumulative all along.
+
+**A10 — A blocked move is priced once, in ticks.** Ruled 2026-09-06. `move` returning `false` is a
+free sensing channel the game teaches deliberately (`w1-01`'s own hint sells bump-and-turn as a
+real, slightly-expensive strategy), and the blocked move's tick cost is the correct, proportional
+price for it. Nothing else may charge for it a second time. The `NO CONTACT REPORTED` commendation
+did, and is gone; the remaining bonus objectives that pay a star for zero blocked moves are on
+notice and are named in `docs/FIX-INCENTIVES.md` §4. A binary all-or-nothing reward for the
+*non-occurrence* of an error signal is jointly satisfiable with an information budget only by
+already knowing the layout, which is hardcoding — the exact behaviour multi-seed levels exist to
+prevent.

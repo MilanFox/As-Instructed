@@ -16,15 +16,33 @@ import type { LevelDef } from '../levels/index.ts';
 import { campaignOrder, getLevel, hardwareUnlockedBy, nextLevel } from '../levels/index.ts';
 import type { RendererPort, RunnerPort } from './ports.ts';
 import { FakeRenderer, FakeRunner } from './ports.ts';
-import type { RunFacts, WorldResult } from './achievements.ts';
-import { earnedBy, isSenseBudget } from './achievements.ts';
+import type { RunFacts } from './achievements.ts';
+import { earnedBy, getAchievement, isSenseBudget } from './achievements.ts';
 import type { LevelProgress, SaveFile } from './save.ts';
 import { emptyProgress, importSave, loadSave, mergeProgress, writeSave } from './save.ts';
-import { medalForLevel, medalOf, objectivesOnEverySeed } from './score.ts';
+import { medalForLevel, objectivesOnEverySeed } from './score.ts';
 
 export type Screen = 'levels' | 'workspace';
 export type RunState = 'idle' | 'running';
 export type ConsoleKind = 'print' | 'system' | 'error' | 'success';
+
+/**
+ * Layouts a work order has to close on that are not in its own `seeds`, and the line that says why.
+ *
+ * The campaign does not know who puts one here and must not find out: the write is one-directional
+ * (`setAuditSeeds`), the read happens once inside `run()`, and nothing here imports the system that
+ * raises them. That is the whole of the seam — `src/game/store.ts` importing `src/meta` would
+ * invert the dependency and make the Repository non-optional.
+ *
+ * `note` travels with the seeds because the console line is the one place this is guaranteed to be
+ * legible whatever the screens look like, and the campaign has no vocabulary for *why* an extra
+ * layout is on the schedule.
+ */
+export interface AuditSeeds {
+  seeds: readonly number[];
+  /** One line, already in the raiser's voice. Printed to the console when the run starts. */
+  note: string;
+}
 
 export interface ConsoleLine {
   id: number;
@@ -81,6 +99,13 @@ export interface GameState {
    * be a line in a brief. It is now a delivery, and it waits until the workspace is actually open.
    */
   requisition: { levelId: string; hardware: string[] } | null;
+  /**
+   * Extra layouts, by work order id. Empty for a player who never opens the Repository.
+   *
+   * Kept in the store rather than read through a port so that a screen can say "this run includes
+   * one you were not shown" without asking anybody who raised it.
+   */
+  auditSeeds: Readonly<Record<string, AuditSeeds>>;
 
   tick: number;
   endTick: number;
@@ -108,6 +133,8 @@ export interface GameState {
   setPanel(panel: 'brief' | 'console' | 'docs'): void;
   setDocsOpen(open: boolean): void;
   setLayout(patch: Partial<SaveFile['settings']['layout']>): void;
+  /** Replaces the whole map. Written from outside; see `AuditSeeds`. */
+  setAuditSeeds(seeds: Readonly<Record<string, AuditSeeds>>): void;
 
   run(): void;
   cancel(): void;
@@ -133,6 +160,20 @@ export interface GameState {
 
   importSaveFile(text: string): void;
   replaceSave(save: SaveFile): void;
+}
+
+/**
+ * The layouts one run has to close on: the work order's own, then any audit layout it does not
+ * already contain.
+ *
+ * The order is the design. The runtime reports the *first* failing seed, so the work order's own
+ * schedule is always answered first and an audit layout can only become the reported failure once
+ * everything the level always asked for already passes. The player is never shown a layout they
+ * were not told about while they still have an ordinary bug.
+ */
+export function runSeeds(own: readonly number[], audit?: AuditSeeds): number[] {
+  if (!audit) return [...own];
+  return [...own, ...audit.seeds.filter((seed) => !own.includes(seed))];
 }
 
 /**
@@ -164,11 +205,6 @@ function withBonus(level: LevelDef, verdict: Verdict, trace: Trace): Verdict {
 
 let lineId = 0;
 let watchdog: ReturnType<typeof setTimeout> | null = null;
-
-/** Moves the bot attempted and did not get. The elegant-solve commendation hangs on this being 0. */
-function blockedMoveCount(trace: Trace): number {
-  return trace.events.filter((event) => event.kind === 'move' && !event.ok).length;
-}
 
 function firstLevelId(): string | null {
   return campaignOrder()[0]?.id ?? null;
@@ -245,6 +281,7 @@ export const useGame = create<GameState>((set, get) => {
     freshCommendations: [],
     personalBest: null,
     requisition: null,
+    auditSeeds: {},
 
     tick: 0,
     endTick: 0,
@@ -300,7 +337,11 @@ export const useGame = create<GameState>((set, get) => {
       get().renderer().setTrace(null);
       get().runner().prepare(levelId);
       clearWatchdog();
-      const undelivered = level.hardware.filter(
+      /* Everything this order's API surface holds that has not been signed for, not just what this
+         order adds. Two orders are open at once now, so a player can arrive here having skipped
+         the one that granted `scan` — and the scope they run against is cumulative either way.
+         Delivering only `level.hardware` would hand them a command nobody announced. */
+      const undelivered = hardwareUnlockedBy(levelId).filter(
         (name) => !get().save.seenRequisitions.includes(name),
       );
       set({
@@ -358,6 +399,10 @@ export const useGame = create<GameState>((set, get) => {
     setDocsOpen(open) {
       set({ docsOpen: open });
     },
+    setAuditSeeds(seeds) {
+      set({ auditSeeds: seeds });
+    },
+
     setLayout(patch) {
       const settings = {
         ...get().save.settings,
@@ -375,6 +420,8 @@ export const useGame = create<GameState>((set, get) => {
       const level = state.currentLevelId ? getLevel(state.currentLevelId) : undefined;
       if (!level) return;
 
+      const audit = state.auditSeeds[level.id];
+      const seeds = runSeeds(level.seeds, audit);
       const token = state.runToken + 1;
       state.pause();
       set({
@@ -395,8 +442,11 @@ export const useGame = create<GameState>((set, get) => {
         {
           t: 0,
           kind: 'system',
-          text: `run ${level.id} — ${level.seeds.length} seed${level.seeds.length === 1 ? '' : 's'}`,
+          text: `run ${level.id} — ${seeds.length} seed${seeds.length === 1 ? '' : 's'}`,
         },
+        ...(audit && seeds.length > level.seeds.length
+          ? [{ t: 0, kind: 'system' as const, text: audit.note }]
+          : []),
       ]);
 
       clearWatchdog();
@@ -416,7 +466,7 @@ export const useGame = create<GameState>((set, get) => {
 
       state
         .runner()
-        .run({ code: state.code, levelId: level.id, seeds: [...level.seeds] })
+        .run({ code: state.code, levelId: level.id, seeds })
         .then((response) => {
           if (get().runToken !== token) return;
           if (!response.ok) {
@@ -487,7 +537,7 @@ export const useGame = create<GameState>((set, get) => {
           resultId: get().resultId + 1,
           ...(verdict.passed ? {} : { failureCursor: get().failureCursor + 1 }),
         });
-        recordResult(levelDef, verdict, medal, trace, results);
+        recordResult(levelDef, verdict, medal, results);
       }
 
       /**
@@ -501,7 +551,6 @@ export const useGame = create<GameState>((set, get) => {
         levelDef: LevelDef,
         verdict: Verdict,
         medal: Medal | null,
-        trace: Trace,
         results: PerSeedResult[],
       ): void {
         const state = get();
@@ -549,27 +598,13 @@ export const useGame = create<GameState>((set, get) => {
           stats.fails += 1;
         }
 
-        const worldResults: WorldResult[] = campaignOrder()
-          .filter((candidate) => candidate.world === levelDef.world)
-          .map((candidate) => {
-            const record = levels[candidate.id] ?? emptyProgress();
-            return { medal: medalOf(candidate, record), closed: record.completed };
-          });
-
         const facts: RunFacts = {
           passed: verdict.passed,
-          medal,
-          ticks: verdict.stats.ticks,
-          parTicks: levelDef.par.ticks,
           attempt,
-          blockedMoves: blockedMoveCount(trace),
-          stars: earned.length,
           senseBudgetMet: verdict.objectives.some(
             (objective) => objective.met && isSenseBudget(objective.id),
           ),
           returnedForStar: previous.completed && previous.stars.length === 0 && earned.length > 0,
-          ...(previous.bestTicks !== undefined ? { previousBestTicks: previous.bestTicks } : {}),
-          worldResults,
         };
 
         const achievements = { ...state.save.achievements };
@@ -644,6 +679,10 @@ export const useGame = create<GameState>((set, get) => {
 
     award(id) {
       const save = get().save;
+      /* A commendation this build does not issue is not recorded. The call sites live outside this
+         module, so a retired id raised by one of them must stop here rather than be written and
+         then dropped by the next load. */
+      if (getAchievement(id) === undefined) return;
       if (save.achievements[id] !== undefined) return;
       persist({ ...save, achievements: { ...save.achievements, [id]: Date.now() } });
       set({ freshCommendations: [...get().freshCommendations, id] });
@@ -737,13 +776,39 @@ export function progressFor(state: GameState, levelId: string): LevelProgress {
   return state.save.levels[levelId] ?? emptyProgress();
 }
 
-/** A level is open once the level before it in campaign order has been closed. */
+/** Closing one work order opens the next two. DESIGN.md §11 A11. */
+export const LEVELS_OPENED_BY_A_CLOSE = 2;
+
+/**
+ * Whether a work order is on the board.
+ *
+ * Two live at a time rather than one, and closing a world puts the whole of the next world up.
+ *
+ * Strictly N−1 made every join in the campaign a single point of failure: a stuck player's only
+ * legal move was to keep grinding the same order, and the hint ladder — which is finite and ends —
+ * was the only other way out. This genre's answer to *stuck* is lateral movement, and the gate
+ * removed it. Two open orders means being stuck is somewhere you leave and come back to.
+ *
+ * The teaching order survives, because the entitlement is bought with closes: reaching World 5
+ * still means closing most of World 4. What does not survive is *not yet succeeding* closing a
+ * door, which it never should have been able to do.
+ */
 export function isLevelUnlocked(save: SaveFile, levelId: string): boolean {
   const order = campaignOrder();
   const index = order.findIndex((level) => level.id === levelId);
-  if (index <= 0) return index === 0;
-  const previous = order[index - 1];
-  return previous ? (save.levels[previous.id]?.completed ?? false) : false;
+  if (index < 0) return false;
+  if (index === 0) return true;
+
+  let deepestClosed = -1;
+  for (const [at, level] of order.entries()) {
+    if (save.levels[level.id]?.completed) deepestClosed = at;
+  }
+  if (deepestClosed >= 0 && index <= deepestClosed + LEVELS_OPENED_BY_A_CLOSE) return true;
+
+  const world = order[index]?.world;
+  if (world === undefined) return false;
+  const before = order.filter((candidate) => candidate.world === world - 1);
+  return before.length > 0 && before.every((c) => save.levels[c.id]?.completed === true);
 }
 
 export function unlockedHardware(levelId: string): string[] {

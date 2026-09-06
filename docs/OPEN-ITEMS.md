@@ -1226,3 +1226,330 @@ possible, not smuggled in.
 Report: `docs/SPIKE-ART-DIRECTION.md`, shots under `docs/shots/art/<direction>/`, three
 separate commits so any one can be taken forward alone. A recommendation is required —
 "they're all fine" is a failed report.
+
+### 2026-09-05, 23:10 — the screen half of A7, and the crash contained (merged)
+
+Green at **1692 tests / 68 files** (+27, +2 files: 13 site map, 14 results), tsc / build clean.
+
+All five defects the previous agent measured but could not touch are fixed. Boot Sector reads
+`6/11 pts` instead of `0/11`; `ALL AT PAR` and the at-par aside now count an ungraded close,
+while the `GOLD`/`SILVER`/`BRONZE` columns stay medal-only — a `Tally.atPar` was added rather
+than blurring the medal counts, which is the right side of that line.
+
+**The accessibility fix, in the real tree:**
+
+```
+before: "w1-01, Cold Start. Closed. no medal."      "w1-05. Open. no medal."
+after:  "w1-01, Cold Start. Closed. Not graded."    "w1-05. Closed. gold medal."
+                                                     "w2-01. Open. no medal."
+```
+
+Three states now say three different things. `MedalBadge` took a real `Medal | null` arm
+rather than a call-site special case.
+
+**A regression the browser caught in its own fix, which no test would have:** `medalForLevel`
+returns `null` on an ungraded level *regardless of whether the run passed*, so a **failed** run
+was stamped with the green closed mark under the words `WORK ORDER OPEN`. Now routed through
+`reportedMedal`. That is the second time today that driving the thing caught a defect in a fix
+that typechecked.
+
+**AUDIT-UI F21 — the modal layer now has an error boundary.** The five stacked modals each get
+the existing `PanelBoundary`. Reproduced against the live crash: `#root.children.length` goes
+`0` → `1`, the workspace survives with the player's program intact, and the fault contains to a
+145px *"The publish offer — unavailable"* notice. It also found that **most of what the crash
+actually cost was a layout bug**: without `.modal-layer { flex: none; height: auto }` the
+fallback inherited `height: 100%` and pushed the editor off screen. The `src/meta/**` loop
+itself is untouched and still throws — that fix is a separate agent's, and the boundary is
+containment, not a cure.
+
+### Open from the audit, with owners now free
+
+- **F1** — a medal legend on the site map. `MedalBadge` now has the honest `CLOSED` state it
+  needs and `medal={medalOf(node.level, node.progress)}` drops straight in; the legend layout
+  is a design call.
+- **F9** — `.modal__body { min-height: 0; overflow-y: auto }`. Real bug: the run report's last
+  paragraph is drawn under its own footer.
+- **F18** — blocked on a ruling: the `GRADE` stat's denominator counts medals while the header
+  counts points. **Ruling: the header follows `reportFor`.** Points are the thing A7 made
+  uniform across graded and ungraded levels, so a second denominator beside it is the
+  disagreeing-tick-counter bug in miniature. Whoever takes F18 should verify that against the
+  code before acting.
+- **F22 half** — `aria-label="Playback speed"` on the speed combobox; the accessible name is
+  currently just `1x`. Left rather than half-done.
+- The ticks cell still reads `par 78 · best 78` on an ungraded level. One ternary; not a target,
+  no colour, so it was flagged rather than changed.
+
+### 2026-09-05, 23:20 — the art brief, sharpened
+
+User: *"I would want something that has an actual art style. Not a 'UI'. A 'game'."*
+
+**My original brief was too small and this is a correction to it, not an addition.** I scoped
+the spike to theme, palette, type scale and spacing — which is a **restyle by construction**. A
+perfectly executed restyle still answers "what UI framework is this" rather than "who drew
+this". Recorded because the same mistake is easy to repeat: scoping an art task to CSS
+variables guarantees a CSS-variable answer.
+
+**What the target actually is:**
+
+- **The things in the world must be drawn, not tokened.** A bot should read as a machine with a
+  silhouette and a front, not a coloured rounded rect. Rock should look like rock; a feeder like
+  industrial equipment; a depot recognisable from across the board. The board is currently
+  semantic fills and it needs to look **authored**.
+- **Silhouette at tile size is the real design problem.** `w8-05` is 48x40 at roughly 24px
+  tiles, and the visited-tile trail has to stay legible *on top of* whatever gets drawn. Dense,
+  small, still readable is exactly what Factorio and Opus Magnum solved.
+- **Identity, not surface.** A title treatment and a consistent line/dither/edge language —
+  something recognisable cropped to a 200px square. TIS-100 is identifiable from any crop.
+- **The chrome must belong to the same world as the board.** The audit's observation that the
+  warm-grey canvas does not join the chrome gets fixed by making them one artefact.
+
+**Scope grew to match: the agent may now author and commit real art assets** — hand-authored
+SVG, sprite sheets, pixel art as data, canvas routines with craft in them. `src/render/sprites.ts`
+is the existing seam. Ownership extended to `src/assets/**` and `public/**`. Constraints: no new
+runtime dependencies, nothing fetched — everything authored in-repo with stated provenance and
+weight.
+
+**Unchanged and still outranking all of it: readability beats beauty.** The player debugs by
+reading the board. A direction that makes the grid harder to count, the bot harder to find or a
+divergence harder to see is wrong however good it looks, and each must state that cost honestly.
+
+### 2026-09-05, 23:45 — window reset. Two more agents out; UI punch list deliberately held.
+
+State verified: main `d8ac109`, **1692 tests / 68 files**, tsc / build clean. The wake-up brief
+was four hours stale — everything it listed as in flight had already merged. Trust the last
+sections of this file over any resume brief.
+
+**Scheduling call: the UI audit's ~19 remaining findings are held until the art spike lands.**
+Most are contrast, spacing and palette fixes on the exact stylesheets the spike is replacing.
+Doing them now is work thrown away twice, and worse, it would make the spike merge against a
+moving target. They get **re-triaged against whatever direction wins** — some will be obsolete,
+some more urgent. Three stay live regardless because they are structural rather than stylistic:
+F9 (the report's last paragraph is drawn under its own footer), F22 (`aria-label` on the speed
+control), and the medal legend.
+
+### In flight — four agents, disjoint
+
+- **Art direction** — highest value, and the one the user is waiting on. Brief was sharpened
+  from restyle to art style; scope now includes authoring real assets.
+- **Publish crash** — the cure; the containment already merged.
+- **Incentives** — audit findings 3 and 5–12, plus cutting fifteen commendations to about five.
+  The evidence that makes it cheap: **both testers say the layer changed their behaviour zero
+  times.** Told to keep `REOPENED ON PURPOSE` and `A SECOND LOOK, AND A THIRD` unless it can
+  argue otherwise — they were added this week to replace the streak and they pay for the loop
+  the game is made of — and to leave `personalBestLine` alone entirely.
+- **Invariants** — the guards. Primary deliverable is *not* more fixes: it is the test that
+  enforces the 24 confessed `verbatim`/`mirrors`/`authoritative` claims, plus unused-export
+  detection, judged by which of the five known instances each would have caught.
+
+### Two rulings issued with that work
+
+1. **`budgets.ts` gets a structured unit field.** The label goes back to saying whatever reads
+   best; parsing survives only as a fallback, and a level that declares is never guessed at.
+   Same shape as the guards: replace an invariant maintained by prose with one maintained by
+   the type system.
+2. **Delete Performance Review tier 1.** `DEVELOPING` (0–24%) is unreachable — the medals-only
+   denominator floors a graded record at 33%. A grade nobody can ever see is dead content, and
+   this game deleted an entire screen on that reasoning three hours earlier. Four tiers. The
+   agent was told to verify my arithmetic first and to propose the honest ladder if tier 2 is
+   also unreachable in practice.
+
+Next wake-up armed for 04:42.
+
+### 2026-09-05, 23:55 — the art brief, third and final sharpening
+
+User: *"Don't be afraid to throw away everything and style it new. Nothing is set in stone. The
+current Website is a UI — I want an ART DIRECTION. Be bold. Try out things. See what sticks.
+Change entire things, throw away assets and try others. I want it to be a GAME, not a WEBSITE."*
+
+**My ownership split was the binding constraint, not the brief.** I had given the art spike
+`src/render/**` and `src/ui/styles/**` and told it to *describe* structural changes rather than
+make them. That caps the work at repainting: a transformation that cannot touch component
+structure cannot stop something looking like a dashboard. Worth recording as the general
+lesson — **twice now the art work was limited by how I scoped it rather than by the idea.**
+First to CSS variables, then to no-markup.
+
+**Now:** the art spike owns **all of `src/ui/`** — screens, components, panels, `Workspace.tsx`,
+`App.tsx`, styles — plus `src/render/**`, `src/assets/**`, `public/**` and `index.html`. The
+incentives agent was pulled off every UI file and confined to `src/game/**`, `src/levels/**`
+and docs; it now hands over diffs, and was told to **lead with the intent rather than the diff**,
+because intent survives a rebuilt component and a diff against a deleted one does not.
+
+**Licence granted explicitly:** restructure the layout, delete components, replace the panel
+system if the panel system is what reads as a dashboard. The existing tokens, spacing scale,
+palette and type are **not a baseline to preserve** — they are what was judged, and the verdict
+was boring. Told to be bolder than feels sensible, and that one of three directions being too
+much is a success condition, not a failure: *"see what sticks" is licence to fail on one.*
+
+**What still holds, and deliberately only this:**
+
+- **Readability beats beauty** — with the honest version spelled out: a direction may cost real
+  legibility if it says so and argues the trade.
+- No gameplay, par, medal, budget, objective, level or difficulty change. Character count stays
+  deleted.
+- Motion respects `prefers-reduced-motion` and `settings.celebrations`; per-frame cost stated.
+- No new runtime dependencies; assets authored in-repo with provenance and weight.
+- Green at the end. **Tests asserting current markup may legitimately need rewriting** — rewrite
+  to assert behaviour. A renderer test failing because the palette changed on purpose is a
+  signal to update the test; one failing because the grid stopped being countable is a signal
+  to stop.
+
+---
+
+## 2026-09-06 — publish crash merged; the reward and invariant agents still out
+
+**Merged: the publish dialog no longer loops the render** (`f90f842`). Main is green at
+**1698 tests / 69 files**, tsc and build clean.
+
+The diagnosis is worth keeping because it is a *class* of bug, not an incident. `PublishOffer`
+carried a `selection` field, so `setSelection` minted a new object identity on every keystroke,
+and a memo that legitimately depended on `offer` could never converge. The regression commit is
+`befef62`, which added `offer` to the memo deps — **the correct move by the rules of hooks**. It
+stepped into a trap laid the day the component was written. The fix is structural rather than a
+guard: `offer` is now write-once (minted by `offerPublish`, cleared by confirm/skip) and
+`confirmPublish(selection)` takes the draft as an argument. An identity guard or narrowed deps
+would both have stopped today's loop while leaving the trap armed for the next reader.
+
+**Rejected on the way:** a hand-written deep compare (stops guarding silently the day
+`PublishSelection` gains a field) and a sibling store field (same trap for the first component
+that subscribes to it). *A mid-interaction draft does not belong in a frozen fact.*
+
+`src/meta/__tests__/publish-dialog.test.ts` brings its own React — a hand-cranked renderer with
+real hook semantics and `Object.is` dep comparison, no jsdom, no testing-library, no new deps.
+Verified by checking the two pre-fix sources back out under it: **3 of 6 fail before, 6 pass
+after**, and it settles in exactly 2 passes rather than never. `skipPublish` and `confirmPublish`
+had **no test at all** in the repo before this.
+
+**Two findings picked up in passing:** F13's 37-word scolding now fires only when actionable and
+is one sentence; the COST tab no longer repeats the status bar verbatim; the Repository's Monaco
+gained `ariaLabel: 'lib.ts'` (two textboxes were both named "Editor content" in the a11y tree).
+
+**Still open from that report:** F20 is live on main — `src/ui/library.ts:90` throws
+`Uncaught (in promise)` from `installTypes` on level entry, logged twice per entry. Routed to
+whoever owns `src/ui/` when the art direction settles. The modal-layer error boundary is still
+owed and still worth having with the loop gone.
+
+**In flight overnight:** the art direction spike (the one that matters), the reward-layer cut,
+and the invariant guards. Reveille armed for the window reset at 04:42 with a full brief; the
+Mac is caffeinated. The art comparison shots go **to the user to pick from** — that call is
+taste, so it is theirs. Every other call is mine.
+
+---
+
+## 2026-09-06 — the reward layer merged; two agents spawned on the files it freed
+
+**Merged: fifteen commendations cut to five** (fast-forward to `3c96853`). Main green at
+**1698 tests / 69 files**. The test applied to each was *"does it name a specific thing the player
+did, that they would be pleased to have noticed?"* — attendance, completion, and restatements of a
+medal the player is already looking at all fail it.
+
+**Survivors:** `second-look`, `raised-again`, `came-back-for-it`, `minimal-observation`,
+`repository`. The consequence worth keeping is structural rather than cosmetic: **no surviving
+commendation reads a medal.** `RunFacts` lost `medal`, `ticks`, `parTicks`, `blockedMoves`, `stars`,
+`previousBestTicks` and `worldResults`, so the A7 hazard — a commendation keyed to a medal on a
+level that has none — is now *absent* rather than *handled*. `WorldResult` and `ELEGANT_FACTOR` are
+gone entirely.
+
+The agent **corrected the audit on finding 6** and I accept the correction. The audit counted six
+systems paying for not bumping; `w3-01`'s `clean-run` counts failed *pickups*, a different family,
+so the live count was five. But the count was never the defect: **a tick cost is proportional and a
+bonus gate is binary, and only one of the two can be traded against.** Beside an information budget
+the pair is jointly satisfiable only by a hardcoded route — precisely what the multi-seed
+conjunction exists to defeat. Recorded as **A10** so it cannot regrow. Its defence of `w7-03`'s
+`no-bumps` also stands: on a one-lane tunnel that bonus asks *"did you schedule?"*, not *"did you
+plan a route"*, and it is the level's only one.
+
+**Finding 3 fixed with a consequence I would not have predicted:** `isLevelUnlocked` now opens the
+next two on a close and a whole world on a sweep — the beginner spent 55 minutes and 11 runs stuck
+on `w3-03` and then quit. It required a companion fix, because a player who skips ahead would
+otherwise arrive holding `scan()` with no requisition card: `openLevel` now delivers every unsigned
+command in the order's API surface.
+
+Save compatibility is `rescueLevels`' whitelist applied to a second field — retired ids dropped on
+read, unrecognised ids kept, because a save written by a build that is not this one must not be
+eaten by this one. Proven on a seeded save in the browser, not just in tests.
+
+### Spawned on the freed files
+
+**Discrepancy agent** (`src/meta/**`, `src/game/store.ts`) — finding 10. The game tells the player a
+published routine failed on a seed and gives them **no way to run that seed**, while the card itself
+offers `Stop raising these`. An accusation with no instrument trains the player to mute the one
+mechanism that challenges overfitting, which is the most likely wrong mental model a player of this
+game can form. Decision made and handed down, not asked: **give them the seed.** The layering
+constraint is the hard part — `store.ts` must not import `src/meta`.
+
+**Bonus and par agent** (`src/levels/**`, `docs/DESIGN.md`) — told to **replace, not just delete**.
+Most bonuses restate the required solution with a tighter number, which is the first idea at a
+smaller tolerance rather than a second idea. The bar is `w6-02`'s `name-the-fault`, which asks the
+player to report *which byte was altered* — a question the objective does not ask. Granted licence
+to author new bonus objectives; refused licence to touch par, budgets, thresholds or required
+objectives. Also carrying the Worlds 3–8 par measurement, which it must split across sub-agents.
+
+### Held for the art direction, deliberately
+
+`docs/FIX-INCENTIVES.md` §A, §B, §C, §H, §I are all `src/ui/**` and wait for the direction to land:
+the shelf's `2/5` fraction, the dead `award('no-regressions')` call, `.screen-stat__streak` in
+`screens.css`, finding 8's *limit vs budget* naming (two different tick numbers on one screen need
+two different words), and findings 9.1/9.2 — `LibraryUsage` already computes `ticks` and `calls` on
+every meta run and throws them away.
+
+**Finding 11** (`src/runtime/**`, the bonus star graded on one seed) goes to the invariants agent
+when it lands; the exact three-file patch is in §E. Done tonight: the stale fifteen-commendation
+comment in `src/audio/__tests__/sounds.test.ts`.
+
+---
+
+## 2026-09-06 — invariants merged; the guard found a live bug before the report was written
+
+**Merged (`worktree-agent-ae39fc29957bc928a`, clean, no conflicts).** Main green at
+**1723 tests / 74 files**, tsc and build clean.
+
+Two guards, and the honest scorecard for them is the part worth keeping. `confessed-invariants`
+turns the `verbatim|mirrors|authoritative` index into a registry exact **in both directions** — a
+new confession fails until registered, a deleted one fails until removed — with seven guards
+hanging off it. `unused-exports` is an exact-set ratchet over 39 dead exports with **no new
+dependency**, and its load-bearing rule is *a re-export is not a read*, which is exactly what made
+`BONUS_STAR_WEIGHT` look alive.
+
+**Neither catches two live implementations under different names**, and the agent said so plainly
+rather than papering over it: G2 gets the dead-copy cases and is blind wherever both copies are
+live; G1 gets the hardest case (three of four copies are not code) and misses the rest. A guard
+that admits its blind spot is worth more than one that implies it has none.
+
+**The index was 24 hits and did not hold 23 invariants.** Nine real duplicated values, **eleven uses
+of the word in ordinary English** ("safe to render verbatim" means *render it as-is*), and three
+real invariants with no literal to compare. The eleven false positives are the reason nobody read
+that index twice.
+
+**The guard found a fifth instance of the bug class within minutes of existing.**
+`src/meta/profile.ts:23` declares a **second `SILVER_FACTOR`**, its comment states the pre-`FIX-PAR`
+rule, and `medalThresholds` beside it drops the `par + 1` floor — so on `w6-01` (par 1) and `w5-02`
+(par 2) the Refactor screen projects a silver rung the engine does not use. **Two of the five known
+instances reproduced in one 223-line file, in a file the audit had explicitly cleared.** Encoded as
+`KNOWN_OPEN` and asserted *exactly*, so fixing it fails the test until the entry goes. Routed to the
+discrepancy agent, which owns `src/meta/**`.
+
+**Tier ruling, arithmetic first:** the floor is exactly 33.3%, so tier 1 was unreachable — but
+**tier 2 is reachable**, since all-bronze lands at 33.3%, inside its band. Four tiers is the honest
+ladder, not three. Ranks stay numbered **2–5** because they are persisted, and renumbering would
+withhold a memo from a player who had never read it. No threshold moved.
+
+**Budgets:** `Objective.meter` and `unit` now live in the engine, so a budget declares its unit
+instead of having it parsed back out of its own prose. `budgets.ts` had its own copy of the union —
+the bug class, inside the file being fixed for it. Parsing stays as a fallback and **only six
+campaign objectives still infer from their label**, pinned exactly. Routed to the levels agent.
+
+### Spawned: bonus stars graded on one seed
+
+Finding 11, and it matters more than its size suggests. The medal reads the **worst** seed; the
+bonus star is re-evaluated against the single returned trace, which is `runs[0]`. So `w3-02` shows
+`TICKS 402 · par 332` with *"Bonus met — beat par by ten percent"* underneath — 402 is the worst
+seed, 281 is seed one. The screen contradicts itself, and worse: **the bonus star is the one reward
+in the game a hardcoded route can still win**, on the exact axis the multi-seed conjunction exists
+to defend. Ruled: a bonus is a level objective and is graded on the same conjunction as every other
+objective. It will make some stars harder, and that is the correction rather than a side effect.
+
+Told to treat §E's patch as a proposal rather than gospel — the agent that wrote it could not run
+it — and that the deliverable is **the list of which bonuses across all forty levels change status**,
+because that list measures how much of the layer was being won on seed one alone.
+
+**Four agents live:** art direction, bonuses-and-par, discrepancy, bonus-seed-grading.

@@ -233,20 +233,20 @@ Constraint: **must be completable by someone who has written a `for` loop and no
 - `bonus` Zero blocked moves (a blocked move still costs a tick — DESIGN.md §4.4).
 
 ### w1-05 — Floor Inspection  *(synthesis)*
-- `premise` Inspect every floor tile in the bay. There is a door in the middle and it is on a timer.
-- `teaches` Nested iteration over a 2-D area (systematic coverage), plus a timing loop against a cycling obstacle.
+- `premise` Inspect every floor tile in the bay. A partition wall splits it, with one doorway at the southern end of the partition.
+- `teaches` Nested iteration over a 2-D area (systematic coverage) where neither the row length nor the row count is known before the run.
 - `assumes` All of World 1.
-- `hardware` — (`wait` is fitted at `w1-01`)
+- `hardware` —
 - `heritage` — (boustrophedon/serpentine coverage)
-- `world` A rectangular bay split by an interior wall with one airlock door. Bot starts in the west half. Every floor tile in both halves must be entered.
-- `varies` Bay width 6–10, height 5–8, door row, door **phase**. The door cycle is always 9 ticks.
-- `anti-hardcode` Dimensions vary, so serpentine leg lengths cannot be constants; the door phase varies, so a fixed `wait(n)` fails.
-- `naive-fails` Hardcoded sweep widths fail on other seeds. Hammering the shut door costs one tick per attempt and blows the tick par; the player must either `wait` for the phase or do useful work while the door is shut.
-- `generalize` Over room dimensions and door phase.
-- `seeds` `[1,2,3,4]`
+- `world` A rectangular bay walled on all four sides and split by one interior wall running North to South. The doorway is that wall's southern-most tile. Bot starts in the north-west interior corner facing East. Every floor tile in both halves must be entered.
+- `varies` Interior width 6–10, height 5–8, and the **column the partition stands in** (3 to width-2), so the two halves are different widths on different seeds.
+- `anti-hardcode` Both dimensions and the partition column are drawn per seed, so no leg length is a constant — not the row width, not the row count, not the width of either half.
+- `naive-fails` A sweep with hardcoded leg lengths passes one seed and stops short or walks into a wall on the next. A sweep that ends at the wrong wall has to drive back over a row it has already inspected, which costs the tick par and the star.
+- `generalize` Over bay dimensions and over the partition column.
+- `seeds` `[21,1,2,6,8]`
 - `size` ~20 lines · `difficulty` **4/10**
-- `bonus` Complete the sweep with zero blocked moves.
-- `defuse` Dot's brief states the cycle length outright ("nine ticks, always has been"). The puzzle is *phase*, not *period*. Discovering an unknown period by experiment is a World 5 skill and does not belong here.
+- `bonus` Inspect the bay in no more than one move per floor tile — a re-entered tile is filed twice and spends a move the budget does not have.
+- `defuse` The facts state where the doorway is outright ("always the tile at the southern end of the partition"). The puzzle is *covering* the bay, not finding the way through it: a sweep that reaches the bottom row going East drives through the doorway without being told to.
 
 ---
 
@@ -787,7 +787,7 @@ Theme: the finale. Unlocks nothing (DESIGN.md §6). Four large levels plus one m
 - `assumes` All thirty-nine previous levels.
 - `hardware` —
 - `heritage` Every heritage in this document, once: MST, topological sort, list scheduling, recursive-descent parsing, online exploration, capacitated routing.
-- `world` 48×40. 6–12 bots. An unknown subsurface region. An infrastructure DAG to energise. A quota of material to route to depots by class. An inbound enciphered, partly-corrupt signal stream revealing part of the map and part of the graph. A hard deadline, a fuel budget and a character budget.
+- `world` 48×40. 6–12 bots. An unknown subsurface region. An infrastructure DAG to energise. A quota of material to route to depots by class. An inbound enciphered, partly-corrupt signal stream revealing part of the map and part of the graph. A hard deadline and a fuel budget.
 - `varies` Every axis above, independently drawn.
 - `anti-hardcode` Seven seeds across six independent axes. The brief states the reason in-fiction: *"the Yards run this every night."*
 - `naive-fails` Any solution that solves one subproblem well and the rest naively misses the deadline. The only shape that reaches gold is a fleet with **roles** — scouts, haulers, electricians — coordinated over `send`/`recv`.
@@ -797,7 +797,7 @@ Theme: the finale. Unlocks nothing (DESIGN.md §6). Four large levels plus one m
   The ~250 this document carried until now was a planning figure from before the level existed;
   it was never true of anything that passes seven seeds. A player who has published the §18
   ladder writes considerably less of it here, which is the whole argument for the Repository.
-- `bonus` **Three separate stars:** (a) beat the deadline by 20%; (b) come in a third under the character budget; (c) zero blocked moves across a 12-bot fleet.
+- `bonus` **Three separate stars:** (a) `under-budget` — close a fifth inside the shift; (b) `fleet-utilisation` — keep every bot working for at least two thirds of it; (c) `no-blocked-moves` — finish without one blocked move. (b) was a character budget until character count was withdrawn from scoring (DESIGN.md §7); the star that replaced it asks for the same thing the character budget was standing in for, which is a fleet that is not idling.
 - `note` **This level must be beatable at bronze by a patient player with a slow, ugly solution.** Bronze's deadline is generous; gold is where it bites. Gating the ending behind gold ends the game for most players one level before the payoff, and the payoff (NARRATIVE.md §3.3) is the reason the other 39 levels exist.
 
 ---
@@ -998,12 +998,12 @@ tutorial matters more than the rule.
 
 | Randomized axis | Levels |
 |---|---|
-| Distance / length | w1-03, w4-01, w5-02, w7-01, w7-03 |
+| Distance / length | w1-03, w1-05, w4-01, w5-02, w7-01, w7-03 |
 | Endpoint positions | w1-05, w2-02, w3-01, w5-01 |
 | Object distribution | w2-01, w2-02, w3-01, w3-02, w7-02, w8-01 |
 | **A mapping the player must read, not know** | w3-02, w8-02 |
 | Set membership / which classes exist | w3-02, w6-02 |
-| Arrival or event schedule | w3-04, w1-05 (door phase) |
+| Arrival or event schedule | w3-04 |
 | Topology of an unknown map | w4-02, w4-04, w4-05, w7-05, w8-02, w8-04 |
 | Graph shape (DAG) | w5-03, w8-03 |
 | Numeric parameters (capacity, budget, quota, key) | w2-04, w2-05, w4-05, w5-04, w5-05, w6-04 |

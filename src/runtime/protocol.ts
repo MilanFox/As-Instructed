@@ -82,7 +82,7 @@ export interface RuntimeFailure {
    * player pressed Stop; nothing went wrong and it should not be reported as a failure.
    */
   kind: 'compile' | 'runtime' | 'halt' | 'oplimit' | 'timeout' | 'cancelled';
-  /** Player-facing. Already mapped to the user's coordinates; safe to render verbatim. */
+  /** Player-facing. Already mapped to the user's coordinates; safe to render as it stands. */
   message: string;
   /** The engine's own classification, for iconography and `Verdict.failure`. */
   code?: FailureCode;

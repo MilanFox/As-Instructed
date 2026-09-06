@@ -12,28 +12,25 @@
  * So the real figure is recovered here, from the trace the objective was evaluated against, and
  * nothing about it is hardcoded per level:
  *
- *  - **Which meter** comes from the objective's own id (`within-<n>-<meter>`, the shape the engine
- *    mints) and, when a level overrode the id, from the words of its own label matched against the
- *    meters the run actually has — the sense commands it called, the resources it spent.
- *  - **Which unit** comes from the label: the word the level itself put after the limit. "Survey
- *    the field on at most 16 beams" is denominated in beams, and so is the readout.
+ *  - **Which meter** comes from `Objective.meter` where the level declared one, and otherwise from
+ *    the objective's own id (`within-<n>-<meter>`, the shape the engine mints) and then from the
+ *    words of its own label matched against the meters the run actually has — the sense commands
+ *    it called, the resources it spent.
+ *  - **Which unit** comes from `Objective.unit`, and otherwise from the label: the word the level
+ *    itself put after the limit. "Survey the field on at most 16 beams" is denominated in beams,
+ *    and so is the readout.
  *  - **Whether it is a budget at all** is behavioural, not textual. An objective that is *met while
  *    its progress is incomplete* is one the player is spending against, and one that is *unmet
  *    with its progress full* has just been overrun. Neither shape is reachable by an objective the
  *    player is working towards. Everything else is a tick-box and is left alone.
  *
- * A level added later gets all three for free, provided it says what it is measuring in its label.
+ * A level added later gets all three for free, provided it says what it is measuring — in its
+ * `meter`, or failing that in its label.
  */
-import type { Divergence, Trace, TraceEvent, Verdict } from '../engine/index.ts';
+import type { BudgetMeter, Divergence, Trace, TraceEvent, Verdict } from '../engine/index.ts';
 
-/** What a budget is denominated in, and where the run's spend against it is counted. */
-export type Meter =
-  | { kind: 'ticks' }
-  | { kind: 'ops' }
-  | { kind: 'sense'; name: string }
-  | { kind: 'spend'; resource: string }
-  /** Anything a level counts by walking the trace itself — marks placed, moves made. */
-  | { kind: 'events'; event: string };
+/** An alias, not a second declaration: `src/engine/objectives.ts` holds the only copy. */
+export type Meter = BudgetMeter;
 
 export interface Budget {
   /** Spent so far. Unclamped — this is the whole point, so it may exceed `limit`. */
@@ -54,6 +51,10 @@ export interface ObjectiveReading {
   progress?: [number, number] | undefined;
   /** The one point this objective and the run parted on, when it reported one. */
   divergence?: Divergence | undefined;
+  /** Declared by the objective. Present means the label is never consulted for the meter. */
+  meter?: Meter | undefined;
+  /** Declared by the objective. Present means the label is never consulted for the noun. */
+  unit?: string | undefined;
 }
 
 export interface BudgetSource {
@@ -126,6 +127,8 @@ function wordIn(haystack: string, needle: string): boolean {
 }
 
 export function meterFor(objective: ObjectiveReading, source: BudgetSource): Meter | null {
+  if (objective.meter) return objective.meter;
+
   const fromId = WITHIN_ID.exec(objective.id);
   if (fromId) {
     const tail = fromId[2] as string;
@@ -316,7 +319,7 @@ export function budgetFor(objective: ObjectiveReading, source: BudgetSource): Bu
   if (limit <= 0) return null;
 
   const minted = WITHIN_ID.test(objective.id);
-  const declared = declaredUnit(objective.label) !== null;
+  const declared = objective.meter !== undefined || declaredUnit(objective.label) !== null;
   const underspent = objective.met && done < limit;
   const overrun = !objective.met && done >= limit;
   if (!underspent && !overrun && !minted && !declared) return null;
@@ -335,7 +338,7 @@ export function budgetFor(objective: ObjectiveReading, source: BudgetSource): Bu
     used,
     limit,
     over: Math.max(0, used - limit),
-    unit: unitFor(objective.label, limit, meter),
+    unit: objective.unit ?? unitFor(objective.label, limit, meter),
     meter,
   };
 }

@@ -122,8 +122,11 @@ export {
   pickCandidate,
   probe,
   shouldProbe,
+  unsettledDiscrepancies,
   withDiscrepancy,
 } from './discrepancy.ts';
+
+export { auditSeedsOf, bindAuditSeeds } from './campaign.ts';
 
 export type { RunnerLike } from './adapters.ts';
 export { createMetaRunner, libraryHashOf, prepareLibrary, toOutcome } from './adapters.ts';

@@ -1,9 +1,9 @@
 /**
  * Scoring, as the player sees it. DESIGN.md §7 and §11 A4.
  *
- * The engine computes the authoritative `Verdict.stats`; this module is what the shell uses for
- * the live readouts, the medal wall and the Performance Review, and it must agree with the engine
- * on every number it also produces.
+ * `Verdict.stats` is the engine's, and it wins wherever the two overlap; this module is what the
+ * shell uses for the live readouts, the medal wall and the Performance Review, and it must agree
+ * with the engine on every number it also produces.
  */
 import { MEDAL_WEIGHT, Medal, SILVER_FACTOR, medalFor } from '../engine/index.ts';
 
@@ -115,7 +115,12 @@ export function progressPoints(
 }
 
 export interface ReviewTier {
-  /** 1..5, as ordered in NARRATIVE.md §7. */
+  /**
+   * Which memo this is. Stable, and 2..5 rather than 1..4 because it is persisted:
+   * `save.reviewedRanks` records the memos a contractor has already been sent, so renumbering the
+   * surviving four would re-point every existing save at the wrong memo and silently withhold one
+   * the player had never read. Tier 1 was deleted (see `REVIEW_TIERS`); its number was not reused.
+   */
   rank: number;
   grade: string;
   /** Inclusive lower bound, as a percentage of available medal points. */
@@ -126,25 +131,24 @@ export interface ReviewTier {
 }
 
 /**
- * The five Performance Review tiers, verbatim from NARRATIVE.md §7. `[n]` and `[m]` are filled by
- * the screen. The escalation runs upward on purpose: a weak review is gentle, a perfect one is a
- * threat assessment. Do not invert it.
+ * The four Performance Review tiers, verbatim from NARRATIVE.md §7 — an invariant enforced by
+ * `src/__tests__/confessed-invariants.test.ts`, not by whoever reads this next. `[n]` and `[m]` are
+ * filled by the screen. The escalation runs upward on purpose: a weak review is gentle, a perfect
+ * one is a threat assessment. Do not invert it.
+ *
+ * There were five. `DEVELOPING`, at 0–24%, could never be shown to anyone: the grade is medal
+ * points over medal points *available*, the cheapest closed work order is a bronze at 1 of 3, so a
+ * record with anything in it floors at 33% and a record with nothing in it is not graded at all.
+ * A grade nobody can reach is dead content dressed as a ladder rung, and it made the ladder read
+ * as harsher than it is — every player who saw `CONSISTENT WITH EXPECTATION` was in fact on the
+ * bottom rung and being shown the second. Deleting it moves no threshold and regrades no save:
+ * every percentage a real record can produce lands on exactly the tier it landed on before.
  */
 export const REVIEW_TIERS: readonly ReviewTier[] = [
   {
-    rank: 1,
-    grade: 'DEVELOPING',
-    min: 0,
-    body:
-      'You are meeting the parts of the standard that we are currently able to measure. ' +
-      'The remainder are being reviewed and may be withdrawn.\n\n' +
-      'Nobody has ever been dismissed from this site. The process for it was written into Appendix C.',
-    dot: "don't read too much into that grade. i got it for four years.",
-  },
-  {
     rank: 2,
     grade: 'CONSISTENT WITH EXPECTATION',
-    min: 25,
+    min: 0,
     body:
       'Your output is consistent with expectation. Expectation was established in 2204 by a ' +
       'contractor who has since been reassigned, or has not.\n\n' +
@@ -193,7 +197,12 @@ export const REVIEW_TIERS: readonly ReviewTier[] = [
   },
 ];
 
-/** Tier for a percentage of medal points earned, 0..100. NARRATIVE.md §7. */
+/**
+ * Tier for a percentage of medal points earned, 0..100. NARRATIVE.md §7.
+ *
+ * The floor tier's `min` is 0 rather than the 33% a graded record cannot go below, so that the
+ * table describes a total function and nonsense input still lands somewhere.
+ */
 export function reviewTier(percent: number): ReviewTier {
   const clamped = Number.isFinite(percent) ? Math.max(0, Math.min(100, percent)) : 0;
   let tier = REVIEW_TIERS[0] as ReviewTier;

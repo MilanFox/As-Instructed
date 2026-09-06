@@ -203,7 +203,7 @@ describe('migrate to the reward fields', () => {
     expect(migrated.settings.speed).toBe(2);
   });
 
-  it('reconstructs only the commendations a version 1 save can prove', () => {
+  it('reconstructs no commendation from a version 1 save, because none of the five follows', () => {
     const v1 = {
       version: 1,
       updatedAt: 1,
@@ -215,9 +215,8 @@ describe('migrate to the reward fields', () => {
     };
     const migrated = migrate(v1);
 
-    expect(migrated.achievements['filed']).toBe(1000);
-    expect(migrated.achievements['within-budget']).toBe(1000);
-    expect(Object.keys(migrated.achievements).sort()).toEqual(['filed', 'within-budget']);
+    /* A medal and a clear date cannot prove which run closed it, or that a budget was met. */
+    expect(migrated.achievements).toEqual({});
     expect(migrated.stats.passes).toBe(2);
     expect(migrated.stats.runs).toBe(4);
   });
@@ -239,14 +238,14 @@ describe('migrate to the reward fields', () => {
       updatedAt: 1,
       levels: {},
       settings: { celebrations: 'yes please' },
-      achievements: { filed: 'soon', '': 5 },
+      achievements: { 'second-look': 'soon', '': 5 },
       stats: { runs: -4, passes: 'lots' },
       seenRequisitions: ['scan', 'scan', 7],
     });
 
     expect(migrated.settings.celebrations).toBe(true);
-    expect(migrated.achievements['filed']).toBeGreaterThan(0);
-    expect(Object.keys(migrated.achievements)).toEqual(['filed']);
+    expect(migrated.achievements['second-look']).toBeGreaterThan(0);
+    expect(Object.keys(migrated.achievements)).toEqual(['second-look']);
     expect(migrated.stats.runs).toBe(0);
     expect(migrated.seenRequisitions).toEqual(['scan']);
   });
@@ -290,12 +289,12 @@ describe('migrate to the reward fields', () => {
 
   it('round-trips the reward fields through export', () => {
     const save = emptySave();
-    save.achievements['filed'] = 4242;
+    save.achievements['second-look'] = 4242;
     save.stats = { runs: 9, passes: 4, fails: 5 };
     save.seenRequisitions = ['scan', 'harvest'];
     const back = parseSave(exportSave(save));
 
-    expect(back.achievements['filed']).toBe(4242);
+    expect(back.achievements['second-look']).toBe(4242);
     expect(back.stats.passes).toBe(4);
     expect(back.seenRequisitions).toEqual(['scan', 'harvest']);
   });
@@ -304,12 +303,16 @@ describe('migrate to the reward fields', () => {
 describe('importSave and the reward fields', () => {
   it('unions commendations and keeps the earlier date for each', () => {
     const current = emptySave();
-    current.achievements = { filed: 500, 'no-contact': 900 };
+    current.achievements = { 'second-look': 500, 'minimal-observation': 900 };
     const incoming = emptySave();
-    incoming.achievements = { filed: 100, 'raised-again': 700 };
+    incoming.achievements = { 'second-look': 100, 'raised-again': 700 };
 
     const merged = importSave(current, JSON.stringify(incoming));
-    expect(merged.achievements).toEqual({ filed: 100, 'no-contact': 900, 'raised-again': 700 });
+    expect(merged.achievements).toEqual({
+      'second-look': 100,
+      'minimal-observation': 900,
+      'raised-again': 700,
+    });
   });
 
   it('keeps the higher tally of each counter', () => {
@@ -347,7 +350,7 @@ describe('importSave and the reward fields', () => {
     const current = emptySave();
     current.levels['w1-01'] = { ...emptyProgress(), code: 'mine();' };
     const incoming = emptySave();
-    incoming.achievements = { filed: 1 };
+    incoming.achievements = { 'second-look': 1 };
 
     const merged = importSave(current, JSON.stringify(incoming));
     expect(merged.levels['w1-01']?.code).toBe('mine();');
@@ -408,13 +411,104 @@ describe('a save that names a withdrawn work order', () => {
   it('does not gate the order that followed it', () => {
     const save = emptySave();
     save.levels['w1-01'] = { ...emptyProgress(), completed: true };
+    /* `w1-02` was withdrawn, so the order after `w1-01` is `w1-03`. The gate walks campaign order,
+       not the ids. Two open at a time reaches `w1-05`; `w2-01` is three along and still shut. */
     expect(isLevelUnlocked(save, 'w1-03')).toBe(true);
-    expect(isLevelUnlocked(save, 'w1-05')).toBe(false);
+    expect(isLevelUnlocked(save, 'w1-05')).toBe(true);
+    expect(isLevelUnlocked(save, 'w2-01')).toBe(false);
   });
 
   it('counts only issued work orders towards the campaign', () => {
     const migrated = reloaded();
     const closed = campaignOrder().filter((level) => migrated.levels[level.id]?.completed);
     expect(closed.map((level) => level.id)).toEqual(['w1-05']);
+  });
+});
+
+/**
+ * Ten of the fifteen commendations were retired (docs/FIX-INCENTIVES.md §1). A save written by the
+ * build that issued them is the ordinary case, not the edge case, so the drop has to be surgical:
+ * the retired ids go, everything beside them stays, and an id this build simply does not recognise
+ * is left alone because it belongs to a build that is not this one.
+ */
+describe('a save written by a build that had fifteen commendations', () => {
+  const beforeTheCut = JSON.stringify({
+    version: SAVE_VERSION,
+    updatedAt: 1,
+    levels: {
+      'w3-03': {
+        code: 'sort();',
+        completed: true,
+        medal: 'silver',
+        stars: ['one-depot-at-a-time'],
+        bestTicks: 402,
+        attempts: 11,
+        clearedAt: 1_699_000_000_000,
+      },
+    },
+    settings: {},
+    achievements: {
+      filed: 100,
+      'within-budget': 200,
+      'first-run': 300,
+      'no-contact': 400,
+      'sector-gold': 500,
+      'second-look': 600,
+      'raised-again': 700,
+      repository: 800,
+    },
+    stats: { runs: 42, passes: 17, fails: 25 },
+    seenRequisitions: ['scan'],
+    reviewedRanks: [2],
+  });
+
+  it('still loads', () => {
+    expect(() => parseSave(beforeTheCut)).not.toThrow();
+  });
+
+  it('drops every retired commendation', () => {
+    const { achievements } = parseSave(beforeTheCut);
+    for (const id of ['filed', 'within-budget', 'first-run', 'no-contact', 'sector-gold']) {
+      expect(achievements[id], id).toBeUndefined();
+    }
+  });
+
+  it('keeps the surviving commendations, dates and all', () => {
+    const { achievements } = parseSave(beforeTheCut);
+    expect(achievements['second-look']).toBe(600);
+    expect(achievements['raised-again']).toBe(700);
+    expect(achievements['repository']).toBe(800);
+  });
+
+  it('loses nothing else the player had', () => {
+    const save = parseSave(beforeTheCut);
+    expect(save.levels['w3-03']?.code).toBe('sort();');
+    expect(save.levels['w3-03']?.medal).toBe('silver');
+    expect(save.levels['w3-03']?.stars).toEqual(['one-depot-at-a-time']);
+    expect(save.levels['w3-03']?.bestTicks).toBe(402);
+    expect(save.levels['w3-03']?.attempts).toBe(11);
+    expect(save.stats).toEqual({ runs: 42, passes: 17, fails: 25 });
+    expect(save.seenRequisitions).toEqual(['scan']);
+    expect(save.reviewedRanks).toEqual([2]);
+  });
+
+  it('keeps a commendation id this build has never heard of', () => {
+    const fromAheadOfUs = JSON.stringify({
+      ...(JSON.parse(beforeTheCut) as Record<string, unknown>),
+      achievements: { 'shipped-it-twice': 900, filed: 100 },
+    });
+    const { achievements } = parseSave(fromAheadOfUs);
+    expect(achievements['shipped-it-twice']).toBe(900);
+    expect(achievements['filed']).toBeUndefined();
+  });
+
+  it('does not resurrect a retired commendation through import', () => {
+    const current = emptySave();
+    current.achievements = { 'second-look': 10 };
+    const merged = importSave(current, beforeTheCut);
+
+    expect(merged.achievements['filed']).toBeUndefined();
+    expect(merged.achievements['second-look']).toBe(10);
+    expect(merged.achievements['repository']).toBe(800);
   });
 });

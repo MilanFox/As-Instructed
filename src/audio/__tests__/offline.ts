@@ -417,7 +417,7 @@ export class MiniBuffer {
 export class MiniContext {
   readonly destination: MiniNode;
   currentTime = 0;
-  /** Mirrors autoplay policy: a suspended context makes no sound and its clock does not move. */
+  /** Models the browser autoplay policy: a suspended context is silent and its clock is stopped. */
   state: 'running' | 'suspended' = 'running';
 
   constructor(readonly sampleRate = 44100) {

@@ -147,6 +147,9 @@ export const REFACTOR = {
   empty:
     'The Repository is empty. This is a supported configuration and no memo will be raised ' +
     'about it.',
+  /** The tab's own empty state. `empty` is the status bar's line and stays there; see AUDIT-UI F12. */
+  nothingToCost:
+    'Publish a subroutine and this tab shows what it costs, per work order that calls it.',
   neverCalled:
     'Published, and called by nothing. It is being maintained for its own sake, which the site ' +
     'has a form for.',
@@ -253,21 +256,34 @@ export const REGRESSION = {
 export const DISCREPANCY = {
   badge: 'DISCREPANCY RAISED',
   ref: (levelId: string): string => `DISCREPANCY 4471-${levelId.replace('-', '')}`,
-  title: (levelId: string): string => `Work order ${levelId} — reopened`,
+  title: (levelId: string): string => `${levelId} — one layout it has not met`,
+  /** The number is the point of the whole card, so it gets a line of its own. */
+  layout: (seed: number): string => `LAYOUT ${seed}`,
   body: (levelId: string, seed: number): string =>
-    `Work order ${levelId} was closed. Shipping have run it against layout ${seed}, which was ` +
-    'not on the schedule, and it did not close.\n\n' +
-    'It has been returned to your queue. It was never removed from your queue; the field for ' +
-    'that was deprecated in 2209.',
+    `The yard was relaid overnight. Shipping ran ${levelId} against layout ${seed}, which has ` +
+    'never been on its schedule, and it did not close.\n\n' +
+    `Layout ${seed} is on that work order's schedule now. Open it, press Run, and you are ` +
+    'looking at exactly what Shipping were looking at.',
   note:
     'the yards get relaid. they have always got relaid. your code just never had to watch it ' +
     'happen before',
-  open: 'OPEN THE WORK ORDER',
+  /** The anxiety this card used to cause, answered on the card. */
+  kept:
+    'Your result stands. The work order is closed, the medal is recorded, and a failed run costs ' +
+    'nothing — this is a layout to go and look at, not a mark against you.',
+  open: 'OPEN IT AND RUN IT',
   close: 'CLOSE THE DISCREPANCY',
-  closeNote: 'Closed is a different field from resolved. Both are available to you.',
+  closeNote: (seed: number): string =>
+    `Closed is a different field from resolved. Both are available to you. Closing also takes ` +
+    `layout ${seed} back off the schedule.`,
+  /** Printed to the run console, by the campaign, whenever the extra layout is on a run. */
+  scheduleNote: (seed: number, ref: string): string =>
+    `layout ${seed} is on this run — ${ref} is open against it. it comes off the schedule the ` +
+    'moment it passes',
   mute: 'Stop raising these',
   muted: 'Noted. Nothing further will be raised. Reversible from the Repository panel.',
-  resolved: (levelId: string): string => `${levelId} closes on that layout now. Nothing was filed.`,
+  resolved: (levelId: string): string =>
+    `${levelId} closes on that layout now. It is off the schedule and nothing was filed.`,
   legal: ['Closure of a discrepancy does not constitute resolution of the discrepancy.'],
 } as const;
 
@@ -289,10 +305,15 @@ export const LIBRARY_FAILURE = {
     'write it here instead; it will work exactly the same.',
 } as const;
 
-/** Shown in the Library panel when `lib.ts` publishes nothing. */
+/**
+ * Shown in the Library panel when `lib.ts` holds a declaration and exports none of it.
+ *
+ * Never on an empty file: `docs/AUDIT-UI.md` finding 13 caught this greeting the player in red,
+ * four seconds after the ceremony handed them the folder, about a state they had not caused. A
+ * line is worth printing when there is something to do about it.
+ */
 export const NO_EXPORTS_WARNING =
-  'lib.ts publishes nothing. Until something is exported, its declarations are visible to every ' +
-  'work order by accident rather than on purpose.';
+  'lib.ts exports nothing. Add `export` to a declaration and any work order can import it.';
 
 export const MEDAL_WORDS: Readonly<Record<Medal, string>> = {
   gold: 'gold',

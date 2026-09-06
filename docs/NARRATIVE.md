@@ -403,8 +403,16 @@ Content agents: these are the required plants. Do not add new mysteries; deepen 
 | Depot 0 | w3-02 brief | w7-04 / w8-02 — it's the north fields' supply depot, kept alive by 4470's fleet |
 | The "Daughters" are never counted | Legal footnote, w2 | w8-04 — the Charter names two; both records are blank |
 | A locker still assigned to #4470 | w1-01 brief | w8-04 — it contains a printed, unsigned termination form and a spare chair caster |
-| The 9-tick airlock nobody wrote down | w1-05, Dot | w8-05 — the finale's timing gate uses the same clock |
+| The 9-tick airlock nobody wrote down | **nowhere — never planted** | w8-05 — Dot names the clock in the finale brief |
 | 4470's status ping | w6-01 as noise | w6-05 as a message |
+
+The airlock row is a payoff with nothing behind it, and it is left in the table saying so rather
+than quietly deleted. `w1-05` was once a timed door on a nine-tick cycle; World 1 was compressed
+(`docs/FIX-COMPRESSION.md`) and the level that ships is a static partition with a fixed doorway,
+briefed by Vance, with no Dot line and no clock in it. So the finale's "nobody wrote it down" lands
+on a reader who has genuinely never been told — which is not the joke it was written to be. Either
+plant it somewhere in Worlds 1–7 or stop calling it a plant; it is not a bug until one of those
+happens.
 
 ### 3.3 The ending (World 8, level 5 completion)
 
@@ -909,10 +917,16 @@ Points: gold 3, silver 2, bronze 1, bonus star +1 (DESIGN.md §11 A4). The star 
 shown; it is not in the denominator. An ungraded level (§11 A7) carries no medal, so it enters
 neither side of the fraction.
 
-**Tier 1 no longer has a reachable band.** The cheapest closed work order is a bronze at 1 of 3, so
-the floor of a graded record is 33%, and below that there is no record to grade and no memo is
-sent. `DEVELOPING` is kept here as written; whether the five bands should be re-spaced across
-33–100% is a scoring question, and the thresholds live in `src/game/score.ts`.
+**There are four tiers, and they are numbered 2 to 5.** Tier 1, `DEVELOPING`, at 0–24%, has been
+deleted: the cheapest closed work order is a bronze at 1 of 3, so a graded record floors at 33%,
+and below that there is no record to grade and no memo is sent. Nobody could ever be sent it. The
+numbers 2–5 are kept because they are written into saves — `reviewedRanks` records which memos a
+contractor has already had, and renumbering would withhold one they had never read.
+
+No band moved. `CONSISTENT WITH EXPECTATION` simply became the floor, so every percentage a real
+record can produce still lands on the tier it always landed on; what changed is that the floor
+tier is now the one the player is actually on. The thresholds live in `src/game/score.ts` and this
+section is checked against them by `src/__tests__/confessed-invariants.test.ts`.
 
 **The escalation runs upward.** The better you do, the more management feels the need to manage
 it. A weak review is gentle and a little sad; a perfect review is a barely-concealed threat
@@ -923,23 +937,7 @@ Each tier renders as: a **grade line**, a **Vance body**, a **Dot aside**, and (
 
 ---
 
-### Tier 1 — 0–24% · "DEVELOPING"
-
-```
-PERFORMANCE REVIEW — CONTRACTOR #4471
-GRADE: DEVELOPING
-
-You are meeting the parts of the standard that we are currently able to
-measure. The remainder are being reviewed and may be withdrawn.
-
-Nobody has ever been dismissed from this site. The process for it was
-written into Appendix C.
-```
-> dot: don't read too much into that grade. i got it for four years. → *(no Legal footnote)*
-
----
-
-### Tier 2 — 25–49% · "CONSISTENT WITH EXPECTATION"
+### Tier 2 — 0–49% · "CONSISTENT WITH EXPECTATION"
 
 ```
 PERFORMANCE REVIEW — CONTRACTOR #4471

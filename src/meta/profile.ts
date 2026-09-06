@@ -1,5 +1,5 @@
 import type { Medal } from '../engine/index.ts';
-import { medalFor } from '../engine/index.ts';
+import { SILVER_FACTOR, medalFor } from '../engine/index.ts';
 import { REFACTOR } from './copy.ts';
 import type { LevelFacts, LibrarySave, PublishedFunction } from './types.ts';
 
@@ -19,9 +19,6 @@ import type { LevelFacts, LibrarySave, PublishedFunction } from './types.ts';
  *
  * Pure. Takes facts, returns rows.
  */
-
-/** Silver is everything up to this multiple of par. Mirrors `medalFor`. */
-const SILVER_FACTOR = 1.25;
 
 export interface CallerFact {
   levelId: string;
@@ -62,9 +59,20 @@ export interface FunctionReport {
   unmeasured: string[];
 }
 
-/** The threshold a work order's ticks must not exceed to hold each medal. */
+/**
+ * The threshold a work order's ticks must not exceed to hold each medal.
+ *
+ * The `par + 1` floor is `medalFor`'s and it is not decoration: ticks are integers, so a par under
+ * four has an empty silver band without it — `floor(3 * 1.25)` is 3, the same number as gold. This
+ * used to drop the floor and its own copy of `SILVER_FACTOR` with it, which projected a silver rung
+ * on `w6-01` (par 1) and `w5-02` (par 2) that the engine does not award. A screen that promises a
+ * rung the simulator will not give is worse than a screen with no projection on it.
+ */
 export function medalThresholds(parTicks: number): { gold: number; silver: number } {
-  return { gold: parTicks, silver: Math.floor(parTicks * SILVER_FACTOR) };
+  return {
+    gold: parTicks,
+    silver: Math.floor(Math.max(parTicks + 1, parTicks * SILVER_FACTOR)),
+  };
 }
 
 /**
