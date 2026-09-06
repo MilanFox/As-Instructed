@@ -231,7 +231,7 @@ const HARDWARE: Record<string, HardwareNote> = {
   },
   use: {
     spec: 'Operates the machine on or beside the tile. Costs 2 ticks.',
-    opens: 'The yard has machines. The machines have never had anyone to press them.',
+    opens: 'The line has substations. Nobody has ever been sent out to throw one.',
   },
   look: {
     spec: 'Returns the tiles the bot can see along one direction. Sensing is free.',

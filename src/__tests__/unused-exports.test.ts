@@ -80,6 +80,8 @@ const IDENTIFIER = /[A-Za-z_$][\w$]*/g;
  * at for `BONUS_STAR_WEIGHT`.
  */
 const KNOWN_DEAD: readonly string[] = [
+  'src/levels/world-2/shared.ts parkedOnRipestCrop',
+  'src/levels/world-2/shared.ts parkedWithoutOvershoot',
   // --- Level-authoring helpers under `src/levels/*/shared.ts` and `caves.ts`. Bonus objectives
   // and terrain queries for levels that were folded away; `docs/FIX-BONUSES.md:86` still credits
   // `noBlockedMoves` / `shortestRoute` to `w1-02` and `w1-04`, and neither level exists. ---
@@ -142,7 +144,7 @@ const KNOWN_DEAD: readonly string[] = [
 ];
 
 /** Exports whose only readers are tests, split as `[every file, files outside `__tests__`]`. */
-const KNOWN_TEST_ONLY: readonly [number, number] = [70, 32];
+const KNOWN_TEST_ONLY: readonly [number, number] = [69, 32];
 
 /** A floor under the scan itself: a regex that quietly stops matching passes every set test. */
 const SCANNED_EXPORTS_AT_LEAST = 1500;
