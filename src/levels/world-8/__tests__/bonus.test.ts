@@ -245,6 +245,102 @@ describe('w8-05 name-the-hold', () => {
 });
 
 // ---------------------------------------------------------------------------
+// w8-05 — the join the coupling created
+// ---------------------------------------------------------------------------
+
+/**
+ * The second star, opened deliberately after `docs/FIX-FINALE-INTEGRATE.md` §1 coupled the airlock
+ * to the grid.
+ *
+ * `name-the-hold` reads the use log and nothing else, which makes it a report on the one thread of
+ * this level that already integrated. `mind-the-gate` reads the join the coupling put there: the
+ * ticks the door stood powered and shut, which is the grid's clock priced against the errand's.
+ *
+ * The property that makes it worth a star rather than a chore is that it is unreachable without
+ * the integration. There is no interval to report on a shift where the gate never moved, and on
+ * this site the gate does not move until the substation it draws from is on — so a program that
+ * did the errand and skipped the grid has nothing to say, and neither does one that did nothing.
+ */
+describe('w8-05 mind-the-gate', () => {
+  test('the reference solution earns it on every seed', () => {
+    referenceEarns(w8_05, 'mind-the-gate');
+  });
+
+  test('the same run without its gate note is refused on every seed', () => {
+    for (const seed of w8_05.seeds) {
+      const run = reportedAs(w8_05, seed, 'gate', () => null);
+      expect(run.passed, `seed ${String(seed)}`).toBe(true);
+      expect(run.met('mind-the-gate'), `seed ${String(seed)}`).toBe(false);
+    }
+  });
+
+  test('the right figure under the wrong substation is refused on every seed', () => {
+    for (const seed of w8_05.seeds) {
+      const run = reportedAs(
+        w8_05,
+        seed,
+        'gate',
+        (line) => `gate sub-0 ${line.split(' ')[2] ?? ''}`,
+      );
+      expect(run.met('mind-the-gate'), `seed ${String(seed)}`).toBe(false);
+    }
+  });
+
+  test('the right substation under a wrong figure is refused on every seed', () => {
+    for (const seed of w8_05.seeds) {
+      const run = reportedAs(w8_05, seed, 'gate', (line) => {
+        const parts = line.split(' ');
+        return `gate ${parts[1] ?? ''} ${String(Number(parts[2]) + 1)}`;
+      });
+      expect(run.met('mind-the-gate'), `seed ${String(seed)}`).toBe(false);
+    }
+  });
+
+  /* The station count is on the desk and the shift length is on the rail, so a note assembled out
+     of numbers the level hands over for free has to be refused too. It is: the interval is a fact
+     about two ticks that only the run that lived them knows. */
+  test('the two stars do not answer the same question', () => {
+    for (const seed of w8_05.seeds) {
+      const run = reportedAs(w8_05, seed, 'gate', (line) => line);
+      expect(run.met('mind-the-gate'), `seed ${String(seed)}`).toBe(true);
+      expect(run.met('name-the-hold'), `seed ${String(seed)}`).toBe(true);
+    }
+    const swapped = reportedAs(w8_05, w8_05.seeds[0] as number, 'gate', () => null);
+    expect(swapped.met('name-the-hold')).toBe(true);
+    expect(swapped.met('mind-the-gate')).toBe(false);
+  });
+
+  test('a program that does nothing is refused it on every seed', () => {
+    for (const seed of w8_05.seeds) {
+      const result = runLevel(w8_05, seed, idle);
+      const met = starsOn(w8_05, {
+        world: result.world,
+        trace: result.trace,
+        initialWorld: result.initialWorld,
+        ops: result.ops,
+      });
+      expect(met('mind-the-gate'), `seed ${String(seed)}`).toBe(false);
+    }
+  });
+
+  /** A guessed line is refused, so the star cannot be had by printing a plausible sentence. */
+  test('a program that only files the note is refused it on every seed', () => {
+    for (const seed of w8_05.seeds) {
+      const result = runLevel(w8_05, seed, (sim, botId) => {
+        sim.print(botId, 'gate sub-0 0');
+      });
+      const met = starsOn(w8_05, {
+        world: result.world,
+        trace: result.trace,
+        initialWorld: result.initialWorld,
+        ops: result.ops,
+      });
+      expect(met('mind-the-gate'), `seed ${String(seed)}`).toBe(false);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
 // The two stars World 8 kept, pinned against the seed-wide grading rule
 // ---------------------------------------------------------------------------
 

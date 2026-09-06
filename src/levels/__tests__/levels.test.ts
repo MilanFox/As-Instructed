@@ -280,11 +280,26 @@ describe('par calibration', () => {
     expect(polled.medal).toBe('gold');
   });
 
-  test('w2-05: serpentining all six rows is correct, and is not gold', () => {
-    const swept = scored('w2-05', serpentineHarvest);
-    expect(swept.passed).toBe(true);
-    expect(swept.medal).toBe('silver');
-    expect(reference('w2-05').worst).toBeLessThan(swept.worst);
+  /**
+   * `docs/FIX-FINALE-INTEGRATE.md` §3. The shift was 84 and the serpentine cost 58–68, so the
+   * level's own promise — *you cannot visit everything, so choose* — decided nothing but the
+   * medal. The shift is 62 now, and this is the assertion that says so from the losing side: the
+   * sweep is still a correct program and it still runs out of shift, on three seeds of five.
+   *
+   * Both halves matter. A serpentine that failed everywhere would mean the deadline had eaten the
+   * level rather than sharpened it, and the reference clearing every seed by 7 ticks at its worst
+   * is what says the ground given up is the ground that was never worth covering.
+   */
+  test('w2-05: serpentining all six rows runs out of shift on most seeds', () => {
+    const level = getLevel('w2-05') as NonNullable<ReturnType<typeof getLevel>>;
+    const closed = level.seeds.filter((seed) => survives('w2-05', seed, serpentineHarvest));
+    expect(closed.length).toBeLessThanOrEqual(2);
+    expect(closed.length).toBeGreaterThan(0);
+
+    const lanes = reference('w2-05');
+    expect(lanes.passed).toBe(true);
+    expect(lanes.medal).toBe('gold');
+    expect(level.budget?.maxTicks).toBeGreaterThanOrEqual(lanes.worst + 7);
   });
 
   /**
