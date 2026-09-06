@@ -67,7 +67,14 @@
   -webkit-font-smoothing: antialiased;
 }
 
-.desk, .desk * { box-sizing: border-box; margin: 0; padding: 0; }
+/* The reset stops at `.routines`, which hosts `src/meta/ui/library.css` — a
+   surface with its own spacing scale that predates the desk. `.desk *` is
+   (0,1,1) and every rule in that file is (0,1,0), so an unscoped reset
+   silently flattens the panel's whole layout. The exclusion is wrapped in
+   `:where()` so it contributes no specificity and every other rule on the
+   desk keeps the weight it was tuned against. */
+.desk, .desk *:not(:where(.routines, .routines *)) { box-sizing: border-box; margin: 0; padding: 0; }
+.desk .routines, .desk .routines * { box-sizing: border-box; }
 
 /* ============================== THE ROOM ========================== */
 

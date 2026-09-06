@@ -33,6 +33,7 @@ import {
   DeskKeyboard,
   Manual,
   Pen,
+  Routines,
   SitePlan,
   Slot,
   StampBlock,
@@ -90,6 +91,13 @@ export const DESKWARE: readonly DeskObject[] = [
   ['The site plan', SitePlan],
   ['The Repository', Binder],
   ['The reference', Manual],
+  /*
+   * `~/lib.ts`, the player's own routines, drawn on the terminal's glass. It is on this list and
+   * not inside `Terminal.tsx` on purpose: it compiles TypeScript, mounts a second Monaco model and
+   * runs a regression suite, so a fault in it must cost the routines and never the program the
+   * player is in the middle of writing. That is what `PanelBoundary` was written for.
+   */
+  ['The routines', Routines],
   ['The stamp block', StampBlock],
   ['The pen', Pen],
   ['The keyboard', DeskKeyboard],

@@ -445,3 +445,60 @@
 .desk .objs li.objective--active > i { color: var(--amber); }
 .desk .objs li.objective--over > i { color: var(--danger); }
 .desk .objs--bonus li.objective--met > i { color: var(--amber); }
+
+
+/* ---- THE FILE RAIL, and the second file itself.
+
+   Two files, two moulded keys, each carrying its whole path and a
+   legend saying what the file is. `docs/AUDIT-UI.md` F12 is why they
+   are keys and not a corner control: a door weighs what is behind it,
+   and behind this one is every routine the player has written. The
+   rail is not drawn at all until the Repository is provisioned, which
+   is what keeps Worlds 1 and 2 a one-file game. */
+
+.desk .tb-files { display: flex; align-items: stretch; gap: calc(3 * var(--u)); }
+.desk .tb-file {
+  display: flex; flex-direction: column; align-items: flex-start; gap: calc(1 * var(--u));
+  border: 0; cursor: pointer; text-align: left;
+  padding: calc(6 * var(--u)) calc(13 * var(--u)) calc(7 * var(--u));
+  font-family: var(--mono);
+  background: #1a242d; color: #93a7b4;
+  box-shadow: inset 0 calc(1 * var(--u)) 0 rgb(var(--key) / .20),
+              inset 0 calc(-2 * var(--u)) 0 rgb(0 0 0 / .46),
+              calc(1 * var(--u)) calc(1 * var(--u)) 0 rgb(var(--ink-sh) / .32);
+}
+.desk .tb-file:hover { background: #23323e; color: var(--ink); }
+.desk .tb-file[aria-current] {
+  background: #24343f; color: var(--ink);
+  box-shadow: inset 0 calc(1 * var(--u)) 0 rgb(var(--key) / .34),
+              inset 0 calc(-3 * var(--u)) 0 var(--accent),
+              calc(1 * var(--u)) calc(1 * var(--u)) 0 rgb(var(--ink-sh) / .32);
+}
+.desk .tbf-path { font-size: calc(13.5 * var(--u) * var(--ts)); }
+.desk .tbf-legend {
+  font-size: calc(9 * var(--u) * var(--ts));
+  letter-spacing: .18em; text-transform: uppercase; color: #8497a3;
+}
+.desk .tb-file[aria-current] .tbf-legend { color: var(--accent); }
+
+/* The loaded file, drawn on the terminal's glass rather than over the
+   desk. The box is the terminal screen's own box - bezel padding 15u
+   inside `.display--term`, 660u tall - and
+   `src/ui/__tests__/desk-frame.test.ts` recomputes it from these
+   stylesheets so the two cannot drift. Nothing is ever drawn over the
+   site feed. */
+
+.desk .routines {
+  position: fixed; z-index: 30;
+  left: calc(50% - 747 * var(--u));
+  top: calc(50% - 487 * var(--u));
+  width: calc(776 * var(--u));
+  height: calc(660 * var(--u));
+  display: flex; flex-direction: column;
+  background: var(--scr); border-radius: calc(2 * var(--u)); overflow: hidden;
+  box-shadow:
+    inset 0 0 0 calc(1 * var(--u)) #26282a,
+    inset calc(3 * var(--u)) calc(3 * var(--u)) calc(2 * var(--u)) rgb(var(--ink-sh) / .32);
+}
+.desk .rt-body { flex: 1 1 auto; min-height: 0; display: flex; }
+.desk .rt-body > .lib { flex: 1 1 auto; min-width: 0; }

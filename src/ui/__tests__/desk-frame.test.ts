@@ -35,6 +35,7 @@ const MUST_CONTAIN: Record<string, string> = {
   stampblock: 'how a work order is closed',
   copystand: 'what is pinned has to stay readable',
   siteplan: 'the way back to the campaign. a player got stuck in a work order without it',
+  routines: 'lib.ts. the door onto the routines the player has published',
 };
 
 /**
@@ -176,6 +177,47 @@ describe('the desk frame contains the desk', () => {
       DESK_FRAME.h,
       `.${by} reaches ${tallest} units from the centre, so the frame needs ${tallest * 2}`,
     ).toBeGreaterThanOrEqual(tallest * 2);
+  });
+
+  /**
+   * The routines file is the terminal showing something else, not a layer laid over it.
+   *
+   * `docs/DESK-CONCEPT.md` §6 is absolute that nothing is drawn over either machine, and a
+   * full-bleed panel is how that rule gets broken by accident. So the box is asserted to be the
+   * terminal's glass exactly — recomputed here from the bezel's padding and the terminal screen's
+   * own height, never restated — which makes it impossible for it to reach the desk, the paper or
+   * the site feed without failing.
+   */
+  it('draws lib.ts on the terminal glass and nowhere else', () => {
+    const term = boxes.get('display--term');
+    const routines = boxes.get('routines');
+    const pad = Number(
+      /\.desk \.bezel\s*\{[^}]*?padding:\s*calc\(\s*([\d.]+)\s*\*\s*var\(--u\)\s*\)/.exec(
+        css,
+      )?.[1],
+    );
+    const screenHeight = Number(
+      /\.desk \.display--term \.screen\s*\{[^}]*?height:\s*calc\(\s*([\d.]+)\s*\*\s*var\(--u\)\s*\)/.exec(
+        css,
+      )?.[1],
+    );
+
+    expect(pad, 'no bezel padding in src/ui/styles/desk/').toBeGreaterThan(0);
+    expect(screenHeight, 'no terminal screen height in src/ui/styles/desk/').toBeGreaterThan(0);
+    expect(term?.left).toBeTypeOf('number');
+    expect(term?.width).toBeTypeOf('number');
+
+    expect({
+      left: routines?.left,
+      top: routines?.top,
+      width: routines?.width,
+      height: routines?.height,
+    }).toEqual({
+      left: (term?.left ?? 0) + pad,
+      top: (term?.top ?? 0) + pad,
+      width: (term?.width ?? 0) - 2 * pad,
+      height: screenHeight,
+    });
   });
 
   it('is not so large that it wastes the window', () => {

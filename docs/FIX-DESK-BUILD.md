@@ -28,6 +28,11 @@ stamp it, which files it into the Repository. A **standing sheet** sits on the d
 never files. The **site plan** takes you back to the campaign, and the site map has a
 `back to the station` control that brings you straight back to the order you were writing.
 
+Once the Repository is provisioned the terminal holds a **second file**. A file rail across the top
+of its screen names both — `~/orders/w2-05` and `~/lib.ts`, with the count of what is published in
+it — and pressing `~/lib.ts` loads the routines onto the same glass. `esc` puts the work order back.
+See §9.
+
 Settings are objects: a **SIZE** dial, a **DISPLAY** switch (Deep Site / Signal), a **REPORTS**
 switch and a **SOUND** key, all screen-printed on the terminal's chin, where a 1988 monitor carried
 H-SIZE and V-SIZE.
@@ -39,6 +44,7 @@ H-SIZE and V-SIZE.
 | thing | where |
 |---|---|
 | the shell, the room, the mode, the object lists | `src/ui/desk/Desk.tsx` |
+| the file rail and `~/lib.ts` on the terminal | `terminal/FileRail.tsx`, `furniture/Routines.tsx` |
 | the scale and the design frame | `src/ui/desk/scale.ts` |
 | terminal, rail, output log, settings bezel, key list | `src/ui/desk/terminal/` |
 | site monitor, transport, graticule, board geometry | `src/ui/desk/monitor/` |
@@ -228,16 +234,8 @@ samples, and the transitions are on `transform`, not `left`/`top` — so it was 
 
 ## 7. Unfinished — read this first if you are picking this up
 
-**The largest known gap: the Repository *routines* feature has no door.**
-`src/meta/ui/LibraryPanel.tsx` — the shared-subroutine library with its editor, refactor, cost,
-structure, regression and discrepancy tabs — was rendered by `Workspace.tsx`, which is deleted.
-**Nothing renders it now.** `LibraryPanel` and `libraryStatusLine` are registered as dead exports so
-the ratchet passes, and that registration *is* the record of the regression. A player can publish a
-routine and then has no way to look at it. The bound **Repository** volume on the desk is a
-different object — the record of closed work orders — and keeping them separate is correct, because
-the campaign must be finishable without the Repository and so the route into a work order cannot
-live inside it. `useLibrary`'s `panelOpen` / `setPanel` surface is intact and untouched: **this is a
-door, not a rebuild.** Fix before shipping.
+**The routines feature's missing door is closed** — `~/lib.ts` is a second file on the terminal.
+See §9. What follows is what is still open.
 
 **Other stated gaps.**
 
@@ -246,17 +244,6 @@ door, not a rebuild.** Fix before shipping.
   `w2-05`'s entire ask is telling them apart. This is a `src/render/**` change, reported not fixed,
   and it is a *solvability* issue rather than a legibility one. Maturity **is** separable, by shape.
 
-- **The Repository *routines* feature has lost its door, and this is the largest gap here.**
-  `src/meta/ui/LibraryPanel.tsx` — the shared-subroutine library, with its editor, refactor, cost,
-  structure, regression and discrepancy tabs — was rendered by `Workspace.tsx`, which is deleted.
-  **Nothing renders it now**, and `LibraryPanel` and `libraryStatusLine` fall out as dead exports.
-  The bound **Repository** volume on the desk is a *different object*: it is the record of closed
-  work orders, and the furniture lane was right to keep them separate (the campaign must be
-  finishable without the Repository, so the only route into a work order cannot live inside it).
-  What is missing is a second door for the routines feature. `useLibrary`'s `panelOpen` /
-  `setPanel` surface is intact and untouched, so this is a door, not a rebuild. Publishing still
-  fires — `PublishDialog` is still in the modal layer — so a player can publish a routine and then
-  have no way to look at it. **Fix before shipping.**
 - **The paper explosion is fixed, and the rule is guarded.** A player opening `w1-03` was handed
   five documents at once, stacked over the terminal. Now **one sheet lies out** — the work order —
   and everything else arrives in the **in-tray** with a count, opened deliberately. Every sheet
@@ -312,3 +299,109 @@ told the rail should print `ticks — / 96` for par — lifted from the prototyp
 defect. **The lane refused with evidence and was right.** The standing instruction given to every
 lane — *if I am wrong, show me the pixels and refuse* — has now caught the prototype, the lane
 briefs and the orchestrator, in three separate places.
+
+---
+
+## 9. `~/lib.ts` — the routines get a door
+
+*Written after §7 was reduced by one item. Read §7 first; this is the item that left it.*
+
+### What the object is
+
+**The terminal holds two files, and `~/lib.ts` is the second one.** The routines a player publishes
+are *code*, and §2 of `docs/DESK-CONCEPT.md` decides where code goes: the screen is the work and the
+paper is the company, and no paper texture ever touches a program. So the routines are not a
+document, not a bound volume and not a modal. They are a second file on the machine the player
+already writes in, and the door is the machine saying which file is loaded.
+
+`Binder.tsx` had already ruled this in its own first paragraph, before anything rendered it: the
+routines "keep their name inside the terminal". This is that sentence, built.
+
+**It is not the bound Repository volume, and the two are still apart.** The volume is the company's
+record of closed work orders; this is the contractor's own accumulated subroutines. The campaign
+must stay finishable by a player who never opens the volume, so no route into a work order may live
+inside it — and none does.
+
+Shot: `docs/shots/desk/19-lib-ts-loaded-on-the-terminal.jpg`.
+
+### The door
+
+A **file rail** across the top of the terminal's screen: two moulded, screen-printed keys, each
+carrying its whole path and a legend saying what the file is. `~/orders/w2-05 · WORK ORDER` and
+`~/lib.ts · YOUR SUBROUTINES · 2 PUBLISHED`. The loaded one is lit and carries the accent rule; the
+other is recessed. It is a rail and not a chip because of `docs/AUDIT-UI.md` F12 — a door weighs
+what is behind it, and behind this one is every routine the player has written. At 1440×783 the rail
+is about 290 × 34 CSS px; at SIZE 1.5 it is 541 design units of the 776 available and still does not
+wrap.
+
+**The count is the notification.** A player who has just published sees the number on the key go up,
+on the machine they are already looking at. Before the Repository is provisioned there is no second
+file and the rail is not drawn at all — `src/meta/unlock.ts` keeps Worlds 1 and 2 strictly a one-file
+game and the whole on-ramp depends on that.
+
+Three ways in, and they all set the same bit:
+
+- the `~/lib.ts` key on the rail
+- `esc` comes back out, one rung above leaving the work order (`src/ui/hooks/useKeyboard.ts`)
+- the provisioning notice's own `open it` button, which called `setPanel('library')` into nothing
+  for the whole life of the desk and now opens the file
+
+**Nothing was moved.** The composition is untouched: no furniture shifted, nothing was added to the
+desk floor, and the frame numbers are unchanged. The reason is measurement rather than restraint —
+the desk floor has no free box larger than about 125 × 53 design units, and every candidate site
+between the binder and the copy stand is where loose paper lands.
+
+### Where it lives
+
+| thing | where |
+|---|---|
+| the rail, on both surfaces | `src/ui/desk/terminal/FileRail.tsx` |
+| the second file, and its boundary | `src/ui/desk/furniture/Routines.tsx` |
+| the panel and the status line, behind the lazy boundary | `src/ui/desk/furniture/RoutinesFile.tsx` |
+| the geometry | `src/ui/styles/desk/terminal.css`, `.tb-file` / `.routines` |
+| the way out | `src/ui/hooks/useKeyboard.ts`, the `escape` ladder |
+
+**It is a `DESKWARE` object with its own `PanelBoundary`, and that is not bookkeeping.**
+`PanelBoundary`'s own docstring was written for this panel. It compiles TypeScript, mounts a second
+Monaco model and runs a regression suite, so it is the likeliest thing on the desk to throw. Inside
+the terminal's tree a fault would take the program, the objectives rail and the output log with it —
+`docs/AUDIT-UI.md` F21. From the list it costs the routines and nothing else.
+
+**The layer is the terminal's glass exactly**, and that is asserted rather than trusted:
+`desk-frame.test.ts` recomputes `.routines` from the bezel's padding and the terminal screen's own
+height and fails if the two drift, which is what makes it impossible for the file to reach the desk,
+the paper or the site feed. Mutation-tested: widening the layer fails with
+`expected { left: -760, … } to deeply equal { left: -747, … }`.
+
+**Monaco stayed behind its boundary.** `RoutinesFile.tsx` is the only module on the desk side that
+reaches `src/meta/ui`, and it is loaded through `lazy()`. Measured on a real build: `RoutinesFile`
+is its own 12.79 kB chunk (3.85 kB gzip), `monaco` is unchanged at 3,904 kB, and the `index` chunk
+did not absorb it.
+
+### Two things found on the way, both reported rather than absorbed
+
+**The desk's reset was flattening the panel.** `desk.css` carried `.desk, .desk * { margin: 0;
+padding: 0 }` at specificity (0,1,1), and every rule in `src/meta/ui/library.css` is (0,1,0) — so the
+tab strip, the hint line and the commit bar all rendered with zero padding and ran together. The
+reset now stops at `.routines`, wrapped in `:where()` so it contributes no specificity and every
+other rule on the desk keeps the weight it was tuned against.
+
+**The covered terminal was still in the accessibility tree.** With `~/lib.ts` loaded the whole
+terminal screen is behind the layer, and a screen reader still walked the program, the rail, the log
+and a second copy of the file rail. `.display--term .screen` now carries `inert` while the file is
+loaded. Verified behaviourally, not by inference: a button under the layer refuses focus and the
+live one takes it.
+
+### Two known limitations, stated
+
+- **`library.css` is sized in fixed pixels**, so the SIZE dial does not reach inside the panel. It is
+  legible at every supported viewport and it was not restyled, because hosting an existing surface
+  is a door and restyling it is a rebuild. If the dial is wanted in there it is a pass over about
+  forty declarations in one file.
+- **The word "Repository" now names two things in the shipped copy**, and it did before this change
+  too. `src/meta/copy.ts` carries `REPOSITORY_NAME = 'Shared Subroutines Repository'`, which is the
+  panel's `aria-label` and prints on the Structure tab as *"Nothing in the Repository calls anything
+  else in it"*; the bound volume on the desk is screen-printed `THE REPOSITORY · CLOSED WORK
+  ORDERS`. The desk's own new copy avoids the collision entirely — the door says `~/lib.ts` and
+  `your subroutines`, never "Repository" — but `src/meta/copy.ts` is outside this lane and the
+  collision is **reported, not fixed**. It is a naming defect and it wants a ruling.

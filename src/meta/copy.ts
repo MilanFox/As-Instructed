@@ -19,7 +19,7 @@ import type { Medal } from '../engine/index.ts';
  * version of a program you leave running so the next person has something to read."
  */
 
-export const REPOSITORY_NAME = 'Shared Subroutines Repository';
+export const REPOSITORY_NAME = 'Shared Subroutines';
 
 /**
  * The delivery note for the Repository itself.
@@ -55,11 +55,11 @@ export const UNLOCK_MEMO = {
   ref: 'MEMO KD-2338',
   from: 'Dep. Coordinator M. Vance',
   cc: 'Contractor #4470',
-  re: 'Shared Subroutines Repository — provisioned',
+  re: 'Shared Subroutines — provisioned',
   body:
-    'Your engagement has been provisioned with a Shared Subroutines Repository. Code published ' +
+    'Your engagement has been provisioned with Shared Subroutines. Code published ' +
     'to it is available to every work order that follows.\n\n' +
-    'The Repository is maintained by the contractor who publishes to it. That is you. There is ' +
+    'Shared Subroutines is maintained by the contractor who publishes to it. That is you. There is ' +
     'no second party.\n\n' +
     'Please note that a subroutine is charged at the point of use, in full, on every call.',
   legal: [
@@ -80,7 +80,7 @@ export const LIBRARY_PANEL_HINT =
   "Everything exported from lib.ts can be imported by any work order: import { pathTo } from 'lib';";
 
 export const LIBRARY_EMPTY_STARTER =
-  '// The Shared Subroutines Repository.\n' +
+  '// Shared Subroutines.\n' +
   '// Anything exported here can be imported by any work order.\n' +
   '//\n' +
   '// NOTE(4470): whatever you put here, you will be reading it in eleven months\n' +
@@ -98,10 +98,10 @@ export const PUBLISH = {
   skip: 'Not this time',
   never: 'Stop offering',
   neverConfirmed:
-    'Noted. The offer is off. You can turn it back on from the Repository panel at any time.',
+    'Noted. The offer is off. You can turn it back on from lib.ts at any time.',
   renameLabel: 'Publish as',
   nameTaken: (name: string): string =>
-    `\`${name}\` is already published. The Repository keeps one subroutine per name.`,
+    `\`${name}\` is already published. Shared Subroutines keeps one subroutine per name.`,
   nameInvalid: 'A subroutine name is a plain identifier. Letters, digits, underscores.',
   nothingToPublish:
     'There is nothing here that can be lifted out on its own. A subroutine has to be a top-level ' +
@@ -115,7 +115,7 @@ export const PUBLISH = {
     `${names.map((name) => `\`${name}\``).join(', ')} ` +
     `${names.length === 1 ? 'is a subroutine, but it is' : 'are subroutines, but they are'} ` +
     `nested inside something else. Move ${names.length === 1 ? 'it' : 'them'} out to the top ` +
-    'level of the file and the Repository can file it.',
+    'level of the file and Shared Subroutines can file it.',
   dependencyWarning: (missing: readonly string[]): string =>
     `This also uses ${missing.map((name) => `\`${name}\``).join(', ')}, which would stay behind. ` +
     'Publish those too, or the subroutine will not run.',
@@ -145,7 +145,7 @@ export const REFACTOR = {
     'Attribution below is measured from your own closed work orders, not estimated. ' +
     'Finance have asked. It is measured.',
   empty:
-    'The Repository is empty. This is a supported configuration and no memo will be raised ' +
+    'Shared Subroutines is empty. This is a supported configuration and no memo will be raised ' +
     'about it.',
   /** The tab's own empty state. `empty` is the status bar's line and stays there; see AUDIT-UI F12. */
   nothingToCost:
@@ -189,10 +189,10 @@ export const STRUCTURE = {
     'What each subroutine is built out of. An indented line is called by the line above it, and ' +
     'carries its ticks with it.',
   empty:
-    'Nothing is published yet, so there is nothing to draw. The Repository is filed as empty ' +
+    'Nothing is published yet, so there is nothing to draw. Shared Subroutines is filed as empty ' +
     'rather than as missing.',
   flat:
-    'Nothing in the Repository calls anything else in it. Filed as a parts list rather than an ' +
+    'Nothing in Shared Subroutines calls anything else in it. Filed as a parts list rather than an ' +
     'assembly.',
   columns: {
     name: 'Subroutine',
@@ -231,8 +231,8 @@ export const REGRESSION = {
   title: 'REGRESSION',
   running: (done: number, total: number): string =>
     `Re-running closed work orders. ${done}/${total}.`,
-  clean: 'Every work order that reads the Repository still closes. Nothing has been raised.',
-  nothingToCheck: 'No closed work order reads the Repository. There is nothing to re-run.',
+  clean: 'Every work order that reads Shared Subroutines still closes. Nothing has been raised.',
+  nothingToCheck: 'No closed work order reads Shared Subroutines. There is nothing to re-run.',
   /** Given verbatim in the brief, and it is the right line. */
   degraded: (levelId: string): string => `${levelId} has entered a degraded state.`,
   broken: (levelId: string): string => `${levelId} no longer closes.`,
@@ -290,7 +290,7 @@ export const DISCREPANCY = {
     `layout ${seed} is on this run — ${ref} is open against it. it comes off the schedule the ` +
     'moment it passes',
   mute: 'Stop raising these',
-  muted: 'Noted. Nothing further will be raised. Reversible from the Repository panel.',
+  muted: 'Noted. Nothing further will be raised. Reversible from Shared Subroutines panel.',
   resolved: (levelId: string): string =>
     `${levelId} closes on that layout now. It is off the schedule and nothing was filed.`,
   legal: ['Closure of a discrepancy does not constitute resolution of the discrepancy.'],
@@ -305,10 +305,10 @@ export const LIBRARY_FAILURE = {
   notCompiled:
     'lib.ts does not build, so nothing could be imported from it. The work order was not run.',
   missing: (names: readonly string[]): string =>
-    `${names.map((name) => `\`${name}\``).join(', ')} is not published. The Repository has no ` +
+    `${names.map((name) => `\`${name}\``).join(', ')} is not published. Shared Subroutines has no ` +
     'entry under that name.',
   threwOnLoad:
-    'The Repository failed while loading, before the work order started. Nothing was attempted.',
+    'Shared Subroutines failed while loading, before the work order started. Nothing was attempted.',
   requiredNote: (names: readonly string[]): string =>
     `This work order expects ${names.map((name) => `\`${name}\``).join(', ')} to exist. You can ` +
     'write it here instead; it will work exactly the same.',
