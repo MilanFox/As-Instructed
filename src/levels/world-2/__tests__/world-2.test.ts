@@ -372,19 +372,37 @@ describe('w2-05 bonus — footprint', () => {
     for (const seed of w2_05.seeds) {
       const run = runLevel(w2_05, seed, surveyTwoLanesThenStrike);
       expect(run.verdict.passed, `seed ${String(seed)}`).toBe(true);
-      expect(run.ticks, `seed ${String(seed)}`).toBeLessThanOrEqual(84);
+      expect(run.ticks, `seed ${String(seed)}`).toBeLessThanOrEqual(
+        w2_05.budget?.maxTicks ?? 0,
+      );
       expect(footprintOf(run), `seed ${String(seed)}`).toBeLessThanOrEqual(32);
       expect(starred(w2_05, run), `seed ${String(seed)}`).toBe(true);
     }
   });
 
-  test('the serpentine sweep solves it and misses the star on every seed', () => {
+  /**
+   * `docs/FIX-FINALE-INTEGRATE.md` §3. The sweep used to come home on all five seeds and lose only
+   * the star; the shift is 62 now, so on three of them it is powered down mid-row with the hopper
+   * still open. Where it does come home it still walks too much ground to have the star, which is
+   * the half of the old assertion worth keeping: the footprint budget is not the deadline wearing
+   * a different label.
+   */
+  test('the serpentine sweep runs out of shift, and misses the star where it does not', () => {
+    const closed: number[] = [];
     for (const seed of w2_05.seeds) {
-      const run = runReference(w2_05, seed, serpentineHarvest);
+      let run;
+      try {
+        run = runReference(w2_05, seed, serpentineHarvest);
+      } catch (error) {
+        expect((error as Error).message, `seed ${String(seed)}`).toContain('Shift over');
+        continue;
+      }
+      closed.push(seed);
       expect(run.verdict.passed, `seed ${String(seed)}`).toBe(true);
       expect(footprintOf(run), `seed ${String(seed)}`).toBeGreaterThan(32);
       expect(starred(w2_05, run), `seed ${String(seed)}`).toBe(false);
     }
+    expect(closed).toEqual([1, 4]);
   });
 
   test('standing still keeps the footprint at one and fails the shift', () => {

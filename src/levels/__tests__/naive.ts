@@ -1,10 +1,13 @@
 import type { Dir as DirType, Sim, Vec } from '../../engine/index.ts';
-import { Dir, ItemKind, step } from '../../engine/index.ts';
+import { Dir, ItemKind, Terrain, step } from '../../engine/index.ts';
 import type { ReferenceSolution } from '../types.ts';
 import { KEY_SPACE, KnownMap, drainAntenna, follow, readPacket } from '../world-8/shared.ts';
 
 /** Every World 8 site is 30 x 30, and `look` is free, so a ray is never worth capping short. */
 const SITE = 30;
+
+/** Except the finale, which is 48 x 40. */
+const FINALE = { w: 48, h: 40 };
 
 /**
  * TEST FIXTURES. The first honest idea a player has on each of these levels, written out so the
@@ -271,8 +274,10 @@ export const corridorPoll: ReferenceSolution = {
  * w2-05: serpentine the field reading only the tile under the wheels, and stop when the hopper
  * refuses a crop.
  *
- * Correct on every seed, and it filters ice properly, which is the level's stated ask. It costs
- * 58-68 because it drives all six rows of a field the sensor can survey from two of them.
+ * It filters ice properly, which is the level's stated ask, and it would fill the hopper on every
+ * seed given the time. It costs 58-68 because it drives all six rows of a field the sensor can
+ * survey from two of them, and the shift is 62, so on three seeds of five it is powered down with
+ * the hopper still open. That is the level's whole subject: the ground you decline to cover.
  */
 export const serpentineHarvest: ReferenceSolution = {
   levelId: 'w2-05',
@@ -384,6 +389,104 @@ export const lockerCanvasser: ReferenceSolution = {
       }
     }
     sim.pickup(botId, ItemKind.Chip);
+  },
+  source: '',
+};
+
+/**
+ * w8-05, the form leg on its own: survey with the fleet, lift KD-0001-T, pay the airlock toll,
+ * file it. **It never energises a substation, and it never looks at one.**
+ *
+ * This is the veteran's third specific written as a program. Their complaint was that the form leg
+ * *"depends on nothing else"* — that deleting the grid from a solution changes no other line of it
+ * — and the only honest way to answer that is to delete the grid from a solution and see whether
+ * the form still gets filed. It did. `docs/FIX-FINALE-INTEGRATE.md` §1 runs this against the same
+ * seeds with and without the door's `fed:` key, which is the one difference between the two
+ * worlds, and the star it is here to earn is the one it now cannot: `file-form`.
+ *
+ * It is deliberately not a good program. It fails `grid-online` and `quota` by construction and it
+ * spends far more of the shift than the reference does, because efficiency is not what is on
+ * trial — reachability is.
+ */
+export const formErrandOnly: ReferenceSolution = {
+  levelId: 'w8-05',
+  run(sim: Sim): void {
+    const clerk = sim.botIds()[0] as number;
+    const map = new KnownMap(FINALE);
+    const look = (): void => {
+      map.observe(sim, clerk, FINALE.w);
+    };
+    look();
+
+    let form: Vec | null = null;
+    for (const packet of drainAntenna(sim, clerk)) {
+      const { fields, valid } = readPacket(packet);
+      if (valid && fields[0] === 'FORM') form = { x: Number(fields[1]), y: Number(fields[2]) };
+    }
+    const airlock = sim.probe(clerk, 'airlock');
+    const charter = sim.probe(clerk, 'slot-charter');
+    if (!form || !airlock || !charter) return;
+
+    const gap = (a: Vec, b: Vec): number => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+    const fill = (): void => {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        if (sim.refuel(clerk)) return;
+        const here = sim.pos(clerk);
+        const pump = map
+          .where((view) => view.terrain === Terrain.Depot)
+          .map((view) => view.at)
+          .sort((a, b) => gap(here, a) - gap(here, b))[0];
+        if (pump === undefined) return;
+        if (!follow(sim, clerk, map, pump, { onStep: look })) return;
+      }
+    };
+    /** One step of survey, chosen for being on the way to `to` rather than merely nearest. */
+    const towards = (to: Vec): boolean => {
+      if (sim.fuel(clerk) < 60) fill();
+      const from = sim.pos(clerk);
+      const edges = map
+        .where((view) => map.isFrontier(view.at))
+        .map((view) => view.at)
+        .sort((a, b) => gap(from, a) + gap(a, to) - (gap(from, b) + gap(b, to)));
+      for (const at of edges.slice(0, 4)) {
+        if (gap(from, at) === 0) continue;
+        if (follow(sim, clerk, map, at, { onStep: look })) return true;
+      }
+      return false;
+    };
+    /**
+     * Walk there, buying map when the ground between is unseen, and give up when buying map stops
+     * buying anything. Ground behind a sealed door is not a survey problem and no amount of
+     * walking turns it into one.
+     */
+    const reach = (to: Vec): boolean => {
+      let stalls = 0;
+      for (let attempt = 0; attempt < 80 && stalls < 3; attempt++) {
+        if (sim.fuel(clerk) < 60) fill();
+        if (map.pathTo(sim.pos(clerk), to) !== null && follow(sim, clerk, map, to, { onStep: look })) {
+          return true;
+        }
+        const before = map.size();
+        if (!towards(to)) return false;
+        stalls = map.size() > before ? 0 : stalls + 1;
+      }
+      return false;
+    };
+
+    if (!reach(form)) return;
+    sim.pickup(clerk, ItemKind.Chip);
+    if (!reach(airlock.at)) return;
+    fill();
+    if (!reach(airlock.at)) return;
+    const stages = airlock.vars['stages'] ?? 0;
+    for (let i = 0; i <= stages; i++) {
+      if (sim.probe(clerk, 'airlock')?.state === 'open') break;
+      if (sim.fuel(clerk) <= 1) break;
+      sim.use(clerk);
+    }
+    look();
+    if (!reach(charter.at)) return;
+    sim.drop(clerk, ItemKind.Chip);
   },
   source: '',
 };

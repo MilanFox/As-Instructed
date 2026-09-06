@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
-import type { ActEvent } from '../../engine/index.ts';
-import { Terrain, machineById, tileAt } from '../../engine/index.ts';
+import type { ActEvent, World } from '../../engine/index.ts';
+import { FED_BY, Terrain, machineById, tileAt } from '../../engine/index.ts';
 import { FakeRunner } from '../../game/ports.ts';
 import { emptySave } from '../../game/save.ts';
 import { objectivesOnEverySeed } from '../../game/score.ts';
@@ -8,8 +8,11 @@ import { useGame } from '../../game/store.ts';
 import { unlockedApiNames } from '../../runtime/ambient.ts';
 import { aggregate } from '../../runtime/aggregate.ts';
 import { runSeed } from '../../runtime/run-level.ts';
-import type { LevelDef } from '../types.ts';
+import type { LevelDef, ReferenceSolution } from '../types.ts';
 import { getLevel } from '../index.ts';
+import { runReference } from '../harness.ts';
+import { SOLUTIONS } from './solutions.ts';
+import { formErrandOnly } from './naive.ts';
 
 /**
  * The two defects docs/FIX-FINALE.md was opened for, pinned as tests.
@@ -188,5 +191,108 @@ describe('a partly-correct program is credited per objective, per seed', () => {
     // A branching grid at the smallest scale, a pure chain, and the fuel squeeze. Anything else
     // in the old list of seven moved a number without moving a decision.
     expect(levelOrThrow('w8-05').seeds).toEqual([1, 4, 7]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The third specific: the form leg used to depend on nothing
+// ---------------------------------------------------------------------------
+
+/**
+ * The same level with the one line of the coupling removed from its door.
+ *
+ * A test that only ran the errand against the shipped level could say that it fails, and would not
+ * be able to say *why* — a fixture that walks into a wall looks identical to a fixture that cannot
+ * walk. Building the level twice, differing in nothing but the `fed:` key `build` writes onto the
+ * airlock, is what makes the difference attributable to the coupling rather than to the program.
+ */
+function withoutTheCoupling(level: LevelDef): LevelDef {
+  return {
+    ...level,
+    build(seed: number): World {
+      const world = level.build(seed);
+      const airlock = machineById(world, 'airlock');
+      for (const name of Object.keys(airlock?.vars ?? {})) {
+        if (name.startsWith(FED_BY) && airlock) delete airlock.vars[name];
+      }
+      return world;
+    },
+  };
+}
+
+function metOn(level: LevelDef, seed: number, solution: ReferenceSolution): Set<string> {
+  const result = runReference(level, seed, solution);
+  return new Set(result.verdict.objectives.filter((entry) => entry.met).map((entry) => entry.id));
+}
+
+/**
+ * docs/PLAYTEST-VETERAN.md §6.7, the one specific that survived docs/FIX-FINALE.md: the finale
+ * *accumulates rather than integrates*, and concretely, *"the form leg depends on nothing else"*.
+ *
+ * It was true, and it was cheap: `formErrandOnly` lifts KD-0001-T, pays the nine-stage toll and
+ * files it in **92 to 146 ticks** without ever looking at a substation, which is a fifth of the
+ * reference's shift for a fifth of the objectives. The airlock draws from the grid now, so the
+ * same program on the same seeds ends holding the chip in front of a door it has no power to move.
+ */
+describe('the form leg cannot be run without the grid', () => {
+  const errand = 'file-form';
+
+  test('deleting the grid from a program used to leave the form leg standing', () => {
+    const level = withoutTheCoupling(levelOrThrow('w8-05'));
+    for (const seed of level.seeds) {
+      expect(metOn(level, seed, formErrandOnly), `seed ${String(seed)}`).toContain(errand);
+    }
+  });
+
+  test('with the coupling it files nothing, on every seed', () => {
+    const level = levelOrThrow('w8-05');
+    for (const seed of level.seeds) {
+      const result = runReference(level, seed, formErrandOnly);
+      const form = result.verdict.objectives.find((entry) => entry.id === errand);
+      expect(form?.met, `seed ${String(seed)}`).toBe(false);
+      expect(machineById(result.world, 'airlock')?.state, `seed ${String(seed)}`).not.toBe('open');
+      // The chip is in a hold rather than lost: the program did the errand and the door refused.
+      expect(
+        result.world.bots.some((bot) =>
+          bot.inventory.some((stack) => stack.kind === 'chip' && stack.count > 0),
+        ),
+        `seed ${String(seed)}`,
+      ).toBe(true);
+    }
+  });
+
+  test('the failure names the door and the dark substation, not the chip', () => {
+    const level = levelOrThrow('w8-05');
+    const result = runReference(level, level.seeds[0] as number, formErrandOnly);
+    const form = result.verdict.objectives.find((entry) => entry.id === errand);
+    expect(form?.divergence?.where).toMatch(/^airlock at \(\d+, \d+\)$/);
+    expect(form?.divergence?.received).toMatch(/^sub-\d+ is off; the gate took the ticks$/);
+  });
+
+  test('the door says which substation, and it is not one with nothing behind it', () => {
+    const level = levelOrThrow('w8-05');
+    for (const seed of level.seeds) {
+      const world = level.build(seed);
+      const airlock = machineById(world, 'airlock');
+      const fed = Object.keys(airlock?.vars ?? {}).filter((name) => name.startsWith(FED_BY));
+      expect(fed.length, `seed ${String(seed)}`).toBe(1);
+
+      /* A feeder with no feeders of its own would be a form leg that depends on one switch
+         instead of on the shift, which is the defect rather than the repair. */
+      const feeder = machineById(world, (fed[0] as string).slice(FED_BY.length));
+      expect(feeder, `seed ${String(seed)}`).toBeDefined();
+      expect(feeder?.vars['deps'] ?? 0, `seed ${String(seed)}`).toBeGreaterThan(0);
+    }
+  });
+
+  test('the reference still closes every seed, and leaves the door open behind it', () => {
+    const level = levelOrThrow('w8-05');
+    const solution = SOLUTIONS['w8-05'] as ReferenceSolution;
+    for (const seed of level.seeds) {
+      const result = runReference(level, seed, solution);
+      expect(result.verdict.passed, `seed ${String(seed)}`).toBe(true);
+      expect(result.ticks, `seed ${String(seed)}`).toBeLessThanOrEqual(level.par.ticks);
+      expect(machineById(result.world, 'airlock')?.state, `seed ${String(seed)}`).toBe('open');
+    }
   });
 });

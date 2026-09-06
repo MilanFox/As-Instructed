@@ -6,8 +6,21 @@ import { hopperFullOf, withinFootprint } from './shared.ts';
 const WIDTH = 12;
 const HEIGHT = 6;
 const MAX_GROWTH = 8;
-/** The shift. Long enough for a disciplined pass, far too short for the whole field. */
-const SHIFT = 84;
+/**
+ * The shift. Long enough for a disciplined pass, far too short for the whole field.
+ *
+ * It was 84, and at 84 the level did not ask its own question. The serpentine that reads only the
+ * tile under the wheels costs 58–68 across the five seeds, so it came home inside the shift on
+ * every one of them and the choosing decided nothing but the medal. Measured, not guessed
+ * (docs/FIX-FINALE-INTEGRATE.md §3): the two-lane route costs 47/52/52/55/48, so the whole usable
+ * window is 56 to 67, and 62 is the tightest number in it that still leaves a tick above par for a
+ * run to land on. The serpentine now misses on three seeds of five and cannot close the level;
+ * the lane route comes home with 7 ticks in hand on its worst seed and 15 on its best.
+ *
+ * 44 of the 62 go on wheels once a full hopper is paid for, against a 72-tile field. Not visiting
+ * everything is now arithmetic rather than advice.
+ */
+const SHIFT = 62;
 /**
  * Distinct tiles a shift may enter.
  *
@@ -21,10 +34,10 @@ const FOOTPRINT = 32;
 /**
  * Gold is the sensor reach, and the reach is on the facts table.
  *
- * Two routes pass. The serpentine reads only the tile under the wheels and costs 58–68 across the
- * seeds; the two lanes, reading the rows either side and stepping off for a ripe crop, cost 46–54.
- * Par sits between them: the lane route golds with six ticks spare on its worst seed, and the
- * serpentine lands on silver at 68 against a silver line of 75.
+ * One route passes. The two lanes, reading the rows either side and stepping off for a ripe crop,
+ * cost 47–55; the serpentine that reads only the tile under the wheels costs 58–68 and no longer
+ * comes home inside the shift on three of the five seeds. Par golds the lane route with five ticks
+ * spare on its worst seed.
  *
  * Not a trim of the old 74. That number was the serpentine's own cost plus a margin, so it paid
  * gold for ignoring the one instrument this level exists to teach.
@@ -112,7 +125,7 @@ export const w2_05: LevelDef = {
   facts: [
     {
       label: 'The field',
-      value: `**${String(WIDTH)} by ${String(HEIGHT)}**. Far more ground than one shift buys.`,
+      value: `**${String(WIDTH)} by ${String(HEIGHT)}** — ${String(WIDTH * HEIGHT)} tiles against a **${String(SHIFT)}-tick** shift, and a full hopper is 16 of those ticks before the wheels turn.`,
     },
     {
       label: 'The hopper',

@@ -10,7 +10,7 @@ import {
 import type { SenseEvent, Trace } from './trace.ts';
 import { KEYFRAME_INTERVAL, MAX_SENSE_EVENTS, TraceBuilder } from './trace.ts';
 import type { Bot, Dir, ItemKind, ItemStack, Machine, Message, Tile, Vec, World } from './types.ts';
-import { MANUAL_ONLY, Terrain } from './types.ts';
+import { FED_BY, MANUAL_ONLY, Terrain } from './types.ts';
 import {
   addGroundItems,
   addToInventory,
@@ -617,6 +617,10 @@ export class Sim {
    * §2) it is transient. A cycle-less machine belongs in the bucket `use` already had for a tile
    * with nothing on it — there is nothing here that `use` can work — and it is reached by standing
    * somewhere, which is the most transient state in the game.
+   *
+   * The third refusal, a machine whose `vars` names a feeder that is not `on` yet, is in the same
+   * bucket for the same reason and is the more obviously transient of the three: energising the
+   * feeder makes the identical call work.
    */
   use(botId: number, dir?: Dir): boolean {
     const bot = this.requireActiveBot(botId);
@@ -627,7 +631,7 @@ export class Sim {
     const machine = machineAt(this.world, at);
     const cycle = machine?.cycle;
 
-    if (!machine || !cycle || cycle.length === 0) {
+    if (!machine || !cycle || cycle.length === 0 || this.unfed(machine)) {
       this.builder.push({
         t,
         botId,
@@ -649,6 +653,21 @@ export class Sim {
     this.builder.push({ t, kind: 'fx', at, fx: 'use', botId });
     this.charge(bot, dt);
     return true;
+  }
+
+  /**
+   * True while any machine this one publishes a `fed:<id>` key for is not `on`.
+   *
+   * A feeder that has been removed from the world counts as unfed rather than as absent: the only
+   * way to write one of these keys is `build`, so a missing id is a level bug and answering "yes,
+   * powered" to it would hide the bug behind a door that opens.
+   */
+  private unfed(machine: Machine): boolean {
+    for (const [name, value] of Object.entries(machine.vars)) {
+      if (value !== 1 || !name.startsWith(FED_BY)) continue;
+      if (machineById(this.world, name.slice(FED_BY.length))?.state !== 'on') return true;
+    }
+    return false;
   }
 
   /**

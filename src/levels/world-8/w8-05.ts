@@ -7,6 +7,7 @@ import type {
 } from '../../engine/index.ts';
 import {
   Dir,
+  FED_BY,
   ItemKind,
   MANUAL_ONLY,
   MachineKind,
@@ -110,6 +111,40 @@ const INSTANCES: readonly (readonly [number, Instance])[] = [
 function instanceFor(seed: number): Instance {
   for (const [id, spec] of INSTANCES) if (id === seed) return spec;
   return INSTANCES[0]?.[1] as Instance;
+}
+
+/**
+ * The substation the airlock draws from: the one furthest down the grid, and of those the one
+ * standing nearest the gate.
+ *
+ * Furthest down rather than simply nearest. Nearest is a *root* on seed 7 — `sub-9` stands three
+ * tiles from the gate with nothing behind it — and an airlock fed by a root is a form leg that
+ * depends on one switch rather than on the shift, which is the defect this is here to close. The
+ * deepest station drags its whole ancestry along with it, because `precedence` already forbids
+ * taking that ancestry out of order, so the door is gated on the grid coming up rather than on a
+ * bot detouring past one machine.
+ *
+ * It buys 2, 9 and 4 feeders on seeds 1, 4 and 7 — on the chain seed the entire grid, which is the
+ * seed where the grid is least parallelisable and the errand has the most reason to start early.
+ */
+function feederIndex(deps: readonly (readonly number[])[], stationAt: Vec[], gate: Vec): number {
+  const depthOf = (i: number): number => {
+    let deep = 0;
+    for (const feeder of deps[i] ?? []) deep = Math.max(deep, depthOf(feeder) + 1);
+    return deep;
+  };
+  let best = 0;
+  let bestDepth = -1;
+  let bestGap = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < deps.length; i++) {
+    const depth = depthOf(i);
+    const gap = manhattan(stationAt[i] as Vec, gate);
+    if (depth < bestDepth || (depth === bestDepth && gap >= bestGap)) continue;
+    best = i;
+    bestDepth = depth;
+    bestGap = gap;
+  }
+  return best;
 }
 
 // ---------------------------------------------------------------------------
@@ -364,13 +399,14 @@ function build(seed: number): World {
     vars: { stations: spec.stations, classes: classes.length, crates: spec.crates },
   });
 
+  const feeder = `${STATION_PREFIX}${String(feederIndex(deps, stationAt, gateStand))}`;
   addMachine(world, {
     id: 'airlock',
     kind: MachineKind.Door,
     at: gateStand,
     state: AIRLOCK_CYCLE[0] as string,
     inventory: [],
-    vars: { stages: AIRLOCK_STAGES, [MANUAL_ONLY]: 1 },
+    vars: { stages: AIRLOCK_STAGES, [MANUAL_ONLY]: 1, [`${FED_BY}${feeder}`]: 1 },
     cycle: [...AIRLOCK_CYCLE],
     links: gates,
   });
@@ -530,6 +566,40 @@ function darkStation(ctx: ObjectiveContext): { id: string; at: Vec; reason: stri
   return undefined;
 }
 
+/** The substation the door draws from, read back off the door rather than recomputed. */
+function airlockFeeder(world: World): string | null {
+  const airlock = machineById(world, 'airlock');
+  if (!airlock) return null;
+  for (const [name, value] of Object.entries(airlock.vars)) {
+    if (value === 1 && name.startsWith(FED_BY)) return name.slice(FED_BY.length);
+  }
+  return null;
+}
+
+/**
+ * The door, when the door is the reason the form is not filed.
+ *
+ * `file-form` used to answer with the chip's address whatever had gone wrong, which on a run that
+ * never got the grid as far as the gate names the symptom and hides the cause: the chip is in
+ * somebody's hold because the wall it was carried to never became a door. Naming the feeder is
+ * free — `probe("airlock").vars` publishes it before anybody walks anywhere — and it is the one
+ * sentence that says the two halves of this level are one shift.
+ */
+function sealedAirlock(ctx: ObjectiveContext): Divergence | undefined {
+  const airlock = machineById(ctx.world, 'airlock');
+  if (!airlock || airlock.state === 'open') return undefined;
+  const feeder = airlockFeeder(ctx.world);
+  const station = feeder === null ? undefined : machineById(ctx.world, feeder);
+  const dark = station !== undefined && station.state !== 'on';
+  return {
+    where: `airlock at ${point(airlock.at)}`,
+    expected: `open — ${String(AIRLOCK_STAGES)} uses, with ${feeder ?? 'its feeder'} on`,
+    received: dark
+      ? `${feeder as string} is ${station.state}; the gate took the ticks`
+      : `${airlock.state}; the chamber is still walled off`,
+  };
+}
+
 /** Where KD-0001-T actually ended the shift, in the words the player can act on. */
 function whereIsTheForm(ctx: ObjectiveContext): string {
   for (const bot of ctx.world.bots) {
@@ -595,6 +665,24 @@ function firstBreach(ctx: ObjectiveContext): Breach | undefined {
 }
 
 const HOLD_KEYWORD = 'held';
+const GATE_KEYWORD = 'gate';
+
+/** The lines the run filed under one keyword, in the order it printed them. */
+function filedLines(ctx: ObjectiveContext, keyword: string): string[] {
+  const prefix = `${keyword} `;
+  return ctx.trace.events
+    .filter((event) => event.kind === 'print' && event.text.startsWith(prefix))
+    .map((event) => (event.kind === 'print' ? event.text : ''));
+}
+
+/** `<keyword> <id> <n>` split back into its two halves, or null when it is not that shape. */
+function readClaim(line: string): { id: string; count: number } | null {
+  const parts = line.split(' ');
+  if (parts.length !== 3) return null;
+  const count = Number(parts[2]);
+  if (!Number.isInteger(count)) return null;
+  return { id: parts[1] as string, count };
+}
 
 /**
  * How long each fed station stood ready and unstarted.
@@ -638,30 +726,13 @@ function longestHold(ctx: ObjectiveContext): { ticks: number; stations: Set<stri
   return { ticks, stations };
 }
 
-/** `held <station> <n>` split back into its two halves, or null when it is not that shape. */
-function readHold(line: string): { station: string; ticks: number } | null {
-  const parts = line.split(' ');
-  if (parts.length !== 3) return null;
-  const ticks = Number(parts[2]);
-  if (!Number.isInteger(ticks)) return null;
-  return { station: parts[1] as string, ticks };
-}
-
-/** The lines the run filed under the hold keyword, in the order it printed them. */
-function holdLines(ctx: ObjectiveContext): string[] {
-  const prefix = `${HOLD_KEYWORD} `;
-  return ctx.trace.events
-    .filter((event) => event.kind === 'print' && event.text.startsWith(prefix))
-    .map((event) => (event.kind === 'print' ? event.text : ''));
-}
-
 function longestHoldFiled(ctx: ObjectiveContext): boolean {
-  const said = holdLines(ctx);
+  const said = filedLines(ctx, HOLD_KEYWORD);
   if (said.length !== 1) return false;
-  const claim = readHold(said[0] as string);
+  const claim = readClaim(said[0] as string);
   if (claim === null) return false;
   const { ticks, stations } = longestHold(ctx);
-  return ticks >= 0 && stations.has(claim.station) && claim.ticks === ticks;
+  return ticks >= 0 && stations.has(claim.id) && claim.count === ticks;
 }
 
 /**
@@ -672,7 +743,7 @@ function longestHoldFiled(ctx: ObjectiveContext): boolean {
  * the bookkeeping that would find the right one exactly where it was.
  */
 function misreadHold(ctx: ObjectiveContext): Divergence {
-  const said = holdLines(ctx);
+  const said = filedLines(ctx, HOLD_KEYWORD);
   const line = said[0];
   if (line === undefined) {
     return {
@@ -688,7 +759,7 @@ function misreadHold(ctx: ObjectiveContext): Divergence {
       received: `${String(said.length)} lines`,
     };
   }
-  const claim = readHold(line);
+  const claim = readClaim(line);
   if (claim === null) {
     return {
       where: 'the hand-over note',
@@ -696,18 +767,134 @@ function misreadHold(ctx: ObjectiveContext): Divergence {
       received: clipValue(line),
     };
   }
-  const own = holdsIn(ctx).get(claim.station);
+  const own = holdsIn(ctx).get(claim.id);
   if (own === undefined) {
     return {
-      where: claim.station,
+      where: claim.id,
       expected: 'a station this run started after its feeders',
       received: 'nothing on the site answers to that',
     };
   }
   return {
-    where: claim.station,
-    expected: own === claim.ticks ? 'the longest stand on the site' : `${String(own)} ticks`,
-    received: own === claim.ticks ? 'a shorter one' : `${String(claim.ticks)} claimed`,
+    where: claim.id,
+    expected: own === claim.count ? 'the longest stand on the site' : `${String(own)} ticks`,
+    received: own === claim.count ? 'a shorter one' : `${String(claim.count)} claimed`,
+  };
+}
+
+/**
+ * The tick the gate first moved, on the clock of whoever moved it.
+ *
+ * Read off the log rather than the door, because the door's final state cannot say *when*, and
+ * when is the whole of the question below. A run that never opened it has no answer at all, which
+ * is the property that keeps a program that does nothing away from the star.
+ */
+function gateMovedAt(ctx: ObjectiveContext): number | undefined {
+  let earliest: number | undefined;
+  for (const record of machineUseLog(ctx)) {
+    if (record.machineId !== 'airlock') continue;
+    if (earliest === undefined || record.t < earliest) earliest = record.t;
+  }
+  return earliest;
+}
+
+/** The tick the door's own substation was thrown, on the clock of whoever threw it. */
+function feederThrownAt(ctx: ObjectiveContext): number | undefined {
+  const feeder = airlockFeeder(ctx.world);
+  if (feeder === null) return undefined;
+  let earliest: number | undefined;
+  for (const record of machineUseLog(ctx)) {
+    if (record.machineId !== feeder) continue;
+    if (earliest === undefined || record.t < earliest) earliest = record.t;
+  }
+  return earliest;
+}
+
+/**
+ * How long the gate stood powered and shut: the ticks between the door's substation being thrown
+ * and the door first moving.
+ *
+ * Undefined when either end of it never happened, which is what keeps the star away from a
+ * program that did not do the work — there is no such interval on a shift where nobody opened the
+ * gate, and no honest number to print about one.
+ */
+function gateSlack(ctx: ObjectiveContext): number | undefined {
+  const powered = feederThrownAt(ctx);
+  const moved = gateMovedAt(ctx);
+  if (powered === undefined || moved === undefined) return undefined;
+  return moved - powered;
+}
+
+/**
+ * `gate <station> <n>`: the substation the door draws from, and the ticks it stood powered before
+ * anybody moved it.
+ *
+ * The question the coupling created, and the only one on this level that reads both halves of the
+ * shift at once. `name-the-hold` grades the grid against its own clock. This grades the *errand*
+ * against the grid — the slack on the join that did not exist until the door needed power — and it
+ * is the number a player who wants a shorter shift has to attack, because every tick of it is the
+ * ending waiting on a walk that could have started earlier.
+ *
+ * The station is free; `probe("airlock").vars` names it before anybody has walked anywhere. It is
+ * asked for anyway, because a note that names the wrong door has not worked out which door it is.
+ * The interval is what has to be earned, and it cannot be reconstructed afterwards: the final
+ * world knows the gate is open and knows the grid is up, and knows nothing whatever about when.
+ */
+function gateReportFiled(ctx: ObjectiveContext): boolean {
+  const said = filedLines(ctx, GATE_KEYWORD);
+  if (said.length !== 1) return false;
+  const claim = readClaim(said[0] as string);
+  if (claim === null) return false;
+  const slack = gateSlack(ctx);
+  if (slack === undefined) return false;
+  return claim.id === airlockFeeder(ctx.world) && claim.count === slack;
+}
+
+/** Where the gate note and the shift part company, without handing over the number. */
+function misreadGate(ctx: ObjectiveContext): Divergence {
+  const said = filedLines(ctx, GATE_KEYWORD);
+  const line = said[0];
+  if (line === undefined) {
+    return {
+      where: 'the gate note',
+      expected: 'a line naming the door’s substation',
+      received: NOTHING,
+    };
+  }
+  if (said.length > 1) {
+    return {
+      where: 'the gate note',
+      expected: 'one line',
+      received: `${String(said.length)} lines`,
+    };
+  }
+  const claim = readClaim(line);
+  if (claim === null) {
+    return {
+      where: 'the gate note',
+      expected: 'a line reading `gate <station> <n>`',
+      received: clipValue(line),
+    };
+  }
+  const feeder = airlockFeeder(ctx.world);
+  if (feeder !== null && claim.id !== feeder) {
+    return {
+      where: claim.id,
+      expected: 'the substation the airlock draws from',
+      received: 'a different one on the site',
+    };
+  }
+  if (gateSlack(ctx) === undefined) {
+    return {
+      where: 'the airlock',
+      expected: 'a gate somebody moved this shift',
+      received: gateMovedAt(ctx) === undefined ? 'nobody moved it' : 'its substation stayed off',
+    };
+  }
+  return {
+    where: 'the gate note',
+    expected: 'how long it stood powered and shut',
+    received: `${String(claim.count)} claimed`,
   };
 }
 
@@ -752,8 +939,8 @@ export function filedIn(world: World): 'charter' | 'renewals' | null {
 
 const BRIEF = [
   'dot: the Yards run this every night, so nothing is where it was yesterday. the',
-  'airlock past the Yards has cycled on a nine-tick clock since before I got here.',
-  'nobody wrote it down because nobody had to. now you know.',
+  'airlock past the Yards has cycled on a nine-tick clock since before I got here,',
+  'and it draws off the grid. nobody wrote that down because nobody had to.',
   '',
   'Bring the grid up, clear the crates, and file KD-0001-T.',
   '',
@@ -808,6 +995,11 @@ const FACTS = [
       'Starts sealed. One `use()` advances one stage for one tick, and `probe("airlock")` publishes `vars.stages` — the uses it takes to open. It stays open after that.',
   },
   {
+    label: 'What opens it',
+    value:
+      'The door runs off the grid. `probe("airlock").vars` carries a `fed:sub-N` key: until that substation reads `on`, every `use()` at the gate costs its tick and does nothing.',
+  },
+  {
     label: 'The form',
     value:
       'KD-0001-T is a chip on a marked tile in the workings. `probe` gives the positions of `slot-charter` and `slot-renewals`.',
@@ -817,13 +1009,18 @@ const FACTS = [
     value:
       'One line, `held <station> <n>`: the substation that stood longest between its last feeder finishing and its own first `use()`, and how many ticks that was.',
   },
+  {
+    label: 'Gate note',
+    value:
+      'One line, `gate <station> <n>`: the substation the airlock draws from, and the ticks between that substation being thrown and the gate first moving.',
+  },
 ];
 
 const STARTER = [
   "// import { reach, dispatch } from 'lib';",
   '',
   '// NOTE(4470): the whole site runs on your code now. mine is all switched off',
-  '// NOTE(4470): the airlock still runs on its own clock. it does not care',
+  '// NOTE(4470): the airlock runs on its own clock and on our power. it needs both',
   '',
   'const fleet = bots();',
   'print(`fleet: ${fleet.length}`);',
@@ -843,11 +1040,15 @@ export const w8_05: LevelDef = {
   brief: BRIEF,
   facts: FACTS,
   seeds: [1, 4, 7],
-  /* Both halves of the reference — the `Sim` driver and the player-facing source — come in
-     between 560 and 977 ticks across the three seeds. Par is left where it was when there were
-     seven: the two most expensive instances went with the seed cull, and moving the gold line
-     down to meet the new worst case would be tightening the medal on a level nobody has closed
-     yet. docs/FIX-FINALE.md flags it as a decision for the orchestrator, not a silent one. */
+  /* Both halves of the reference — the `Sim` driver at 514 / 779 / 894 and the player-facing
+     source at 636 / 756 / 970 — come in between 514 and 970 ticks across the three seeds, so
+     both gold on all three. Coupling the airlock to the grid took ticks *off* the driver rather
+     than adding them (560 / 806 / 917 before it): holding the errand until the feeder is lit
+     stops the carrier spending the opening of the shift walking to a door it cannot move.
+     Par is left where it was when there were seven seeds: the two most expensive instances went
+     with the seed cull, and moving the gold line down to meet the new worst case would be
+     tightening the medal on a level nobody has closed yet. docs/FIX-FINALE.md flags it as a
+     decision for the orchestrator, not a silent one. */
   par: { ticks: 1050 },
   costs: { use: 1 },
   budget: { maxTicks: 16000, maxOps: 8_000_000 },
@@ -907,11 +1108,12 @@ export const w8_05: LevelDef = {
       'File KD-0001-T in the Charter registry or the renewals tray',
       (ctx) => filedIn(ctx.world) !== null,
       {
-        divergence: (ctx) => ({
-          where: 'KD-0001-T',
-          expected: 'on slot-charter or slot-renewals',
-          received: whereIsTheForm(ctx),
-        }),
+        divergence: (ctx) =>
+          sealedAirlock(ctx) ?? {
+            where: 'KD-0001-T',
+            expected: 'on slot-charter or slot-renewals',
+            received: whereIsTheForm(ctx),
+          },
       },
     ),
     Objectives.custom(
@@ -938,6 +1140,14 @@ export const w8_05: LevelDef = {
       longestHoldFiled,
       { divergence: misreadHold },
     ),
+    /* Also no `progress()`, and for the same reason: the number is one join's slack rather than a
+       run-wide total, so `budgetFor` would have had to guess a meter and would have drawn one. */
+    Objectives.custom(
+      'mind-the-gate',
+      'Name the substation the airlock draws from and how long it stood powered and shut',
+      gateReportFiled,
+      { divergence: misreadGate },
+    ),
   ],
   starter: STARTER,
   hints: [
@@ -952,6 +1162,9 @@ export const w8_05: LevelDef = {
     'Until somebody has stood at the airlock and paid every stage of it, your route ' +
       'planner sees a wall. The toll is the same size whoever pays it, so let the bot ' +
       'that was going that way anyway pay it early.',
+    'The gate is on the same grid you were sent here to bring up, and it says which ' +
+      'substation before anybody walks anywhere. That substation is not allowed to come ' +
+      'up before its own feeders, so the errand east has a queue in front of it.',
     'Nothing in the grid records when a station could have started, only when it did. ' +
       'If you want to know which one your order kept standing about, you have to read ' +
       'the clock as you throw each one.',

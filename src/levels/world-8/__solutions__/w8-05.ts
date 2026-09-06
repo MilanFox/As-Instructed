@@ -99,6 +99,16 @@ export const solution: ReferenceSolution = {
     const airlock = sim.probe(anyBot, 'airlock');
     const charter = sim.probe(anyBot, 'slot-charter');
 
+    /* The gate draws off the grid, and says which substation it draws from before anybody has
+       walked anywhere: `vars` carries one `fed:<id>` key. Until that station reads `on`, every
+       `use()` at the gate costs its tick and moves nothing, so the errand east is not a thing
+       this program may start whenever it likes — it is queued behind a rank of the grid. */
+    const gateFeeder = Object.keys(airlock?.vars ?? {})
+      .find((name) => name.startsWith('fed:'))
+      ?.slice('fed:'.length);
+    const gatePowered = (): boolean =>
+      gateFeeder === undefined || sim.probe(anyBot, gateFeeder)?.state === 'on';
+
     // ---- the crew is terrain --------------------------------------------
     // A bot that has stopped holds its tile for good, so a route goes around the rest of the
     // fleet where it can and asks them to shift where it cannot.
@@ -421,9 +431,14 @@ export const solution: ReferenceSolution = {
     let stage = 0;
     let fumbled = 0;
     let errandTries = 0;
+    /* The tick the gate first moved, off the clock of whoever moved it. Nothing in the final world
+       remembers it, and the gate note is a fact about that instant rather than about the door. */
+    let gateAt: number | null = null;
 
     const errandStep = (): boolean => {
       if (!form || !airlock || !charter || stage >= 3 || errandTries >= 40) return false;
+      // Nothing to do at the gate while the gate is dark, and nothing spent finding that out.
+      if (stage === 1 && !gatePowered()) return true;
       errandTries++;
       if (stage === 0) {
         // Whoever is nearest with a tank worth the trip, and never the bot holding the grid.
@@ -454,10 +469,15 @@ export const solution: ReferenceSolution = {
           // on having been the one who started it.
           const stages = airlock.vars['stages'] ?? 0;
           for (let i = 0; i <= stages && sim.fuel(carrier) > 1; i++) {
-            if (sim.probe(carrier, 'airlock')?.state === 'open') break;
+            const was = sim.probe(carrier, 'airlock')?.state;
+            if (was === 'open') break;
+            const at = sim.clock(carrier);
             sim.use(carrier);
+            if (gateAt === null && sim.probe(carrier, 'airlock')?.state !== was) gateAt = at;
           }
           map.observe(sim, carrier, WIDTH);
+          // The toll is only paid when the door says so. Anything else and it is paid again.
+          if (sim.probe(carrier, 'airlock')?.state !== 'open') return true;
         } else {
           sim.drop(carrier, ItemKind.Chip);
         }
@@ -640,6 +660,12 @@ export const solution: ReferenceSolution = {
       heldId = station.id;
     }
     if (heldId !== '') sim.print(anyBot, `held ${heldId} ${String(heldFor)}`);
+
+    // How long the gate stood powered and shut: the walk east, priced against the grid's clock.
+    const poweredAt = gateFeeder === undefined ? undefined : thrown.get(gateFeeder);
+    if (gateAt !== null && gateFeeder !== undefined && poweredAt !== undefined) {
+      sim.print(anyBot, `gate ${gateFeeder} ${String(gateAt - poweredAt)}`);
+    }
   },
   source: [
     '// Roles, not a rota: one electrician, one clerk, everybody else on crates.',
@@ -677,6 +703,10 @@ export const solution: ReferenceSolution = {
     '}',
     "const airlock = probe('airlock');",
     "const charter = probe('slot-charter');",
+    '// The gate draws off the grid and says so before anybody walks: one `fed:<id>` key in its',
+    '// vars. Until that substation is on, a use() at the gate costs its tick and moves nothing.',
+    "const gateFeeder = Object.keys(airlock.vars).find((n) => n.startsWith('fed:'))?.slice(4);",
+    "const gatePowered = () => !gateFeeder || probe(gateFeeder)?.state === 'on';",
     '',
     '// The only map anybody has is the one the fleet has looked at.',
     'const seen = new Map();',
@@ -959,8 +989,12 @@ export const solution: ReferenceSolution = {
     'let stage = 0;',
     'let fumbled = 0;',
     'let tries = 0;',
+    '// The tick the gate first moved. Nothing but this program will remember it afterwards.',
+    'let gateAt = null;',
     'const errand = () => {',
     '  if (!form || stage >= 3 || tries >= 40) return false;',
+    '  // Nothing to do at the gate while the gate is dark, and nothing spent finding that out.',
+    '  if (stage === 1 && !gatePowered()) return true;',
     '  tries++;',
     '  if (stage === 0) {',
     '    // Whoever is nearest with a tank worth the trip, not whoever is next in the list.',
@@ -983,10 +1017,15 @@ export const solution: ReferenceSolution = {
     '  if (reach(carrier, target) && ready(carrier)) {',
     '    if (stage === 1) {',
     '      for (let i = 0; i <= airlock.vars.stages && bot(carrier).fuel() > 1; i++) {',
-    "        if (bot(carrier).probe('airlock').state === 'open') break;",
+    "        const was = bot(carrier).probe('airlock').state;",
+    "        if (was === 'open') break;",
+    '        const at = bot(carrier).clock();',
     '        bot(carrier).use();',
+    "        if (gateAt === null && bot(carrier).probe('airlock').state !== was) gateAt = at;",
     '      }',
     '      look4(carrier);',
+    '      // The toll is only paid when the door says so. Anything else and it is paid again.',
+    "      if (bot(carrier).probe('airlock').state !== 'open') return true;",
     '    } else {',
     '      bot(carrier).drop(ItemKind.Chip);',
     '    }',
@@ -1148,5 +1187,11 @@ export const solution: ReferenceSolution = {
     '  heldId = s.id;',
     '}',
     "if (heldId !== '') print(`held ${heldId} ${heldFor}`);",
+    '',
+    '// How long the gate stood powered and shut: the walk east, priced against the grid’s clock.',
+    'const poweredAt = gateFeeder ? thrown.get(gateFeeder) : undefined;',
+    'if (gateAt !== null && poweredAt !== undefined) {',
+    '  print(`gate ${gateFeeder} ${gateAt - poweredAt}`);',
+    '}',
   ].join('\n'),
 };

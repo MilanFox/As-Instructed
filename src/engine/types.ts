@@ -132,6 +132,21 @@ export type MachineKind = (typeof MachineKind)[keyof typeof MachineKind];
  */
 export const MANUAL_ONLY = 'manual';
 
+/**
+ * Reserved `Machine.vars` key *prefix*. `fed:<machineId>` set to `1` says this machine draws from
+ * that one: `use()` at its tile costs its tick and returns false for as long as the named machine
+ * is anything but `on`.
+ *
+ * The id rides in the key rather than in the value because `vars` holds numbers and the fact has
+ * to ride somewhere `probe` publishes — a door that refuses for a reason the player cannot read
+ * before they hit it is a trap, not a rule, which is the same argument `MANUAL_ONLY` above is
+ * made of. `link()` already writes `link:<toId>` into this map, so a keyed id is not a new shape.
+ *
+ * The refusal is a `false` rather than a throw because it clears: energise the feeder and the
+ * identical call works, which is docs/ENGINE.md §2's succeed-later test passing.
+ */
+export const FED_BY = 'fed:';
+
 export interface Machine {
   id: string;
   kind: MachineKind;
