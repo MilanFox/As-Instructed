@@ -1637,3 +1637,60 @@ It was told the thing that matters about these guards: the original index was 24
 real invariants and eleven ordinary English uses of the word "mirrors", and **that ratio must not
 come back** — reword the prose, do not register the false positive. And that deleting a dead export
 beats listing it.
+
+---
+
+## 2026-09-06 — bonuses are graded on every seed now
+
+**Merged** (`37daffd` + `b3fca45`). Main green at **1744 tests / 76 files**, tsc, build and eslint
+clean but for the known `w5-01.ts:32` false positive.
+
+**Three of 37 bonuses change status**, and the shape matters more than the count:
+
+| level | bonus | per-seed | was | is |
+|---|---|---|---|---|
+| `w7-02` | `within-ten-percent` | `Y Y n Y` | star | refused |
+| `w7-04` | `within-bound` | `Y Y n Y Y` | star | refused |
+| `w8-01` | `audit-tight` | `Y n n n` | star | refused |
+
+**All three are budget bonuses.** Not one predicate bonus moved — `no-overshoot`, `no-bumps`,
+`single-pass`, `no-resurvey` hold on every layout or none. So seed-one grading was softening
+*precisely* the half of the bonus layer where the number was supposed to be the challenge, and
+leaving the half that was never at risk alone. That is a better finding than the count.
+
+The proof is the part I would keep: three programs differing only in when they group the round by
+class, the third grouping **only when the yard matches seed one** (`crates.length === 8 &&
+depots.size === 4`) — a hardcoded route written down as a program. Seed one meets the bonus, no
+other seed does, the star is refused. The grouped-everywhere program still earns it. Before and
+after in the browser: `TICKS 332 · gold · 4 pts · 1 star` with the seed table reading 218 and 332 —
+three numbers that could not all be true — against `TICKS 332 · gold · 3 pts` where both numbers
+are seed two's.
+
+**It departed from the proposed patch in four places and was right each time**, which is why the
+brief said to treat that patch as a proposal: `evaluateObjectives` instead of a second
+`buildVerdict` (two of the six proposed args were noise and the second verdict built a discarded
+failure message); **generalised `worstPerObjective` rather than adding a near-duplicate** — one copy
+of the rule, which is the whole point of the guard work that landed hours earlier; template list
+from the *reported* run rather than `runs[0]`, matching what required objectives already do; and
+`senseTotals(trace)` hoisted so bonus and required objectives are graded against identical counts.
+
+**A trap found on the way:** `withBonus` passed no `ops`, and `withinOps` reads `ctx.ops ?? 0` — so
+an ops-budget bonus was **always trivially met**. No shipped bonus used it. It is closed rather than
+documented.
+
+`withBonus` is now deleted, which its own comment had asked for: *"Delete this the day the verdict
+carries them."* Today was the day — both `RunnerPort` implementations carry the bonus, including
+`FakeRunner`, which never needed `withBonus` specifically, only *someone* to put bonus rows in the
+verdict. Leaving it would have silently re-graded, on one seed, any future bonus the runtime failed
+to report.
+
+**One content finding routed to the levels agent, and it is a good one: an idle `print()` on
+`w8-05` meets two of its three bonuses** — `under-budget` and `no-blocked-moves`. A program that
+does nothing collects two thirds of the finale's optional credit. `no-blocked-moves` was already
+marked for deletion; this is the argument for it, and it puts `under-budget` on that level under
+suspicion too.
+
+I edited one hunk in the levels agent's territory — `finale.test.ts` compared banked work against
+every met objective, which held only while the verdict carried required objectives alone. It was
+the only red test on main and main does not stay red overnight. The agent has been told, and told
+that its version wins if they collide.
