@@ -1915,3 +1915,68 @@ Two standing instructions in that brief worth keeping: **test behaviour, not mar
 directions ship and the front end may be rebuilt again, so a class-name assertion is noise by next
 week — and the medal key must be proved distinguishable **under `signal`**, since a key that only
 works in colour fails the direction it was rebuilt for.
+
+---
+
+## 2026-09-06 — both free pars were content bugs, and neither was about par
+
+**Merged.** Main green at **1833 tests / 82 files**, tsc, build and eslint clean but for the known
+`w5-01.ts:32` false positive.
+
+### `w8-04`: the intended route now wins on every seed
+
+Par 223 → **116**, medal from the worst seed:
+
+| program | worst | medal |
+|---|---:|---|
+| reference — decode, drive the plan, repair falls | **116** | **gold** |
+| never receives, scavenges the frontier | 290 | bronze |
+| never receives, probes every locker | 358 | bronze |
+
+Previously the scavenger golded with **158 ticks to spare**.
+
+**The mechanism was not free sensing, which is what I would have guessed.** It was in `build`: the
+fourteen "old workings" stopped one tile *short* of any corridor they hit — which leaves their last
+tile adjacent to it, i.e. **joined**. They were short cuts across a route whose entire job is to
+wander. Their own comment read *"they do not go anywhere, which is the point."* They went somewhere.
+
+The repair makes **every corridor an induced path**, so the workings form a tree and the filed route
+*is* the shortest walk to the locker: refusing to read the plan can only add ground, never remove
+it. `build` now asserts `worldDistance(LIFT, locker) === Σ legs + 6 × collapses` and **throws rather
+than shipping a free par**. Two supporting repairs, both good instincts: decoy workings now wind,
+because a straight stub is dismissed by a single free `look`; and **every working ends in a locker**,
+in shuffled ids, because `probe(id)` reaches any machine for zero ticks and exactly one machine
+named `locker` handed the answer over at tick zero. The proof is a naive-program fixture and a par
+calibration test, not prose. No bonus touched.
+
+### `w8-03`: a seed problem, exactly as ruled
+
+Seed 3 was `layers: 1` — **a grid with no edges**. Two defects in one number: `precedence-held` is
+**vacuously true** there, so the seed did not test the objective the level exists for; and
+`deadlineFor` keys off the chain, so **the seed with no chain drew the tightest shift in the set.**
+The level was grading hardest on the layout that had removed its own idea. The formula was fine all
+along — a consistent 1.85–2.05× the honest unoptimised program on all five seeds.
+
+`layers: 1 → 3`. Par 128 → **84**, silver now under every seed's deadline, and bronze — previously
+**empty on two seeds and truncated on a third** — is 33–254 ticks wide everywhere. Difficulty rises:
+the layer-barrier answer goes from golding on four seeds to bronzing. **Par stays scalar and no
+per-seed machinery was built.**
+
+### Also landed
+
+`w5-01` par 37 → 32; the probe-free answer moves gold → silver. `CustomReport` carries a meter, both
+remaining objectives converted, and the tails that existed only to feed the parser dropped — so
+**`INFERRED_FROM_LABEL` is now empty and nothing in the campaign reads its unit out of its own
+English.** A13 amended, since it still called that the gap to close first.
+
+Two ratchet edits applied by me, as routed: `worldDistance` is read by the new build assertion so it
+left the dead list, and two off-plan fixtures joined the test-only count. Also fixed a comment in
+`budgets.ts` that cited `w8-04`'s deleted `no-resurvey` to illustrate why the match is made against
+sampled history rather than the final figure — **the reasoning holds, the citation did not.**
+
+**Still out:** the UI coverage agent.
+
+### Open, and mine to decide when the user picks a direction
+
+`docs/AUDIT-UI.md`'s held styling findings still need re-triage against the winning art direction.
+`DEFAULT_ART` is `survey` pending that call.
