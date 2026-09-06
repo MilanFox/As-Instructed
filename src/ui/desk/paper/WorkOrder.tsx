@@ -19,6 +19,7 @@ import { currentLevel, useGame } from '../../../game/store.ts';
 import { worldMeta } from '../../../levels/index.ts';
 import { requirementsFor } from '../../../meta/index.ts';
 import { InlineMarkdown, Markdown } from '../../components/Markdown.tsx';
+import { usePapers } from './papers.ts';
 
 export function WorkOrder(): React.JSX.Element | null {
   const level = useGame(currentLevel);
@@ -75,6 +76,15 @@ export function WorkOrder(): React.JSX.Element | null {
               onClick={(event) => {
                 event.stopPropagation();
                 revealHint(revealed + 1);
+                /*
+                 * The sheet lies at the desk edge, so the hint the player just asked for arrived
+                 * one line above the bottom of the window and every further rung of the SIZE dial
+                 * pushed it further off. Requesting a hint is a deliberate act of reading, and
+                 * `docs/AUDIT-UI.md` F15's answer to reading is enlarge — so the order comes up to
+                 * reading size, where the field notes strip is the first thing under the head.
+                 */
+                const id = `order:${level.id}`;
+                if (usePapers.getState().lifted !== id) usePapers.getState().lift(id);
               }}
             >
               Request hint {revealed + 1} of {hints.length}

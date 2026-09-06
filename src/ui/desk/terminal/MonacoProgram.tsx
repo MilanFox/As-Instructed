@@ -122,7 +122,21 @@ export function MonacoProgram({
       overviewRulerLanes: 0,
       scrollbar: { verticalScrollbarSize: 10, horizontalScrollbarSize: 10 },
       fixedOverflowWidgets: true,
-      wordWrap: 'off' as const,
+      /*
+       * Nothing is closed for the player, and nothing the player types is retyped for them.
+       * Monaco's auto-closing pairs put a `}` after the cursor, the player typed their own `}` on
+       * a new line, and a program written in the style that worked on `w1-01` came back with a
+       * stray brace and `Declaration or statement expected`. This is a programming game: an editor
+       * that edits the program is worse than an editor with no conveniences.
+       */
+      autoClosingBrackets: 'never' as const,
+      autoClosingQuotes: 'never' as const,
+      autoClosingOvertype: 'never' as const,
+      autoSurround: 'never' as const,
+      /* A long line is unreadable rather than merely long: the terminal's pane does not scroll to
+         where the player is typing on its own, and they had already given up on multi-line code. */
+      wordWrap: 'on' as const,
+      wrappingIndent: 'indent' as const,
       bracketPairColorization: { enabled: false },
     }),
     [fontSize, lineHeight],

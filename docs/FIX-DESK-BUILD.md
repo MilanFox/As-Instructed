@@ -283,6 +283,86 @@ See §9. What follows is what is still open.
 
 ---
 
+### Found by a fresh-eyes playtest, and fixed
+
+*A tester who had never seen the game closed the first two work orders and recorded every moment
+they got stuck. Five of the six things they hit were real. The sixth was not, and it is recorded
+below with the evidence, because a wrong finding acted on is worse than a finding.*
+
+- **The in-tray could not be clicked, and `put it away` was a one-way door.** The tab was an
+  unstyled button in the corner of a box that sits at the desk edge behind the copy stand, so
+  `document.elementFromPoint` at its centre returned the copy stand — whose box reaches 38 units
+  below everything it draws — and the panel it opened flowed *downward*, off the bottom of the
+  frame, as a single white line. The tray was the only route back to a document that had been put
+  away, so the button nobody could hit was also the way out of a one-way door; the tester escaped by
+  leaving to the site map and re-entering the level. Fixed as a hit area and a panel placement, with
+  no furniture moved: the copy stand gives back the space it does not paint (`pointer-events: none`
+  on the box, `auto` on the board, clip, post and foot), the tab is a plate on the strip of the
+  tray's back rail that is both drawn and clear — above the foot at y 466, right of the post at
+  x 631 — and the panel opens *upward*, promoting the tray above the copy stand only while it is
+  open. `src/ui/__tests__/control-reachability.test.ts` is the guard, and it is the class rather
+  than the instance: it recomputes every control's box and every object's box from the stylesheets
+  and fails if anything that paints above a control overlaps it. Mutation-tested — putting the tab
+  back down into the tray fails with `.cs-foot (z 10) covers .tray-tab (z 7)`.
+
+- **The CLOSED die did nothing, four presses in a row.** Not a dead handler: a certificate is issued
+  *to the in-tray*, because one sheet lies out and that sheet is the work order — so the die went
+  live with nothing on the desk carrying a stamp box. And a certificate at its own `DOC_HOME` puts
+  its box at y 893 in an 839px window, so taking it out is not enough on its own either. Picking the
+  die up now takes the certificate out of the tray **and** brings it up to reading size, which is
+  what the copy on the die already said it would do. The row still reads `GOLD SILVER BRONZE CLOSED`
+  and the three grade dies are still the company's and still inert; the live one prints
+  `PRESS TO FILE` above itself, in the accent, and `CLICK THE BOX` once it is in hand. Watched end
+  to end by mouse: die → certificate up → box → filed with mark `closed`.
+
+- **A requested hint was one line above the bottom of the window.** Measured on `w1-01`: the hint
+  landed at y 812..838 in an 839px window and the *next* `Request hint` button then sat at y 855,
+  off screen. Raising SIZE made it worse. Requesting a hint is a deliberate act of reading and F15's
+  answer to reading is enlarge, so the order now comes up to reading size on reveal — the field
+  notes strip is the first thing under the addressing block, so the hint you asked for is what you
+  are looking at.
+
+- **The board-zoom controls were three unlabelled ~10px glyphs beside a 6px legend.** The tester
+  spent about two minutes unable to read the walls, resized the browser three times, and found `FIT`
+  **by reading the accessibility tree**; it solved their problem the moment they pressed it. That is
+  F12 exactly. Same place on the case, no furniture moved: a legended key cluster, `ZOOM` over
+  `OUT` `FIT` `IN`, 112 x 45 CSS px at 1440x839 against 85 x 17 before. The scrub track absorbs the
+  width (147 -> 120 px). Drag already panned the board and nothing said so; `#board` now carries
+  `cursor: grab`.
+
+- **The editor inserted a brace the player did not type.** Monaco's auto-closing pairs put a `}`
+  after the cursor, the player typed their own on a new line, and a program written in the style
+  that worked on `w1-01` came back with a stray trailing `}` and `Declaration or statement expected`.
+  Reproduced first try. `autoClosingBrackets`, `autoClosingQuotes`, `autoClosingOvertype` and
+  `autoSurround` are all `never` on both editors — `MonacoProgram.tsx` and `LibraryEditor.tsx`, which
+  holds player code too — and `wordWrap` is `on`, because the tester's fallback was one long line
+  they then could not read.
+
+### Reported and refused: the hints were never in the DOM
+
+The finding was *"the browser's page-text extraction returned all five of `w1-01`'s hints,
+unrequested, including the literal route"*. It does not hold. `WorkOrder.tsx` renders
+`hints.slice(0, revealed)` and nothing else; the extraction on a fresh save returns
+`Request hint 1 of 5` and no hint text, and with one hint revealed `document.body.innerText` still
+does not contain hint 2. What the tester read was the **site data table**, which is `level.facts` —
+and `w1-01`'s facts do print the route, in the level's own words, on purpose:
+`ROUTE AFTER IT — 19 East, 5 South, 22 West, 5 South, 22 East.` That is the company telling you the
+job, not a hint leaking. Every other reveal-on-request surface was checked and there is only this
+one. **If the route on the face of the work order is too much, that is a level-copy decision about
+`w1-01.facts`, not a DOM defect, and it is a different argument.**
+
+### Still open, from the same session
+
+- **The board is unreadable before you run anything.** A fresh player sees a 25x14 grid of
+  near-black tiles, `NO TRACE ON FILE`, no bot, no pad and no legend. They found their bearings only
+  by pressing DISPATCH and getting `WANT (23, 12) · GOT (2, 2)` back. That is a design question
+  about the resting state of the feed, not a bug.
+- **Scoring is opaque.** They closed `w1-01` at exactly 90/90 ticks, were given 3/11 points, saw
+  GOLD/SILVER/BRONZE all reading 0, and the site map header saying `1 AT PAR OR UNDER`. They never
+  worked out what par was or how to earn a medal.
+- **The tile inspector is undiscovered.** Hovering the board prints `13, 5 · wall` in the panel
+  header; they found it by accident while dragging.
+
 ## 8. Conflicts raised rather than decided
 
 **Ruling 3, geometric versus type scale.** Raised, measured, and amended by the orchestrator: the

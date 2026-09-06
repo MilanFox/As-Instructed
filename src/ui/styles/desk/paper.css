@@ -201,7 +201,13 @@
   left: calc(50% + 470 * var(--u)); top: calc(50% + 66 * var(--u));
   width: calc(306 * var(--u)); height: calc(414 * var(--u));
   z-index: 10;
+  /* The stand's box is taller than anything it paints: below the board there is only the post and
+     the foot, and the empty space between them was still swallowing every click that landed on the
+     in-tray behind it. A box that catches a pointer where it draws nothing is a control nobody can
+     reach — the parts that are drawn take their clicks back below. */
+  pointer-events: none;
 }
+.desk .cs-board, .desk .cs-clip, .desk .cs-post, .desk .cs-foot { pointer-events: auto; }
 .desk .cs-foot {
   position: absolute; left: calc(46 * var(--u)); right: calc(46 * var(--u));
   bottom: 0; height: calc(14 * var(--u)); border-radius: calc(6 * var(--u));

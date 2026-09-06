@@ -185,6 +185,13 @@ export function Transport({ onZoom }: TransportProps): React.ReactElement {
         ))}
       </select>
 
+      {/*
+       * `AUDIT-UI.md` F12 again, and the ruling that every door is an object with weight rather
+       * than a corner chip. These were three unlabelled ~10px glyphs beside a 6px legend: a player
+       * who could not read the walls spent two minutes resizing the browser and found `FIT` by
+       * reading the accessibility tree, not by looking at the screen. It solved their problem the
+       * moment they pressed it. Same place, same three rungs, drawn as keys with words on them.
+       */}
       <div className="fc-zoom">
         <span className="fc-legend">ZOOM</span>
         <button
@@ -194,7 +201,7 @@ export function Transport({ onZoom }: TransportProps): React.ReactElement {
           title="Smaller tiles"
           aria-label="Zoom out one step"
         >
-          −
+          OUT
         </button>
         <button
           type="button"
@@ -212,7 +219,7 @@ export function Transport({ onZoom }: TransportProps): React.ReactElement {
           title="Bigger tiles"
           aria-label="Zoom in one step"
         >
-          +
+          IN
         </button>
       </div>
 
