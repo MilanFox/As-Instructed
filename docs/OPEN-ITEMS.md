@@ -1857,3 +1857,61 @@ still inferring their unit from their label.
 reporting are free.** That is deliberate and stays: it is why par can never rank a program for
 sensing less, and why an **information budget is the only instrument in the game that can price
 sensing at all.**
+
+---
+
+## 2026-09-06 — the UI defects merged, and a coverage gap I am not letting stand
+
+**Merged** (`7a24e80`). Main green at **1831 tests / 82 files**, tsc, build and eslint clean but for
+the known `w5-01.ts:32` false positive.
+
+**What a player can now do:** tell which tick number ends their shift — `w8-01` showed 215 and 165
+both labelled "ticks", and the objective now carries a `LIMIT` tag against a rail row labelled
+`par`, with one seven-word line where both appear: *"par sets the medal. the limit ends the work
+order."* Read long dialogs to the end. See what the Repository actually did. Know what a medal
+means. Get back to their work after a dialog falls over.
+
+### Item 1 was a real bug, not noise
+
+The rejection value was the bare **string** `'TypeScript not registered!'`, which is why it printed
+as `Uncaught (in promise)` with nothing after it. Monaco installs its TypeScript mode lazily behind
+`languages.onLanguage`, and `installTypes` asked for the worker **in the same tick as mount, before
+any editor existed** — losing the race on a cold module cache. Twice per entry because `StrictMode`
+mounts twice; both captured rejections had `levelId === undefined`, i.e. both were the mount path.
+
+**The consequence was not cosmetic:** the `declare module 'lib'` that `installTypes` exists to
+publish was silently never installed on that pass, so **a player's own `import` stayed red until the
+next Run.** Verified against a forced-cold `vite --force` cache three times.
+
+### The a11y item needed no change, and the reasoning is the standard
+
+The speed control already has an associated `<label class="sr-only">` and `select.labels` returns
+`["Playback speed"]`. The accessibility tree prints `combobox "1x"` because that is its **value** —
+proved by setting `aria-label="ZZPROBE"` and re-reading the tree, which still printed `"1x"`.
+**Adding the attribute would have been a second name for a control that already has one.** Pulling
+the tree rather than reading the DOM is exactly why this was caught.
+
+### Three routed back, all applied
+
+`LibraryEditor.tsx` had **the same Monaco race on the path the guard was not on** — it called
+`compileLibrary` directly, and does not reproduce today only because a 400ms debounce hides it and
+the panel cannot open before the workspace editor. Fixed rather than noted, because "does not
+reproduce today" is not a property anyone maintains. An **ungraded work order no longer prints a
+par** — the last place the two tick numbers could still read as one kind of thing. Dead
+`.sitemap .screen-stat__best` deleted.
+
+**Left as intended, recorded so it is not mistaken for a defect:** `ModalBoundary` renders nothing
+for the rest of the session after a dismissal. Remounting the child that threw is a loop.
+
+### The gap: that whole pass shipped with zero tests
+
+Every fix above was verified by hand in a browser. That is good and it is not durable.
+**`ModalBoundary.tsx` is new code whose entire purpose is to catch a crash, and nothing asserts that
+it catches one** — a safety net nobody has jumped into. Spawned a coverage agent, told to prove each
+test **fails against the unfixed code** by checking the pre-fix source back out under it, because
+this task exists precisely because that check was skipped.
+
+Two standing instructions in that brief worth keeping: **test behaviour, not markup** — four art
+directions ship and the front end may be rebuilt again, so a class-name assertion is noise by next
+week — and the medal key must be proved distinguishable **under `signal`**, since a key that only
+works in colour fails the direction it was rebuilt for.
