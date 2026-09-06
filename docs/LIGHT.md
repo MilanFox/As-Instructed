@@ -185,6 +185,40 @@ contrast, is 0.99 — a `drawImage` costs a `drawImage` regardless of size, whic
 directions can beat it at small tiles and why giving that back would be a real loss rather than a
 rounding error.
 
+### The test has a second half
+
+The check above is **per element**, and per element is not enough. The desk lane found this on its
+own board approximation and it is the sharper half of the rule:
+
+**A per-element count can fall correctly while the per-frame total stays flat, because the tile
+count rises exactly as fast as the per-tile count falls.**
+
+Their case: an ordered dither whose cell is correctly pinned to device pixels, so the per-tile block
+count *does* shrink with the tile — it passes the two-size test locally. But at a 40 device-px tile
+that is ~400 fills per tile, and a 40×40 board is tens of thousands of calls per frame **at every
+zoom**, because halving the tile doubles the number of tiles. The element scales; the frame does
+not.
+
+So run the count twice:
+
+```
+count(mark,  16) < count(mark,  48)      // per element
+count(board, 16) < count(board, 48)      // per frame, whole board
+```
+
+**The second one is the one that decides whether a player's frame rate is safe.** A construct that
+passes the first and fails the second has to move off the per-frame path entirely — baked into an
+offscreen sheet once per zoom step — rather than being tuned.
+
+That is what the terrain cache already is, and why it is worth its complexity. Verified for
+`deepsite.ts` at the time of writing: all 23 `dither` call sites sit inside the sheet-row painters
+that `buildSheet` composes, none on any live path — so the dither runs once per zoom step and the
+board pays one `drawImage` per frame for all of it. The live painters loop per *object*, and object
+count does not rise when the tile shrinks, so they are safe by shape rather than by tuning.
+
+**Anything that loops per tile per frame is the thing to look for.** There is nothing like it in
+`deepsite`; `signal` and the shared modules have not been audited.
+
 ## 8. Where it lives
 
 `src/render/art/deepsite.ts`. The constants above are module scope and built once; nothing on the
