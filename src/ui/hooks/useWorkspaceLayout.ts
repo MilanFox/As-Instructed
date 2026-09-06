@@ -2,7 +2,7 @@
  * How wide the program rig is, derived from the window and from the shape of the level being run.
  *
  * The saved fraction is the player's and a value they have dragged is used as given — the splitter
- * stays authoritative. What is derived here is only the *default*, because one constant cannot
+ * has the last word. What is derived here is only the *default*, because one constant cannot
  * serve a 13" laptop and a 27" monitor at once.
  *
  * The board is now the screen: it is the full height of the workspace and everything else floats
@@ -28,7 +28,8 @@ const RIG_MIN = 440;
 const RIG_MAX = 640;
 /** The board never gets narrower than this, however little width there is to go round. */
 const BOARD_MIN = 420;
-/** One gutter's worth of board: what the objective read-out and the chips need to stay off the grid. */
+/** One gutter's worth of board. Mirrors `.hud-card`'s width in app.css: reserve less than the
+ *  card is wide and the objective read-out sits over the grid instead of beside it. */
 const HUD_GUTTER = 232;
 
 export interface WorkspaceBox {

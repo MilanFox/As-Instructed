@@ -49,7 +49,7 @@ describe('restingPose', () => {
     expect(pose.clock).toBe(0);
   });
 
-  it('mirrors a dead bot rather than hiding it', () => {
+  it('reports a dead bot rather than hiding it', () => {
     const bot = parkedBot();
     bot.alive = false;
     const pose = restingPose(bot, 0, false);

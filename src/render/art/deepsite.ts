@@ -34,8 +34,6 @@ import type { Biome } from '../tiles.ts';
 
 /** Lit floor plate. Everything else is keyed off this value. */
 export const FLOOR = '#4c5661';
-/** Direction of the key light, as a unit-ish offset in tile space. North-west. */
-export const LIGHT = { x: -0.7, y: -0.7 } as const;
 
 type Ctx = CanvasRenderingContext2D;
 

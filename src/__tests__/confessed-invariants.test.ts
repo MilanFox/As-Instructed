@@ -33,7 +33,7 @@ import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import { REVIEW_TIERS } from '../game/score.ts';
-import { palette } from '../render/theme.ts';
+import { DIRECTIONS } from '../render/theme.ts';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const SRC = join(ROOT, 'src');
@@ -77,8 +77,8 @@ const REGISTRY: readonly Confession[] = [
     guard: 'a constant declared in two files has one value',
   },
   {
-    file: 'src/render/theme.ts',
-    says: 'lifted verbatim from there',
+    file: 'src/render/art/standard.ts',
+    says: 'lifted verbatim from the old frozen records',
     guard: 'the palette is the same twelve colours everywhere it is written down',
   },
   {
@@ -88,7 +88,7 @@ const REGISTRY: readonly Confession[] = [
   },
   {
     file: 'src/ui/hooks/useWorkspaceLayout.ts',
-    says: 'Mirrors `--timeline-h` and `.splitter--horizontal` in app.css',
+    says: "Mirrors `.hud-card`'s width in app.css",
     guard: 'the workspace default geometry matches the stylesheet it is derived from',
   },
   {
@@ -404,10 +404,16 @@ test('a constant that claims to be the only copy is the only copy', () => {
 
 /**
  * Twelve colours, written down three times: `DESIGN.md` §8 is named as the place to change them
- * first, `tokens.css` is what the DOM renders, and `render/theme.ts` is what Canvas2D renders. The
- * third copy is deliberate and the reason given for it is sound — Canvas2D cannot read a CSS
- * custom property without a layout round-trip per frame — but the trail, the bot colours and the
- * medal rings still have to match the panels and badges drawn around them.
+ * first, `tokens.css` is what the DOM renders, and the `standard` art direction is what Canvas2D
+ * renders. The third copy is deliberate and the reason given for it is sound — Canvas2D cannot read
+ * a CSS custom property without a layout round-trip per frame — but the trail, the bot colours and
+ * the medal rings still have to match the panels and badges drawn around them.
+ *
+ * The direction registry moved the canvas copy out of `theme.ts` and into `art/standard.ts`, whose
+ * own docstring says its values were lifted verbatim from the records that used to live there. That
+ * is the copy this reads, by name rather than through `theme.ts`'s live binding: the other three
+ * directions are *meant* to differ, they overwrite the tokens at runtime from their own palettes,
+ * and which of the four ships as the default is not this test's business.
  */
 test('the palette is the same twelve colours everywhere it is written down', () => {
   const tokens = read('src/ui/styles/tokens.css');
@@ -418,11 +424,12 @@ test('the palette is the same twelve colours everywhere it is written down', () 
   const cssValue = (text: string, name: string): string | undefined =>
     new RegExp(`${name}:\\s*(#[0-9a-f]{3,8})`, 'i').exec(text)?.[1]?.toLowerCase();
 
-  const keys = Object.keys(palette);
+  const baseline = DIRECTIONS.standard.palette;
+  const keys = Object.keys(baseline);
   expect(keys.length).toBe(12);
   for (const key of keys) {
     const name = kebab(key);
-    const canvas = palette[key as keyof typeof palette].toLowerCase();
+    const canvas = baseline[key as keyof typeof baseline].toLowerCase();
     expect([name, 'tokens.css', cssValue(tokens, name)]).toEqual([name, 'tokens.css', canvas]);
     expect([name, 'DESIGN.md §8', cssValue(section, name)]).toEqual([name, 'DESIGN.md §8', canvas]);
   }
@@ -445,9 +452,18 @@ test('CelebrationKind is spelled the same on both sides of the port', () => {
 });
 
 /**
- * The workspace's first-load default is computed from the viewport, and two pieces of the chrome
- * it subtracts are sized in CSS. Blast radius is cosmetic and first-load only — once a save exists
- * the splitters win — but it is the same shape as everything else here and it costs one regex.
+ * The workspace's first-load default is computed from the viewport, and one piece of the chrome it
+ * reserves room for is sized in CSS.
+ *
+ * The pair this guard was written against — `TIMELINE_H` against `--timeline-h`, `SPLITTER_PX`
+ * against `.splitter--horizontal` — no longer exists. The board is now the full height of the
+ * workspace and the timeline floats over it, so the hook subtracts no chrome height at all and
+ * both constants are gone from it. What survived the restructure is the other half of the same
+ * shape: `HUD_GUTTER` is the width the derivation holds back on each side of the board so the
+ * objective read-out and the panel chips land on background, and the card that has to fit in it is
+ * sized in `app.css`. Widen `.hud-card` alone and the read-out goes back over the grid, which is
+ * the defect the float was introduced to avoid. Blast radius is still cosmetic and still first-load
+ * only — once a save exists the splitter wins — and it still costs one regex.
  */
 test('the workspace default geometry matches the stylesheet it is derived from', () => {
   const hook = read('src/ui/hooks/useWorkspaceLayout.ts');
@@ -455,12 +471,7 @@ test('the workspace default geometry matches the stylesheet it is derived from',
   const constant = (name: string): string | undefined =>
     new RegExp(`const ${name} = (\\d+)`).exec(hook)?.[1];
 
-  expect(['TIMELINE_H', constant('TIMELINE_H')]).toEqual([
-    'TIMELINE_H',
-    /--timeline-h:\s*(\d+)px/.exec(css)?.[1],
-  ]);
-  expect(['SPLITTER_PX', constant('SPLITTER_PX')]).toEqual([
-    'SPLITTER_PX',
-    /\.splitter--horizontal\s*\{[^}]*height:\s*(\d+)px/.exec(css)?.[1],
-  ]);
+  const carded = /\.hud-card\s*\{[^}]*\bwidth:\s*(\d+)px/.exec(css)?.[1];
+  expect(['.hud-card width', carded]).toEqual(['.hud-card width', expect.any(String)]);
+  expect(['HUD_GUTTER', constant('HUD_GUTTER')]).toEqual(['HUD_GUTTER', carded]);
 });

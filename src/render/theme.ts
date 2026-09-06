@@ -87,7 +87,7 @@ export function setArtDirection(id: ArtId): void {
 }
 
 /**
- * Mirrors the direction onto the document as CSS custom properties and a `data-art` attribute.
+ * Writes the direction onto the document as CSS custom properties and a `data-art` attribute.
  *
  * The attribute is what lets each direction ship its own stylesheet without a build flag, and
  * writing the palette across means the chrome and the canvas cannot disagree about what `accent`
