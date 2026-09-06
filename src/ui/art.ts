@@ -16,7 +16,7 @@ import type { ArtId } from '../render/theme.ts';
 export const ART_KEY = 'bootstrap.art';
 
 /** The direction the spike ships in until the comparison is settled. */
-export const DEFAULT_ART: ArtId = 'survey';
+export const DEFAULT_ART: ArtId = 'deepsite';
 
 export function storedArt(): ArtId {
   try {
