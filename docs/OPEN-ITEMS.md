@@ -2139,3 +2139,88 @@ the old "accumulates rather than integrates" criticism may no longer hold.
 
 `DEFAULT_ART` is `survey`, pending the user. `docs/AUDIT-UI.md`'s held styling findings wait on the
 same call.
+
+---
+
+## 2026-09-06 — the unknown-id ruling, and `w2-01` is cut
+
+**Merged.** Main green at **1885 tests / 90 files** (down 19 with the level), tsc, build and eslint
+clean but for the known `w5-01.ts:32` false positive. The campaign is **33 work orders.**
+
+### The tangle had to be split before anything could be ruled
+
+`applyMachineChange` was doing two jobs, and **the only way to reach the second — bill a tick and log
+a refusal — was to hand it an id you already knew was wrong.** Both World 6 verbs did exactly that.
+So a level verb's *deliberate* refusal and a *genuinely broken* id arrived at the engine as the same
+call, and no ruling was possible until they were separated. `Sim.refuseMachineAct` now carries the
+billing; trace shape is unchanged, so replay is unchanged.
+
+**The deciding test gave a different answer for each, and they were not flattened:**
+
+- **`link` throws.** Both ids are player-supplied, neither can become valid, and `probe(id)` returns
+  `null` for free. It keeps its `boolean` — a level may still call a pair illegal. Its example used
+  to be `if (link(…)) {…}`, **teaching a branch that could never flip**; that is gone.
+- **`transmit` — the ruling does not reach it, because it takes no id.** Its two refusals were
+  sharing one bit: an antenna that is *off* is a state (`power` it on and the same call succeeds,
+  and there is now a test that does exactly that), so `false` stays and stays honest; a work order
+  with **no antenna** is permanent and throws. **That is `plant()`'s defect — three causes, one bit —
+  surfacing in World 6.**
+- **`applyMachineChange` throws and loses its `boolean`.** It is an engine extension point, not a
+  player surface; once the deliberate refusals moved out, the only way to arrive with an unknown id
+  is a *verb* that computed one — our program, not the player's — so post-split the return could
+  only ever be `true`.
+
+**It reopened `power()`, as I said it would have to.** Its unknown-id branch returned `false` on the
+reasoning that *"an unknown id is a state of the world."* It is not, and that fails its own test.
+Leaving it would have shipped **an incoherence created by this very change**: on `w5-03` and `w5-05`
+both verbs take the same substation ids from the same `probe` loop, so `link("hub","ghost")` would
+stop the run while `power("ghost","on")` shrugged. Only four tests went red — the four pinning the
+old behaviour — **which is itself the evidence that no shipped content depended on it.**
+
+### `w2-01` dies, and the reason is not that it taught nothing
+
+It did teach one thing its neighbours do not: a running argmax carried with its position. What kills
+it is that **its own par never discriminated anybody.** Par 16 exists to separate the walk-back
+answer (18, silver) from the believe-the-instrument answer (≤9, gold), and **both playtesters took
+gold, the star and exact par on their first run.** A discrimination that discriminates nobody is a
+lap.
+
+The one real objection — CURRICULUM §1.1's *"hardware in isolation"* rule — **does not survive
+contact**: `w2-02` already shipped `scan()` in its starter with two hints and a reference page, i.e.
+it was already using a verb it did not requisition, and both testers golded it in five minutes.
+§1.1 now carries World 2 as a **stated exception with the three things anyone else must measure
+first**, rather than a rule the campaign quietly breaks. `w2-04` — the best level of the first
+twenty — moves to position 4. Save survival and campaign completability were **run, not reasoned**.
+
+### `use` was inert, not merely unmotivated
+
+**Worlds 1–4 place no machines at all**, so `use()` was provably dead everywhere before World 5. The
+card moves to `w5-01`, the first level that needs it and cannot be solved without it. While there it
+found CURRICULUM had `w5-01`'s and `w5-02`'s `hardware` **the wrong way round**, with `w5-01`'s
+`teaches` row describing a verb that level does not unlock.
+
+### Drift was worse than "drift"
+
+`w2-05` had **ten** disagreements and described a materially different level — 14×10 with a silo, a
+±20% quota, a tick-budget bonus; shipped is 14×8, no silo, the quota *is* the hopper, and the bonus
+is a 32-tile wheel budget. `w8-05` had **eighteen**, including a `heritage` row claiming a minimum
+spanning tree the level does not contain.
+
+### Two escalated to me. Both decided the same way the night keeps deciding.
+
+**`w2-05` does not ask what it promises** — CURRICULUM sells *"you cannot visit everything, so
+choose"*, but the shift is 84 and the naive serpentine costs 58–68, so **nothing has to be given up
+to pass** and the choosing only picks the medal. The agent flagged it and declined to act because it
+is a difficulty change on a settled level. Right to escalate; **overruled**, for the same reason
+`w8-04` and `w8-03` were repaired hours earlier: *a level that does not make its own idea
+load-bearing is broken, not balanced.* Told to find the number by measurement rather than take ~70
+on trust, and to stop and report if no single shift can both defeat the sweep and pass every seed —
+that would make it a seed problem like `w8-03`.
+
+**`w8-05`'s form leg still depends on nothing.** Two of the veteran's three specifics are now dead,
+but the third is verbatim true, and `FIX-FINALE`'s ten-line fix — make the airlock draw from the
+grid — was never made. **Decided: make it.** A finale with a leg that depends on nothing is a finale
+you can solve in pieces, which is the whole complaint. And **only if that lands**, a second bonus:
+`name-the-hold` currently reads the one thread that already integrates best, so coupling the airlock
+creates the first genuinely new question the level can ask. Bonuses are otherwise settled; this one
+is reopened deliberately, because job 1 changes what the level asks.
