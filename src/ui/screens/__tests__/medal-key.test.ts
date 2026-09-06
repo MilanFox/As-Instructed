@@ -13,89 +13,12 @@
  * told apart without colour?** — each row is named in words, and the marks themselves separate by
  * hue or by lightness in every direction, which is checked against each direction's own palette.
  *
- * The renderer is local to this file for the reason `src/ui/__tests__/limit-and-par.test.ts` gives:
- * `src/__tests__/unused-exports.test.ts` pins the test-only export count exactly, so a shared
- * fixture module fails the suite until that number moves.
+ * The renderer is `src/ui/__tests__/react-driver.ts`, one hand-cranked React shared by every UI
+ * test; the tree walk below is this file's own, because no other file needs a node's marks.
  */
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type * as ReactModule from 'react';
-
-const driver = vi.hoisted(() => {
-  interface Slot {
-    filled: boolean;
-    value: unknown;
-    deps: readonly unknown[] | undefined;
-  }
-
-  const slots: Slot[] = [];
-  let cursor = 0;
-
-  function slot(): Slot {
-    const existing = slots[cursor];
-    cursor += 1;
-    if (existing) return existing;
-    const fresh: Slot = { filled: false, value: undefined, deps: undefined };
-    slots[cursor - 1] = fresh;
-    return fresh;
-  }
-
-  function same(a: readonly unknown[] | undefined, b: readonly unknown[] | undefined): boolean {
-    if (!a || !b || a.length !== b.length) return false;
-    return a.every((each, index) => Object.is(each, b[index]));
-  }
-
-  function memo<T>(factory: () => T, deps: readonly unknown[]): T {
-    const here = slot();
-    if (!here.filled || !same(here.deps, deps)) {
-      here.filled = true;
-      here.value = factory();
-      here.deps = deps;
-    }
-    return here.value as T;
-  }
-
-  const hooks = {
-    useState<T>(initial: T | (() => T)): [T, (next: T) => void] {
-      const here = slot();
-      if (!here.filled) {
-        here.filled = true;
-        here.value = typeof initial === 'function' ? (initial as () => T)() : initial;
-      }
-      return [
-        here.value as T,
-        (next: T): void => {
-          here.value = next;
-        },
-      ];
-    },
-    useRef<T>(initial: T): { current: T } {
-      const here = slot();
-      if (!here.filled) {
-        here.filled = true;
-        here.value = { current: initial };
-      }
-      return here.value as { current: T };
-    },
-    useCallback<T>(fn: T, deps: readonly unknown[]): T {
-      return memo(() => fn, deps);
-    },
-    useMemo: memo,
-    useEffect(): void {},
-    useLayoutEffect(): void {},
-    useSyncExternalStore<T>(_subscribe: unknown, snapshot: () => T): T {
-      return snapshot();
-    },
-    useDebugValue(): void {},
-  };
-
-  return {
-    hooks,
-    reset(): void {
-      slots.length = 0;
-      cursor = 0;
-    },
-  };
-});
+import { reactDriver as driver } from '../../__tests__/react-driver.ts';
 
 vi.mock('react', async (importOriginal) => {
   const actual = await importOriginal<typeof ReactModule>();
