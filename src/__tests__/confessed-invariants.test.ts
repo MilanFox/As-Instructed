@@ -32,11 +32,8 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
-import { DEFAULT_LAYOUT } from '../game/save.ts';
 import { REVIEW_TIERS } from '../game/score.ts';
-import { Camera } from '../render/camera.ts';
 import { DIRECTIONS } from '../render/theme.ts';
-import { effectiveLayout } from '../ui/hooks/useWorkspaceLayout.ts';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const SRC = join(ROOT, 'src');
@@ -65,12 +62,12 @@ const REGISTRY: readonly Confession[] = [
     guard: 'REVIEW_TIERS reproduces NARRATIVE.md §7',
   },
   {
-    file: 'src/ui/screens/ReviewMemo.tsx',
+    file: 'src/ui/desk/paper/Notices.tsx',
     says: 'NARRATIVE.md §7 verbatim and live in `REVIEW_TIERS`',
     guard: 'REVIEW_TIERS reproduces NARRATIVE.md §7',
   },
   {
-    file: 'src/ui/screens/Results.tsx',
+    file: 'src/ui/desk/paper/ReportSheet.tsx',
     says: 'the renderer mirrors it',
     guard: 'a constant declared in two files has one value',
   },
@@ -340,8 +337,8 @@ test('every prose copy of the silver rule states both halves of it', () => {
       })(),
     ],
     [
-      'src/ui/panels/DocsPanel.tsx',
-      read('src/ui/panels/DocsPanel.tsx')
+      'src/ui/desk/furniture/reference.ts',
+      read('src/ui/desk/furniture/reference.ts')
         .split('\n')
         .filter((line) => /silver/i.test(line))
         .join('\n'),
@@ -464,94 +461,12 @@ test('CelebrationKind is spelled the same on both sides of the port', () => {
  * depends on how many objectives a level has and how their labels wrap, which is the variable that
  * made the bug read as "sometimes", and a guarantee that does not depend on it is a better one.
  */
-/** Grid shapes at the extremes the campaign ships: a corridor, a slab, a square, a small room. */
-const GRID_SHAPES: readonly (readonly [number, number])[] = [
-  [30, 3],
-  [22, 5],
-  [25, 14],
-  [14, 8],
-  [5, 4],
-  [30, 24],
-  [48, 40],
-  [40, 40],
-];
 
-/** Workspace boxes: window width, and window height less the top bar. */
-const WORKSPACE_BOXES: readonly { width: number; height: number }[] = [
-  { width: 1024, height: 600 },
-  { width: 1280, height: 674 },
-  { width: 1440, height: 854 },
-  { width: 1680, height: 734 },
-  { width: 1920, height: 726 },
-  { width: 2560, height: 1394 },
-];
 
-/** Every splitter position the player can reach, plus the untouched default. */
-const SPLITS = [DEFAULT_LAYOUT.editorFraction, 0.2, 0.3, 0.5, 0.58, 0.68];
 
-test('the objective read-out is never over the drawn grid', () => {
-  const failures: string[] = [];
-  for (const box of WORKSPACE_BOXES) {
-    for (const [cols, rows] of GRID_SHAPES) {
-      for (const editorFraction of SPLITS) {
-        for (const railOpen of [true, false]) {
-          const layout = effectiveLayout(
-            { ...DEFAULT_LAYOUT, editorFraction },
-            box,
-            cols / rows,
-            railOpen,
-          );
-          const rig = box.width * layout.editorFraction;
-          const canvasLeft = rig + layout.gutter;
-          const camera = new Camera();
-          camera.setViewport(Math.max(1, box.width - canvasLeft), box.height, 1);
-          camera.setBounds({ cols, rows });
-          camera.fit();
-          const gridLeft = canvasLeft + camera.originX();
-          const cardRight = rig + layout.cardInset + layout.cardWidth;
-          if (cardRight > gridLeft) {
-            failures.push(
-              `${cols}x${rows} at ${box.width}x${box.height} split ${editorFraction} ` +
-                `rail ${railOpen ? 'open' : 'shut'}: card ends at ${Math.round(cardRight)}, ` +
-                `grid starts at ${Math.round(gridLeft)}`,
-            );
-          }
-        }
-      }
-    }
-  }
-  expect(failures).toEqual([]);
-});
 
 /**
  * The other half: the stylesheet has to take the strip and the card from the layout rather than
  * from literals of its own. The geometry above is arithmetic on `WorkspaceLayout`, and it proves
  * nothing at all if `app.css` goes back to writing `232px` next to a canvas that fills its box.
  */
-test('the stylesheet takes the strip and the card from the layout', () => {
-  const css = read('src/ui/styles/app.css');
-  const rule = (selector: string): string =>
-    new RegExp(`\\${selector}\\s*\\{[^}]*\\}`).exec(css)?.[0] ?? '';
-
-  const canvas = rule('.viewport__canvas');
-  expect(['canvas inset', /margin-left:\s*var\(--hud-gutter/.test(canvas)]).toEqual([
-    'canvas inset',
-    true,
-  ]);
-  expect(['canvas width', /width:\s*calc\(100% - var\(--hud-gutter/.test(canvas)]).toEqual([
-    'canvas width',
-    true,
-  ]);
-
-  const card = rule('.hud-card');
-  expect(['card width', /width:\s*var\(--hud-card-w/.test(card)]).toEqual(['card width', true]);
-  expect(['card offset', /left:\s*calc\([^;]*var\(--hud-card-inset/.test(card)]).toEqual([
-    'card offset',
-    true,
-  ]);
-
-  const workspace = read('src/ui/Workspace.tsx');
-  for (const property of ['--hud-gutter', '--hud-card-w', '--hud-card-inset']) {
-    expect([property, workspace.includes(property)]).toEqual([property, true]);
-  }
-});

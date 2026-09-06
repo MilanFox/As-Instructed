@@ -1,0 +1,232 @@
+/* monitor.css — ported from docs/prototypes/desk/desk.css:
+   the site feed subsection (.feed-controls, .asset-tag, .osd-*, .feed-*).
+   .osd-xy is moved here from the source's SETTINGS ARE OBJECTS section —
+   it belongs to the monitor's on-screen display, not the terminal. */
+
+/* ---- the site feed. the company's. older, and it shows. ---------- */
+
+.desk .display--feed { left: calc(50% + 64 * var(--u)); top: calc(50% - 486 * var(--u)); width: calc(700 * var(--u)); }
+.desk .bezel--feed {
+  padding: calc(22 * var(--u)) calc(22 * var(--u)) calc(20 * var(--u));
+  background: #b0ac9c;
+  box-shadow:
+    var(--arris-n), var(--arris-w), var(--arris-e), var(--arris-s),
+    calc(30 * var(--u)) calc(30 * var(--u)) calc(9 * var(--u)) rgb(var(--ink-sh) / .32),
+    calc(3 * var(--u)) calc(3 * var(--u)) 0 rgb(var(--ink-sh) / .30);
+  border-radius: calc(9 * var(--u));
+}
+.desk .bezel--feed .screen { height: calc(438 * var(--u)); }
+.desk .glass--feed { inset: calc(22 * var(--u)) calc(22 * var(--u)) calc(20 * var(--u)); }
+.desk .stand--feed { top: calc(600 * var(--u)); width: calc(136 * var(--u)); height: calc(50 * var(--u)); }
+
+/*
+   The reserved margin, and the whole of docs/DESK-CONCEPT.md §9 item 1.
+
+   The prototype drew its graticule inside the canvas, in a margin the canvas left itself. The real
+   renderer's camera fits whatever box it is given, so a margin that is not taken away from the
+   element is a margin the camera fills with tiles. The canvas is therefore inset by --feed-n/-e/-s/-w,
+   published by Monitor.tsx from src/ui/desk/monitor/geometry.ts, and every readout on this screen
+   lives in the strip that inset created. Nothing is positioned over the picture.
+
+   None of the type inside the screen multiplies by --ts. A type scale that grew these would have to
+   take the room from the board, and the board's answer to "make it bigger" is the zoom ladder on the
+   transport, not the SIZE dial. Type on the *case* — the transport readout, the legends, the asset
+   tag — scales normally.
+
+   The width and the height are stated rather than left to the four insets. A canvas is a replaced
+   element: with `width: auto` it takes its *intrinsic* 300x150 and CSS 2.1 §10.3.8 then drops the
+   `right` and `bottom` constraints, so the board draws into a 300x150 box in the corner of the
+   screen and every zoom rung measured off it is measuring that instead of the design. */
+.desk #board {
+  position: absolute; display: block;
+  top: var(--feed-n); left: var(--feed-w);
+  width: calc(100% - var(--feed-w) - var(--feed-e));
+  height: calc(100% - var(--feed-n) - var(--feed-s));
+}
+
+.desk .feed-osd {
+  position: absolute; left: calc(9 * var(--u)); top: calc(7 * var(--u)); right: calc(9 * var(--u));
+  display: flex; justify-content: space-between;
+  font-family: var(--mono); font-size: calc(9.5 * var(--u));
+  letter-spacing: .18em; color: rgba(196,224,218,.9); pointer-events: none;
+  text-shadow: 0 0 calc(6 * var(--u)) #000;
+}
+.desk .osd-xy {
+  font-family: var(--mono); font-size: calc(9.5 * var(--u));
+  letter-spacing: .16em; color: rgba(120,232,214,.95);
+}
+.desk .feed-tick {
+  position: absolute; right: calc(10 * var(--u)); bottom: calc(2 * var(--u)); line-height: 1;
+  font-family: var(--mono); font-size: calc(26 * var(--u)); font-weight: 300;
+  color: rgba(53,224,200,.9); letter-spacing: .06em; pointer-events: none;
+  text-shadow: 0 0 calc(12 * var(--u)) rgba(53,224,200,.4), 0 0 calc(4 * var(--u)) #000;
+}
+.desk .feed-stamp {
+  position: absolute; left: calc(10 * var(--u)); bottom: calc(8 * var(--u));
+  font-family: var(--mono); font-size: calc(10 * var(--u)); letter-spacing: .3em;
+  color: rgba(206,220,230,.6); pointer-events: none;
+}
+
+.desk .feed-controls {
+  display: flex; align-items: center; gap: calc(12 * var(--u));
+  margin-top: calc(8 * var(--u));
+  padding: calc(7 * var(--u)) calc(14 * var(--u));
+  background: linear-gradient(#a9a69b, #8b887f 55%, #6b685f);
+  border-radius: calc(3 * var(--u));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.45), inset 0 -1px 0 rgba(0,0,0,.3),
+              calc(8 * var(--u)) calc(8 * var(--u)) calc(3 * var(--u)) rgb(var(--ink-sh) / .32);
+}
+.desk .fc-keys { display: flex; gap: calc(5 * var(--u)); }
+.desk .fk {
+  width: calc(28 * var(--u)); height: calc(20 * var(--u));
+  border: 0; border-radius: calc(2 * var(--u));
+  background: linear-gradient(#e3e0d5, #bdbab0 55%, #98958c);
+  box-shadow: 0 calc(2 * var(--u)) 0 #5f5d56, calc(3 * var(--u)) calc(3 * var(--u)) calc(2 * var(--u)) rgb(var(--ink-sh) / .32);
+  color: #37362f; font-size: calc(9 * var(--u) * var(--ts)); cursor: pointer;
+  transition: transform .06s linear, box-shadow .06s linear;
+}
+.desk .fk-wide { width: calc(42 * var(--u)); }
+.desk .fk:active, .desk .fk.down { transform: translateY(calc(2 * var(--u))); box-shadow: 0 0 0 #5f5d56; }
+.desk .fc-scrub { flex: 1; }
+.desk #scrub { width: 100%; -webkit-appearance: none; appearance: none; background: transparent; height: calc(16 * var(--u)); }
+.desk #scrub::-webkit-slider-runnable-track {
+  height: calc(5 * var(--u)); background: #4b4941;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.7); border-radius: calc(3 * var(--u));
+}
+.desk #scrub::-webkit-slider-thumb {
+  -webkit-appearance: none; width: calc(13 * var(--u)); height: calc(17 * var(--u));
+  margin-top: calc(-6 * var(--u)); border-radius: calc(2 * var(--u));
+  background: linear-gradient(#efece1, #b9b6ac 60%, #8c8981);
+  box-shadow: 1px 1px 3px rgb(var(--ink-sh) / .32);
+}
+.desk .fc-read {
+  font-family: var(--mono); font-size: calc(12 * var(--u) * var(--ts)); color: #2e2d28;
+  letter-spacing: .06em; background: #cfccc0; padding: calc(2 * var(--u)) calc(7 * var(--u));
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.35);
+}
+.desk .fc-read i { opacity: .45; font-style: normal; padding: 0 calc(3 * var(--u)); }
+.desk .fc-read em { font-style: normal; letter-spacing: .22em; opacity: .55;
+  font-size: calc(8 * var(--u) * var(--ts)); padding-right: calc(6 * var(--u)); }
+.desk .fc-lamp {
+  width: calc(9 * var(--u)); height: calc(9 * var(--u)); border-radius: 50%;
+  background: #4a4a44; box-shadow: inset 0 0 calc(4 * var(--u)) rgba(0,0,0,.7);
+}
+.desk[data-mode='watch'] .fc-lamp { background: #ffb020; box-shadow: 0 0 calc(10 * var(--u)) rgba(255,176,32,.8); }
+
+.desk .asset-tag {
+  position: absolute; right: calc(24 * var(--u)); top: calc(-2 * var(--u));
+  display: flex; gap: calc(6 * var(--u)); align-items: baseline;
+  font-family: var(--mono); font-size: calc(7.5 * var(--u) * var(--ts));
+  letter-spacing: .18em; color: #58564f;
+  background: #d7d3c4; padding: calc(2 * var(--u)) calc(6 * var(--u));
+  border: 1px solid #a5a094;
+  transform: rotate(-.5deg);
+}
+.desk .asset-tag b { color: #2f2e29; letter-spacing: .1em; }
+
+/* ---- the graticule. in the strip the canvas gave up, never on a tile. ----
+   AUDIT-UI.md F6: the player is handed coordinates and no coordinate system.
+   Every mark positions itself off three custom properties the camera writes
+   once a frame — --gx0/--gy0 (the world origin, in CSS px from the canvas's
+   corner) and --gt (CSS px per tile) — so a camera move costs three style
+   writes rather than one draw call per cell. docs/LIGHT.md §7. */
+
+/* Above the canvas in paint order, and that is deliberate rather than a lapse. The strip the
+   canvas gave up holds the ruler when the grid fills the picture; when the camera letterboxes a
+   grid it centres, the ruler follows the grid down into the empty band the letterbox left, so a
+   numeral is beside the column it names instead of fifty pixels clear of it. Its far edge is the
+   grid's own edge by construction, so it can reach the board and never a tile. */
+.desk .feed-rule {
+  position: absolute; z-index: 1; pointer-events: none; overflow: hidden;
+  color: rgba(150,178,186,.7);
+}
+/* Each rule ends where the grid begins. The camera centres a grid that fits, so a ruler pinned to
+   the canvas edge instead would float a hundred pixels clear of the board it is measuring — and
+   `overflow` is hidden because a zoomed-in grid puts most of its rows off the canvas, and a numeral
+   for a row nobody can see must not escape into the picture. */
+.desk .feed-rule--x {
+  left: var(--feed-w); right: var(--feed-e);
+  top: max(calc(var(--feed-n) - 14 * var(--u)),
+           calc(var(--feed-n) + var(--gy0, 0px) - 14 * var(--u)));
+  height: calc(14 * var(--u));
+}
+.desk .feed-rule--y {
+  top: var(--feed-n); bottom: var(--feed-s);
+  left: 0; width: calc(var(--feed-w) + max(0px, var(--gx0, 0px)));
+}
+.desk .feed-tick-mark { position: absolute; background: currentColor; }
+.desk .feed-tick-mark b {
+  position: absolute; font-family: var(--mono); font-weight: 400; line-height: 1;
+  font-size: calc(8.5 * var(--u)); letter-spacing: .04em; white-space: nowrap;
+  opacity: var(--gnum, 1);
+}
+.desk .feed-rule--x .feed-tick-mark {
+  left: calc(var(--gx0, 0px) + var(--i) * var(--gt, 0px));
+  bottom: 0; width: 1px; height: calc(3 * var(--u));
+}
+.desk .feed-rule--x .feed-tick-mark.is-major { height: calc(6 * var(--u)); }
+.desk .feed-rule--x .feed-tick-mark b { left: calc(2 * var(--u)); bottom: calc(4 * var(--u)); }
+.desk .feed-rule--y .feed-tick-mark {
+  top: calc(var(--gy0, 0px) + var(--i) * var(--gt, 0px));
+  right: 0; height: 1px; width: calc(3 * var(--u));
+}
+.desk .feed-rule--y .feed-tick-mark.is-major { width: calc(6 * var(--u)); }
+/* The width is stated because the anchor is a 1px tick: without it the shrink-to-fit box is the
+   tick's own width, `nowrap` overflows it to the *right*, and the numeral lands on the board and is
+   then clipped away by the rule's own `overflow`. */
+.desk .feed-rule--y .feed-tick-mark b {
+  right: calc(8 * var(--u)); top: 0; width: calc(15 * var(--u)); text-align: right;
+  transform: translateY(calc(var(--gt, 0px) * .5 - 50%));
+}
+.desk .feed-origin {
+  position: absolute; z-index: 1; pointer-events: none;
+  left: calc(var(--feed-w) + max(0px, var(--gx0, 0px)) - 7 * var(--u));
+  top: calc(var(--feed-n) + max(0px, var(--gy0, 0px)) - 7 * var(--u));
+  width: calc(6 * var(--u)); height: calc(6 * var(--u));
+  border-left: 1px solid rgba(150,178,186,.8);
+  border-top: 1px solid rgba(150,178,186,.8);
+}
+.desk .osd-xy { flex: 1; text-align: center; overflow: hidden; white-space: nowrap; }
+
+/* ---- the transport's track, and the run as acts ------------------- */
+
+.desk .fc-scrub { position: relative; height: calc(24 * var(--u)); }
+.desk #scrub { position: absolute; left: 0; right: 0; top: calc(3 * var(--u)); }
+.desk .fc-acts {
+  position: absolute; left: 0; right: 0; top: 0;
+  height: calc(3 * var(--u)); pointer-events: none;
+}
+.desk .fc-act { position: absolute; top: 0; height: 100%; background: rgba(88,86,78,.85); }
+.desk .fc-act--alt { background: rgba(126,123,112,.85); }
+.desk .fc-act--current { background: #ffb020; }
+.desk .fc-step { position: absolute; top: 0; width: 1px; height: 100%; background: rgba(24,23,20,.7); }
+.desk .fc-marks { position: absolute; left: 0; right: 0; bottom: 0; height: calc(5 * var(--u)); }
+.desk .fc-mark {
+  position: absolute; bottom: 0; padding: 0; border: 0; cursor: pointer;
+  width: calc(5 * var(--u)); height: calc(5 * var(--u)); border-radius: 50%;
+  transform: translateX(-50%);
+  box-shadow: 1px 1px 0 rgb(var(--ink-sh) / .32);
+}
+.desk .fc-mark--met { background: #6fd08a; }
+.desk .fc-mark--lost { background: #e2624a; }
+.desk .fc-mark--bonus { border-radius: 0; transform: translateX(-50%) rotate(45deg); }
+
+/* ---- speed, and the zoom ladder as a stepped control on the case ---
+   AUDIT-UI.md F12: the doors to everything in this game were 10px chips in a
+   corner, and that is the chrome the desk exists to abolish. A board a player
+   cannot enlarge is a board they cannot read, so the camera's own rungs are a
+   key on the housing rather than a shortcut in a tooltip. */
+
+.desk .fc-speed {
+  font-family: var(--mono); font-size: calc(9 * var(--u) * var(--ts));
+  color: #2e2d28; background: #cfccc0; border: 0;
+  padding: calc(2 * var(--u)) calc(3 * var(--u));
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.35);
+}
+.desk .fc-zoom { display: flex; align-items: center; gap: calc(4 * var(--u)); }
+.desk .fc-legend {
+  font-family: var(--mono); font-size: calc(7.5 * var(--u) * var(--ts));
+  letter-spacing: .18em; color: #3e3d37;
+}
+.desk .fk-narrow { width: calc(22 * var(--u)); font-size: calc(8 * var(--u) * var(--ts)); }
+.desk .fk:disabled { opacity: .45; cursor: default; }

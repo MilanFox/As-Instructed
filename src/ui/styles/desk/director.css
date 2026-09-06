@@ -1,0 +1,20 @@
+/* director.css — ported from docs/prototypes/desk/desk.css: the DIRECTOR
+   section only. Prototype-only scaffolding — do NOT import this anywhere
+   in the shipped app. */
+
+.desk .director {
+  position: fixed; right: calc(8 * var(--u)); bottom: calc(8 * var(--u)); z-index: 90;
+  background: rgba(6,9,12,.9); border: 1px solid #1e2a33;
+  padding: calc(8 * var(--u)); width: calc(196 * var(--u));
+  font-family: var(--mono); font-size: calc(9.5 * var(--u) * var(--ts));
+  display: flex; flex-direction: column; gap: calc(3 * var(--u));
+}
+.desk .director b { color: #4f6472; letter-spacing: .2em; font-weight: 500; padding-bottom: calc(3 * var(--u)); }
+.desk .director button {
+  text-align: left; background: #101a20; border: 1px solid #1c2a33; color: #93a5b2;
+  padding: calc(4 * var(--u)) calc(6 * var(--u)); cursor: pointer; font: inherit;
+}
+.desk .director button:hover { background: #16242c; color: var(--accent); }
+.desk .director button.on { border-color: var(--accent); color: var(--accent); }
+.desk .director label { color: #6d8391; display: flex; gap: calc(5 * var(--u)); align-items: center; padding-top: calc(2 * var(--u)); }
+.desk.nodirector .director { opacity: 0; pointer-events: none; }

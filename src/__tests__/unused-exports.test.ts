@@ -80,8 +80,6 @@ const IDENTIFIER = /[A-Za-z_$][\w$]*/g;
  * at for `BONUS_STAR_WEIGHT`.
  */
 const KNOWN_DEAD: readonly string[] = [
-  'src/levels/world-2/shared.ts parkedOnRipestCrop',
-  'src/levels/world-2/shared.ts parkedWithoutOvershoot',
   // --- Level-authoring helpers under `src/levels/*/shared.ts` and `caves.ts`. Bonus objectives
   // and terrain queries for levels that were folded away; `docs/FIX-BONUSES.md:86` still credits
   // `noBlockedMoves` / `shortestRoute` to `w1-02` and `w1-04`, and neither level exists. ---
@@ -91,6 +89,8 @@ const KNOWN_DEAD: readonly string[] = [
   'src/levels/world-2/shared.ts harvestedNothingTwice',
   'src/levels/world-2/shared.ts leftUnripeStanding',
   'src/levels/world-2/shared.ts noFailedHarvests',
+  'src/levels/world-2/shared.ts parkedOnRipestCrop',
+  'src/levels/world-2/shared.ts parkedWithoutOvershoot',
   'src/levels/world-4/caves.ts floorGraphSummary',
   'src/levels/world-4/caves.ts gridExtent',
   'src/levels/world-4/caves.ts spreadCells',
@@ -124,27 +124,33 @@ const KNOWN_DEAD: readonly string[] = [
   'src/runtime/modules.ts MODULE_PREAMBLE_LINES',
   'src/runtime/modules.ts SOURCE_URLS',
   'src/ui/components/Icons.tsx IconTarget',
-  'src/ui/copy.ts failureLine',
+  'src/ui/components/Icons.tsx IconBook',
+  'src/ui/components/Icons.tsx IconClear',
+  'src/ui/components/Icons.tsx IconClose',
+  'src/ui/components/Icons.tsx IconPause',
+  'src/ui/components/Icons.tsx IconPlay',
+  'src/ui/components/Icons.tsx IconSkipEnd',
+  'src/ui/components/Icons.tsx IconSkipStart',
+  'src/ui/components/Icons.tsx IconStepBack',
+  'src/ui/components/Icons.tsx IconStepForward',
+  'src/ui/hooks/useOverlay.ts useOverlayRequests',
   'src/ui/copy.ts seedFailureLine',
 
-  // --- The write half of a read/write pair over one `localStorage` key. `storedArt()` is read at
-  // module load; `chooseArt()` is what a direction picker would call and no picker has been built,
-  // so which direction ships is decided by editing `DEFAULT_ART`. Listed rather than deleted
-  // because it is not the `BONUS_STAR_WEIGHT` shape: there is no live twin doing the job instead,
-  // so no edit to it can silently no-op, and deleting half the pair leaves a key that can be read
-  // and never written. It comes off this list the day something calls it. ---
-  'src/ui/art.ts chooseArt',
 
   // --- Dead behind a barrel: the declaration and the re-export that carries it out of the module.
   // `docs/LIBRARY.md:129,166` documents `toFragment` as part of the library's public surface. ---
   'src/meta/index.ts ProgressFacts',
   'src/meta/index.ts toFragment',
   'src/meta/save.ts toFragment',
+  'src/meta/ui/LibraryPanel.tsx LibraryPanel',
+  'src/meta/ui/LibraryPanel.tsx libraryStatusLine',
+  'src/meta/ui/index.ts LibraryPanel',
+  'src/meta/ui/index.ts libraryStatusLine',
   'src/meta/types.ts ProgressFacts',
 ];
 
 /** Exports whose only readers are tests, split as `[every file, files outside `__tests__`]`. */
-const KNOWN_TEST_ONLY: readonly [number, number] = [70, 32];
+const KNOWN_TEST_ONLY: readonly [number, number] = [73, 34];
 
 /** A floor under the scan itself: a regex that quietly stops matching passes every set test. */
 const SCANNED_EXPORTS_AT_LEAST = 1500;

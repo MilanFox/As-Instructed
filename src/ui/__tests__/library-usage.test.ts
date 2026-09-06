@@ -42,7 +42,8 @@ vi.mock('zustand', async () => {
   };
 });
 
-const { Results } = await import('../screens/Results.tsx');
+const { ReportSheet } = await import('../desk/paper/ReportSheet.tsx');
+const { snapshotReport } = await import('../desk/paper/report.ts');
 const { StructureScreen } = await import('../../meta/ui/StructureScreen.tsx');
 const { useGame } = await import('../../game/store.ts');
 const { useLibrary } = await import('../../meta/store.ts');
@@ -52,6 +53,16 @@ const { STRUCTURE } = await import('../../meta/copy.ts');
 const { Medal } = await import('../../game/score.ts');
 const { buildRows, campaignTally } = await import('../screens/LevelSelect.tsx');
 const { reportFor } = await import('../screens/review.ts');
+
+/**
+ * The run report as the desk draws it: a snapshot, on a certificate of closure or a HALT notice.
+ * `Results` was a modal that destroyed itself (`docs/AUDIT-UI.md` §6.6); the sheet is the same
+ * report on paper, and it is read off `snapshotReport` exactly as `usePaperwork` reads it.
+ */
+function Results(): unknown {
+  const report = snapshotReport(useGame.getState() as never);
+  return report ? ReportSheet({ report } as never) : null;
+}
 
 type Props = Record<string, unknown>;
 

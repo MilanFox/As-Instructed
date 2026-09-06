@@ -1,48 +1,32 @@
-import { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { isGraded } from '../game/score.ts';
 import { currentLevel, useGame } from '../game/store.ts';
 import { CanvasRenderer, RuntimeRunner } from './adapters.ts';
 import { exportSave } from '../game/save.ts';
 import { worldMeta } from '../levels/index.ts';
 // Deep import on purpose: `src/meta/ui/index.ts` also re-exports `LibraryPanel`, which pulls
-// Monaco back into the entry chunk and undoes the split below.
+// Monaco back into the entry chunk and undoes the split inside the terminal.
 import { PublishDialog } from '../meta/ui/PublishDialog.tsx';
 import { useLibrary } from '../meta/store.ts';
 import { mountAudio } from './audio.ts';
 import { mountLibrary } from './library.ts';
-import { IconBook, IconMap, IconSound } from './components/Icons.tsx';
+import { IconMap, IconSound } from './components/Icons.tsx';
 import { ModalBoundary } from './components/ModalBoundary.tsx';
+import { Desk } from './desk/Desk.tsx';
+import { usePaperwork } from './desk/paper/usePaperwork.ts';
 import { useKeyboard } from './hooks/useKeyboard.ts';
 import { AudioSettings } from './screens/AudioSettings.tsx';
 import { LevelSelect } from './screens/LevelSelect.tsx';
-import { RepositoryIssue } from './screens/RepositoryIssue.tsx';
-import { Requisition } from './screens/Requisition.tsx';
-import { Results } from './screens/Results.tsx';
-import { ReviewMemo } from './screens/ReviewMemo.tsx';
-import { reviewOwed } from './screens/review.ts';
 // Side effect: sets `data-art` and the palette custom properties before the first render.
 import './art.ts';
 import './styles/fonts.css';
 import './styles/app.css';
-import './styles/art/survey.css';
 import './styles/art/signal.css';
 import './styles/art/deepsite.css';
 
-/**
- * The workspace is the only screen that needs Monaco, and Monaco is most of the build. Splitting
- * it out is what keeps the site map — the screen the game opens on — a small download.
- */
-const Workspace = lazy(async () => ({ default: (await import('./Workspace.tsx')).Workspace }));
-
-/** The memo files itself by rank, so closing a broken one has to look the rank up the same way. */
-function fileOwedReview(): void {
-  const state = useGame.getState();
-  const tier = reviewOwed(state.save);
-  if (tier) state.fileReview(tier.rank);
-}
-
 export function App(): React.JSX.Element {
   useKeyboard();
+  usePaperwork();
   const screen = useGame((state) => state.screen);
 
   useEffect(() => {
@@ -62,53 +46,33 @@ export function App(): React.JSX.Element {
 
   return (
     <div className="app">
-      <TopBar />
-      {screen === 'workspace' ? (
-        <Suspense fallback={<div className="screen screen--loading">opening the terminal…</div>}>
-          <Workspace />
-        </Suspense>
-      ) : null}
+      {/* The desk has no top bar. Every control it carried is an object on the desk instead. */}
+      {screen === 'levels' ? <TopBar /> : null}
+      {screen === 'workspace' ? <Desk /> : null}
       {screen === 'levels' ? (
         <div className="screen">
           <LevelSelect />
         </div>
       ) : null}
       {/*
-        One boundary per modal, not one around the layer.
-        A throw in any of these used to unmount the whole tree — the site map, the editor and the
-        player's unsaved program went with it, for a fault in a dialog they did not open
-        (docs/AUDIT-UI.md F21). They are boundaried separately because they stack: a publish offer
-        that falls over must still leave the run report that raised it on the screen. Each one
-        hands the boundary its own close, because a modal the store still thinks is open is a modal
-        the next run raises again.
+        Four of the five ceremonies that used to live here are paper now. `Results`, the hardware
+        requisition, the Repository note and the performance memo arrive on the desk and stay
+        there until they are filed — see `src/ui/desk/paper/usePaperwork.ts` and
+        `docs/AUDIT-UI.md` §6.2 and §6.6. A modal that destroys itself is the defect the desk
+        exists to remove, and re-adding one here would undo it.
+
+        The publish offer is the exception and it is not ours: it belongs to `src/meta/ui`. It
+        keeps its boundary for the reason the original comment gives — a throw in a dialog the
+        player did not open used to unmount the site map, the editor and their unsaved program
+        with it (docs/AUDIT-UI.md F21) — and it keeps its own close, because a modal the store
+        still thinks is open is a modal the next run raises again.
       */}
       <div className="modal-layer">
-        <ModalBoundary label="The run report" onDismiss={() => useGame.getState().dismissResults()}>
-          <Results />
-        </ModalBoundary>
         <ModalBoundary
           label="The publish offer"
           onDismiss={() => useLibrary.getState().skipPublish(false)}
         >
           <PublishDialog />
-        </ModalBoundary>
-        {/* The Repository note waits for the hardware crate itself, so order here is cosmetic. */}
-        <ModalBoundary
-          label="The Repository note"
-          onDismiss={() => useLibrary.getState().markBriefed()}
-        >
-          <RepositoryIssue />
-        </ModalBoundary>
-        {/* Last, so the delivery note stacks above a publish offer raised by the same transition. */}
-        <ModalBoundary
-          label="The delivery note"
-          onDismiss={() => useGame.getState().signRequisition()}
-        >
-          <Requisition />
-        </ModalBoundary>
-        {/* Site map only, and it checks the other four are gone. Nothing here shares its screen. */}
-        <ModalBoundary label="The performance memo" onDismiss={fileOwedReview}>
-          <ReviewMemo />
         </ModalBoundary>
       </div>
     </div>
@@ -121,8 +85,6 @@ function TopBar(): React.JSX.Element {
   const runState = useGame((state) => state.runState);
   const run = useGame((state) => state.run);
   const goto = useGame((state) => state.goto);
-  const setPanel = useGame((state) => state.setPanel);
-  const panel = useGame((state) => state.brief);
   const verdict = useGame((state) => state.verdict);
   const save = useGame((state) => state.save);
   const importSaveFile = useGame((state) => state.importSaveFile);
@@ -193,26 +155,21 @@ function TopBar(): React.JSX.Element {
       ) : null}
 
       <div className="topbar__actions">
-        <button
-          type="button"
-          className="icon-btn"
-          onClick={() => goto('levels')}
-          aria-pressed={screen === 'levels'}
-          title="Site map (Esc)"
-          aria-label="Site map"
-        >
-          <IconMap />
-        </button>
-        {screen === 'workspace' ? (
+        {/*
+          The way back to the station. The desk carries the site plan as an object, and this is the
+          same door in the other direction — a player who came here from a work order they were
+          half way through must not have to find that order again on the map to get back to it.
+          `currentLevelId` is still set, so it is one move.
+        */}
+        {level ? (
           <button
             type="button"
-            className="icon-btn"
-            onClick={() => setPanel('docs')}
-            aria-pressed={panel === 'docs'}
-            title="Reference (F1)"
-            aria-label="Reference"
+            className="btn topbar__resume"
+            onClick={() => goto('workspace')}
+            title={`Back to the station — ${level.id.toUpperCase()}`}
           >
-            <IconBook />
+            <IconMap />
+            <span>back to the station</span>
           </button>
         ) : null}
 
