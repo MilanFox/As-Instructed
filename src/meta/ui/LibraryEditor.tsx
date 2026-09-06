@@ -107,6 +107,13 @@ export function LibraryEditor(): React.JSX.Element {
             tabSize: 2,
             renderLineHighlight: 'line',
             automaticLayout: true,
+            // The same settings as the program's editor: this one holds player code too.
+            autoClosingBrackets: 'never',
+            autoClosingQuotes: 'never',
+            autoClosingOvertype: 'never',
+            autoSurround: 'never',
+            wordWrap: 'on',
+            wrappingIndent: 'indent',
           }}
         />
       </div>

@@ -58,6 +58,14 @@ export function StampBlock(): React.ReactElement {
    * The die reacting *only* when there is something to stamp is the whole instruction: a control
    * that is plainly inert until the moment it is needed teaches itself, and this game does not get
    * a tutorial or a tooltip. The grade dies never react, because the player never operates them.
+   *
+   * A certificate is *issued to the in-tray*, because one sheet lies out and that sheet is the
+   * work order. So the die was live with nothing on the desk carrying a stamp box: a player closed
+   * a level, was told to pick the die up, pressed it four times and watched it do nothing. And a
+   * certificate lying at its own `DOC_HOME` puts its stamp box at y 893 in an 839px window —
+   * measured, not assumed — so taking it out is not enough on its own either. Picking the die up
+   * therefore takes the certificate out of the tray *and* brings it up to reading size, which is
+   * the ceremony the copy on the die describes: pick it up, and the box is in front of you.
    */
   const waiting = docs.find(
     (doc) => !doc.filed && doc.payload.kind === 'certificate' && doc.mark === null,
@@ -155,11 +163,26 @@ export function StampBlock(): React.ReactElement {
             onClick={(event) => {
               event.stopPropagation();
               setAt({ x: event.clientX, y: event.clientY });
-              setHeld(held ? null : CLOSURE);
+              if (held) {
+                setHeld(null);
+                return;
+              }
+              if (waiting) {
+                const papers = usePapers.getState();
+                if (waiting.stowed) papers.takeOut(waiting.id);
+                if (papers.lifted !== waiting.id) papers.lift(waiting.id);
+              }
+              setHeld(CLOSURE);
             }}
           >
             <span className="sh" />
             <span className="sb">{CLOSURE.die}</span>
+            {/*
+              Screen-printed on the block under the live die. The row reads GOLD SILVER BRONZE
+              CLOSED, which a player read as a legend rather than as a control; the three grade
+              dies stay a legend, and this says which one of the four is a key.
+            */}
+            {ready ? <span className="sc">{held ? 'CLICK THE BOX' : 'PRESS TO FILE'}</span> : null}
           </button>
         </div>
       </div>

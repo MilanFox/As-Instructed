@@ -37,8 +37,9 @@
    element: with `width: auto` it takes its *intrinsic* 300x150 and CSS 2.1 §10.3.8 then drops the
    `right` and `bottom` constraints, so the board draws into a 300x150 box in the corner of the
    screen and every zoom rung measured off it is measuring that instead of the design. */
+/* Drag pans the board. The tester had to guess that, so the pointer says it. */
 .desk #board {
-  position: absolute; display: block;
+  position: absolute; display: block; cursor: grab;
   top: var(--feed-n); left: var(--feed-w);
   width: calc(100% - var(--feed-w) - var(--feed-e));
   height: calc(100% - var(--feed-n) - var(--feed-s));
@@ -223,10 +224,22 @@
   padding: calc(2 * var(--u)) calc(3 * var(--u));
   box-shadow: inset 0 1px 2px rgba(0,0,0,.35);
 }
-.desk .fc-zoom { display: flex; align-items: center; gap: calc(4 * var(--u)); }
-.desk .fc-legend {
-  font-family: var(--mono); font-size: calc(7.5 * var(--u) * var(--ts));
-  letter-spacing: .18em; color: #3e3d37;
+.desk .fc-zoom {
+  display: grid; grid-template-columns: repeat(3, auto);
+  gap: calc(3 * var(--u)) calc(4 * var(--u));
+  padding: calc(4 * var(--u)) calc(6 * var(--u)) calc(5 * var(--u));
+  border-radius: calc(3 * var(--u));
+  background: linear-gradient(#9c998f, #85827a 55%, #6a675f);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.34), inset 0 -1px 0 rgba(0,0,0,.26);
 }
-.desk .fk-narrow { width: calc(22 * var(--u)); font-size: calc(8 * var(--u) * var(--ts)); }
+.desk .fc-legend {
+  grid-column: 1 / -1; text-align: center;
+  font-family: var(--mono); font-size: calc(8.5 * var(--u) * var(--ts));
+  letter-spacing: .28em; color: #2f2e29;
+}
+.desk .fk-narrow {
+  width: calc(38 * var(--u)); height: calc(23 * var(--u));
+  font-family: var(--mono); font-size: calc(10.5 * var(--u) * var(--ts)); letter-spacing: .06em;
+}
 .desk .fk:disabled { opacity: .45; cursor: default; }
+.desk #board:active { cursor: grabbing; }

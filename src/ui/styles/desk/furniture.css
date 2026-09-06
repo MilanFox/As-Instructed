@@ -48,6 +48,59 @@
   box-shadow: calc(2 * var(--u)) calc(2 * var(--u)) calc(2 * var(--u)) rgb(var(--ink-sh) / .32);
 }
 
+/* The tab, and the only part of the tray a hand can reach.
+   The tray is a MAY_OVERFLOW object: it sits at the desk edge behind the copy stand, so its front
+   plate is off frame and most of its back rail is under the stand's foot. The tab is therefore
+   placed on the one strip that is both drawn and clear — above the foot at y 466, right of the
+   post at x 631, right of where the work order rests — and stands proud of the rail the way a file
+   tab does. It was previously an unstyled button in the corner of the box, which put it under the
+   copy stand, and `document.elementFromPoint` at its centre never returned it.
+   `src/ui/__tests__/control-reachability.test.ts` is the guard. */
+.desk .tray-tab {
+  position: absolute; z-index: 2;
+  right: calc(4 * var(--u)); top: calc(-18 * var(--u));
+  width: calc(134 * var(--u)); height: calc(40 * var(--u));
+  display: flex; align-items: center; justify-content: center; gap: calc(8 * var(--u));
+  border: 0; cursor: pointer; padding: 0;
+  background: linear-gradient(#959288, #6f6c63 52%, #4b4942);
+  border-radius: calc(3 * var(--u)) calc(3 * var(--u)) 0 0;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.42),
+              calc(4 * var(--u)) calc(4 * var(--u)) calc(2 * var(--u)) rgb(var(--ink-sh) / .32);
+  font-family: var(--mono); font-size: calc(9.5 * var(--u) * var(--ts));
+  letter-spacing: .14em; color: #e8e4d6;
+}
+.desk .tray-tab:hover { filter: brightness(1.1); }
+.desk .tray-tab:focus-visible { outline: calc(2 * var(--u)) solid var(--accent); outline-offset: calc(2 * var(--u)); }
+.desk .tray-count {
+  min-width: calc(20 * var(--u)); padding: 0 calc(4 * var(--u));
+  background: #23221d; color: #f0ecdd; border-radius: calc(2 * var(--u));
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.6);
+}
+/* The panel opens upward, because the tray's own box is mostly below the frame: opening downward
+   put it off the bottom of the screen as a single white line. Open, the tray outranks the copy
+   stand and the paper layer; at rest its z-index is untouched, so the composition is unchanged. */
+.desk .tray[data-open='1'] { z-index: 40; }
+.desk .tray-list {
+  position: absolute; z-index: 3; list-style: none;
+  right: calc(4 * var(--u)); bottom: calc(140 * var(--u));
+  width: calc(238 * var(--u)); max-height: calc(330 * var(--u)); overflow-y: auto;
+  padding: calc(8 * var(--u));
+  background: linear-gradient(#efecdf, #dad6c7);
+  border-radius: calc(3 * var(--u));
+  box-shadow: calc(10 * var(--u)) calc(10 * var(--u)) calc(4 * var(--u)) rgb(var(--ink-sh) / .32),
+              inset 0 1px 0 rgba(255,255,255,.6);
+}
+.desk .tray-list li + li { margin-top: calc(4 * var(--u)); }
+.desk .tray-list button {
+  display: block; width: 100%; text-align: left; border: 0; cursor: pointer;
+  padding: calc(7 * var(--u)) calc(9 * var(--u));
+  background: #fbf8ec; color: #2b2924;
+  font-family: var(--mono); font-size: calc(9.5 * var(--u) * var(--ts));
+  letter-spacing: .1em;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.14), calc(2 * var(--u)) calc(2 * var(--u)) 0 rgb(var(--ink-sh) / .18);
+}
+.desk .tray-list button:hover { background: #fff; }
+
 /* DISPATCH — the commitment act. a keyed switch, on the desk, by your hand. */
 .desk .dispatch {
   left: calc(50% - 768 * var(--u)); top: calc(50% + 232 * var(--u));
@@ -286,7 +339,13 @@
  * otherwise. That is the instruction: a control that is inert until the moment it is needed
  * teaches itself, and this game gets no tutorial and no tooltip.
  */
-.desk .stamp.closed { transform: translateY(calc(9 * var(--u))); filter: saturate(.25) brightness(.7); cursor: default; }
+.desk .stamp.closed { position: relative; transform: translateY(calc(9 * var(--u))); filter: saturate(.25) brightness(.7); cursor: default; }
+.desk .stamp .sc {
+  position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%);
+  margin-bottom: calc(7 * var(--u)); white-space: nowrap; pointer-events: none;
+  font-family: var(--mono); font-size: calc(7.5 * var(--u) * var(--ts));
+  letter-spacing: .2em; color: var(--accent);
+}
 .desk .stamp.closed .sh { opacity: .55; }
 .desk .stamp.closed.is-ready {
   transform: translateY(calc(-3 * var(--u))); filter: none; cursor: pointer;
