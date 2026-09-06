@@ -9,7 +9,7 @@
  */
 import { create } from 'zustand';
 import type { PrintEvent, Trace, Verdict } from '../engine/index.ts';
-import { Medal, evaluateObjectives, replayTo, reviveTrace, usesFuel } from '../engine/index.ts';
+import { Medal, usesFuel } from '../engine/index.ts';
 import type { PerSeedResult, RuntimeFailure } from '../runtime/protocol.ts';
 import { WORKER_TIMEOUT_MS } from '../runtime/protocol.ts';
 import type { LevelDef } from '../levels/index.ts';
@@ -174,33 +174,6 @@ export interface GameState {
 export function runSeeds(own: readonly number[], audit?: AuditSeeds): number[] {
   if (!audit) return [...own];
   return [...own, ...audit.seeds.filter((seed) => !own.includes(seed))];
-}
-
-/**
- * Bonus objectives are worth a star (DESIGN.md §7) but the worker's verdict currently reports the
- * required objectives only. Evaluating the level's own bonus objectives against the returned
- * trace closes the gap without inventing a second scoring rule — it is the engine's evaluator,
- * run on the world the trace ends in. Delete this the day the verdict carries them.
- */
-function withBonus(level: LevelDef, verdict: Verdict, trace: Trace): Verdict {
-  const bonus = level.bonus ?? [];
-  const reported = new Set(verdict.objectives.map((objective) => objective.id));
-  const missing = bonus.filter((objective) => !reported.has(objective.id));
-  if (missing.length === 0) return verdict;
-  try {
-    const revived = reviveTrace(trace);
-    const context = {
-      world: replayTo(revived, revived.endTick),
-      trace: revived,
-      initialWorld: revived.initialWorld,
-    };
-    return {
-      ...verdict,
-      objectives: [...verdict.objectives, ...evaluateObjectives(missing, context)],
-    };
-  } catch {
-    return verdict;
-  }
 }
 
 let lineId = 0;
@@ -495,10 +468,9 @@ export const useGame = create<GameState>((set, get) => {
       function applyResponse(
         levelDef: LevelDef,
         trace: Trace,
-        rawVerdict: Verdict,
+        verdict: Verdict,
         results: PerSeedResult[],
       ): void {
-        const verdict = withBonus(levelDef, rawVerdict, trace);
         const cap = get().save.settings.consoleCap;
         const prints = trace.events.filter((event): event is PrintEvent => event.kind === 'print');
         const shown = prints.slice(0, cap);
