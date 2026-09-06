@@ -47,7 +47,7 @@ export const w2_02: LevelDef = {
   world: 2,
   index: 2,
   title: 'Rotation',
-  hardware: ['harvest', 'plant'],
+  hardware: ['scan', 'harvest', 'plant'],
   brief: [
     '**FROM:** Field Eng. D. Halloran',
     '',
@@ -57,6 +57,10 @@ export const w2_02: LevelDef = {
     'Work every tile of the field.',
   ].join('\n'),
   facts: [
+    {
+      label: '`scan()`',
+      value: 'Reads the tile under the bot. `scan(Dir.East)` reads the next one along. Free.',
+    },
     { label: 'Ready', value: 'A crop whose `growth` has reached its `maxGrowth`.' },
     { label: 'A ready tile', value: 'Harvest it, then plant it again before you move on.' },
     {

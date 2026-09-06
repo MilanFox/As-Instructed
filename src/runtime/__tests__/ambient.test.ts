@@ -15,13 +15,13 @@ import { implementedApiNames } from '../api-bindings.ts';
  */
 
 const W1_01 = ['move', 'pos', 'print', 'wait'];
-const W2_01 = unlockedApiNames('w2-01');
+const W2_02 = unlockedApiNames('w2-02');
 
 describe('unlockedApiNames', () => {
   test('grows with the campaign and never goes backwards', () => {
     expect(unlockedApiNames('w1-01')).toEqual(W1_01);
     expect(unlockedApiNames('w1-03')).toEqual(['move', 'pos', 'print', 'wait', 'canMove']);
-    expect(W2_01).toEqual([...unlockedApiNames('w1-03'), 'scan']);
+    expect(W2_02).toEqual([...unlockedApiNames('w1-03'), 'scan', 'harvest', 'plant']);
     expect(unlockedApiNames('w8-05')).toEqual(PLAYER_API.functions.map((fn) => fn.name));
   });
 
@@ -57,7 +57,7 @@ describe('buildAmbientDts', () => {
   });
 
   test('drags in transitive types: TileView needs ItemStack, ItemKind and Terrain', () => {
-    const dts = buildAmbientDts(W2_01);
+    const dts = buildAmbientDts(W2_02);
     expect(dts).toContain('interface TileView');
     expect(dts).toContain('interface ItemStack');
     expect(dts).toContain('declare const ItemKind:');

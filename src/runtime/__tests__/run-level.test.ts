@@ -104,13 +104,13 @@ describe('locked hardware', () => {
     expect(result.passed).toBe(false);
     expect(result.failure?.kind).toBe('runtime');
     expect(result.failure?.message).toContain('`scan()` is not installed');
-    expect(result.failure?.message).toContain('w2-01');
+    expect(result.failure?.message).toContain('w2-02');
     expect(result.failure?.line).toBe(1);
   });
 
   test('unlocking it makes the same call work', () => {
     const { result } = run('scan();\nmove(Dir.East);', {
-      hardware: unlockedApiNames('w2-01'),
+      hardware: unlockedApiNames('w2-02'),
     });
     expect(result.failure).toBeUndefined();
   });
@@ -267,12 +267,12 @@ describe('power() on a hand-operated machine', () => {
     expect(verdict.failure?.line).toBe(2);
   });
 
-  test('an unknown machine id is still an ordinary false, not a stopped run', () => {
+  test('an unknown machine id stops the run too, on the player line that asked', () => {
     const level = getLevel('w8-03') as LevelDef;
     const seed = level.seeds[0] as number;
-    const source = 'print("power ghost -> " + power("ghost", "on"));';
+    const source = 'print("reaching for it");\npower("ghost", "on");';
     const { js, lineMap } = transpile(source);
-    const { result, trace } = runSeed({
+    const { verdict, trace } = runSeed({
       level,
       seed,
       js,
@@ -281,10 +281,15 @@ describe('power() on a hand-operated machine', () => {
       unlockedHardware: unlockedApiNames('w8-03'),
     });
 
-    expect(result.failure).toBeUndefined();
+    expect(verdict.failure?.code).toBe('illegal-action');
+    const message = verdict.failure?.message ?? '';
+    expect(message).toContain('power("ghost")');
+    expect(message).toContain('probe("ghost")');
+    expect(verdict.failure?.line).toBe(2);
+
     const prints = trace.events.filter(
       (event: TraceEvent): event is PrintEvent => event.kind === 'print',
     );
-    expect(prints[0]?.text).toBe('power ghost -> false');
+    expect(prints[0]?.text).toBe('reaching for it');
   });
 });

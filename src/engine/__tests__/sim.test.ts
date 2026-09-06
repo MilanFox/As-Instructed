@@ -869,12 +869,26 @@ describe('power', () => {
     expect(must(acts[0]).detail).toBe('on');
   });
 
-  test('returns false for an unknown machine but still charges', () => {
+  test('an unknown machine stops the run, and is charged and logged first', () => {
     const world = openWorld(3, 1, 1);
     const sim = new Sim(world);
-    expect(sim.power(0, 'ghost', 'on')).toBe(false);
+    expect(() => sim.power(0, 'ghost', 'on')).toThrow(IllegalActionError);
     expect(bot(world).clock).toBe(DEFAULT_COSTS.power);
     expect(must(eventsOfKind(sim.finish().events, 'act')[0]).ok).toBe(false);
+  });
+
+  test('the unknown-machine message names the id and the free check for it', () => {
+    const world = openWorld(3, 1, 1);
+    const sim = new Sim(world);
+    let message = '';
+    try {
+      sim.power(0, 'ghost', 'on');
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toContain('power("ghost")');
+    expect(message).toContain('no machine on this work order has that id');
+    expect(message).toContain('probe("ghost")');
   });
 
   test('a manual machine refuses in a sentence that names it and its tile', () => {
@@ -1909,28 +1923,42 @@ describe('virtual clocks and collisions', () => {
 // ---------------------------------------------------------------------------
 
 describe('extension points', () => {
-  test('applyMachineChange mutates and traces, and reports unknown machines', () => {
+  test('applyMachineChange mutates and traces, and stops the run on an unknown machine', () => {
     const world = openWorld(3, 1, 1);
     placeMachine(world, { id: 'm', kind: MachineKind.Node, at: vec(0, 0), vars: { charge: 0 } });
     const sim = new Sim(world);
 
-    expect(
-      sim.applyMachineChange(
-        0,
-        'm',
-        (machine) => {
-          machine.vars['charge'] = 5;
-          machine.state = 'live';
-        },
-        3,
-      ),
-    ).toBe(true);
+    sim.applyMachineChange(
+      0,
+      'm',
+      (machine) => {
+        machine.vars['charge'] = 5;
+        machine.state = 'live';
+      },
+      3,
+    );
     expect(bot(world).clock).toBe(3);
     expect(must(machineById(world, 'm')).state).toBe('live');
 
-    expect(sim.applyMachineChange(0, 'ghost', () => undefined, 2)).toBe(false);
+    expect(() => sim.applyMachineChange(0, 'ghost', () => undefined, 2)).toThrow(
+      IllegalActionError,
+    );
     expect(bot(world).clock).toBe(5);
     expect(eventsOfKind(sim.finish().events, 'machineChange')).toHaveLength(1);
+  });
+
+  test('refuseMachineAct bills a refusal without pretending an id was involved', () => {
+    const world = openWorld(3, 1, 1);
+    placeMachine(world, { id: 'm', kind: MachineKind.Node, at: vec(0, 0), vars: {} });
+    const sim = new Sim(world);
+
+    sim.refuseMachineAct(0, '', 2);
+    expect(bot(world).clock).toBe(2);
+
+    const trace = sim.finish();
+    expect(eventsOfKind(trace.events, 'machineChange')).toHaveLength(0);
+    const act = must(eventsOfKind(trace.events, 'act')[0]);
+    expect([act.name, act.ok, act.detail]).toEqual(['machine', false, '']);
   });
 
   test('applyTileChange edits a tile for free and traces the before/after', () => {

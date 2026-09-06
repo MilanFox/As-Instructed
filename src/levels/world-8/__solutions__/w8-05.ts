@@ -30,8 +30,9 @@ import { KnownMap, distancesOn, drainAntenna, key, pathOn, readPacket } from '..
  *    picks that pump so that being interrupted half way still leaves it able to move.
  *
  * Deliberately not the fastest shape available. A player who batches crates by class into a
- * six-slot hold and sends the clerk out with a hauler's load will beat it, which is where the
- * twenty-percent bonus lives.
+ * six-slot hold and sends the clerk out with a hauler's load will beat it, which is the room par
+ * leaves. It used to say that room was where the twenty-percent bonus lived; that bonus was
+ * withdrawn with the other two (docs/FIX-BONUSES-7-8.md) and the room is still there.
  */
 
 const WIDTH = 48;

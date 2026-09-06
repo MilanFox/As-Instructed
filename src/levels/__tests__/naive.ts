@@ -268,33 +268,6 @@ export const corridorPoll: ReferenceSolution = {
 };
 
 /**
- * w2-01: read every tile in the row, then drive back to the highest reading.
- *
- * Correct on every seed, and the answer the level's own hints walk a player to. It costs the trip
- * out plus most of the trip back — 18 on the worst seed — because it never uses the one thing the
- * facts table states outright: exactly one tile sits at `maxGrowth`, so a reading that hits the
- * ceiling has nothing left to be compared against.
- */
-export const rowSweep: ReferenceSolution = {
-  levelId: 'w2-01',
-  run(sim: Sim, botId: number): void {
-    let bestGrowth = -1;
-    let bestX = sim.pos(botId).x;
-    for (;;) {
-      const here = sim.scan(botId);
-      if (here.crop !== null && here.growth > bestGrowth) {
-        bestGrowth = here.growth;
-        bestX = sim.pos(botId).x;
-      }
-      if (!sim.canMove(botId, Dir.East)) break;
-      sim.move(botId, Dir.East);
-    }
-    while (sim.pos(botId).x > bestX) sim.move(botId, Dir.West);
-  },
-  source: '',
-};
-
-/**
  * w2-05: serpentine the field reading only the tile under the wheels, and stop when the hopper
  * refuses a crop.
  *

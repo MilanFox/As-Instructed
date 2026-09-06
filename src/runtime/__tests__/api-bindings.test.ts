@@ -1,6 +1,15 @@
 import { describe, expect, test } from 'vitest';
 import type { World } from '../../engine/index.ts';
-import { Sim, addBot, addMachine, createWorld, setTile, tileAt, vec } from '../../engine/index.ts';
+import {
+  IllegalActionError,
+  Sim,
+  addBot,
+  addMachine,
+  createWorld,
+  setTile,
+  tileAt,
+  vec,
+} from '../../engine/index.ts';
 import { PLAYER_API } from '../api-spec.ts';
 import { assertApiComplete, buildPlayerScope, implementedApiNames } from '../api-bindings.ts';
 
@@ -105,6 +114,29 @@ describe('transmit', () => {
     expect(tileAt(world, ANTENNA)?.meta?.['tx']).toBeUndefined();
     expect(sim.ticks).toBe(1);
   });
+
+  test('an off antenna is a state, so the same call succeeds once it is powered', () => {
+    const { sim } = listeningPost([], 'off');
+    const { transmit, power } = api(sim, ['transmit', 'power']);
+    expect(transmit?.('ping')).toBe(false);
+    power?.('ant-1', 'on');
+    expect(transmit?.('ping')).toBe(true);
+  });
+
+  test('a work order with no antenna stops the run instead, and still charges', () => {
+    const world = createWorld({ w: 4, h: 4, seed: 1 });
+    addBot(world, { at: vec(1, 1) });
+    const sim = new Sim(world);
+    let message = '';
+    try {
+      api(sim, ['transmit']).transmit?.('ping');
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toContain('no antenna');
+    expect(message).toContain('Drop the call');
+    expect(sim.ticks).toBe(1);
+  });
 });
 
 describe('decode', () => {
@@ -153,10 +185,23 @@ describe('link', () => {
     expect(sim.ticks).toBe(2);
   });
 
-  test('an unknown machine is refused, and still costs the full price', () => {
+  test('an unknown machine stops the run, and still costs the full price', () => {
     const { sim } = grid();
-    expect(api(sim, ['link']).link?.('node-1', 'node-9')).toBe(false);
+    expect(() => api(sim, ['link']).link?.('node-1', 'node-9')).toThrow(IllegalActionError);
     expect(sim.spendTotals()).toEqual({});
     expect(sim.ticks).toBe(2);
+  });
+
+  test('the refusal names the id that was wrong, not the pair', () => {
+    const { sim } = grid();
+    let message = '';
+    try {
+      api(sim, ['link']).link?.('node-9', 'node-2');
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toContain('link("node-9", "node-2")');
+    expect(message).toContain('the id "node-9"');
+    expect(message).toContain('probe("node-9")');
   });
 });

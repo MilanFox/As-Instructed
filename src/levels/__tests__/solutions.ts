@@ -3,7 +3,6 @@ import type { ReferenceSolution } from '../types.ts';
 import { solution as w1_01 } from '../world-1/__solutions__/w1-01.ts';
 import { solution as w1_03 } from '../world-1/__solutions__/w1-03.ts';
 import { solution as w1_05 } from '../world-1/__solutions__/w1-05.ts';
-import { solution as w2_01 } from '../world-2/__solutions__/w2-01.ts';
 import { solution as w2_02 } from '../world-2/__solutions__/w2-02.ts';
 import { solution as w2_04 } from '../world-2/__solutions__/w2-04.ts';
 import { solution as w2_05 } from '../world-2/__solutions__/w2-05.ts';
@@ -37,14 +36,13 @@ import { solution as w8_05 } from '../world-8/__solutions__/w8-05.ts';
 
 /**
  * Every level ships a reference solution (DESIGN.md §5). Registered here so that the level
- * suite and the par suite drive the same 34 programs; the par table is only evidence if the
+ * suite and the par suite drive the same 33 programs; the par table is only evidence if the
  * thing it measures is the thing the campaign is proved solvable with.
  */
 export const SOLUTIONS: Record<string, ReferenceSolution> = {
   'w1-01': w1_01,
   'w1-03': w1_03,
   'w1-05': w1_05,
-  'w2-01': w2_01,
   'w2-02': w2_02,
   'w2-04': w2_04,
   'w2-05': w2_05,

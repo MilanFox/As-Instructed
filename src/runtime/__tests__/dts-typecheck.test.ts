@@ -111,7 +111,7 @@ describe('locked hardware is a type error', () => {
   });
 
   test('the same call compiles once the hardware is installed', () => {
-    expect(messages(check('w2-01', 'const tile = scan();\nprint(String(tile.walkable));'))).toEqual(
+    expect(messages(check('w2-02', 'const tile = scan();\nprint(String(tile.walkable));'))).toEqual(
       [],
     );
   });

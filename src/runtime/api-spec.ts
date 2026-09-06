@@ -248,7 +248,7 @@ if (ahead.walkable && ahead.botId === null) {
   move(Dir.South);
 }`,
     cost: 0,
-    unlockedBy: 'w2-01',
+    unlockedBy: 'w2-02',
     world: 2,
     category: 'sensing',
     requiresTypes: ['Dir', 'TileView'],
@@ -414,8 +414,8 @@ print(\`loaded \${taken} ore\`);`,
   move(Dir.North);
 }`,
     cost: 2,
-    unlockedBy: 'w3-04',
-    world: 3,
+    unlockedBy: 'w5-01',
+    world: 5,
     category: 'machines',
     requiresTypes: ['Dir'],
   },
@@ -530,7 +530,7 @@ if (node !== null && node.state === 'off') {
       { name: 'state', type: 'string', doc: "The state to force, typically 'on' or 'off'." },
     ],
     returns: 'boolean',
-    doc: "Sets a machine's state directly instead of stepping through its cycle the way `use` does, from anywhere on the map. Returns false for an unknown machine id. A machine that publishes `vars.manual: 1` is hand-operated: calling `power` on it stops the run with a message naming the machine and its tile, because only a `use()` at that tile moves it. It costs the full price either way.",
+    doc: "Sets a machine's state directly instead of stepping through its cycle the way `use` does, from anywhere on the map. Two calls stop the run rather than report back, because neither could have gone differently later in the shift: an id belonging to no machine here, and a machine publishing `vars.manual: 1`, which is hand-operated and moves only for a `use()` at its tile. Both name what was asked for; `probe(id)` is the free check for the first. It costs the full price either way.",
     example: `power('node-1', 'on');
 power('node-2', 'off');`,
     cost: 2,
@@ -545,10 +545,9 @@ power('node-2', 'off');`,
       { name: 'toId', type: 'string', doc: 'The machine the connection ends at.' },
     ],
     returns: 'boolean',
-    doc: 'Connects two machines so that `fromId` feeds `toId`, returning false when either id is unknown or the grid refuses the connection. What a connection carries, and which pairs are legal, is defined by the level and stated in its brief.',
-    example: `if (link('node-1', 'node-2')) {
-  power('node-1', 'on');
-}`,
+    doc: 'Connects two machines so that `fromId` feeds `toId`. The run stops and names the id when either one belongs to no machine here — no command builds a machine, so a bad id stays bad, and `probe(id)` returns null on one for free. It returns false only where a level says a pair is illegal, and its brief says so. What a connection carries is defined by the level too.',
+    example: `link('node-1', 'node-2');
+power('node-1', 'on');`,
     cost: 2,
     unlockedBy: 'w5-03',
     world: 5,
@@ -573,7 +572,7 @@ while (packet !== null) {
     name: 'transmit',
     params: [{ name: 'text', type: 'string', doc: 'The payload to send.' }],
     returns: 'boolean',
-    doc: 'Sends `text` back out over the antenna and returns whether it was accepted. Rejection usually means the antenna is unpowered or the payload is malformed; the exact acceptance rule is defined by the level.',
+    doc: 'Sends `text` back out over the antenna and returns whether it was accepted. A false means the antenna is unpowered or the payload was refused; the exact acceptance rule is defined by the level. On a work order carrying no antenna at all the run stops instead, because powering one up is something you can do and installing one is not.',
     example: `const packet = receive();
 if (packet !== null && !transmit(packet)) {
   print('antenna rejected the payload');

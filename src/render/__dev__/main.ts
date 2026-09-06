@@ -6,8 +6,9 @@
  * the production build's entry graph.
  */
 
-import { Renderer, padCells } from '../index.ts';
-import type { FrameInfo, TileReadout } from '../index.ts';
+import { Renderer, padCells, snapTilePx } from '../index.ts';
+import type { ArtId, FrameInfo, TileReadout } from '../index.ts';
+import { ART_IDS, DIRECTIONS } from '../theme.ts';
 import { allScenes } from './scenes.ts';
 import type { Scene } from './scenes.ts';
 
@@ -15,6 +16,7 @@ const canvas = document.getElementById('stage') as HTMLCanvasElement;
 const hud = document.getElementById('hud') as HTMLElement;
 const readout = document.getElementById('readout') as HTMLElement;
 const sceneSelect = document.getElementById('scene') as HTMLSelectElement;
+const artSelect = document.getElementById('art') as HTMLSelectElement;
 const scrub = document.getElementById('scrub') as HTMLInputElement;
 const tickLabel = document.getElementById('tickLabel') as HTMLElement;
 const playPause = document.getElementById('playPause') as HTMLButtonElement;
@@ -26,6 +28,13 @@ for (const scene of scenes) {
   option.value = scene.id;
   option.textContent = scene.label;
   sceneSelect.append(option);
+}
+
+for (const id of ART_IDS) {
+  const option = document.createElement('option');
+  option.value = id;
+  option.textContent = DIRECTIONS[id].label;
+  artSelect.append(option);
 }
 
 let current: Scene = scenes[0] as Scene;
@@ -102,6 +111,10 @@ scrub.addEventListener('pointerup', () => {
 });
 scrub.addEventListener('input', () => {
   renderer.seek((Number(scrub.value) / 1000) * renderer.endTick);
+});
+
+artSelect.addEventListener('change', () => {
+  renderer.setArt(artSelect.value as ArtId);
 });
 
 sceneSelect.addEventListener('change', () => {
@@ -185,6 +198,23 @@ window.addEventListener('keydown', (event) => {
     playPause.classList.remove('on');
   },
   zoom: (steps: number) => renderer.camera.zoomBy(steps),
+  art: (id: ArtId) => {
+    artSelect.value = id;
+    renderer.setArt(id);
+  },
+  /**
+   * Pins the board to one `ZOOM_LADDER` rung and holds it there.
+   *
+   * `setZoom` only moves the *target*; the camera eases onto it over the next few frames, so a
+   * screenshot taken immediately after is of the zoom on the way rather than the one asked for.
+   * The shots that prove small-tile legibility are worthless if they are half a rung off, so this
+   * lands both.
+   */
+  tile: (devicePx: number) => {
+    renderer.camera.setZoom(devicePx);
+    renderer.camera.deviceTilePx = snapTilePx(devicePx);
+    return renderer.camera.deviceTilePx;
+  },
   celebrate: (kind: 'bronze' | 'silver' | 'gold' | 'pass' | 'fail') => renderer.celebrate(kind),
   reduced: (on: boolean | null) => renderer.setReducedMotion(on),
   speed: (ticksPerSecond: number) => renderer.setSpeed(ticksPerSecond),

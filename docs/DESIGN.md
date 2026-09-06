@@ -211,14 +211,16 @@ level where you install the sensor. Each world's finale is a bigger multi-object
 |---|---|---|---|---|
 | 1 | **Boot Sector** | A dusty test hangar | loops, conditionals, coordinates | `move` `pos` `canMove` `print` `wait` |
 | 2 | **Regolith Fields** | Agriculture on a hostile rock | state machines, resource cycles | `scan` `harvest` `plant` `inventory` |
-| 3 | **The Sorting Yards** | Logistics depot | data structures, filtering, maps | `pickup` `drop` `carrying` `use` |
+| 3 | **The Sorting Yards** | Logistics depot | data structures, filtering, maps | `pickup` `drop` `carrying` |
 | 4 | **Cave Systems** | Unmapped tunnels | search, BFS/DFS, memory of unknown maps | `look` `mark` `readMark` |
-| 5 | **The Grid** | Power infrastructure | constraint solving, ordering, graphs | `power` `probe` `link` |
+| 5 | **The Grid** | Power infrastructure | constraint solving, ordering, graphs | `probe` `use` `power` `link` |
 | 6 | **Deep Signal** | A listening post | string/number crunching, parsing, checksums | `receive` `transmit` `decode` |
 | 7 | **Swarm** | A hundred cheap robots | parallelism, scheduling, makespan | `bots` `spawn` `sync` `send`/`recv` |
 | 8 | **The Kessler Contract** | The finale | everything, under budget | — (capstone levels) |
 
-5 levels per world, ~40 total. World 8 has 4 large ones plus one true monster.
+33 work orders. Seven of the planned forty were withdrawn (docs/FIX-COMPRESSION.md,
+docs/FIX-CONTENT.md), so a world is no longer five levels and `index` is ascending rather than
+contiguous. World 8 has 4 large ones plus one true monster.
 
 ## 7. Scoring
 
@@ -372,8 +374,9 @@ they learn that exactly where the grade is about to start carrying information.
 
 The set, measured by driving a *lazy* and a *smart* program through the harness on every seed:
 **`w1-01`, `w1-03`, `w5-02`, `w6-01`, `w6-03`, `w6-05`.** World 2 stays graded in full — on
-`w2-01` and `w2-05` a lazy route genuinely costs more than a smart one, which is why their par
-moved instead.
+`w2-05` a lazy route genuinely costs more than a smart one, which is why its par moved instead.
+`w2-01` was measured the same way and reached the same answer; it has since been withdrawn
+(docs/FIX-CONTENT.md).
 
 `w2-04` is the case that fixes the criterion's wording. Ticks there cannot tell lapping from
 waiting, so the clock cannot see the lesson — but it still graded both testers at 63 against par

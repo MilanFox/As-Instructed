@@ -16,7 +16,6 @@ import {
   lockerCanvasser,
   rawRelay,
   roundRobinDispatch,
-  rowSweep,
   serpentineHarvest,
 } from './naive.ts';
 
@@ -37,13 +36,14 @@ function runOnce(level: (typeof LEVELS)[number], seed: number) {
 }
 
 /**
- * Six work orders were withdrawn (docs/FIX-COMPRESSION.md) and the survivors kept their ids, so
- * the campaign is no longer five per world and `index` is no longer contiguous inside one. It is
- * still strictly ascending, which is all `campaignOrder` and the site map need.
+ * Seven work orders were withdrawn (docs/FIX-COMPRESSION.md, docs/FIX-CONTENT.md) and the
+ * survivors kept their ids, so the campaign is no longer five per world and `index` is no longer
+ * contiguous inside one. It is still strictly ascending, which is all `campaignOrder` and the
+ * site map need.
  */
 const EXPECTED_INDICES: Readonly<Record<number, number[]>> = {
   1: [1, 3, 5],
-  2: [1, 2, 4, 5],
+  2: [2, 4, 5],
   3: [1, 2, 4],
   4: [1, 2, 4, 5],
   5: [1, 2, 3, 4, 5],
@@ -64,7 +64,7 @@ describe('registry', () => {
   });
 
   test('nothing still points at a withdrawn work order', () => {
-    for (const id of ['w1-02', 'w1-04', 'w2-03', 'w3-03', 'w3-05', 'w4-03']) {
+    for (const id of ['w1-02', 'w1-04', 'w2-01', 'w2-03', 'w3-03', 'w3-05', 'w4-03']) {
       expect(getLevel(id), id).toBeUndefined();
     }
   });
@@ -278,13 +278,6 @@ describe('par calibration', () => {
     expect(polled.passed).toBe(true);
     expect(polled.worst).toBe(reference('w1-03').worst);
     expect(polled.medal).toBe('gold');
-  });
-
-  test('w2-01: reading the whole row and driving back is correct, and is not gold', () => {
-    const swept = scored('w2-01', rowSweep);
-    expect(swept.passed).toBe(true);
-    expect(swept.medal).toBe('silver');
-    expect(reference('w2-01').worst).toBeLessThan(swept.worst);
   });
 
   test('w2-05: serpentining all six rows is correct, and is not gold', () => {

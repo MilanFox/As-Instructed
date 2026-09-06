@@ -7,25 +7,24 @@ import { playbackFor } from '../../../game/playback.ts';
 import type { LevelRunResult } from '../../harness.ts';
 import { runLevel, runReference } from '../../harness.ts';
 import type { LevelDef, ReferenceSolution } from '../../types.ts';
-import { WORLD_2_LEVELS, w2_01, w2_04, w2_05 } from '../index.ts';
-import { solution as w2_01Solution } from '../__solutions__/w2-01.ts';
+import { WORLD_2_LEVELS, w2_04, w2_05 } from '../index.ts';
 import { solution as w2_02Solution } from '../__solutions__/w2-02.ts';
 import { solution as w2_04Solution } from '../__solutions__/w2-04.ts';
 import { solution as w2_05Solution } from '../__solutions__/w2-05.ts';
-import { rowSweep, serpentineHarvest } from '../../__tests__/naive.ts';
+import { serpentineHarvest } from '../../__tests__/naive.ts';
 
 /**
- * The Regolith Fields, and specifically its three reworked bonus objectives.
+ * The Regolith Fields, and specifically its reworked bonus objectives.
  *
  * Every bonus here is proved in both directions: a driver that earns the star on every declared
  * seed, and the obvious correct answer missing it. A bonus only one of those is true of is either
  * confetti or impossible, and both have shipped before.
  *
  * That obvious answer used to be the level's own reference solution. Since docs/FIX-PAR.md it is
- * not: on w2-01 and w2-05 par moved onto the route that uses the level's hardware, so the
- * reference had to move with it, and the lazier route lives in `src/levels/__tests__/naive.ts` as
- * `rowSweep` and `serpentineHarvest`. It is still correct, still passes every seed, and now takes
- * silver rather than gold.
+ * not: on w2-05 par moved onto the route that uses the level's hardware, so the reference had to
+ * move with it, and the lazier route lives in `src/levels/__tests__/naive.ts` as
+ * `serpentineHarvest`. It is still correct, still passes every seed, and now takes silver rather
+ * than gold.
  *
  * The readouts are proved too. `src/game/budgets.ts` decides what number the player sees by
  * matching words in the label against the meters a run actually produced, so a label is a piece of
@@ -33,7 +32,6 @@ import { rowSweep, serpentineHarvest } from '../../__tests__/naive.ts';
  */
 
 const SOLUTIONS: Record<string, ReferenceSolution> = {
-  'w2-01': w2_01Solution,
   'w2-02': w2_02Solution,
   'w2-04': w2_04Solution,
   'w2-05': w2_05Solution,
@@ -101,16 +99,6 @@ const stayPut = (): void => undefined;
 // ---------------------------------------------------------------------------
 // Drivers
 // ---------------------------------------------------------------------------
-
-/** w2-01, the star: drive east reading as you go and stop on the first unbeatable reading. */
-function stopOnTheUnbeatableReading(sim: Sim, botId: number): void {
-  for (let guard = 0; guard < 20; guard++) {
-    const here = sim.scan(botId);
-    if (here.crop !== null && here.growth >= here.maxGrowth) return;
-    if (!sim.canMove(botId, Dir.East)) return;
-    sim.move(botId, Dir.East);
-  }
-}
 
 /**
  * w2-04, the star: poll the plot for whatever ripens next and be standing on it when it does.
@@ -294,13 +282,8 @@ function surveyTwoLanesThenStrike(sim: Sim, botId: number): void {
 // ---------------------------------------------------------------------------
 
 describe('world 2 shape', () => {
-  test('four levels, in order, each with exactly one bonus star', () => {
-    expect(WORLD_2_LEVELS.map((level) => level.id)).toEqual([
-      'w2-01',
-      'w2-02',
-      'w2-04',
-      'w2-05',
-    ]);
+  test('three levels, in order, each with exactly one bonus star', () => {
+    expect(WORLD_2_LEVELS.map((level) => level.id)).toEqual(['w2-02', 'w2-04', 'w2-05']);
     for (const level of WORLD_2_LEVELS) {
       expect((level.bonus ?? []).length, level.id).toBe(1);
     }
@@ -325,55 +308,6 @@ describe('world 2 shape', () => {
         expect(objective.label.toLowerCase(), level.id).not.toMatch(/char|length|line|short/);
       }
     }
-  });
-});
-
-// ---------------------------------------------------------------------------
-// w2-01 — stop when you already have the answer
-// ---------------------------------------------------------------------------
-
-describe('w2-01 bonus — the survey that stops early', () => {
-  test('stopping on the first unbeatable reading earns the star on every seed', () => {
-    for (const seed of w2_01.seeds) {
-      const run = runLevel(w2_01, seed, stopOnTheUnbeatableReading);
-      expect(run.verdict.passed, `seed ${String(seed)}`).toBe(true);
-      expect(starred(w2_01, run), `seed ${String(seed)}`).toBe(true);
-    }
-  });
-
-  test('reading the whole row and walking back solves it and misses the star', () => {
-    const missed = w2_01.seeds.filter((seed) => {
-      const run = runReference(w2_01, seed, rowSweep);
-      expect(run.verdict.passed, `seed ${String(seed)}`).toBe(true);
-      return !starred(w2_01, run);
-    });
-    expect(missed).toContain(1);
-    expect(missed.length).toBeGreaterThanOrEqual(3);
-  });
-
-  test('a seed whose target is the far tile is the one the old bonus was free on', () => {
-    const run = runReference(w2_01, 2, rowSweep);
-    expect(run.ticks).toBe(9);
-    expect(starred(w2_01, run)).toBe(true);
-  });
-
-  test('a bot that never moves does not pass the level it would flatter', () => {
-    const run = runLevel(w2_01, 1, stayPut);
-    expect(run.verdict.passed).toBe(false);
-  });
-
-  test('the overshoot reads back in moves, unclamped', () => {
-    const over = runReference(w2_01, 1, rowSweep);
-    expect(scoreBonus(w2_01, over).progress).toEqual([15, 3]);
-    const budget = readout(w2_01, over);
-    expect(budget?.meter).toEqual({ kind: 'events', event: 'move' });
-    expect(budget?.used).toBe(15);
-    expect(budget?.limit).toBe(3);
-    expect(budget?.unit).toBe('moves');
-
-    const clean = runLevel(w2_01, 1, stopOnTheUnbeatableReading);
-    expect(scoreBonus(w2_01, clean).progress).toEqual([3, 3]);
-    expect(readout(w2_01, clean)).toBeNull();
   });
 });
 
