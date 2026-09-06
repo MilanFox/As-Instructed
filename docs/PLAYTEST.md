@@ -1,6 +1,6 @@
 # Playtest — desk UI, campaign run
 
-**Coverage so far: w1-05, w2-02..w2-05, w3-01..w3-04, w4-01..w4-05, w5-01..w5-05, w6-01..w6-05, w7-01..w7-05, w8-01..w8-04.** Reference solutions used: 7 (w7-02..w7-05, w8-02, w8-03, w8-04) — all "understood it, the code was the work".
+**Coverage: all 33 work orders closed (w1-01..w8-05).** Reference solutions used: 8 (w7-02..w7-05, w8-02..w8-05) — all "understood it, the code was the work".
 
 Run: fresh localStorage, viewport 1280x684 (window would not resize past this), Chrome.
 Convention: findings are written before any source file for that level is opened.
@@ -847,3 +847,192 @@ now wrong in at least two places. Someone should sweep app.css for classes only 
   The route to the one that is not was filed eleven months ago by the contractor who put it there.
   Most of it is still true."
 
+## w1-03 Length Unknown — closed, 24 ticks (played only to complete the campaign)
+
+Trivial (`while (canMove(Dir.East)) move(Dir.East);`), bonus missed on purpose (19/7 canMove calls).
+Recorded only because closing it took the site to 33/33.
+
+## w8-05 The Kessler Contract — GOLD + **2 stars**, 970 ticks (par 1050). **REFERENCE (8th).**
+
+- **Which kind of stuck?** Second kind. This is the finale and it is *five* objectives plus two
+  report bonuses at once: bring an unmapped 48x40 site into view, energise a dependency-ordered
+  grid, sort five classes of crate to five depots, carry a chip through a nine-stage airlock that
+  only opens once a named substation is live, and manage fuel with no gauge — while the score is
+  the last bot's clock. I read it, understood every part, and did not attempt to write 465 lines of
+  fleet scheduling by hand.
+- **Objective clear before running?** Remarkably, yes. The two facts that would otherwise be
+  unguessable are both stated plainly: FUEL — "Every bot starts full and a full cell has no gauge,
+  so `fuel()` before anybody moves is the number" — and WHAT OPENS IT — "The door runs off the grid.
+  `probe('airlock').vars` carries a `fed:sub-N` key: until that substation reads on, every `use()`
+  at the gate costs its tick and does nothing." Both are the kind of thing that would produce a
+  silent, baffling failure, and both are pre-empted.
+- **The fiction closes properly.** The form can go in either of two slots: "The Charter registry
+  countersigns it and the engagement concludes. The renewals tray processes it and the Contract
+  runs on, with you as signatory. Either one closes the work order." A finale that offers a choice
+  with no mechanical difference and lets the player decide what it meant is exactly right for this
+  game.
+- **UI defect at the finale:** the PUBLISH TO REPOSITORY modal listed **twelve** candidate routines
+  and grew past the bottom of the viewport — PUBLISH / NOT THIS TIME / STOP OFFERING sat on the
+  1280x684 bottom edge, half-clipped, and the list itself did not scroll. I hit NOT THIS TIME by
+  clicking the top half of a button that was falling off the screen. On a shorter screen the
+  buttons would be unreachable and the modal would be a dead end.
+- **Typing this program exposed the editor-focus problem properly.** The reference is 465 lines
+  after stripping comments; the automation types it in ~10 chunks. Twice, a chunk went in while I
+  believed it had failed (the extension reported a disconnect after the keystrokes had landed),
+  producing a duplicated block and `Cannot redeclare block-scoped variable 'who'`. That is my
+  tooling, not the game. What *is* the game: **clicking in the editor's empty area below the last
+  line does not focus the editor**, and there is no visible focus state, so `cmd+A` silently means
+  "select the whole page" instead of "select the program", and the next `ctrl+Enter` dispatches the
+  untouched starter. It cost me two wasted dispatches on two different levels before I worked out
+  the rule (click *on a line of text*, never below it).
+
+---
+
+# The end-of-campaign surfaces
+
+## Campaign complete — 33/33
+
+Site map header: `120/133 pts · 33/33 closed · 22 gold · 4 silver · 1 bronze · 27 stars ·
+3 commendations`, and `100% OF THE SITE CLOSED · 28 AT PAR OR UNDER`. Every world carries an
+`ALL AT PAR` or `SECTOR NOMINAL` badge. There is no separate "you have finished the game" screen and
+it does not need one — the bar filling to 100% and the last world going gold is the ending.
+
+## THE REPOSITORY (the bound ledger) — very good, no notes
+
+Clicking the bound volume on the desk opens a ledger of all 33 closed work orders, grouped by world,
+each card carrying its medal chip and a star if the bonus was taken, with `120 POINTS · 33 CLOSED ·
+22 GOLD · 4 SILVER · 1 BRONZE · 27 STARS` across the head and a `shut the binder` button. It is
+legible at 1280x684, it needs no explanation, and it is the first place in the run where the whole
+campaign is visible at once. Nothing to fix.
+
+## PERFORMANCE REVIEW — lands, and one wrong number
+
+See `docs/shots/playtest/performance-review-exceptional.jpg`.
+
+> **EXCEPTIONAL (NON-BINDING)** — FROM Deputy Site Coordinator M. Vance · REVIEWED 27 work orders ·
+> GRADE 93%
+> "22 gold results. Finance have asked whether the tick budgets were set correctly. They were. I
+> have told them they were. They have asked again.¹ ... when a contractor performs at this level,
+> the question the site asks is not 'how', it is 'why is this possible', and that question has
+> historically been resolved by adjusting the budgets. Contractor #4470 held this grade for two
+> consecutive quarters."
+> dot: "4470 got this grade too. i'd slow down. i wouldn't, but i'd say it."
+> ¹ "Exceptional" is descriptive and confers no entitlement, escalation, or standing.
+> [Acknowledge receipt]
+
+- It is the best-written document in the game and it closes the #4470 thread properly: the reward
+  for finishing is being told you have the same grade as the man who disappeared.
+- **Acknowledge receipt worked** and filed the sheet.
+- **`REVIEWED 27 work orders` contradicts `33/33 closed` on the site map.** 27 is the *graded* count
+  (six work orders are ungraded: w1-01, w1-03, w5-02, w6-01, w6-03, w6-05). The number is right and
+  the label is wrong — a player who has just watched the site map say 33 will read this as the
+  review having lost six of their orders.
+- Cosmetic: the pen sprite lies across the "Acknowledge receipt" button and obscures two characters
+  of its label.
+
+### **The review can be destroyed before you read it. This is the worst thing I found.**
+
+The review arrives as a paper on the desk. `usePaperwork.ts` issues it with `issueOnce('memo:<rank>')`,
+which refuses to issue again if a document with that id already exists. Meanwhile `papers.ts` has
+`DESK_CAPACITY = 6`: when a seventh loose document arrives, **the oldest is silently marked `filed`**,
+which removes it from the in-tray for good.
+
+Every **failed dispatch files a HALT NOTICE** into the same pile. I failed w8-01 five times in a row,
+which is an entirely normal thing to do on a level with two hard budgets — and that quietly pushed my
+unread performance review out of the tray. By the time I finished the campaign and went looking for
+it, it did not exist on any surface: not on the desk, not in the in-tray, not in the Repository, and
+`issueOnce` will never re-issue it.
+
+I only saw the review at all because I cleared the `bootstrap.desk` localStorage key (which holds
+only paper state, not progress) and reloaded, at which point it was re-issued correctly. **A player
+has no such route.** The auto-file behaviour is deliberate and documented ("the desk is tidy on
+purpose"), and it is fine for work orders and requisitions, which are all retrievable elsewhere. The
+review is the one document in the game that is one-shot, unrepeatable, and the payoff for the whole
+campaign.
+
+---
+
+# Summary of the run
+
+**33 of 33 work orders closed.** 120/133 points, 22 gold, 4 silver, 1 bronze, 27 stars,
+3 commendations, 28 at par or under. Fresh localStorage, one sitting, viewport 1280x684.
+
+**Reference solutions used: 8** — w7-02, w7-03, w7-04, w7-05, w8-02, w8-03, w8-04, w8-05.
+**Every one was "I understood what was wanted and the code was the work."** Not once in 33 work
+orders did I fail to understand the objective from the sheet. That is the headline result of this
+run and it is a good one: the briefs are doing their job.
+
+## Where the difficulty actually is
+
+Worlds 1-6 are single-bot puzzles where a correct idea produces a correct program; I closed all
+nineteen of them myself, sixteen of them on the first dispatch, most at or under par. **w7-02 is
+where that stops.** From there every level is per-bot clocks plus tile contention, a correct idea
+deadlocks, and the fact that makes the difference — a bot holds its tile against *its own* clock,
+so partition space rather than the worklist — is never stated. See the RULED entry above; the
+sentence belongs on the requisition that issues the second bot.
+
+## The three worst things I found
+
+1. **The performance review can be destroyed before it is read.** `DESK_CAPACITY = 6` auto-files
+   the oldest loose paper; every failed dispatch files a HALT NOTICE; `issueOnce` never re-issues.
+   Five failed attempts at w8-01 — a normal number on a level with two hard budgets — silently
+   consumed the payoff document for the entire campaign, with no route back for a player.
+2. **w3-04's star bonus is un-earned and possibly unearnable.** It counts "slots that started the
+   shift empty", but an empty rack slot and an open aisle tile are byte-identical in a `TileView`.
+   No test asserts it can be met, world-3's `bonus.test.ts` covers w3-01 only, and
+   `docs/FIX-BONUSES-3-5.md` states outright "Reference misses it on all four seeds."
+3. **w7-02's unsignposted difficulty step**, above. It is the only place in the campaign where I
+   understood the objective, wrote a correct-in-principle program twice, and lost to a rule the
+   game had never mentioned.
+
+Runners-up, all recorded in full above: the reference offers a `ticks` chip and a `capacity()`
+function that do not exist; clicking below the last line of the editor does not focus it, so
+`cmd+A` silently means "select the page" and the next dispatch runs the untouched starter; the
+in-tray labels every document by type only, so five HALT NOTICES are indistinguishable.
+
+## What I fixed (all verified in the browser, suite green at 2064 / 97 files, `tsc` clean)
+
+- `src/ui/styles/app.css` — deleted the orphaned `.crate*` block. Bare `.crate` was still matching
+  the desk's hardware requisition and painting `background: var(--bg-raised)` behind paper ink, so
+  the eight verb names the document exists to deliver were invisible.
+- `src/ui/styles/desk/paper.css` — `.desk .crate .nm { flex-wrap: wrap }`, so the `reference`
+  button drops under the verb name instead of printing on top of the spec sentence.
+- `src/ui/styles/app.css` — deleted the orphaned `.seed-row__outstanding` rule, whose
+  `white-space: nowrap; overflow: hidden` was clipping every per-seed failure reason on the HALT
+  NOTICE mid-word, hiding the per-seed counts that are the most useful thing on the sheet.
+
+All three are the same defect: **`src/ui/styles/app.css` is leaking into the desk.** The header of
+`src/ui/__tests__/monitor-margin.test.ts` claims "the desk uses none of app.css". That is not true,
+and a sweep of app.css for classes only the desk renders would be worth someone's afternoon.
+
+## What worked better than expected — do not change these
+
+- **The work orders.** Thirty-three briefs, not one of which I had to re-read to know what was
+  wanted. The field-note glossary format (`THE PARTITION`, `A SWING`, `ONE USE TOO MANY`) is doing
+  almost all of the teaching, and it is doing it without a tutorial anywhere in the game.
+- **Bonuses that state their acceptance condition** (w4-02's breadcrumbs, w5-05's `weak <id> <n>`,
+  w6-02's `bad <packet> <byte>`) were taken first time, every time. Bonuses that say "the best
+  order" or "how many trips" (w3-01, w4-04) were missed and gave no feedback at all. The pattern is
+  unambiguous across 33 levels.
+- **The Repository hand-off across w4-04 → w4-05 → w5-01.** Being told "the two halves you write
+  get names later: survey and pathTo", then finding them listed on the next work order as if they
+  were already mine, then having the publish modal warn me that `goto` calls hardware that earlier
+  work orders do not have — and then watching the editor rewrite my program into
+  `import { goto } from 'lib';` — is the best-taught mechanic in the game.
+- **The HALT NOTICE.** Naming one tile and stating `want` / `got` in the game's own words is worth
+  more than any error message, and "Nothing was billed. Attempts are not recorded against you" is
+  exactly the right thing to say to someone who has just failed five times.
+- **The certificate varies its line by how you got there** — "Gold. The number is small and the
+  number is correct", "Under budget. Not the budget we hoped for. A budget", "At par. Somebody
+  upstairs will assume par was set wrong", "Dot looked at your trace and said nothing. That is high
+  praise." Nobody will notice unless they play the whole campaign. It is worth it.
+
+## Note on the test suite
+
+Final state at hand-off: **`npx vitest run` 2064 passed / 97 files, `npx tsc --noEmit` clean.**
+
+One thing worth knowing: with the vite dev server and a browser both running, one suite run came
+back `7 failed | 2057 passed` with 6 errors and a duration of **88s** instead of the usual 15-21s.
+An immediate re-run on a quiet machine was clean at 21s. So the suite has a handful of tests that
+fail on timeout under CPU contention rather than on logic. Not chased — flagging it because a CI
+box under load could see the same thing and it would look like a real regression.
