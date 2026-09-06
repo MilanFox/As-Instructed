@@ -1,137 +1,116 @@
 /**
- * The renderer's single colour source. DESIGN.md §8 fixes the palette; every value below is
- * either lifted verbatim from there or derived from it. Nothing in `src/render/` may hardcode a
- * colour literal — if a shade is missing, add it here.
+ * The renderer's live view of the current art direction.
  *
- * These duplicate `src/ui/styles/tokens.css` on purpose: Canvas2D cannot read CSS custom
- * properties without a layout round-trip per frame, and the renderer must not touch the DOM
- * inside the RAF loop.
+ * This used to be the palette itself: one frozen record, hand-mirrored from `tokens.css`. It is
+ * now a set of live bindings onto whichever direction is selected, so every existing call site —
+ * `palette.bgVoid`, `overlay.grid`, `bot.hull` — keeps working unchanged while the values behind
+ * them can be swapped wholesale. The directions live in `art/`; this file is the only thing that
+ * knows which one is current.
+ *
+ * These still duplicate `src/ui/styles/tokens.css` rather than reading it: Canvas2D cannot read
+ * CSS custom properties without a layout round-trip per frame, and the renderer must not touch
+ * the DOM inside the RAF loop. What is new is that the duplication now runs one way and is
+ * mechanical — `applyArtDirection()` writes the direction's palette onto `:root` as custom
+ * properties, so the stylesheet takes its values *from* here and the two cannot drift.
  */
+import { DIRECTIONS } from './art/index.ts';
+import type {
+  ArtDirection,
+  ArtId,
+  BotColors,
+  FxColors,
+  Metrics,
+  OverlayColors,
+  Palette,
+  TrailRamp,
+} from './art/types.ts';
 
-export const palette = {
-  bgVoid: '#0a0e14',
-  bgPanel: '#121820',
-  bgRaised: '#1b2430',
-  ink: '#c9d5e3',
-  inkDim: '#6a7a8c',
-  accent: '#35e0c8',
-  accent2: '#ffb020',
-  danger: '#ff5d5d',
-  ok: '#7ee06a',
-  gold: '#ffd166',
-  silver: '#c0cbd8',
-  bronze: '#cd8b52',
-} as const;
+export { alpha, luminance, mix, shade } from './art/color.ts';
+export type { ArtDirection, ArtId, Metrics, TrailRamp } from './art/types.ts';
+export { ART_IDS, DIRECTIONS, isArtId } from './art/index.ts';
 
-export type PaletteKey = keyof typeof palette;
+let current: ArtDirection = DIRECTIONS.standard;
 
 /**
- * Opacity steps `alpha()` quantises to. 1/64 is well below the point a human can see a step, and
- * bounding the step count is what makes the table cache viable.
+ * Bumped on every change. Anything holding a table derived from the palette — the trail ramp is
+ * the only one — compares against this once per draw rather than subscribing, which keeps the
+ * dependency pointing one way and costs a single integer compare per frame.
  */
-const ALPHA_STEPS = 64;
-const alphaTables = new Map<string, string[]>();
+let version = 0;
 
-/**
- * `rgba()` string for a colour at a given opacity, memoised.
- *
- * This is called from inside draw loops — tread marks, brackets, gauges, the blocked-move flash —
- * so building the string each time would allocate a few hundred short-lived strings per frame and
- * show up as periodic multi-frame GC pauses during playback. One table per colour, built once.
- */
-export function alpha(hex: string, a: number): string {
-  const step = a <= 0 ? 0 : a >= 1 ? ALPHA_STEPS : Math.round(a * ALPHA_STEPS);
-  let table = alphaTables.get(hex);
-  if (!table) {
-    const n = Number.parseInt(hex.slice(1), 16);
-    const r = (n >> 16) & 255;
-    const g = (n >> 8) & 255;
-    const b = n & 255;
-    table = new Array<string>(ALPHA_STEPS + 1);
-    for (let i = 0; i <= ALPHA_STEPS; i++) {
-      table[i] = `rgba(${r}, ${g}, ${b}, ${(i / ALPHA_STEPS).toFixed(4)})`;
-    }
-    alphaTables.set(hex, table);
-  }
-  return table[step] as string;
+export function artVersion(): number {
+  return version;
 }
 
-/**
- * Linear blend between two palette entries, `t` in 0..1.
- *
- * Exists so a ramp between two *existing* hues counts as derived colour rather than a new accent
- * — the visited-tile trail runs `inkDim` to `danger` and would otherwise need literals for every
- * step. Call it while building a lookup table, never per draw.
- */
-export function mix(from: string, to: string, t: number): string {
-  const k = t <= 0 ? 0 : t >= 1 ? 1 : t;
-  const a = Number.parseInt(from.slice(1), 16);
-  const b = Number.parseInt(to.slice(1), 16);
-  const lerp = (shift: number): number =>
-    Math.round(((a >> shift) & 255) + (((b >> shift) & 255) - ((a >> shift) & 255)) * k);
-  return `#${((1 << 24) | (lerp(16) << 16) | (lerp(8) << 8) | lerp(0)).toString(16).slice(1)}`;
+export function artDirection(): ArtDirection {
+  return current;
 }
 
-export function shade(hex: string, factor: number): string {
-  const n = Number.parseInt(hex.slice(1), 16);
-  const clamp = (v: number): number => Math.max(0, Math.min(255, Math.round(v)));
-  const r = clamp(((n >> 16) & 255) * factor);
-  const g = clamp(((n >> 8) & 255) * factor);
-  const b = clamp((n & 255) * factor);
-  return `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`;
-}
-
-/**
- * Per-bot accent hues. World 7 puts twenty-odd bots on one grid and the player has to be able to
- * say "that one is bot 6" at a glance, so these are chosen for maximum separation at 48 px while
- * staying inside the game's cool-industrial range. Index by `botId % BOT_ACCENTS.length`.
+/*
+ * Live bindings. ES module semantics mean a `let` reassigned here is seen by every importer, so
+ * `import { palette } from './theme.ts'` stays correct across a direction change without a single
+ * call site learning that directions exist.
  */
-export const BOT_ACCENTS: readonly string[] = [
-  '#35e0c8',
-  '#ffb020',
-  '#7ee06a',
-  '#ff5d5d',
-  '#4ea8ff',
-  '#ff7ad9',
-  '#ffd166',
-  '#9a7bd8',
-  '#5ce1e6',
-  '#f2825b',
-  '#a3e635',
-  '#e879f9',
-];
+export let palette: Palette = current.palette;
+export let bot: BotColors = current.bot;
+export let fxColors: FxColors = current.fxColors;
+export let overlay: OverlayColors = current.overlay;
+export let metrics: Metrics = current.metrics;
+export let trailRamp: TrailRamp = current.trail;
+export let BOT_ACCENTS: readonly string[] = current.botAccents;
+
+export type PaletteKey = keyof Palette;
 
 export function botAccent(botId: number): string {
   const list = BOT_ACCENTS;
   return list[((botId % list.length) + list.length) % list.length] as string;
 }
 
-/** Chassis colours shared by every bot; only the accent trim differs. */
-export const bot = {
-  hullDark: '#1a222c',
-  hull: '#33404f',
-  hullLight: '#46566a',
-  rim: '#8298b0',
-  glass: '#0d1319',
-  tread: '#121821',
-  shadow: 'rgba(0, 0, 0, 0.45)',
-} as const;
+/**
+ * Selects a direction for the renderer.
+ *
+ * Does not touch the DOM and does not invalidate the terrain cache — the caller owns both,
+ * because the terrain layer keys on the direction id and will rebuild itself on the next frame.
+ */
+export function setArtDirection(id: ArtId): void {
+  const next = DIRECTIONS[id];
+  if (next === current) return;
+  current = next;
+  palette = next.palette;
+  bot = next.bot;
+  fxColors = next.fxColors;
+  overlay = next.overlay;
+  metrics = next.metrics;
+  trailRamp = next.trail;
+  BOT_ACCENTS = next.botAccents;
+  version++;
+}
 
-export const fxColors = {
-  dust: '#8a7a68',
-  spark: '#ffd166',
-  chip: '#c0cbd8',
-  pulse: '#35e0c8',
-  power: '#ffb020',
-  bad: '#ff5d5d',
-  good: '#7ee06a',
-} as const;
-
-export const overlay = {
-  grid: 'rgba(106, 122, 140, 0.18)',
-  gridMajor: 'rgba(106, 122, 140, 0.30)',
-  goal: '#ffb020',
-  hover: '#35e0c8',
-  vignette: '#000000',
-  outOfBounds: '#070a0f',
-} as const;
+/**
+ * Mirrors the direction onto the document as CSS custom properties and a `data-art` attribute.
+ *
+ * The attribute is what lets each direction ship its own stylesheet without a build flag, and
+ * writing the palette across means the chrome and the canvas cannot disagree about what `accent`
+ * means — which is the defect AUDIT-UI describes as the canvas not joining the chrome. Called
+ * once at startup and again on a change, never in a frame.
+ */
+export function applyArtDirection(id: ArtId, root?: HTMLElement): void {
+  setArtDirection(id);
+  const element = root ?? (typeof document === 'undefined' ? null : document.documentElement);
+  if (!element) return;
+  element.dataset['art'] = id;
+  const style = element.style;
+  const p = current.palette;
+  style.setProperty('--bg-void', p.bgVoid);
+  style.setProperty('--bg-panel', p.bgPanel);
+  style.setProperty('--bg-raised', p.bgRaised);
+  style.setProperty('--ink', p.ink);
+  style.setProperty('--ink-dim', p.inkDim);
+  style.setProperty('--accent', p.accent);
+  style.setProperty('--accent-2', p.accent2);
+  style.setProperty('--danger', p.danger);
+  style.setProperty('--ok', p.ok);
+  style.setProperty('--gold', p.gold);
+  style.setProperty('--silver', p.silver);
+  style.setProperty('--bronze', p.bronze);
+}

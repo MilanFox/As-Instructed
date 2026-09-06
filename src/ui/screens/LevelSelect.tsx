@@ -331,8 +331,19 @@ export function LevelSelect(): JSX.Element {
         <div className="sitemap__route" onKeyDown={onKeyDown}>
           {rows.map((row) => {
             const fill = row.issued > 0 ? (row.closed / row.issued) * 100 : 0;
+            /*
+             * The world's colour comes from the art direction, not from the level definition.
+             *
+             * `WORLDS` carries eight literal accents, three of which are not in the palette at
+             * all and two of which *are* reserved semantic tokens — World 7 is `--danger` and
+             * World 8 is `--gold`, so on `w8-05` the world's colour and the medal being chased
+             * are the same colour. Eight decorative hues on top of a six-colour semantic palette
+             * is how a palette stops meaning anything (AUDIT-UI F1). Indirecting through
+             * `--world-N` leaves the level data untouched and hands the decision to whichever
+             * direction is loaded.
+             */
             const style: StyleVars = {
-              '--world-accent': row.world.accent,
+              '--world-accent': `var(--world-${row.world.id})`,
               '--rail-fill': `${fill}%`,
             };
 

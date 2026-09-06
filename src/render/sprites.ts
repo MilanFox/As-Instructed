@@ -15,9 +15,10 @@
  */
 
 import type { Dir } from '../engine/index.ts';
+import type { BotDrawOptions } from './art/types.ts';
 import type { BotPose, BotSegment, BotTimeline } from './timeline.ts';
 import { TREAD_FADE_TICKS } from './timeline.ts';
-import { alpha, bot as botTheme, palette } from './theme.ts';
+import { alpha, artDirection, bot as botTheme, metrics, palette } from './theme.ts';
 import type { TileSet } from './tiles.ts';
 import { TILE_PX } from './tiles.ts';
 
@@ -92,29 +93,7 @@ class GradientCache {
 
 const gradients = new GradientCache();
 
-export interface BotDrawOptions {
-  accent: string;
-  /** Seconds since the renderer started. Drives the idle bob and the light flicker. */
-  time: number;
-  /** Highlight the bot the UI considers selected. */
-  active: boolean;
-  /** Items in the bot's inventory; drives the little cargo pip. */
-  carrying: number;
-  /** 0..1, drawn as a gauge ring only when the level uses fuel. */
-  fuel: number;
-  showFuel: boolean;
-  /** Draw the bot id when there is room for it. */
-  showLabel: boolean;
-  /**
-   * 0..1 by playback speed. Adds the speed lines that make a 200-tick solution at 8x read as
-   * *fast* rather than as *jerky*. Zero at ordinary speeds and under reduced motion.
-   */
-  rush: number;
-  /** Honour `prefers-reduced-motion`: no smear, no sway, no shimmy. Every tell stays. */
-  reduced: boolean;
-  /** Device pixel ratio. Every "is there room for this" threshold below is in *screen* pixels. */
-  dpr: number;
-}
+export type { BotDrawOptions } from './art/types.ts';
 
 /**
  * The smear behind a bot in transit, plus the speed lines at high playback rates.
@@ -132,7 +111,14 @@ function drawSmear(
   const back = (0.3 + rush * 0.85) * glide * tilePx;
   if (back < 1) return;
   ctx.fillStyle = alpha(accent, 0.09 * glide);
-  roundRect(ctx, -back - tilePx * 0.3, -tilePx * 0.24, back + tilePx * 0.34, tilePx * 0.48, tilePx * 0.2);
+  roundRect(
+    ctx,
+    -back - tilePx * 0.3,
+    -tilePx * 0.24,
+    back + tilePx * 0.34,
+    tilePx * 0.48,
+    tilePx * 0.2,
+  );
   ctx.fill();
   if (rush <= 0.02) return;
   ctx.strokeStyle = alpha(accent, 0.2 * rush * glide);
@@ -204,14 +190,20 @@ export function drawTreads(
   ctx.restore();
 }
 
-/** The headlight cone. Drawn under the bots so overlapping bots do not wash each other out. */
+/**
+ * The headlight cone. Drawn under the bots so overlapping bots do not wash each other out.
+ *
+ * A direction with its own `drawBot` owns its own light and gets none of this: the cone is an
+ * additive radial gradient, which is a claim about the medium that only some of them make.
+ */
 export function drawHeadlight(
   ctx: CanvasRenderingContext2D,
   pose: BotPose,
   tilePx: number,
   dpr = 1,
 ): void {
-  if (!pose.alive || tilePx < BOT_DETAIL_TILE_PX * dpr) return;
+  if (artDirection().drawBot) return;
+  if (!pose.alive || tilePx < botDetailTilePx() * dpr) return;
   const s = tilePx / REF;
   const cx = (pose.x + 0.5) * tilePx;
   const cy = (pose.y + 0.5) * tilePx;
@@ -241,8 +233,13 @@ export function drawHeadlight(
  * Screen, not device: on a retina display a 22-device-pixel tile is 11 px of actual screen, and
  * comparing against the device number keeps the detailed chassis switched on for the entire range
  * where it is unreadable — which is most of where the game is played.
+ *
+ * A direction that implements `drawBot` owns this threshold itself, and is not obliged to change
+ * shape at it.
  */
-export const BOT_DETAIL_TILE_PX = 22;
+export function botDetailTilePx(): number {
+  return metrics.botDetailTilePx;
+}
 
 /**
  * The far-zoom bot: a solid accent chip with a dark rim and a nose that points the way it faces.
@@ -319,8 +316,13 @@ export function drawBot(
   tilePx: number,
   options: BotDrawOptions,
 ): void {
+  const art = artDirection();
+  if (art.drawBot) {
+    art.drawBot(ctx, pose, tilePx, options);
+    return;
+  }
   gradients.invalidate(tilePx);
-  if (tilePx < BOT_DETAIL_TILE_PX * options.dpr) {
+  if (tilePx < botDetailTilePx() * options.dpr) {
     drawBotChip(ctx, pose, tilePx, options);
     return;
   }
@@ -753,7 +755,13 @@ function drawMachineChip(
     const pulse = 0.5 + 0.5 * Math.sin(time * 2.6 + px + py);
     ctx.fillStyle = alpha(palette.accent2, 0.55 + pulse * 0.45);
     ctx.beginPath();
-    ctx.arc(px + tilePx * 0.78, py + tilePx * 0.22, Math.max(1.5 * dpr, tilePx * 0.1), 0, Math.PI * 2);
+    ctx.arc(
+      px + tilePx * 0.78,
+      py + tilePx * 0.22,
+      Math.max(1.5 * dpr, tilePx * 0.1),
+      0,
+      Math.PI * 2,
+    );
     ctx.fill();
   }
   ctx.restore();
@@ -776,7 +784,7 @@ export function drawMachine(
 ): void {
   const px = x * tilePx;
   const py = y * tilePx;
-  if (tilePx < BOT_DETAIL_TILE_PX * dpr) {
+  if (tilePx < botDetailTilePx() * dpr) {
     drawMachineChip(ctx, tiles, name, px, py, tilePx, powered, time, dpr);
     return;
   }

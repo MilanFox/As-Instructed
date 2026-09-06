@@ -98,7 +98,7 @@ export function ObjectiveRail(): React.JSX.Element {
     return bot ? { fuel: bot.fuel, max: bot.fuelMax } : null;
   }, [showFuel, trace, flooredTick]);
 
-  if (!level) return <div className="panel rail" />;
+  if (!level) return <div className="hud-card rail" />;
 
   const ticks = verdict?.stats.ticks;
   const met = rows.filter((row) => !row.bonus && row.met).length;
@@ -109,12 +109,17 @@ export function ObjectiveRail(): React.JSX.Element {
   const hardStop = gradesTicks ? undefined : level.budget?.maxTicks;
 
   return (
-    <section className="panel rail" aria-label="Objectives and targets">
-      <header className="panel__head">
-        <span>objectives</span>
+    <section className="hud-card rail" aria-label="Objectives and targets">
+      {/*
+        The one number on the board that says how the run is going, sized to be read from the far
+        side of the screen. Everything under it is detail, and it is set as detail.
+      */}
+      <header className="hud-card__head">
+        <span className="hud-card__label">objectives</span>
         <span className="panel__head-spacer" />
-        <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-          {met}/{total}
+        <span className="hud-card__count numeric">
+          {met}
+          <span className="hud-card__of">/{total}</span>
         </span>
       </header>
 

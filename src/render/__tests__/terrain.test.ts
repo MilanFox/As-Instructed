@@ -5,7 +5,15 @@ import { cacheTilePxFor, keysEqual } from '../terrain.ts';
 import type { TerrainKey } from '../terrain.ts';
 
 function key(over: Partial<TerrainKey> = {}): TerrainKey {
-  return { cols: 12, rows: 9, biome: 'hangar', revision: 0, cacheTilePx: 48, ...over };
+  return {
+    cols: 12,
+    rows: 9,
+    biome: 'hangar',
+    revision: 0,
+    cacheTilePx: 48,
+    art: 'standard',
+    ...over,
+  };
 }
 
 describe('terrain cache resolution', () => {

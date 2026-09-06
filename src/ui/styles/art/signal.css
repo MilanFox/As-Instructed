@@ -1,0 +1,745 @@
+/*
+ * SIGNAL — the chrome is the bezel around the tube.
+ *
+ * One family, one hue, one weight of rule. Nothing here is a "component"; everything is either
+ * lit phosphor or the dark glass it sits behind. The palette custom properties come from
+ * `src/render/art/signal.ts`.
+ *
+ * Two rules the rest of the file obeys. First: a box is drawn as a rule, never as a fill, because
+ * a fill is paint and this machine has no paint — it has a beam that is either on or off. Second:
+ * every difference that used to be a hue is now a difference in *weight, texture or count*, since
+ * monochrome deletes hue as a channel and pretending otherwise is how a direction like this ships
+ * a screen the player cannot read.
+ */
+
+[data-art='signal'] {
+  --radius: 0;
+  --border: #3a2609;
+  --border-strong: #5c3f12;
+
+  /* There is no prose font on this machine. Everything the terminal prints, it prints in one face. */
+  --font-prose: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  /*
+   * The campaign is linear and the tube has one hue, so world identity becomes brightness: World 1
+   * is a cold filament and World 8 is a driven one. Position in the sequence was always the thing
+   * worth encoding and here it is the only thing that can be.
+   */
+  --world-1: #7a5417;
+  --world-2: #94661d;
+  --world-3: #ad7823;
+  --world-4: #c2872f;
+  --world-5: #d9993c;
+  --world-6: #ffab3d;
+  --world-7: #ffbe57;
+  --world-8: #ffdca4;
+
+  /*
+   * A terminal has a character cell and everything sits on it. The old screen was 12–14 px at one
+   * weight from edge to edge, which is most of why it read as a form rather than as an instrument.
+   */
+  --t-micro: 9px;
+  --t-label: 10px;
+  --t-body: 12px;
+  --t-read: 15px;
+  --t-big: 26px;
+  --t-huge: 40px;
+  --track: 0.22em;
+
+  --glow: 0 0 7px rgb(255 190 87 / 30%);
+  --glow-hot: 0 0 10px rgb(255 220 164 / 55%);
+  /* Failure is texture before it is colour, so it survives being read by someone who cannot see the shift. */
+  --hatch: repeating-linear-gradient(135deg, rgb(255 90 31 / 22%) 0 2px, transparent 2px 6px);
+
+  --topbar-h: 58px;
+  --panel-head-h: 26px;
+}
+
+/*
+ * The scanline stops being a tasteful 1.5% overlay and becomes the display. It is still bounded:
+ * the raster is on the *chrome*, and the canvas draws its own in `post()` where it can be tuned
+ * against the board rather than against text.
+ */
+[data-art='signal'] .scanlines::after {
+  background: repeating-linear-gradient(to bottom, rgb(255 154 31 / 5%) 0 1px, transparent 1px 3px);
+}
+
+[data-art='signal'] body,
+[data-art='signal'] .app {
+  background: var(--bg-void);
+  font-family: var(--font-mono);
+  font-size: var(--t-body);
+  line-height: 16px;
+  letter-spacing: 0.02em;
+}
+
+[data-art='signal'] :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+}
+
+/* ---------------------------------------------------------------- masthead */
+
+[data-art='signal'] .topbar {
+  align-items: center;
+  border-bottom: 1px solid var(--border-strong);
+  background: var(--bg-void);
+  box-shadow: inset 0 -3px 0 -2px var(--accent-2);
+}
+
+[data-art='signal'] .topbar__title,
+[data-art='signal'] .topbar__order-title {
+  color: var(--ink);
+  font-size: var(--t-read);
+  font-weight: 500;
+  letter-spacing: var(--track);
+  text-transform: uppercase;
+  text-shadow: var(--glow);
+}
+
+[data-art='signal'] .topbar__org,
+[data-art='signal'] .topbar__id {
+  color: var(--ink-dim);
+  font-size: var(--t-micro);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+
+[data-art='signal'] .topbar__world-dot {
+  border-radius: 0;
+}
+
+[data-art='signal'] .topbar__stats {
+  gap: var(--space-5);
+}
+
+[data-art='signal'] .stat__label {
+  color: var(--ink-dim);
+  font-size: var(--t-micro);
+  letter-spacing: 0.28em;
+}
+
+/* The numbers are the instrument. They get to be the largest thing in the bezel. */
+[data-art='signal'] .stat__value {
+  font-size: var(--t-big);
+  font-weight: 300;
+  line-height: 26px;
+  letter-spacing: -0.02em;
+  text-shadow: var(--glow);
+}
+
+[data-art='signal'] .stat__value--over {
+  color: var(--danger);
+  text-shadow: 0 0 9px rgb(255 90 31 / 45%);
+}
+
+[data-art='signal'] .stat__par {
+  color: var(--ink-dim);
+  font-size: var(--t-micro);
+}
+
+/* ------------------------------------------------------------------ chrome */
+
+[data-art='signal'] .panel,
+[data-art='signal'] .modal,
+[data-art='signal'] .console,
+[data-art='signal'] .rail {
+  border-radius: 0;
+  background: var(--bg-void);
+  box-shadow: none;
+}
+
+[data-art='signal'] .panel {
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+/* A head is a channel label on a rack, so it is a rule with a lit tab and not a filled bar. */
+[data-art='signal'] .panel__head {
+  gap: var(--space-2);
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--t-micro);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  box-shadow: inset 3px 0 0 var(--accent-2);
+  padding-left: var(--space-4);
+}
+
+[data-art='signal'] .splitter {
+  background: var(--border);
+}
+
+[data-art='signal'] .splitter[data-dragging='true'] {
+  background: var(--accent);
+  box-shadow: var(--glow-hot);
+}
+
+/* ----------------------------------------------------------------- buttons */
+
+[data-art='signal'] .btn,
+[data-art='signal'] .icon-btn,
+[data-art='signal'] .tab,
+[data-art='signal'] .filter-group button,
+[data-art='signal'] .select {
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink-dim);
+  font-family: var(--font-mono);
+  font-size: var(--t-label);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+[data-art='signal'] .btn {
+  height: 30px;
+  border: 1px solid var(--border-strong);
+}
+
+[data-art='signal'] .btn:hover:not(:disabled),
+[data-art='signal'] .icon-btn:hover:not(:disabled),
+[data-art='signal'] .filter-group button:hover {
+  border-color: var(--accent);
+  background: transparent;
+  color: var(--accent);
+  text-shadow: var(--glow);
+}
+
+[data-art='signal'] .btn:disabled {
+  border-color: var(--border);
+  color: var(--ink-dim);
+  opacity: 0.45;
+}
+
+/* The one inverted element on the screen. A run is the only thing the operator commits to. */
+[data-art='signal'] .btn--run,
+[data-art='signal'] .btn--next {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg-void);
+  font-weight: 700;
+  box-shadow: var(--glow-hot);
+}
+
+[data-art='signal'] .btn--run:hover:not(:disabled),
+[data-art='signal'] .btn--next:hover:not(:disabled) {
+  background: var(--ink);
+  color: var(--bg-void);
+}
+
+[data-art='signal'] .btn--cancel {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+[data-art='signal'] .btn__key {
+  border-radius: 0;
+  font-size: var(--t-micro);
+  opacity: 0.7;
+}
+
+[data-art='signal'] .tab[aria-selected='true'],
+[data-art='signal'] .filter-group button[aria-pressed='true'],
+[data-art='signal'] .icon-btn[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: transparent;
+  color: var(--accent);
+  box-shadow: inset 0 -2px 0 var(--accent);
+  text-shadow: var(--glow);
+}
+
+/* ---------------------------------------------------------------- viewport */
+
+[data-art='signal'] .viewport {
+  background: var(--bg-void);
+}
+
+[data-art='signal'] .viewport__badge {
+  border-radius: 0;
+  border-color: var(--border-strong);
+  background: transparent;
+  font-size: var(--t-micro);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+[data-art='signal'] .viewport__empty-title {
+  font-size: var(--t-read);
+  letter-spacing: 0.34em;
+  color: var(--ink);
+  text-shadow: var(--glow);
+}
+
+[data-art='signal'] .viewport__empty-note {
+  max-width: 46ch;
+  font-family: var(--font-mono);
+  font-size: var(--t-body);
+  color: var(--ink-dim);
+}
+
+[data-art='signal'] .viewport__now,
+[data-art='signal'] .viewport__now-tag {
+  border-radius: 0;
+  font-family: var(--font-mono);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+/* ---------------------------------------------------------------- timeline */
+
+[data-art='signal'] .timeline {
+  border-top: 1px solid var(--border);
+  background: var(--bg-void);
+}
+
+[data-art='signal'] .timeline__act,
+[data-art='signal'] .timeline__step,
+[data-art='signal'] .timeline__tick {
+  border-radius: 0;
+}
+
+/*
+ * Playhead marks: squares, and the exceptional ones are told apart by silhouette and by count
+ * rather than by fill. A lost step is a hollow square with a burn in it; a bonus is a doubled one.
+ */
+[data-art='signal'] .timeline__mark {
+  border-radius: 0;
+  background: var(--ok);
+  opacity: 1;
+}
+
+[data-art='signal'] .timeline__mark--lost {
+  background: transparent;
+  box-shadow:
+    inset 0 0 0 2px var(--danger),
+    0 0 6px rgb(255 90 31 / 50%);
+}
+
+[data-art='signal'] .timeline__mark--bonus {
+  background: var(--accent);
+  box-shadow:
+    0 0 0 2px var(--bg-void),
+    0 0 0 3px var(--accent);
+}
+
+[data-art='signal'] .timeline__scrub::-webkit-slider-thumb {
+  border-radius: 0;
+  box-shadow: var(--glow-hot);
+}
+
+[data-art='signal'] .timeline__scrub::-moz-range-thumb {
+  border-radius: 0;
+}
+
+/* ----------------------------------------------------------------- console */
+
+[data-art='signal'] .console__body {
+  font-family: var(--font-mono);
+  font-size: var(--t-body);
+  line-height: 18px;
+}
+
+[data-art='signal'] .console__row {
+  border-left: 2px solid transparent;
+}
+
+[data-art='signal'] .console__row:hover {
+  border-left-color: var(--accent-2);
+  background: transparent;
+}
+
+[data-art='signal'] .console__t {
+  min-width: 7ch;
+  opacity: 0.65;
+}
+
+[data-art='signal'] .console__text--print {
+  color: var(--ink);
+  text-shadow: var(--glow);
+}
+
+[data-art='signal'] .console__text--error {
+  color: var(--danger);
+  background: var(--hatch);
+}
+
+[data-art='signal'] .console__text--success {
+  color: var(--accent);
+  text-shadow: var(--glow-hot);
+}
+
+/* -------------------------------------------------------- objectives, rail */
+
+[data-art='signal'] .rail__label,
+[data-art='signal'] .cause__head,
+[data-art='signal'] .par-row__label,
+[data-art='signal'] .score-cell__label {
+  color: var(--ink-dim);
+  font-family: var(--font-mono);
+  font-size: var(--t-micro);
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+/*
+ * Objective state, with no colour in it: pending is a hollow cell, met is a solid lit one, over
+ * budget is hatched. Three textures a monochrome tube can hold apart at any size.
+ */
+[data-art='signal'] .objective__mark,
+[data-art='signal'] .seed-chip,
+[data-art='signal'] .tag,
+[data-art='signal'] .world__stamp {
+  border-radius: 0;
+  font-family: var(--font-mono);
+}
+
+[data-art='signal'] .objective--met .objective__mark {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg-void);
+  box-shadow: var(--glow-hot);
+}
+
+[data-art='signal'] .objective--over .objective__mark,
+[data-art='signal'] .seed-chip--missed {
+  border-color: var(--danger);
+  background: var(--hatch);
+  color: var(--danger);
+}
+
+[data-art='signal'] .objective--bonus .objective__mark {
+  box-shadow:
+    0 0 0 2px var(--bg-void),
+    0 0 0 3px var(--accent-2);
+}
+
+[data-art='signal'] .seed-chip--met {
+  border-color: var(--accent);
+  color: var(--accent);
+  text-shadow: var(--glow);
+}
+
+[data-art='signal'] .objective__label {
+  font-family: var(--font-mono);
+  font-size: var(--t-body);
+}
+
+[data-art='signal'] .objective--active .objective__label {
+  color: var(--accent);
+  text-shadow: var(--glow-hot);
+}
+
+[data-art='signal'] .budget-bar,
+[data-art='signal'] .fuel__track,
+[data-art='signal'] .campaign-bar,
+[data-art='signal'] .world__rail {
+  border-radius: 0;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+
+[data-art='signal'] .budget-bar__fill,
+[data-art='signal'] .fuel__fill,
+[data-art='signal'] .campaign-bar__fill,
+[data-art='signal'] .world__rail-fill {
+  border-radius: 0;
+  background: var(--accent-2);
+  box-shadow: var(--glow);
+}
+
+[data-art='signal'] .budget-bar--over .budget-bar__fill,
+[data-art='signal'] .fuel__fill--low {
+  background: var(--danger);
+  box-shadow: 0 0 8px rgb(255 90 31 / 55%);
+}
+
+/* ------------------------------------------------------------------ medals */
+
+/*
+ * Medals, weighted rather than coloured.
+ *
+ * `MedalBadge` already prints I / II / III / — / ✓, which is a shape encoding the hue was merely
+ * decorating; three intensities of one amber is exactly the comparison a player cannot make from
+ * memory across two sessions, and a ring count is uncountable at 18 px. So rank is carried by how
+ * the beam is *driven*: gold is the only inverted badge on the screen, silver is a struck rule,
+ * bronze is a dotted one, and an unearned rung has no border at all. Four weights, four
+ * silhouettes, no hue.
+ */
+[data-art='signal'] .medal {
+  border-radius: 0;
+  border-width: 1px;
+  min-width: 20px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+[data-art='signal'] .medal--gold {
+  border-color: var(--gold);
+  background: var(--gold);
+  color: var(--bg-void);
+  box-shadow: 0 0 10px rgb(255 214 138 / 45%);
+  text-shadow: none;
+}
+
+[data-art='signal'] .medal--silver {
+  border-width: 2px;
+  border-color: var(--silver);
+  background: transparent;
+  color: var(--silver);
+  text-shadow: var(--glow);
+}
+
+[data-art='signal'] .medal--bronze {
+  border-style: dotted;
+  border-color: var(--bronze);
+  background: transparent;
+  color: var(--bronze);
+}
+
+[data-art='signal'] .medal--none {
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-dim);
+}
+
+[data-art='signal'] .medal--closed {
+  border-color: var(--ok);
+  background: transparent;
+  color: var(--ok);
+  box-shadow: inset 0 -3px 0 -1px var(--ok);
+}
+
+[data-art='signal'] .medal--lg {
+  width: 46px;
+  height: 46px;
+  font-size: var(--t-read);
+}
+
+/* ------------------------------------------------------------ pass or fail */
+
+[data-art='signal'] .modal {
+  border: 1px solid var(--border-strong);
+  box-shadow:
+    0 0 0 1px var(--bg-void),
+    0 0 40px rgb(255 154 31 / 8%);
+}
+
+[data-art='signal'] .modal__head {
+  border-bottom: 1px solid var(--border-strong);
+}
+
+[data-art='signal'] .modal__verdict {
+  padding: 2px var(--space-3);
+  font-size: var(--t-big);
+  font-weight: 700;
+  letter-spacing: 0.3em;
+}
+
+/*
+ * A pass is the beam turned all the way up and inverted — the only lit slab in the whole chrome.
+ * A failure is the same slab with the raster torn across it, so the two are told apart by texture
+ * at a glance and by the shift toward burnt phosphor on a second look, never by hue alone.
+ */
+[data-art='signal'] .modal__verdict--pass {
+  background: var(--accent);
+  color: var(--bg-void);
+  box-shadow: var(--glow-hot);
+}
+
+[data-art='signal'] .modal__verdict--fail {
+  color: var(--danger);
+  background: var(--hatch);
+  box-shadow: inset 0 0 0 1px var(--danger);
+  text-shadow: 0 0 10px rgb(255 90 31 / 50%);
+}
+
+[data-art='signal'] .failure-box {
+  border-radius: 0;
+  border-left: 3px solid var(--danger);
+  background: var(--hatch);
+}
+
+[data-art='signal'] .failure-box__code {
+  font-family: var(--font-mono);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+[data-art='signal'] .score-cell,
+[data-art='signal'] .record,
+[data-art='signal'] .crate,
+[data-art='signal'] .commend {
+  border-radius: 0;
+  background: transparent;
+}
+
+[data-art='signal'] .score-cell__value {
+  font-family: var(--font-mono);
+  font-size: var(--t-big);
+  font-weight: 300;
+  text-shadow: var(--glow);
+}
+
+[data-art='signal'] .commend__seal {
+  border-radius: 0;
+}
+
+/* ------------------------------------------------------------ level select */
+
+[data-art='signal'] .screen,
+[data-art='signal'] .sitemap {
+  font-family: var(--font-mono);
+}
+
+[data-art='signal'] .world__num {
+  border-radius: 0;
+  border-color: var(--world-accent);
+  color: var(--world-accent);
+  font-size: var(--t-body);
+  text-shadow: var(--glow);
+}
+
+[data-art='signal'] .world__name {
+  font-size: var(--t-huge);
+  font-weight: 300;
+  letter-spacing: 0.12em;
+  line-height: 44px;
+  text-transform: uppercase;
+  text-shadow: var(--glow);
+}
+
+[data-art='signal'] .world__subtitle,
+[data-art='signal'] .world__issued,
+[data-art='signal'] .world__tally {
+  font-family: var(--font-mono);
+  font-size: var(--t-micro);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+
+[data-art='signal'] .world__blurb,
+[data-art='signal'] .memo__body,
+[data-art='signal'] .requisition__intro {
+  font-family: var(--font-mono);
+  font-size: var(--t-body);
+  line-height: 20px;
+}
+
+/* A level is an addressable slot on a rack, not a bubble on a map. */
+[data-art='signal'] .node,
+[data-art='signal'] .node__disc {
+  border-radius: 0;
+}
+
+[data-art='signal'] .node__disc {
+  width: 46px;
+  height: 46px;
+  border-color: var(--border-strong);
+  background: transparent;
+}
+
+[data-art='signal'] .node--live .node__disc {
+  border-color: var(--world-accent);
+  color: var(--ink);
+  box-shadow: inset 0 -3px 0 -1px var(--world-accent);
+}
+
+[data-art='signal'] .node--live:hover .node__disc {
+  background: transparent;
+  box-shadow:
+    inset 0 -3px 0 -1px var(--world-accent),
+    var(--glow-hot);
+}
+
+[data-art='signal'] .node--locked .node__disc {
+  border-style: dashed;
+  border-color: var(--border);
+}
+
+/* The same four weights as the badges, so the two readings of "how well did I do" agree. */
+[data-art='signal'] .node--gold .node__disc {
+  border-color: var(--gold);
+  background: var(--gold);
+  color: var(--bg-void);
+  box-shadow: 0 0 14px rgb(255 214 138 / 40%);
+}
+
+[data-art='signal'] .node--silver .node__disc {
+  border-width: 2px;
+  border-color: var(--silver);
+  color: var(--silver);
+  box-shadow: none;
+}
+
+[data-art='signal'] .node--bronze .node__disc {
+  border-style: dotted;
+  border-color: var(--bronze);
+  color: var(--bronze);
+  box-shadow: none;
+}
+
+[data-art='signal'] .node__index {
+  font-size: var(--t-read);
+  font-weight: 300;
+}
+
+[data-art='signal'] .node__pip {
+  border-radius: 0;
+}
+
+[data-art='signal'] .node__title,
+[data-art='signal'] .node__status,
+[data-art='signal'] .node__id {
+  font-family: var(--font-mono);
+  font-size: var(--t-micro);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+[data-art='signal'] .sitemap__route::before {
+  background: var(--border);
+}
+
+/* ------------------------------------------------------------------ editor */
+
+[data-art='signal'] .editor-status {
+  font-family: var(--font-mono);
+  font-size: var(--t-micro);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+[data-art='signal'] .statusbar__status {
+  font-family: var(--font-mono);
+  font-size: var(--t-micro);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+/*
+ * The one moving thing in the chrome: the carrier lamp on the masthead, breathing at the rate a
+ * forty-minute-old feed refreshes at. It is the only animation this direction adds, which is what
+ * makes it affordable to delete outright when the reader has asked for stillness.
+ */
+[data-art='signal'] .statusbar__status--busy {
+  animation: signal-carrier 1.8s ease-in-out infinite;
+}
+
+@keyframes signal-carrier {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+    text-shadow: var(--glow-hot);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-art='signal'] .statusbar__status--busy {
+    animation: none;
+    opacity: 1;
+  }
+}

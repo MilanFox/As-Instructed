@@ -5,6 +5,11 @@
  * draws whatever tick it is told to, at a *fractional* tick so movement interpolates between the
  * integer ticks the engine actually produced.
  *
+ * Before the first run there is no trace, and a black rectangle is not a level (AUDIT-UI.md F3).
+ * `setPreview` takes the level's starting `World` and draws it still — same terrain, same
+ * features, bots at rest — so the board is readable before anything has been executed. A trace
+ * outranks a preview: `setTrace` takes the picture over and clearing it hands the picture back.
+ *
  * Frame budget discipline:
  *
  * - Static terrain lives in an offscreen canvas and is rebuilt only when the current tick crosses
@@ -45,7 +50,7 @@ import {
 } from './overlays.ts';
 import type { TileReadout } from './overlays.ts';
 import {
-  BOT_DETAIL_TILE_PX,
+  botDetailTilePx,
   drawBot,
   drawGroundStack,
   drawHeadlight,
@@ -54,7 +59,9 @@ import {
 } from './sprites.ts';
 import type { BotDrawOptions } from './sprites.ts';
 import { TerrainLayer } from './terrain.ts';
-import { botAccent, palette } from './theme.ts';
+import { applyArtDirection, artDirection, botAccent, palette } from './theme.ts';
+import type { ArtId } from './theme.ts';
+import type { PostPaint } from './art/types.ts';
 import {
   CONVEYOR_PHASES,
   TileSet,
@@ -65,7 +72,7 @@ import {
   terrainArt,
 } from './tiles.ts';
 import type { Biome } from './tiles.ts';
-import { TraceTimeline, createPose } from './timeline.ts';
+import { TraceTimeline, createPose, dirVectorX, dirVectorY } from './timeline.ts';
 import { VisitTrail } from './trail.ts';
 import type { BotPose } from './timeline.ts';
 
@@ -161,6 +168,8 @@ export interface RendererOptions {
   interactive?: boolean;
   /** Base URL for the tile atlas. */
   assetBase?: string;
+  /** Art direction to select at construction. Defaults to whichever one is already current. */
+  theme?: ArtId;
   onFrame?: (info: FrameInfo) => void;
   onComplete?: () => void;
   onHover?: (readout: TileReadout | null) => void;
@@ -188,6 +197,13 @@ export class Renderer {
   private timeline: TraceTimeline | null = null;
   private trail: VisitTrail | null = null;
 
+  /** Starting world for the still, pre-run board. Outranked by a trace while one is loaded. */
+  private previewWorld: World | null = null;
+  private previewUsesFuel = false;
+  /** Resting poses, one per preview bot. Grown, never rebuilt — `frame()` must not allocate. */
+  private readonly previewPoses: BotPose[] = [];
+  private readonly previewOrder: number[] = [];
+
   private currentTick = 0;
   private playing = false;
   private speed = DEFAULT_SPEED;
@@ -200,6 +216,14 @@ export class Renderer {
   /** Index of the first trace event not yet applied to `snapshot`. */
   private workingIndex = 0;
   private snapshotUsesFuel = false;
+  /**
+   * World the three cell indices below describe.
+   *
+   * The replay path re-indexes whenever `refreshSnapshot` touches the snapshot. A preview has no
+   * events to touch it, so the identity of the world it was built from is the whole cache key —
+   * and it is also what stops a cleared trace leaving its stale cells behind the preview.
+   */
+  private indexedWorld: World | null = null;
   private readonly cropCells: number[] = [];
   private readonly markCells: number[] = [];
   private readonly conveyorCells: number[] = [];
@@ -221,6 +245,14 @@ export class Renderer {
     delay: 0,
   };
 
+  /**
+   * The bag handed to an art direction's `backdrop` and `post` hooks.
+   *
+   * Rebuilt only when the context changes, for the same reason `this.fx` is reused: a direction
+   * that paints a scanline pass would otherwise cost one object per frame for a whole replay.
+   */
+  private paint: PostPaint | null = null;
+
   private readonly poses = new Map<number, BotPose>();
   private readonly drawOrder: number[] = [];
   private readonly range: ViewRange = { ...EMPTY_RANGE };
@@ -228,6 +260,12 @@ export class Renderer {
   private readonly byScreenDepth = (a: number, b: number): number => {
     const pa = this.poses.get(a) as BotPose;
     const pb = this.poses.get(b) as BotPose;
+    return pa.y - pb.y || a - b;
+  };
+  /** The same, over `previewPoses` indices. A preview has no timeline and so no pose map. */
+  private readonly byPreviewDepth = (a: number, b: number): number => {
+    const pa = this.previewPoses[a] as BotPose;
+    const pb = this.previewPoses[b] as BotPose;
     return pa.y - pb.y || a - b;
   };
   private readonly botOptions: BotDrawOptions = {
@@ -308,6 +346,7 @@ export class Renderer {
     this.biome = biomeForWorld(this.worldNumber);
     this.reducedOverride = options.reducedMotion ?? null;
     this.celebrationsEnabled = options.celebrations !== false;
+    if (options.theme) this.setArt(options.theme);
     this.watchMotion();
   }
 
@@ -333,6 +372,12 @@ export class Renderer {
 
     this.resize();
     this.camera.fit(true);
+    // A screenshot harness needs a handle on the live instance to switch directions and step
+    // frames. `import.meta.env.DEV` is a compile-time constant, so this block is gone from a
+    // production bundle rather than merely unreachable in it.
+    if (import.meta.env.DEV) {
+      (window as unknown as { __renderer?: Renderer }).__renderer = this;
+    }
     this.startLoop();
   }
 
@@ -355,6 +400,9 @@ export class Renderer {
     this.trace = null;
     this.timeline = null;
     this.snapshot = null;
+    this.previewWorld = null;
+    this.indexedWorld = null;
+    this.paint = null;
     this.canvas = null;
     this.ctx = null;
   }
@@ -389,7 +437,48 @@ export class Renderer {
       this.camera.fit(true);
       this.snapshotUsesFuel = usesFuel(trace.initialWorld);
       this.refreshSnapshot(0);
+    } else {
+      // Clearing the trace hands the picture back to whatever preview was set behind it.
+      this.enterPreview();
     }
+  }
+
+  /**
+   * The level's starting world, drawn still until a trace arrives.
+   *
+   * This is the board a player sees while writing the program that will run on it: real terrain,
+   * real machines and crops, bots parked where the level puts them, goal brackets on the cells
+   * the objective is about. Nothing moves except the idle tells, because nothing has happened yet
+   * — and under `prefers-reduced-motion` not even those.
+   *
+   * Setting a preview while a trace is loaded is legal and silent: the trace keeps the picture,
+   * and the preview appears the moment `setTrace(null)` clears it.
+   */
+  setPreview(world: World | null): void {
+    if (world === this.previewWorld) return;
+    this.previewWorld = world;
+    if (!world) return;
+    this.ensurePreviewPoses(world.bots.length);
+    if (!this.trace) this.enterPreview();
+  }
+
+  /** Frames the preview and rebuilds everything the replay path would have owned. */
+  private enterPreview(): void {
+    const world = this.previewWorld;
+    if (!world) return;
+    this.previewUsesFuel = usesFuel(world);
+    this.ensurePreviewPoses(world.bots.length);
+    this.indexSnapshot(world);
+    this.terrain.invalidate();
+    this.camera.setBounds({ cols: world.w, rows: world.h });
+    this.camera.fit(true);
+    this.cameraHeld = false;
+    this.leaning = false;
+  }
+
+  /** Grows the pose pool. Never shrinks it: a level reload should not cost a fresh allocation. */
+  private ensurePreviewPoses(count: number): void {
+    while (this.previewPoses.length < count) this.previewPoses.push(createPose());
   }
 
   get tick(): number {
@@ -474,6 +563,17 @@ export class Renderer {
   }
 
   /**
+   * Switches art direction, chrome included.
+   *
+   * `applyArtDirection` deliberately does not touch the terrain cache — the cache belongs to the
+   * renderer, and this is the renderer telling it that the thing it keyed on has changed.
+   */
+  setArt(id: ArtId): void {
+    applyArtDirection(id);
+    this.terrain.invalidate();
+  }
+
+  /**
    * Cells the current objective is about. Drawn as pulsing brackets under the bots, and — while
    * the run is playing — leaned towards. See `LEAN_SECONDS`.
    */
@@ -529,17 +629,21 @@ export class Renderer {
   /** Tile under a CSS-pixel point, with everything on it as of the current tick. */
   readoutAt(cssX: number, cssY: number): TileReadout | null {
     const cell = this.camera.tileAtScreen(cssX, cssY);
-    if (!cell || !this.snapshot) return null;
-    return describeTile(this.snapshot, cell.x, cell.y, Math.floor(this.currentTick));
+    const world = this.world;
+    if (!cell || !world) return null;
+    return describeTile(world, cell.x, cell.y, Math.floor(this.currentTick));
   }
 
   setHover(cell: Vec | null): void {
     this.hoverCell = cell;
   }
 
-  /** The world as of the current tick. The UI may read it; it must not mutate it. */
+  /**
+   * The world as of the current tick, or the preview's starting world when no trace is loaded.
+   * The UI may read it; it must not mutate it.
+   */
   get world(): World | null {
-    return this.snapshot;
+    return this.snapshot ?? this.previewWorld;
   }
 
   // -------------------------------------------------------------------------
@@ -578,7 +682,17 @@ export class Renderer {
     this.leaning = false;
     const at = options.at ?? this.celebrationCell();
     if (tier.strength > 0) {
-      this.burst('medal', at.x + 0.5, at.y + 0.5, tier.color, kind.length * 7919, 0, 0, tier.strength, MEDAL_BEAT);
+      this.burst(
+        'medal',
+        at.x + 0.5,
+        at.y + 0.5,
+        tier.color,
+        kind.length * 7919,
+        0,
+        0,
+        tier.strength,
+        MEDAL_BEAT,
+      );
       // Silver and gold hand the moment to the machines that earned it: one small ring per bot,
       // rippling outward from the objective in the order they happen to be standing in. Cheap,
       // and it stops a good result being one ring in one corner of an otherwise still picture.
@@ -832,9 +946,8 @@ export class Renderer {
   }
 
   private emitFor(event: TraceEvent, index: number): void {
-    const accent = 'botId' in event && typeof event.botId === 'number'
-      ? botAccent(event.botId)
-      : palette.accent;
+    const accent =
+      'botId' in event && typeof event.botId === 'number' ? botAccent(event.botId) : palette.accent;
     const damp = this.reducedMotion;
     switch (event.kind) {
       case 'fx':
@@ -862,7 +975,8 @@ export class Renderer {
           );
           // The arrival puff, held back until the bot is actually there. In particle time, which
           // scales with playback speed, one engine tick is one `DEFAULT_SPEED`-th of a second.
-          const dwell = ('dt' in event && typeof event.dt === 'number' ? event.dt : 1) / DEFAULT_SPEED;
+          const dwell =
+            ('dt' in event && typeof event.dt === 'number' ? event.dt : 1) / DEFAULT_SPEED;
           this.burst(
             'land',
             event.to.x + 0.5,
@@ -990,6 +1104,7 @@ export class Renderer {
    * position object per cell.
    */
   private indexSnapshot(world: World): void {
+    this.indexedWorld = world;
     this.cropCells.length = 0;
     this.markCells.length = 0;
     this.conveyorCells.length = 0;
@@ -1017,18 +1132,36 @@ export class Renderer {
     const deviceW = canvas.width;
     const deviceH = canvas.height;
 
+    const art = artDirection();
+    const paint = this.artPaint(ctx, deviceW, deviceH, dpr);
+
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = palette.bgVoid;
-    ctx.fillRect(0, 0, deviceW, deviceH);
+    if (art.backdrop) {
+      art.backdrop(paint);
+    } else {
+      ctx.fillStyle = palette.bgVoid;
+      ctx.fillRect(0, 0, deviceW, deviceH);
+    }
 
-    const trace = this.trace;
-    const timeline = this.timeline;
-    if (!trace || !timeline) return;
+    const timeline = this.trace ? this.timeline : null;
+    let world: World | null = null;
+    let tick = 0;
+    if (timeline) {
+      tick = this.currentTick;
+      this.refreshSnapshot(tick);
+      world = this.snapshot;
+    } else if (this.previewWorld) {
+      world = this.previewWorld;
+      if (this.indexedWorld !== world) this.indexSnapshot(world);
+    }
+    paint.preview = world !== null && timeline === null;
 
-    const tick = this.currentTick;
-    this.refreshSnapshot(tick);
-    const world = this.snapshot;
-    if (!world) return;
+    // The post pass is the direction's treatment of the *canvas*, not of the board, so an empty
+    // canvas still gets it — a CRT that switches itself off between levels is not a CRT.
+    if (!world) {
+      art.post?.(paint);
+      return;
+    }
 
     const tilePx = this.camera.deviceTilePx;
     // Snapping the world origin to whole device pixels is what keeps the cached terrain layer
@@ -1036,25 +1169,26 @@ export class Renderer {
     const originX = Math.round(this.camera.originX() * dpr);
     const originY = Math.round(this.camera.originY() * dpr);
     ctx.setTransform(1, 0, 0, 1, originX, originY);
+    paint.originX = originX;
+    paint.originY = originY;
+    paint.tilePx = tilePx;
+    paint.cols = world.w;
+    paint.rows = world.h;
     this.camera.visibleRange(this.range, 1);
 
     // --- terrain -----------------------------------------------------------
-    this.terrain.sync(world, tiles, this.biome, timeline.terrainRevision(tick), tilePx);
+    this.terrain.sync(
+      world,
+      tiles,
+      this.biome,
+      timeline ? timeline.terrainRevision(tick) : 0,
+      tilePx,
+    );
     const cache = this.terrain.canvas;
     const cacheTile = this.terrain.cacheTilePx;
     ctx.imageSmoothingEnabled = tilePx < cacheTile;
     ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(
-      cache,
-      0,
-      0,
-      cache.width,
-      cache.height,
-      0,
-      0,
-      world.w * tilePx,
-      world.h * tilePx,
-    );
+    ctx.drawImage(cache, 0, 0, cache.width, cache.height, 0, 0, world.w * tilePx, world.h * tilePx);
 
     // The visited-tile trail sits between the floor and the grid: the grid lines stay legible on
     // top of it, and every feature, mark, item and bot below draws over it (DESIGN.md §11 A5).
@@ -1096,7 +1230,8 @@ export class Renderer {
     this.particles.draw(ctx, FX_LAYER_UNDER, tilePx);
 
     // --- bots --------------------------------------------------------------
-    this.drawBots(ctx, timeline, world, tilePx, tick);
+    if (timeline) this.drawBots(ctx, timeline, world, tilePx, tick);
+    else this.drawRestingBots(ctx, world, tilePx);
 
     // --- fx over -----------------------------------------------------------
     this.particles.draw(ctx, FX_LAYER_OVER, tilePx);
@@ -1114,15 +1249,63 @@ export class Renderer {
       const envelope = u < 0.12 ? u / 0.12 : Math.max(0, 1 - (u - 0.12) / 0.88);
       drawCelebration(ctx, deviceW, deviceH, show.color, envelope * show.peak);
     }
+
+    art.post?.(paint);
+  }
+
+  /** Refreshes the reused hook bag. Rebuilt only when the context behind it changes. */
+  private artPaint(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    dpr: number,
+  ): PostPaint {
+    let paint = this.paint;
+    if (!paint || paint.ctx !== ctx) {
+      paint = {
+        ctx,
+        width,
+        height,
+        dpr,
+        time: 0,
+        preview: false,
+        reducedMotion: false,
+        originX: 0,
+        originY: 0,
+        tilePx: 0,
+        cols: 0,
+        rows: 0,
+      };
+      this.paint = paint;
+    }
+    paint.width = width;
+    paint.height = height;
+    paint.dpr = dpr;
+    paint.time = this.elapsed;
+    paint.reducedMotion = this.reducedMotion;
+    // Cleared rather than left alone: the bag outlives the frame, and a `post` handed last frame's
+    // transform on a frame that drew no board would place its marks on a board that is not there.
+    paint.tilePx = 0;
+    paint.cols = 0;
+    paint.rows = 0;
+    return paint;
   }
 
   private inRange(x: number, y: number): boolean {
-    return x >= this.range.x0 - 1 && x <= this.range.x1 + 1 && y >= this.range.y0 - 1 && y <= this.range.y1 + 1;
+    return (
+      x >= this.range.x0 - 1 &&
+      x <= this.range.x1 + 1 &&
+      y >= this.range.y0 - 1 &&
+      y <= this.range.y1 + 1
+    );
   }
 
   private drawConveyors(ctx: CanvasRenderingContext2D, world: World, tilePx: number): void {
     const tiles = this.tiles;
     if (!tiles || this.conveyorCells.length === 0) return;
+    // A direction that paints its own terrain painted its own conveyors with it (art/types.ts),
+    // and this pass would drop a 48px atlas frame on top of them.
+    if (artDirection().paintTerrain) return;
     const phase = Math.floor(this.elapsed * 8) % CONVEYOR_PHASES.length;
     const name = CONVEYOR_PHASES[phase] as string;
     for (let c = 0; c < this.conveyorCells.length; c++) {
@@ -1167,7 +1350,8 @@ export class Renderer {
     for (let m = 0; m < world.machines.length; m++) {
       const machine = world.machines[m] as Machine;
       if (!this.inRange(machine.at.x, machine.at.y)) continue;
-      const powered = machine.state === 'on' || machine.state === 'open' || machine.state === 'busy';
+      const powered =
+        machine.state === 'on' || machine.state === 'open' || machine.state === 'busy';
       drawMachine(
         ctx,
         tiles,
@@ -1223,7 +1407,7 @@ export class Renderer {
     order.sort(this.byScreenDepth);
 
     const dpr = this.camera.dpr;
-    if (tilePx >= BOT_DETAIL_TILE_PX * dpr) {
+    if (tilePx >= botDetailTilePx() * dpr) {
       for (let i = 0; i < order.length; i++) {
         const id = order[i] as number;
         const bot = timeline.timelineFor(id);
@@ -1251,6 +1435,57 @@ export class Renderer {
       // would be a lie. Only gauge the ones that can run dry.
       opts.showFuel = this.snapshotUsesFuel && hasFuel;
       opts.showLabel = timeline.botOrder.length > 1;
+      drawBot(ctx, pose, tilePx, opts);
+    }
+  }
+
+  /**
+   * The same bots, standing still, for the pre-run board.
+   *
+   * No timeline exists yet, so there are no treads to lay down and no clocks to disagree about.
+   * Everything else is the replay path: same sprite, same accents, same painter's order, so the
+   * moment the run starts nothing about the picture jumps.
+   */
+  private drawRestingBots(ctx: CanvasRenderingContext2D, world: World, tilePx: number): void {
+    const bots = world.bots;
+    this.ensurePreviewPoses(bots.length);
+    const reduced = this.reducedMotion;
+    const order = this.previewOrder;
+    order.length = 0;
+    for (let i = 0; i < bots.length; i++) {
+      const pose = restingPose(
+        bots[i] as Bot,
+        this.elapsed,
+        reduced,
+        this.previewPoses[i] as BotPose,
+      );
+      if (!this.inRange(pose.x, pose.y)) continue;
+      order.push(i);
+    }
+    order.sort(this.byPreviewDepth);
+
+    const dpr = this.camera.dpr;
+    if (tilePx >= botDetailTilePx() * dpr) {
+      for (let i = 0; i < order.length; i++) {
+        drawHeadlight(ctx, this.previewPoses[order[i] as number] as BotPose, tilePx, dpr);
+      }
+    }
+    const opts = this.botOptions;
+    opts.rush = 0;
+    opts.reduced = reduced;
+    opts.dpr = dpr;
+    opts.time = this.elapsed;
+    opts.showLabel = bots.length > 1;
+    for (let i = 0; i < order.length; i++) {
+      const index = order[i] as number;
+      const record = bots[index] as Bot;
+      const pose = this.previewPoses[index] as BotPose;
+      opts.accent = botAccent(record.id);
+      opts.active = this.activeBot === record.id;
+      opts.carrying = countItems(record.inventory);
+      const hasFuel = Number.isFinite(record.fuelMax);
+      opts.fuel = hasFuel ? record.fuel / record.fuelMax : 1;
+      opts.showFuel = this.previewUsesFuel && hasFuel;
       drawBot(ctx, pose, tilePx, opts);
     }
   }
@@ -1291,7 +1526,8 @@ export class Renderer {
     const cssH = Math.max(1, Math.round(rect.height || canvas.clientHeight || 1));
     const deviceW = Math.max(1, Math.round(cssW * dpr));
     const deviceH = Math.max(1, Math.round(cssH * dpr));
-    const changed = canvas.width !== deviceW || canvas.height !== deviceH || this.camera.dpr !== dpr;
+    const changed =
+      canvas.width !== deviceW || canvas.height !== deviceH || this.camera.dpr !== dpr;
     if (canvas.width !== deviceW) canvas.width = deviceW;
     if (canvas.height !== deviceH) canvas.height = deviceH;
     this.camera.setViewport(cssW, cssH, dpr);
@@ -1321,10 +1557,9 @@ export class Renderer {
     const changed = cell?.x !== this.hoverCell?.x || cell?.y !== this.hoverCell?.y;
     this.hoverCell = cell;
     if (changed && this.options.onHover) {
+      const world = this.world;
       this.options.onHover(
-        cell && this.snapshot
-          ? describeTile(this.snapshot, cell.x, cell.y, Math.floor(this.currentTick))
-          : null,
+        cell && world ? describeTile(world, cell.x, cell.y, Math.floor(this.currentTick)) : null,
       );
     }
   };
@@ -1347,7 +1582,11 @@ export class Renderer {
     const rect = canvas.getBoundingClientRect();
     this.cameraHeld = true;
     this.leaning = false;
-    this.camera.zoomBy(event.deltaY < 0 ? 1 : -1, event.clientX - rect.left, event.clientY - rect.top);
+    this.camera.zoomBy(
+      event.deltaY < 0 ? 1 : -1,
+      event.clientX - rect.left,
+      event.clientY - rect.top,
+    );
   };
 
   private attachPointer(): void {
@@ -1369,6 +1608,59 @@ export class Renderer {
     canvas.removeEventListener('pointerleave', this.onPointerLeave);
     canvas.removeEventListener('wheel', this.onWheel);
   }
+}
+
+/** Slowest of the idle oscillations, so a row of parked bots breathes rather than flickers. */
+const REST_IDLE_HZ = 0.55;
+/**
+ * Floor of the resting `idle` value.
+ *
+ * `idle` is a gate, not an amplitude — `sprites.ts` only asks whether it is above zero — so this
+ * has to stay positive through the whole cycle or the waiting tell would strobe on and off once
+ * a second, which is precisely the thing it exists to avoid.
+ */
+const REST_IDLE_FLOOR = 0.4;
+
+/**
+ * A bot standing on the board with nothing to do yet.
+ *
+ * Pure, and written into a caller-owned pose, because the preview runs inside `frame()` and
+ * `frame()` does not allocate. The only animated field is `idle`: a resting bot is *waiting for
+ * a program*, and a board of frozen machines reads as a broken canvas rather than as a level
+ * ready to run. Under `prefers-reduced-motion` the oscillation flattens to its floor, which keeps
+ * the tell present and stops it moving.
+ */
+export function restingPose(
+  bot: Bot,
+  elapsed: number,
+  reducedMotion: boolean,
+  out: BotPose = createPose(bot.id),
+): BotPose {
+  out.id = bot.id;
+  out.present = true;
+  out.alive = bot.alive;
+  out.x = bot.at.x;
+  out.y = bot.at.y;
+  out.facing = bot.facing;
+  out.travel = 0;
+  out.stretch = 0;
+  out.settle = 0;
+  out.blocked = 0;
+  out.anticipate = 0;
+  out.recoil = 0;
+  out.action = 0;
+  out.actionKind = '';
+  out.idle = reducedMotion
+    ? REST_IDLE_FLOOR
+    : REST_IDLE_FLOOR +
+      (1 - REST_IDLE_FLOOR) * (0.5 + 0.5 * Math.sin(elapsed * REST_IDLE_HZ * Math.PI * 2 + bot.id));
+  out.failed = false;
+  out.dx = dirVectorX(bot.facing);
+  out.dy = dirVectorY(bot.facing);
+  out.atX = bot.at.x;
+  out.atY = bot.at.y;
+  out.clock = 0;
+  return out;
 }
 
 function countItems(inventory: readonly { count: number }[]): number {

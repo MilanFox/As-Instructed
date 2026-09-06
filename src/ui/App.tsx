@@ -18,8 +18,13 @@ import { RepositoryIssue } from './screens/RepositoryIssue.tsx';
 import { Requisition } from './screens/Requisition.tsx';
 import { Results } from './screens/Results.tsx';
 import { ReviewMemo } from './screens/ReviewMemo.tsx';
+// Side effect: sets `data-art` and the palette custom properties before the first render.
+import './art.ts';
 import './styles/fonts.css';
 import './styles/app.css';
+import './styles/art/survey.css';
+import './styles/art/signal.css';
+import './styles/art/deepsite.css';
 
 /**
  * The workspace is the only screen that needs Monaco, and Monaco is most of the build. Splitting
@@ -134,7 +139,7 @@ function TopBar(): React.JSX.Element {
         <div className="topbar__order">
           <span
             className="topbar__world-dot"
-            style={{ background: world?.accent ?? 'var(--accent)' }}
+            style={{ background: world ? `var(--world-${world.id})` : 'var(--accent)' }}
             aria-hidden="true"
           />
           <span className="topbar__id">{level.id.toUpperCase()}</span>

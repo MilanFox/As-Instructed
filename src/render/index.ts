@@ -17,7 +17,7 @@
  * ```
  */
 
-export { Renderer, DEFAULT_SPEED } from './renderer.ts';
+export { Renderer, DEFAULT_SPEED, restingPose } from './renderer.ts';
 export type {
   CelebrationKind,
   CelebrationOptions,
@@ -76,7 +76,7 @@ export {
 export type { TileReadout } from './overlays.ts';
 
 export {
-  BOT_DETAIL_TILE_PX,
+  botDetailTilePx,
   drawBot,
   drawGroundStack,
   drawHeadlight,
@@ -110,3 +110,4 @@ export type { TerrainKey } from './terrain.ts';
 export { VisitTrail, TRAIL_MIN_VISITS, TRAIL_MAX_VISITS, trailFill } from './trail.ts';
 
 export { BOT_ACCENTS, botAccent, palette, alpha, mix, shade } from './theme.ts';
+export type { ArtId } from './theme.ts';
