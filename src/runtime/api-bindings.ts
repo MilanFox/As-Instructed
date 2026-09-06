@@ -1,6 +1,7 @@
 import type { Dir, ItemKind, Machine, Sim, Tile, Vec } from '../engine/index.ts';
 import {
   Dir as DirValue,
+  IllegalActionError,
   ItemKind as ItemKindValue,
   Terrain as TerrainValue,
   machineById,
@@ -115,14 +116,25 @@ function receivePacket(sim: Sim, botId: number): string | null {
 
 /**
  * Outbound payloads accumulate on the antenna machine: `vars.sent` counts them and the tile's
- * `tx` meta keeps them in order, which is what an objective reads. Rejected when the antenna is
- * missing or not `on`, and the tick is charged either way.
+ * `tx` meta keeps them in order, which is what an objective reads. The tick is charged either way.
+ *
+ * The two refusals are not the same kind of thing, and used to be one `false`. An antenna that is
+ * not `on` is a state: `power(id, "on")` clears it and the identical call then succeeds, so it
+ * keeps the `false` a program can honestly branch on. A work order with no antenna at all is not
+ * a state — nothing in the API installs one — so it throws (docs/ENGINE.md §2). Note that neither
+ * is an unknown *id*: `transmit` never takes one, which is why the ruling that makes `link` throw
+ * on a bad id leaves this verb's boolean intact.
  */
 function transmitPayload(sim: Sim, botId: number, text: string, cost: number): boolean {
   const antenna = antennaFor(sim, botId);
   if (!antenna) {
-    sim.applyMachineChange(botId, '', () => {}, cost);
-    return false;
+    sim.refuseMachineAct(botId, '', cost);
+    throw new IllegalActionError(
+      'transmit(): this work order has no antenna, so there is nothing here that can send. ' +
+        'Drop the call — no command installs one, and the listening-post work orders that do ' +
+        'carry one say so in the brief.',
+      { botId },
+    );
   }
 
   const accepted = antenna.state !== 'off';
@@ -165,7 +177,13 @@ function decodeText(text: string, key: number): string {
 /**
  * A connection is recorded on the source machine as `vars['link:<toId>'] = 1`, and the cable it
  * consumes is the Manhattan distance between the two, reported through `Verdict.stats.spend`
- * (DESIGN.md §11 A5). Unknown ids cost the full price and return false.
+ * (DESIGN.md §11 A5).
+ *
+ * An id that names no machine costs the full price and then stops the run. Nothing in the API
+ * creates a machine, so the identical call can never succeed later (docs/ENGINE.md §2), and
+ * `probe(id)` returns `null` for free — which is the idiom the World 5 briefs already teach for
+ * finding where the substations stop. The `boolean` is kept because a level may yet refuse a pair
+ * it considers illegal, which would be a refusal the player can do something about.
  */
 function linkMachines(
   sim: Sim,
@@ -177,8 +195,14 @@ function linkMachines(
   const from = machineById(sim.world, fromId);
   const to = machineById(sim.world, toId);
   if (!from || !to) {
-    sim.applyMachineChange(botId, from ? toId : fromId, () => {}, cost);
-    return false;
+    const missing = from ? toId : fromId;
+    sim.refuseMachineAct(botId, missing, cost);
+    throw new IllegalActionError(
+      `link("${fromId}", "${toId}"): no machine on this work order has the id "${missing}". ` +
+        `probe("${missing}") returns null for an id that does not exist, and costs nothing — ` +
+        'check it before you lay cable to it.',
+      { botId },
+    );
   }
 
   const distance = manhattan(from.at, to.at);

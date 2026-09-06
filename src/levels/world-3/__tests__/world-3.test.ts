@@ -24,7 +24,7 @@ const SOLUTIONS: Record<string, ReferenceSolution> = {
 const HARDWARE: Record<string, string[]> = {
   'w3-01': ['pickup', 'drop'],
   'w3-02': ['carrying'],
-  'w3-04': ['use'],
+  'w3-04': [],
 };
 
 const bonusMet = (level: LevelDef, ctx: ObjectiveContext): boolean =>

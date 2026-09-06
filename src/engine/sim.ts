@@ -652,21 +652,22 @@ export class Sim {
   }
 
   /**
-   * Directly sets a machine's state (World 5's `power`). Returns false for an unknown machine id,
-   * and throws `IllegalActionError` for a machine whose `vars.manual` is `1` — those are
-   * hand-operated and only a `use()` at the tile moves them.
+   * Directly sets a machine's state (World 5's `power`). Throws `IllegalActionError` for an id
+   * that names no machine, and for a machine whose `vars.manual` is `1` — those are hand-operated
+   * and only a `use()` at the tile moves them.
    *
    * The manual flag exists because `power` reaches any id anywhere on the map for a flat cost, so
    * a level whose whole subject is *getting a fleet to the machines* is defeated by a loop over
    * ids. Levels that want the travel back mark the machines rather than the command, so World 5,
    * where operating the grid from the desk is the point, is untouched.
    *
-   * The two refusals are graded differently on purpose. An unknown id is a state of the world, so
-   * it takes the `false` the API gives every other "the world says no" (docs/ENGINE.md §2). A
-   * manual machine is not a state: nothing in the API clears the flag, so the same call is wrong
-   * for the whole run and a `false` the player could branch on would be a branch that can never
-   * flip. It is the same category as an unknown bot id, and it speaks the way `LivelockError`
-   * does — at the moment it bites, naming the machine and its tile.
+   * Both refusals are permanent, which is what puts them on the throwing side of docs/ENGINE.md
+   * §2: nothing in the API clears `vars.manual` and nothing in it creates a machine, so each call
+   * is wrong for the whole run rather than wrong now, and a `false` the player could branch on
+   * would be a branch that can never flip. The unknown id kept that `false` for one release, on
+   * the reasoning that it was a state of the world; it is not one, and the free `probe(id)` that
+   * returns `null` is the pre-check that makes the throw fair. Both speak the way `LivelockError`
+   * does — at the moment they bite, naming what was asked for.
    */
   power(botId: number, machineId: string, state: string): boolean {
     const bot = this.requireActiveBot(botId);
@@ -677,7 +678,12 @@ export class Sim {
     if (!machine) {
       this.builder.push({ t, botId, dt, kind: 'act', name: 'power', ok: false, detail: machineId });
       this.charge(bot, dt);
-      return false;
+      throw new IllegalActionError(
+        `power("${machineId}"): no machine on this work order has that id. ` +
+          `probe("${machineId}") returns null for an id that does not exist, and costs nothing — ` +
+          'check it before you act on it.',
+        { botId },
+      );
     }
     if (machine.vars[MANUAL_ONLY] === 1) {
       this.builder.push({
@@ -942,15 +948,38 @@ export class Sim {
   // -------------------------------------------------------------------------
 
   /**
+   * Bills and logs a machine action that never reached a machine, so the verb that refused it can
+   * report the refusal in its own words. Charges `cost` ticks and emits the same `ok: false` act
+   * event a failed change emits.
+   *
+   * It exists because `applyMachineChange` used to be the only way to pay for a refusal: a caller
+   * that had already decided to refuse passed an id it knew was wrong and read the `false` back.
+   * That made a level verb's deliberate refusal and a genuinely broken id arrive at the engine as
+   * the same call, so neither the engine nor the player could tell them apart.
+   */
+  refuseMachineAct(botId: number, detail: string, cost: number): void {
+    const bot = this.requireActiveBot(botId);
+    const t = bot.clock;
+    this.requireFuel(bot, cost, 'machine');
+    this.builder.push({ t, botId, dt: cost, kind: 'act', name: 'machine', ok: false, detail });
+    this.charge(bot, cost);
+  }
+
+  /**
    * Escape hatch for world-specific machine logic (World 5/6). Applies `mutate` to the machine and
    * emits the matching `machineChange` event so replay stays faithful. Charges `cost` ticks.
+   *
+   * An id that names no machine throws. Nothing in the API creates one, so the identical call
+   * cannot succeed later in the run (docs/ENGINE.md §2), and with `refuseMachineAct` carrying the
+   * refusals level verbs make on purpose, the only way to arrive here with an unknown id is a verb
+   * that computed one. The refusal is still logged and charged first, so a replay stays in step.
    */
   applyMachineChange(
     botId: number,
     machineId: string,
     mutate: (machine: Machine) => void,
     cost: number,
-  ): boolean {
+  ): void {
     const bot = this.requireActiveBot(botId);
     const t = bot.clock;
     this.requireFuel(bot, cost, 'machine');
@@ -966,11 +995,15 @@ export class Sim {
     });
     if (!machine) {
       this.charge(bot, cost);
-      return false;
+      throw new IllegalActionError(
+        `No machine on this work order has the id "${machineId}". ` +
+          `probe("${machineId}") returns null for an id that does not exist, and costs nothing — ` +
+          'check it before you act on it.',
+        { botId },
+      );
     }
     this.mutate(machine, t, mutate);
     this.charge(bot, cost);
-    return true;
   }
 
   /**

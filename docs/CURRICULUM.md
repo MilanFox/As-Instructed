@@ -1,15 +1,16 @@
 # BOOTSTRAP — Curriculum
 
 > Companion to `docs/DESIGN.md` §5 and §6. **DESIGN.md wins every conflict.**
-> 34 levels across 8 worlds. This document specifies *what each level teaches and why it is
+> 33 levels across 8 worlds. This document specifies *what each level teaches and why it is
 > hard*. It contains **no solutions and no solution code**, deliberately and permanently.
 > Reference solutions live in `src/levels/**/__solutions__/` and are test fixtures only.
 >
-> **Six work orders were withdrawn** after the playtests in `docs/PLAYTEST-BEGINNER.md` and
-> `docs/PLAYTEST-VETERAN.md`: `w1-02`, `w1-04`, `w2-03`, `w3-03`, `w3-05` and `w4-03`. The
-> survivors kept their ids, so `index` inside a world is ascending but no longer contiguous —
-> `w1-05` is the third work order in World 1. What each cut level introduced, and where that
-> introduction now lives, is recorded in `docs/FIX-COMPRESSION.md`.
+> **Seven work orders were withdrawn** after the playtests in `docs/PLAYTEST-BEGINNER.md` and
+> `docs/PLAYTEST-VETERAN.md`: `w1-02`, `w1-04`, `w2-01`, `w2-03`, `w3-03`, `w3-05` and `w4-03`.
+> The survivors kept their ids, so `index` inside a world is ascending but no longer contiguous —
+> `w1-05` is the third work order in World 1 and `w2-02` is the first in World 2. What each cut
+> level introduced, and where that introduction now lives, is recorded in
+> `docs/FIX-COMPRESSION.md` and `docs/FIX-CONTENT.md`.
 
 ---
 
@@ -46,15 +47,15 @@ and nothing else. w8-05 should be a real evening's work for an Advent of Code ve
 10 |          |          |          |          |          |          |          |        ##
  9 |          |          |          |          |          |          |        ##|    ######
  8 |          |          |          |      ##  |        ##|        ##|      ####|  ########
- 7 |          |      ##  |          |    ####  |      ####|      ####|    ######|  ########
- 6 |          |    ####  |    ##    |    ####  |    ######|      ####|    ######|  ########
- 5 |          |    ####  |    ##    |  ######  |    ######|    ######|  ########|##########
- 4 |    ##    |    ####  |  ####    |  ######  |  ########|  ########|  ########|##########
- 3 |    ##    |  ######  |  ####    |########  |##########|  ########|##########|##########
- 2 |  ####    |########  |######    |########  |##########|##########|##########|##########
- 1 |######    |########  |######    |########  |##########|##########|##########|##########
+ 7 |          |    ##    |          |    ####  |      ####|      ####|    ######|  ########
+ 6 |          |  ####    |    ##    |    ####  |    ######|      ####|    ######|  ########
+ 5 |          |  ####    |    ##    |  ######  |    ######|    ######|  ########|##########
+ 4 |    ##    |  ####    |  ####    |  ######  |  ########|  ########|  ########|##########
+ 3 |    ##    |######    |  ####    |########  |##########|  ########|##########|##########
+ 2 |  ####    |######    |######    |########  |##########|##########|##########|##########
+ 1 |######    |######    |######    |########  |##########|##########|##########|##########
    +----------+----------+----------+----------+----------+----------+----------+----------
-    1 2 3     1 2 3 4   1 2 3     1 2 3 4   1 2 3 4 5  1 2 3 4 5  1 2 3 4 5  1 2 3 4 5
+    1 2 3     1 2 3     1 2 3     1 2 3 4   1 2 3 4 5  1 2 3 4 5  1 2 3 4 5  1 2 3 4 5
        W1         W2         W3         W4         W5         W6         W7         W8
 ```
 
@@ -63,12 +64,12 @@ third column is `w1-05`.
 
 ```
 W1  1  2  4              W5  3  4  6  7  8
-W2  2  3  6  7           W6  2  4  5  7  8
+W2  3  6  7              W6  2  4  5  7  8
 W3  2  4  6              W7  3  5  7  8  9
 W4  3  5  7  8           W8  5  8  9  9 10
 ```
 
-Mean 5.5. Per-world means: 2.3, 4.5, 4.0, 5.8, 5.6, 5.2, 6.4, 8.2. The first four worlds moved
+Mean 5.6. Per-world means: 2.3, 5.3, 4.0, 5.8, 5.6, 5.2, 6.4, 8.2. The first four worlds moved
 up because what came out of them was the flat part: the veteran took gold on the first honest run
 on nine of the first ten levels, and six of those landed on *exact* par.
 
@@ -78,6 +79,14 @@ The curve is **not** monotonic and must not be flattened into one. Every world r
 its opener and climbs to its finale. That produces seven drops, and every one of them is
 load-bearing: a new world's opener is where a new piece of hardware is taught in isolation, and
 a player fighting a hard puzzle *and* an unfamiliar API at the same time learns neither.
+
+**World 2 is the stated exception, and it is stated rather than silent.** `w2-02` is `scan`'s
+first appearance *and* the world's opener, because `w2-01` — which existed to be the isolation
+level — was withdrawn (`docs/FIX-CONTENT.md`). The rule's condition is a *hard* puzzle, and
+`w2-02` is a 3: both testers golded it first-run in under five minutes, it already opened with
+`scan()` in its starter, two of its five hints were about free sensing, and its `docs` panel
+already carried the reference page. The isolation was nominal. Nothing else in the document may
+take this exception without measuring the same three things.
 
 | Drop | From → to | Justification |
 |---|---|---|
@@ -105,7 +114,10 @@ runway rather than as rest:
   anywhere, so the rule from `w4-01` is still enough on that one shift, and the brief says so.
 - **w2-01 → w2-03 at 2 / 2 / 2** was three consecutive first-run golds doing the same activity
   with one predicate changed. Both testers named this as where they would have put the game down.
-  `w2-02` now carries the predicate *and* the replant cycle *and* the moving start corner.
+  The first pass merged `w2-03` into `w2-02` and left the head of the run standing; the second
+  withdrew `w2-01` as well, because *walk the row recording, walk back to the best one* is a
+  strict subset of what the merged `w2-02` asks on a field. `w2-02` now carries `scan` *and* the
+  predicate *and* the replant cycle *and* the moving start corner, and World 2 opens on it.
 
 ### 1.3 Spikes, and why
 
@@ -119,7 +131,7 @@ runway rather than as rest:
 
 ### 1.4 Rough hour budget
 
-W1 ≈ 20 min · W2 ≈ 1.2 h · W3 ≈ 1.2 h · W4 ≈ 2.5 h · W5 ≈ 3 h · W6 ≈ 2.5 h · W7 ≈ 4 h ·
+W1 ≈ 20 min · W2 ≈ 1 h · W3 ≈ 1.2 h · W4 ≈ 2.5 h · W5 ≈ 3 h · W6 ≈ 2.5 h · W7 ≈ 4 h ·
 W8 ≈ 6 h. Total ≈ 20 h to bronze-complete, considerably more to gold everything. These are
 planning figures for pacing, not promises.
 
@@ -257,27 +269,11 @@ From here on, `seeds.length >= 3` is mandatory (DESIGN.md §5).
 
 ---
 
-### w2-01 — The Sensor Package  *(hardware in isolation)*
-- `premise` One planted row. Harvest what is ripe and nothing else.
-- `teaches` `scan()` — sensing is **free** (0 ticks) and acting is not, so look before you act.
-- `assumes` W1 loops and traversal.
-- `hardware` `scan` `harvest`
-- `heritage` —
-- `world` 12×3, single planted row of 10 tiles, each ripe / unripe / empty.
-- `varies` Which tiles are ripe (4–8 of them).
-- `anti-hardcode` Ripe positions are redrawn per seed; a fixed index list fails.
-- `naive-fails` Harvesting every tile costs 2 ticks each and misses par by ~2×. Harvesting a memorized set fails other seeds.
-- `generalize` Over the ripeness distribution, including a seed with a ripe tile at each end of the row.
-- `seeds` `[1,2,8,13]`
-- `size` ~8 lines · `difficulty` **2/10**
-- `bonus` Exactly as many `harvest` calls as there are ripe tiles.
-- `par` 16, from the survey that stops at the top of the scale (at most 9). Reading the whole row and driving back to the best tile is correct and takes silver at 18. `docs/FIX-PAR.md` §3.
-
 ### w2-02 — Rotation
 - `premise` Work every tile of the field: take what is ready, put a seed in every hole. The mule drops you at a different corner each quarter.
 - `teaches` A two-phase per-cell cycle where **the world changes underneath you** — the state you sensed is stale the instant you act — guarded by a ripeness predicate the tile has to be asked about first.
-- `assumes` Scan-guarded action, serpentine coverage.
-- `hardware` `harvest` `plant`
+- `assumes` W1 loops and traversal.
+- `hardware` `scan` `harvest` `plant`
 - `heritage` —
 - `world` 5×5 field, mixed ripeness with 4–6 bare tiles. The mule parks in one of the four corners.
 - `varies` Ripeness map, how many tiles are bare, **which corner** the mule parks in.
@@ -288,7 +284,7 @@ From here on, `seeds.length >= 3` is mandatory (DESIGN.md §5).
 - `size` ~14 lines · `difficulty` **3/10**
 - `bonus` Waste no swing and no seed.
 - `defuse` Requires the renderer growth-stage overlay (DESIGN.md §11 A5) to be readable at all. That amendment names the withdrawn `w2-03`; **this is the level it now protects.**
-- `note` This is `w2-02` and the withdrawn `w2-03` in one work order. Both testers reported them as one level printed twice — *"w2-02 is w2-03 minus a predicate"*, *"two lines different"* — and both proposed exactly this merge. The version that demands the predicate is the one that survived.
+- `note` This is `w2-01`, `w2-02` and the withdrawn `w2-03` in one work order, merged in two passes. Both testers reported `w2-02` and `w2-03` as one level printed twice — *"w2-02 is w2-03 minus a predicate"*, *"two lines different"* — and both proposed that merge; the version that demands the predicate survived. `w2-01` followed for the same reason from the other end (`docs/FIX-COMPRESSION.md` §2, `docs/FIX-CONTENT.md`): its content was *read the row, act on the best reading*, which is what this level already asks on a field. **This level is therefore World 2's opener and `scan`'s isolation level at the same time** — see §1.1.
 
 ### w2-04 — Capacity
 - `premise` The bot holds a limited load. The field holds more than that.
@@ -306,26 +302,26 @@ From here on, `seeds.length >= 3` is mandatory (DESIGN.md §5).
 - `bonus` Zero failed harvests due to a full inventory.
 
 ### w2-05 — Harvest Quota  *(synthesis)*
-- `premise` Two crops, one quota, one shift. Only one of them counts.
-- `teaches` Prioritisation under a hard deadline — you cannot visit everything, so choose.
+- `premise` Two things grow in the west field and only one of them is the crop. Come back with the hopper full of it.
+- `teaches` **The sensor reaches further than the wheels do** — survey wide, walk narrow, and never spend a hopper slot on something the instrument could have told you was worthless.
 - `assumes` All of World 2.
 - `hardware` —
-- `heritage` Orienteering / prize-collecting route under a budget. **A greedy nearest-ripe heuristic must suffice**; par is set from one.
-- `world` 14×10, two crop types interleaved, capacity limit, ripening active, silo in a corner. `maxTicks` allows roughly 70% of the field to be reached.
-- `varies` Crop layout, ripeness, capacity, and the quota itself (±20%).
-- `anti-hardcode` The quota varies, so even the *amount* of work cannot be assumed; the crop layout varies, so no route is reusable.
-- `naive-fails` Any fixed route. Any solution that treats both crops as harvestable wastes half its budget. Any solution that ignores capacity strands units in a full hopper.
-- `generalize` Over layout, quota, capacity and ripening simultaneously — the first four-axis level.
+- `heritage` — (lawn-mower coverage where the sensor footprint is wider than the vehicle). **Par is derived from the two-lane survey the *Sensor reach* fact describes**, not from a route heuristic: par set from the serpentine's own cost paid gold for ignoring the one instrument this level exists to teach.
+- `world` 14×8 walled, a **12×6** field inside it. Ripe crop, ice-scrub that likes the same soil and is worth nothing to anybody, four or five crops still coming on, and a great deal of bare ground. **No silo, no depot and no return leg** — the run ends wherever it stops with the hopper full. The shift is 84 ticks against a 72-tile field.
+- `varies` Where the ripe crop, the ice and the still-growing crop sit; **how big the hopper is** (7–9, readable only through `inventory()`); and how far off the unripe crops are. The quota *is* the hopper, so the amount of work moves with it — there is no second number.
+- `anti-hardcode` Hopper size is drawn per seed and is not a constant the player may write down. Ripe crop is spread one per equal slice of the serpentine, so a disciplined pass always meets enough of it: the level is about the *shape* of the route rather than the luck of the layout, and a memorised route is worth nothing.
+- `naive-fails` Swinging at everything spends hopper slots on ice, and **a slot spent on the wrong thing stays spent for the rest of the shift**. `harvest()` hands back nothing on an unripe crop *and* nothing on a full hopper, and from inside the program the two look identical. The six-row serpentine that reads only the tile under the wheels is **correct** — 58–68 ticks over 41–49 tiles — and takes silver and no star.
+- `generalize` Over layout, hopper size and ripening simultaneously.
 - `seeds` `[1,2,3,4,5]`
-- `size` ~40 lines · `difficulty` **7/10**
-- `bonus` Hit quota with 15% of the tick budget unspent.
+- `size` ~33 lines · `difficulty` **7/10**
+- `bonus` Fill the hopper having set foot on at most 32 tiles — a budget on the wheels rather than on the clock, so a run that reads more may walk less. The two-lane survey enters 23 tiles; the serpentine that drives across everything it surveys enters 41 and cannot have it.
 - `par` 60, from the two-lane survey the *Sensor reach* fact describes (at most 55). The six-row serpentine is correct and takes silver at 68. `docs/FIX-PAR.md` §3.
 
 ---
 
 ## 5. World 3 — The Sorting Yards
 
-Theme: logistics depot. Unlocks `pickup` `drop` `carrying` `use`.
+Theme: logistics depot. Unlocks `pickup` `drop` `carrying`.
 
 ---
 
@@ -363,8 +359,8 @@ Theme: logistics depot. Unlocks `pickup` `drop` `carrying` `use`.
 - `premise` The conveyor doesn't care which crate is nearest. It cares which arrived first.
 - `teaches` Order-preserving processing — the next correct action is determined by arrival order, not proximity.
 - `assumes` Lookup tables, routing.
-- `hardware` `use`
-- `hardware note` **`use` has no job in this work order.** It belonged to the withdrawn `w3-03`, and DESIGN.md §6 pins it to World 3; this is the last World 3 slot, and the first level that actually operates a machine is `w5-01`. The requisition ceremony therefore fires one shift early and hands over a verb nothing here needs. Flagged in `docs/FIX-COMPRESSION.md`: either give `w3-04`'s outbound bay a terminal to `use`, or move the unlock to `w5-01` and amend DESIGN.md §6.
+- `hardware` —
+- `hardware note` This slot used to requisition `use`, which had no job here: it belonged to the withdrawn `w3-03`, and DESIGN.md §6 pinned it to World 3, so the ceremony fired one shift early and handed over a verb nothing in the level operated. Worlds 1–4 place no machines at all. The unlock moved to `w5-01`, the first work order that cannot be solved without it, and DESIGN.md §6 moved with it (`docs/FIX-CONTENT.md`).
 - `heritage` FIFO queue discipline; producer/consumer.
 - `world` 18×10. An inbound conveyor deposits crates at a mouth tile on a schedule; each crate carries an arrival index. An outbound bay rejects a crate if any lower index is still unshipped. The mouth blocks if it is not cleared.
 - `varies` Arrival order, arrival timing, destinations, crate count 8–16.
@@ -451,7 +447,7 @@ the first half of the game.
 
 ## 7. World 5 — The Grid
 
-Theme: power infrastructure. Unlocks `power` `probe` `link`.
+Theme: power infrastructure. Unlocks `probe` `use` `power` `link`.
 This is the game's most algorithmically classical world; three of its five levels have a named
 textbook heritage and should be authored as honest, well-scaffolded versions of them.
 
@@ -459,9 +455,9 @@ textbook heritage and should be authored as honest, well-scaffolded versions of 
 
 ### w5-01 — Mains  *(hardware in isolation)*
 - `premise` A line of substations and one reactor. Energise all of them.
-- `teaches` `power()` and **preconditions** — a node only energises if its upstream is already live.
+- `teaches` `probe()` and `use()`, and **preconditions** — a station only latches if the one feeding it is already live, so the direction of the line has to be read before the bot drives it.
 - `assumes` Traversal.
-- `hardware` `power`
+- `hardware` `probe` `use`
 - `heritage` —
 - `world` 20×5, 6–9 substations in a line, reactor at one end.
 - `varies` Chain length, station spacing, **and which end the reactor is on**.
@@ -475,8 +471,8 @@ textbook heritage and should be authored as honest, well-scaffolded versions of 
 ### w5-02 — Continuity Test
 - `premise` Two hundred segments of feeder. One break. Ten probes.
 - `teaches` **Binary search** — halving a search space instead of scanning it.
-- `assumes` `power`, loops with computed indices.
-- `hardware` `probe`
+- `assumes` `use`, loops with computed indices.
+- `hardware` `power`
 - `heritage` Binary search.
 - `world` A 200-segment feeder run laid out as a long corridor. `probe(a,b)` reports whether the span between two points is continuous, at a tick cost. Probe budget: 10 (log₂200 ≈ 7.6).
 - `varies` Break position.
@@ -784,21 +780,21 @@ Theme: the finale. Unlocks nothing (DESIGN.md §6). Four large levels plus one m
 ### w8-05 — The Kessler Contract  *(the monster)*
 - `premise` Everything. Tonight. Under budget.
 - `teaches` Nothing new. It is an integration exam and it should feel like one.
-- `assumes` All thirty-nine previous levels.
+- `assumes` All thirty-two previous levels.
 - `hardware` —
-- `heritage` Every heritage in this document, once: MST, topological sort, list scheduling, recursive-descent parsing, online exploration, capacitated routing.
-- `world` 48×40. 6–12 bots. An unknown subsurface region. An infrastructure DAG to energise. A quota of material to route to depots by class. An inbound enciphered, partly-corrupt signal stream revealing part of the map and part of the graph. A hard deadline and a fuel budget.
-- `varies` Every axis above, independently drawn.
-- `anti-hardcode` Seven seeds across six independent axes. The brief states the reason in-fiction: *"the Yards run this every night."*
-- `naive-fails` Any solution that solves one subproblem well and the rest naively misses the deadline. The only shape that reaches gold is a fleet with **roles** — scouts, haulers, electricians — coordinated over `send`/`recv`.
+- `heritage` Topological order under precedence, list scheduling across a fleet, online exploration of unknown ground, capacitated routing. Four heritages, each once, and every one of them on the same bots and the same fuel. **Not** MST and **not** a grammar: those end at `w5-05` and `w6-05` and are deliberately not re-run. This row used to claim every heritage in the document at once, which is the difference between a finale and a pile.
+- `world` 48×40 of unmapped workings, walled off from a chamber to the east by a nine-stage airlock. 6–7 bots out of a muster bay. 8–12 substations wired into a feeder DAG, **every one of them hand-operated**, so `power()` from the desk is refused and a bot has to stand on the tile. 12–20 crates in 3–4 classes, one sink per class. KD-0001-T on a marked tile in the workings, and two slots past the airlock to file it in. A live antenna publishing a **plain** manifest — nothing on it is enciphered or corrupt, and it names crates, class depots and the form, but neither the map nor the graph. Per-bot fuel of 110–120 against five or six tiles that refuel. The shift itself is deliberately slack — see `note`.
+- `varies` Three authored instances rather than a draw. Seed 1 is the general case at the smallest scale and the shape a player should close first; seed 4 is a **pure chain**, where the grid cannot be parallelised at all and the answer is to spend the rest of the fleet on crates instead; seed 7 is the **squeeze** — the same six bots against twelve stations and twenty crates, where fuel runs out before scheduling does. Inside each, the cave carve, the gate row, the class set, the branching and every placement are drawn per seed.
+- `anti-hardcode` The map is carved per seed and nothing is where it was, which the brief states in-fiction: *"the Yards run this every night."* Fleet size, station count, crate count and graph shape all move between the three instances, so no route, no rank order and no schedule is reusable.
+- `naive-fails` A grid loop fired from the desk energises nothing: every station is hand-operated and a bot has to walk to it. A solution that solves one subproblem well and the rest naively still finishes inside the shift and misses **par** by a wide margin. The only shape that reaches gold is a fleet with **roles** — scouts, haulers, electricians — with the crew treated as terrain and each dependency rank fenced by a `sync()` on either side. `send`/`recv` is `w7-05`'s idea and does not recur here.
 - `generalize` Over everything at once. This is the only level in the game where that sentence is allowed.
-- `seeds` `[1,2,3,4,5,6,7]` — the highest count in the game.
-- `size` ~500 lines · `difficulty` **10/10** — the shipped reference source is 500 lines exactly.
-  The ~250 this document carried until now was a planning figure from before the level existed;
-  it was never true of anything that passes seven seeds. A player who has published the §18
+- `seeds` `[1,4,7]` — three, and the joint-lowest count in the game, which is deliberate: each asks a different question (see `varies`). The seven this document carried until now moved numbers without moving a decision, and seven randomisations of a 48×40 map is seven times the failure surface for no extra idea. `docs/FIX-FINALE.md` records which four went and why.
+- `size` ~506 lines · `difficulty` **10/10** — the shipped reference source is 506 lines.
+  The ~250 this document carried until the level existed was a planning figure and was never
+  true of anything that passes its seeds. A player who has published the §18
   ladder writes considerably less of it here, which is the whole argument for the Repository.
-- `bonus` **Three separate stars:** (a) `under-budget` — close a fifth inside the shift; (b) `fleet-utilisation` — keep every bot working for at least two thirds of it; (c) `no-blocked-moves` — finish without one blocked move. (b) was a character budget until character count was withdrawn from scoring (DESIGN.md §7); the star that replaced it asks for the same thing the character budget was standing in for, which is a fleet that is not idling.
-- `note` **This level must be beatable at bronze by a patient player with a slow, ugly solution.** Bronze's deadline is generous; gold is where it bites. Gating the ending behind gold ends the game for most players one level before the payoff, and the payoff (NARRATIVE.md §3.3) is the reason the other 39 levels exist.
+- `bonus` **One star, and deliberately one.** `name-the-hold` — file a single line, `held <station> <n>`, naming the substation with the longest gap between its last feeder going quiet and its own first `use()`, and how many ticks that gap was. It is the only question on this level the five required objectives cannot ask: `precedence` grades one side of every edge — *nobody may start early* — and nothing has ever looked at the other side, which is where a schedule actually leaks. The three stars this row carried until now are gone: `under-budget` and `no-blocked-moves` were both met by a program that did nothing, and `fleet-utilisation` was unreachable rather than hard, because World 8 charges `sync` as idleness and so paid for *not* coordinating on the coordination finale. Five required objectives is already the most in the campaign. `docs/FIX-BONUSES-7-8.md`.
+- `note` **This level must be beatable at bronze by a patient player with a slow, ugly solution.** Bronze's deadline is generous; gold is where it bites. Gating the ending behind gold ends the game for most players one level before the payoff, and the payoff (NARRATIVE.md §3.3) is the reason the other 32 levels exist.
 
 ---
 
@@ -908,7 +904,7 @@ Three were caught in draft and replaced:
 | `w7-02` | "Spawn more bots and do `w7-01` again" | `w7-01` (parallel clocks, scaled) | **Divide the Field** | Partitioning by work when the worker count is unknown at write time |
 | `w8-01` | "A medium mixed level" | Everything and nothing | **Efficiency Audit** | Optimisation under a dual budget — ticks and the information budget — as a skill in its own right |
 
-Three more were caught **in play**, and shipping them was the mistake this section was supposed
+Four more were caught **in play**, and shipping them was the mistake this section was supposed
 to prevent. The tell in every case is the same one: an experienced player passes on the first
 honest run without thinking, and can say in one sentence what the previous level's file needed
 changed. Recorded so the argument does not have to be had twice:
@@ -916,6 +912,7 @@ changed. Recorded so the argument does not have to be had twice:
 | Withdrawn | Duplicated | The tell |
 |---|---|---|
 | `w1-02` Forty-Five Metres | `w1-01` (a longer straight route) | Both testers passed first run. 45 literal `move` calls took gold, the star and both objectives. |
+| `w2-01` The Sensor Package | `w2-02` (the same read-then-act, on one row instead of a field) | Both testers golded it on their first honest run at exact par, 18/18, and both named `w2-01 → w2-03` as where the pull weakened. `docs/FIX-COMPRESSION.md` §2. |
 | `w2-03` Rotation | `w2-02` (the same serpentine, one predicate on) | *"Two lines different from w2-02."* Folded together; the merged level is `w2-02`. |
 | `w4-03` Left Hand on the Wall | `w4-02` (the same visited-set sweep) | `w4-02`'s file pasted in unedited took gold 34% under par. |
 
@@ -937,47 +934,47 @@ beginner passed it first run at 680 against a par of 439 and reported feeling no
 
 ---
 
-## 13. Concept Ledger — the 34 distinct ideas
+## 13. Concept Ledger — the 33 distinct ideas
 
 | # | Level | Concept |
 |---|---|---|
 | 1 | w1-01 | Issuing an action; the coordinate model; bounded repetition |
 | 2 | w1-03 | Conditional repetition on a sensed predicate |
 | 3 | w1-05 | Nested iteration for systematic coverage |
-| 4 | w2-01 | Free sensing vs. costly action; conditional action |
-| 5 | w2-02 | Multi-phase per-cell cycle; stale state after acting |
-| 6 | w2-04 | Resource cap; interrupt and resume a traversal |
-| 7 | w2-05 | Prioritisation under a deadline you cannot beat exhaustively |
-| 8 | w3-01 | Carry semantics; a single-slot resource |
-| 9 | w3-02 | Dispatch table keyed by data read from the world |
-| 10 | w3-04 | Order-preserving processing; a queue |
-| 11 | w4-01 | Local sensing in an unknown map |
-| 12 | w4-02 | External memory as a visited set |
-| 13 | w4-04 | Build a graph, then plan over it |
-| 14 | w4-05 | Explore vs. exploit under a shared budget |
-| 15 | w5-01 | Preconditions; direction read from the world |
-| 16 | w5-02 | Binary search |
-| 17 | w5-03 | Topological sort |
-| 18 | w5-04 | Assignment under capacity; order of consideration matters |
-| 19 | w5-05 | Minimum-cost network construction |
-| 20 | w6-01 | Drain a queue; handle the empty case |
-| 21 | w6-02 | Validation; rejecting untrusted input |
-| 22 | w6-03 | Decoding a compressed instruction stream |
-| 23 | w6-04 | Candidate search against a checkable property |
-| 24 | w6-05 | Parsing a recursive grammar |
-| 25 | w7-01 | Parallel clocks; makespan as the metric |
-| 26 | w7-02 | Partitioning by work with an unknown worker count |
-| 27 | w7-03 | Mutual exclusion; livelock |
-| 28 | w7-04 | Dynamic scheduling by earliest-free worker |
-| 29 | w7-05 | Message passing; scout/worker |
-| 30 | w8-01 | Optimisation under a dual budget (ticks *and* information) |
-| 31 | w8-02 | Pipeline composition with interleaved phases |
-| 32 | w8-03 | Precedence constraints executed in parallel |
-| 33 | w8-04 | Reconciling a stale plan against observation |
-| 34 | w8-05 | Integration under simultaneous constraints |
+| 4 | w2-02 | Multi-phase per-cell cycle; stale state after acting |
+| 5 | w2-04 | Resource cap; interrupt and resume a traversal |
+| 6 | w2-05 | Prioritisation under a deadline you cannot beat exhaustively |
+| 7 | w3-01 | Carry semantics; a single-slot resource |
+| 8 | w3-02 | Dispatch table keyed by data read from the world |
+| 9 | w3-04 | Order-preserving processing; a queue |
+| 10 | w4-01 | Local sensing in an unknown map |
+| 11 | w4-02 | External memory as a visited set |
+| 12 | w4-04 | Build a graph, then plan over it |
+| 13 | w4-05 | Explore vs. exploit under a shared budget |
+| 14 | w5-01 | Preconditions; direction read from the world |
+| 15 | w5-02 | Binary search |
+| 16 | w5-03 | Topological sort |
+| 17 | w5-04 | Assignment under capacity; order of consideration matters |
+| 18 | w5-05 | Minimum-cost network construction |
+| 19 | w6-01 | Drain a queue; handle the empty case |
+| 20 | w6-02 | Validation; rejecting untrusted input |
+| 21 | w6-03 | Decoding a compressed instruction stream |
+| 22 | w6-04 | Candidate search against a checkable property |
+| 23 | w6-05 | Parsing a recursive grammar |
+| 24 | w7-01 | Parallel clocks; makespan as the metric |
+| 25 | w7-02 | Partitioning by work with an unknown worker count |
+| 26 | w7-03 | Mutual exclusion; livelock |
+| 27 | w7-04 | Dynamic scheduling by earliest-free worker |
+| 28 | w7-05 | Message passing; scout/worker |
+| 29 | w8-01 | Optimisation under a dual budget (ticks *and* information) |
+| 30 | w8-02 | Pipeline composition with interleaved phases |
+| 31 | w8-03 | Precedence constraints executed in parallel |
+| 32 | w8-04 | Reconciling a stale plan against observation |
+| 33 | w8-05 | Integration under simultaneous constraints |
 
-**Six ideas left with the six withdrawn work orders**, and only two of them are losses worth
-recording. *Coordinate arithmetic and signed deltas* (`w1-04`) was never a puzzle — the brief
+**Six ideas left with the seven withdrawn work orders** — six, not seven, because `w2-01`'s did
+not leave: *free sensing against costly driving* is `w2-02`'s opening line and its scored bonus.
+Only two of the six are losses worth recording. *Coordinate arithmetic and signed deltas* (`w1-04`) was never a puzzle — the brief
 printed the formula — and the skill reappears inside every later `goTo`. *Capacitated multi-stop
 routing* (`w3-05`) survives as `w7-04`'s temporal cousin. *Time-dependent world state* (`w2-03`
 as drafted) never shipped in that form at all. The two genuine losses:
@@ -1000,7 +997,7 @@ tutorial matters more than the rule.
 |---|---|
 | Distance / length | w1-03, w1-05, w4-01, w5-02, w7-01, w7-03 |
 | Endpoint positions | w1-05, w2-02, w3-01, w5-01 |
-| Object distribution | w2-01, w2-02, w3-01, w3-02, w7-02, w8-01 |
+| Object distribution | w2-02, w3-01, w3-02, w7-02, w8-01 |
 | **A mapping the player must read, not know** | w3-02, w8-02 |
 | Set membership / which classes exist | w3-02, w6-02 |
 | Arrival or event schedule | w3-04 |
@@ -1095,7 +1092,7 @@ solution really does want that shape, not when a caller could be forced.
 | `pathTo(x, y, b?)` — walk a bot to a tile the record already knows | w4-04 | w4-05, w7-02, w7-05, w8-01, w8-02, w8-03 | **yes** |
 | `waves(deps)` — group a dependency graph into startable-at-once sets | w5-03 | w5-05, w8-03 | no |
 | `unpack(route)` — a run-length route into the moves it stands for | w6-03 | w6-05, w8-04 | no |
-| `findKey(packets)` — the shift a band was sent with | w6-04 | w6-05, w8-04, w8-05 | no |
+| `findKey(packets)` — the shift a band was sent with | w6-04 | w6-05, w8-04 | no |
 | `deal(costs, fleet)` — heaviest job to the least-loaded worker | w7-04 | w7-05, w8-03 | no |
 
 `pathTo` is the only one with weight, which makes it the one the Cost tab has something to say
@@ -1119,8 +1116,10 @@ two other routines of theirs, and the tick cost flowing up through the chain int
 that called the outermost one (`meterExport`, `docs/LIBRARY.md` §2). w8-02 and w8-03 are the two
 levels whose brief says so outright: *"they are two routines and this depot wants one."*
 
-`w8-05` then imports `findKey`, `reach` and `dispatch` — one brick and two composites — which is
-the joke and the payoff at the same time. The whole site runs on Contractor #4471's code.
+`w8-05` then imports `reach` and `dispatch` — two composites, each built from bricks of the
+player's own — which is the joke and the payoff at the same time. The whole site runs on
+Contractor #4471's code. `findKey` left this list when the finale's band stopped being
+enciphered; it is still earned at `w6-04` and still named by two later work orders.
 
 ### 18.3 The refactor beat
 

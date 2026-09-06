@@ -165,7 +165,7 @@ export const w5_01: LevelDef = {
   world: 5,
   index: 1,
   title: 'Mains',
-  hardware: ['probe'],
+  hardware: ['probe', 'use'],
   brief: [
     '**MEMO KD-2488**',
     '**FROM:** Dep. Coordinator M. Vance',

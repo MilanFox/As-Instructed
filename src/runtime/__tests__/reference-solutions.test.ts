@@ -22,7 +22,6 @@ import { createFakeMonaco } from './fake-monaco.ts';
 import { solution as w1_01 } from '../../levels/world-1/__solutions__/w1-01.ts';
 import { solution as w1_03 } from '../../levels/world-1/__solutions__/w1-03.ts';
 import { solution as w1_05 } from '../../levels/world-1/__solutions__/w1-05.ts';
-import { solution as w2_01 } from '../../levels/world-2/__solutions__/w2-01.ts';
 import { solution as w2_02 } from '../../levels/world-2/__solutions__/w2-02.ts';
 import { solution as w2_04 } from '../../levels/world-2/__solutions__/w2-04.ts';
 import { solution as w2_05 } from '../../levels/world-2/__solutions__/w2-05.ts';
@@ -70,7 +69,7 @@ import { solution as w8_05 } from '../../levels/world-8/__solutions__/w8-05.ts';
 
 const SOLUTIONS: Record<string, ReferenceSolution> = {
   'w1-01': w1_01, 'w1-03': w1_03, 'w1-05': w1_05,
-  'w2-01': w2_01, 'w2-02': w2_02, 'w2-04': w2_04, 'w2-05': w2_05,
+  'w2-02': w2_02, 'w2-04': w2_04, 'w2-05': w2_05,
   'w3-01': w3_01, 'w3-02': w3_02, 'w3-04': w3_04,
   'w4-01': w4_01, 'w4-02': w4_02, 'w4-04': w4_04, 'w4-05': w4_05,
   'w5-01': w5_01, 'w5-02': w5_02, 'w5-03': w5_03, 'w5-04': w5_04, 'w5-05': w5_05,
@@ -327,7 +326,7 @@ describe('the player-facing compiler accepts ordinary JavaScript', () => {
   });
 
   test('a misspelled API name is still an error', async () => {
-    const result = await compilePlayerCode(editor.monaco, playerModel('w2-01', 'scann();'));
+    const result = await compilePlayerCode(editor.monaco, playerModel('w2-02', 'scann();'));
     expect(result.ok).toBe(false);
   });
 });

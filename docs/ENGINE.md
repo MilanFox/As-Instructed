@@ -68,20 +68,30 @@ Two failure philosophies, applied consistently:
 
 | Situation | Behaviour |
 |---|---|
-| The world says no (wall, empty tile, full inventory, no machine) | returns `false` / `null` / `0`, **still charges the full tick cost** |
-| The program is incoherent (unknown bot id, dead bot, negative count, `power` on a `vars.manual` machine) | throws `IllegalActionError` |
+| The world says no (wall, empty tile, full inventory, no machine on this tile, an antenna switched off) | returns `false` / `null` / `0`, **still charges the full tick cost** |
+| The program is incoherent (unknown bot id, dead bot, negative count, `power` on a `vars.manual` machine, a machine id that names nothing, `transmit` where no antenna exists) | throws `IllegalActionError` |
 
 The line between the two is whether the identical call could succeed later in the same run. A wall
-can open and an inventory can empty; an unknown bot id cannot become known, and nothing in the API
-clears `vars.manual`, so `power("sub-3", "on")` is wrong for the whole run rather than wrong now.
-A `false` the player could branch on would be a branch that can never flip. The refused `power`
-is still logged and still charged before it throws, so the trace and the live world stay in step.
+can open, an inventory can empty and an antenna can be powered up; an unknown bot id cannot become
+known, nothing in the API clears `vars.manual`, and nothing in it builds a machine or installs an
+antenna, so `power("sub-3", "on")` and `link("node-1", "ghost")` are wrong for the whole run rather
+than wrong now. A `false` the player could branch on would be a branch that can never flip. Every
+refusal on the throwing side is still logged and still charged before it throws, so the trace and
+the live world stay in step.
+
+Machine ids are on the throwing side for the same reason bot ids are, and they have the same free
+pre-check: `probe(id)` returns `null` for an id that names nothing and costs nothing to ask, which
+is the idiom the World 5 briefs already teach for finding where the substations stop.
 | Budget blown | throws `HaltError` / `OpLimitError` |
 | Bot ran dry | throws `OutOfFuelError` **before mutating anything** |
 | Every bot blocked, forever | throws `LivelockError` |
 
 Extension points for World 5/6 commands that DESIGN.md leaves unspecified:
 `sim.applyMachineChange(botId, machineId, mutate, cost)` and `sim.applyTileChange(at, mutate)`.
+`applyMachineChange` throws on an id that names no machine — it is for changing a machine you have
+already found. When your verb wants to *refuse* and charge for the attempt, say so with
+`sim.refuseMachineAct(botId, detail, cost)` and then report the refusal in your own words; passing
+a knowingly-bad id to bill for it is what that method exists to replace.
 Both emit the right trace events for you. **Do not mutate `sim.world` directly** — an unrecorded
 mutation makes replay diverge silently, which is the single worst bug class in this codebase.
 

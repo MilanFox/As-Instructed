@@ -4,7 +4,7 @@
  * The Regolith Fields grade the trace rather than the final world — a rotated tile ends the run
  * planted whatever the run did to it — so a miss here used to be the least readable in the game:
  * the level held a tick, a tile and a swing, and printed a fraction. These tests pin down what it
- * says instead, and, on `park-ripest`, what it still refuses to say.
+ * says instead.
  */
 import { describe, expect, test } from 'vitest';
 import type { Objective, Sim, Vec, World } from '../../../engine/index.ts';
@@ -13,11 +13,10 @@ import { must } from '../../../engine/__tests__/helpers.ts';
 import { runLevel } from '../../harness.ts';
 import type { LevelDef } from '../../types.ts';
 import { WORLD_2_LEVELS } from '../index.ts';
-import { w2_01 } from '../w2-01.ts';
 import { w2_02 } from '../w2-02.ts';
 import { w2_04 } from '../w2-04.ts';
 import { w2_05 } from '../w2-05.ts';
-import { at, ripeAtStart, ripestCrop, soilTiles } from '../shared.ts';
+import { at, ripeAtStart, soilTiles } from '../shared.ts';
 
 function diverge(level: LevelDef, seed: number, id: string, drive: (sim: Sim, bot: number) => void) {
   const result = runLevel(level, seed, drive);
@@ -68,67 +67,6 @@ function ripeOf(world: World, kind: ItemKind): Vec[] {
     return maturity(here, 0) >= here.maxGrowth;
   });
 }
-
-describe('w2-01 compares the two readings without naming the tile', () => {
-  test('a run that parks on the wrong crop reads its own tile back against the top of the scale', () => {
-    const { met, divergence } = diverge(w2_01, 1, 'park-ripest', (sim, botId) => {
-      for (let step = 0; step < 9; step++) sim.move(botId, Dir.East);
-    });
-
-    expect(met).toBe(false);
-    expect(divergence).toEqual({
-      where: `${at({ x: 10, y: 1 })}, where the run parked`,
-      expected: 'growth 8 of 8',
-      received: 'growth 1 of 8',
-    });
-  });
-
-  /**
-   * The level is "find the highest reading in the row", so the ripest tile's coordinate is the
-   * answer and never appears. The only coordinate in the report is the one the run chose itself.
-   */
-  test('it never names the ripest tile, only what the ripest tile reads', () => {
-    const goal = must(ripestCrop(w2_01.build(1)), 'the ripest crop');
-    const { divergence } = diverge(w2_01, 1, 'park-ripest', () => undefined);
-    const shown = must(divergence, 'a divergence');
-
-    expect(`${shown.expected} ${shown.received}`).not.toMatch(/\(/);
-    expect(`${shown.where} ${shown.expected} ${shown.received}`).not.toContain(at(goal));
-  });
-
-  test('no-overshoot on a run that never found the crop asks for the crop, not the ticks', () => {
-    const { met, divergence } = diverge(w2_01, 1, 'no-overshoot', (sim, botId) => {
-      for (let step = 0; step < 9; step++) sim.move(botId, Dir.East);
-    });
-
-    expect(met).toBe(false);
-    expect(divergence).toEqual({
-      where: 'end of run',
-      expected: 'parked on the ripest crop',
-      received: `${at({ x: 10, y: 1 })}, growth 1 of 8`,
-    });
-  });
-
-  /**
-   * Once the run is parked on the right tile the allowance is a distance to a tile it has already
-   * found, so quoting it gives nothing away and says exactly what the wandering cost.
-   */
-  test('a run that found the crop and wandered is priced against the drive straight there', () => {
-    const goal = must(ripestCrop(w2_01.build(1)), 'the ripest crop');
-    const { met, divergence } = diverge(w2_01, 1, 'no-overshoot', (sim, botId) => {
-      goTo(sim, botId, goal);
-      sim.move(botId, Dir.East);
-      sim.move(botId, Dir.West);
-    });
-
-    expect(met).toBe(false);
-    expect(divergence).toEqual({
-      where: 'the drive',
-      expected: `${String(goal.x - 1)} ticks, straight there`,
-      received: `${String(goal.x + 1)} ticks`,
-    });
-  });
-});
 
 describe('w2-02 names the tile, and says whether the arm ever came down on it', () => {
   test('harvested-ripe names a ready crop the run never swung at', () => {

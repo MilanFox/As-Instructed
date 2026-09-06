@@ -358,12 +358,13 @@ describe('importSave and the reward fields', () => {
 });
 
 /**
- * Six work orders were withdrawn (docs/FIX-COMPRESSION.md) and their ids will never be reissued.
+ * Seven work orders were withdrawn (docs/FIX-COMPRESSION.md, docs/FIX-CONTENT.md) and their ids
+ * will never be reissued.
  * A save written before the cut still names them, and the rule that player code is never lost has
  * no exception for a work order that no longer exists.
  */
 describe('a save that names a withdrawn work order', () => {
-  const WITHDRAWN = ['w1-02', 'w1-04', 'w2-03', 'w3-03', 'w3-05', 'w4-03'];
+  const WITHDRAWN = ['w1-02', 'w1-04', 'w2-01', 'w2-03', 'w3-03', 'w3-05', 'w4-03'];
 
   const beforeTheCut = (): SaveFile => {
     const save = emptySave();
@@ -400,10 +401,10 @@ describe('a save that names a withdrawn work order', () => {
 
   it('imports over another save without losing either side', () => {
     const current = emptySave();
-    current.levels['w2-01'] = { ...emptyProgress(), code: 'ours();' };
+    current.levels['w2-02'] = { ...emptyProgress(), code: 'ours();' };
     const merged = importSave(current, exportSave(beforeTheCut()));
 
-    expect(merged.levels['w2-01']?.code).toBe('ours();');
+    expect(merged.levels['w2-02']?.code).toBe('ours();');
     expect(merged.levels['w1-05']?.medal).toBe('gold');
     expect(merged.levels['w2-03']?.code).toBe('w2-03 code');
   });
@@ -412,10 +413,10 @@ describe('a save that names a withdrawn work order', () => {
     const save = emptySave();
     save.levels['w1-01'] = { ...emptyProgress(), completed: true };
     /* `w1-02` was withdrawn, so the order after `w1-01` is `w1-03`. The gate walks campaign order,
-       not the ids. Two open at a time reaches `w1-05`; `w2-01` is three along and still shut. */
+       not the ids. Two open at a time reaches `w1-05`; `w2-02` is three along and still shut. */
     expect(isLevelUnlocked(save, 'w1-03')).toBe(true);
     expect(isLevelUnlocked(save, 'w1-05')).toBe(true);
-    expect(isLevelUnlocked(save, 'w2-01')).toBe(false);
+    expect(isLevelUnlocked(save, 'w2-02')).toBe(false);
   });
 
   it('counts only issued work orders towards the campaign', () => {
