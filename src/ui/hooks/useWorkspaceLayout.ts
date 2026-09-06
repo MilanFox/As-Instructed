@@ -1,19 +1,26 @@
 /**
- * How wide the program rig is, derived from the window and from the shape of the level being run.
+ * How the workspace is divided: the program rig, the strip the read-out lives in, and the board.
  *
  * The saved fraction is the player's and a value they have dragged is used as given — the splitter
- * has the last word. What is derived here is only the *default*, because one constant cannot
- * serve a 13" laptop and a 27" monitor at once.
+ * has the last word over the *split*. What is derived here is the default, because one constant
+ * cannot serve a 13" laptop and a 27" monitor at once, and the strip, which is not negotiable.
  *
- * The board is now the screen: it is the full height of the workspace and everything else floats
- * over it, so there is one split left to make and it is the one between the code and the board.
- * Two observations drive where it lands:
+ * The board is the screen: it is the full height of the workspace and the read-outs float over it.
+ * Two observations drive where the split lands:
  *
  *  - `tilePx = min(viewW/cols, viewH/rows)`, so a grid can only spend `height x aspect` of width.
  *    Width past that is empty background, and the code is a better home for it than the void.
- *  - The objective read-out and the panel chips float in the board's own gutters. Reserving that
- *    much width on each side is what keeps them off the grid instead of over it, and it costs the
- *    board nothing while the surplus exists.
+ *  - The panel chips float in the board's right-hand corner. Leaving that much width on that side
+ *    is what keeps them over background, and it costs the board nothing while the surplus exists.
+ *
+ * **The strip is different, and this is the fix for `docs/FIX-HUD-OVERLAP.md`.** The objective
+ * read-out used to float in a gutter this derivation *hoped* would be there. It was a preference,
+ * and the first thing surrendered when `RIG_MIN` bound or the player dragged the splitter, so the
+ * card ended up over the grid on the game's first work order at the default split. So the strip is
+ * no longer hoped for: `gutter` is subtracted from the canvas itself (`.viewport__canvas`), the
+ * camera fits the grid into what is left, and the card is laid out inside the strip from the same
+ * numbers. There is nowhere for the two to meet. Widening the card widens the strip and moves the
+ * board; it cannot move the card onto the grid.
  *
  * The old pair of fractions split the workspace into four boxes; the second one — `viewportFraction`,
  * the site view's share of the right column's height — has nothing left to divide and is no longer
@@ -26,11 +33,26 @@ import { DEFAULT_LAYOUT, type Layout } from '../../game/save.ts';
 const RIG_MIN = 440;
 /** Past this the rig is carrying surplus the code cannot spend either, so the board keeps it. */
 const RIG_MAX = 640;
-/** The board never gets narrower than this, however little width there is to go round. */
+/** How much *drawn* board is left when the splitter is dragged as far right as it goes. */
 const BOARD_MIN = 420;
-/** One gutter's worth of board. Mirrors `.hud-card`'s width in app.css: reserve less than the
- *  card is wide and the objective read-out sits over the grid instead of beside it. */
-const HUD_GUTTER = 232;
+
+/**
+ * The strip, open and shut.
+ *
+ * Open it holds the objective card; shut it holds the tab that brings the card back — narrow, but
+ * still a reserved strip, so the way back is never itself over the grid.
+ *
+ * The card's width follows the window because the strip is real now. A fixed 232px is a fair share
+ * of a 1920px workspace and nearly a third of the board on a 1280px one, where it cost `w1-01` a
+ * rung and a half of zoom — and a rework that buys a tidy read-out with smaller tiles has missed
+ * the point of putting the board on the screen. So it is a share, floored where the card stops
+ * being a column of text and capped where more width only buys whitespace.
+ */
+const RAIL_SHARE = 0.14;
+const CARD_MIN = 168;
+const CARD_MAX = 232;
+const RAIL_OPEN_INSET = 12;
+const RAIL_SHUT = { inset: 8, content: 24 };
 
 export interface WorkspaceBox {
   width: number;
@@ -43,35 +65,58 @@ export interface WorkspaceLayout {
   /** The splitter's live bounds. Both are pixel limits, expressed against the box it is dividing. */
   min: number;
   max: number;
+  /** Width the board gives up down its left edge, in CSS pixels. The canvas starts after it. */
+  gutter: number;
+  /** The read-out's own width inside that strip. */
+  cardWidth: number;
+  /** The read-out's offset from the rig's right edge. */
+  cardInset: number;
 }
 
 function clamp(value: number, low: number, high: number): number {
   return Math.min(Math.max(value, low), high);
 }
 
+function strip(
+  box: WorkspaceBox,
+  railOpen: boolean,
+): Pick<WorkspaceLayout, 'gutter' | 'cardWidth' | 'cardInset'> {
+  const { inset, content } = railOpen
+    ? {
+        inset: RAIL_OPEN_INSET,
+        content: clamp(Math.round(box.width * RAIL_SHARE), CARD_MIN, CARD_MAX),
+      }
+    : RAIL_SHUT;
+  return { gutter: inset * 2 + content, cardWidth: content, cardInset: inset };
+}
+
 /**
- * The fraction the workspace should actually use, and the range the splitter may be dragged over.
- * `gridAspect` is the level's cols/rows; pass 1 when nothing is loaded, which is the shape the
- * derivation is least generous to.
+ * The fraction the workspace should actually use, the range the splitter may be dragged over, and
+ * the strip held back for the read-out. `gridAspect` is the level's cols/rows; pass 1 when nothing
+ * is loaded, which is the shape the derivation is least generous to.
  */
 export function effectiveLayout(
   saved: Layout,
   box: WorkspaceBox,
   gridAspect: number,
+  railOpen = true,
 ): WorkspaceLayout {
+  const held = strip(box, railOpen);
   if (box.width <= 0 || box.height <= 0) {
-    return { editorFraction: saved.editorFraction, min: 0.24, max: 0.68 };
+    return { ...held, editorFraction: saved.editorFraction, min: 0.24, max: 0.68 };
   }
   const min = Math.min(RIG_MIN / box.width, 0.5);
-  const max = clamp((box.width - BOARD_MIN) / box.width, min, 0.68);
+  const max = clamp((box.width - held.gutter - BOARD_MIN) / box.width, min, 0.68);
   const dragged = saved.editorFraction !== DEFAULT_LAYOUT.editorFraction;
-  const fraction = dragged ? saved.editorFraction : rigWidth(box, gridAspect) / box.width;
-  return { editorFraction: clamp(fraction, min, max), min, max };
+  const fraction = dragged
+    ? saved.editorFraction
+    : rigWidth(box, gridAspect, held.gutter) / box.width;
+  return { ...held, editorFraction: clamp(fraction, min, max), min, max };
 }
 
-function rigWidth(box: WorkspaceBox, gridAspect: number): number {
-  // The width the grid can actually spend at full height, plus a gutter each side for the HUD.
-  const board = box.height * Math.max(gridAspect, 0.01) + HUD_GUTTER * 2;
+function rigWidth(box: WorkspaceBox, gridAspect: number, gutter: number): number {
+  // The strip, the width the grid can spend at full height, and a matching margin for the chips.
+  const board = box.height * Math.max(gridAspect, 0.01) + gutter * 2;
   return clamp(box.width - board, RIG_MIN, RIG_MAX);
 }
 
@@ -80,6 +125,7 @@ export function useWorkspaceLayout(
   ref: React.RefObject<HTMLElement | null>,
   saved: Layout,
   gridAspect: number,
+  railOpen = true,
 ): WorkspaceLayout {
   const [box, setBox] = useState<WorkspaceBox>({ width: 0, height: 0 });
 
@@ -95,5 +141,8 @@ export function useWorkspaceLayout(
     return () => observer.disconnect();
   }, [ref]);
 
-  return useMemo(() => effectiveLayout(saved, box, gridAspect), [saved, box, gridAspect]);
+  return useMemo(
+    () => effectiveLayout(saved, box, gridAspect, railOpen),
+    [saved, box, gridAspect, railOpen],
+  );
 }

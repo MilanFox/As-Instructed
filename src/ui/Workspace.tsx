@@ -12,6 +12,7 @@ import {
   useOverlay,
   useOverlayRequests,
 } from './hooks/useOverlay.ts';
+import { useRail } from './hooks/useRail.ts';
 import { useWorkspaceLayout } from './hooks/useWorkspaceLayout.ts';
 import { BriefPanel } from './panels/BriefPanel.tsx';
 import { ConsolePanel } from './panels/ConsolePanel.tsx';
@@ -55,7 +56,8 @@ export function Workspace(): React.JSX.Element {
     [level, trace],
   );
   const gridAspect = world && world.h > 0 ? world.w / world.h : 1;
-  const layout = useWorkspaceLayout(workspaceRef, saved, gridAspect);
+  const railOpen = useRail();
+  const layout = useWorkspaceLayout(workspaceRef, saved, gridAspect, railOpen);
 
   useOverlayRequests(level?.id ?? null);
 
@@ -63,7 +65,14 @@ export function Workspace(): React.JSX.Element {
     <div
       className="workspace"
       ref={workspaceRef}
-      style={{ ['--rig-w' as string]: `${layout.editorFraction * 100}%` }}
+      style={
+        {
+          ['--rig-w' as string]: `${layout.editorFraction * 100}%`,
+          ['--hud-gutter' as string]: `${layout.gutter}px`,
+          ['--hud-card-w' as string]: `${layout.cardWidth}px`,
+          ['--hud-card-inset' as string]: `${layout.cardInset}px`,
+        } as React.CSSProperties
+      }
     >
       <ViewportPanel world={world} />
 

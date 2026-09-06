@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useGame } from '../../game/store.ts';
 import { useLibrary } from '../../meta/index.ts';
 import { closeOverlay, overlayState, toggleOverlay } from './useOverlay.ts';
+import { toggleRail } from './useRail.ts';
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -69,6 +70,9 @@ export function useKeyboard(): void {
           break;
         case 'c':
           toggleOverlay('console');
+          break;
+        case 'o':
+          toggleRail();
           break;
         case '?':
         case 'F1':

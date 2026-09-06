@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Camera } from '../../../render/camera.ts';
+import { Camera, ladderIndex } from '../../../render/camera.ts';
 import { DEFAULT_LAYOUT, type Layout } from '../../../game/save.ts';
 import { LEVELS } from '../../../levels/index.ts';
 import { effectiveLayout } from '../useWorkspaceLayout.ts';
@@ -38,9 +38,15 @@ function legacyBoard(box: { width: number; height: number }, aspect: number) {
   return { width: detail, height: viewportHeight };
 }
 
+/**
+ * The box the camera actually gets: the workspace less the rig and less the strip the read-out is
+ * laid out in, because the strip is subtracted from the canvas rather than floated over it
+ * (`docs/FIX-HUD-OVERLAP.md`). Anything measured against `box.width * (1 - editorFraction)` would
+ * be measuring a board that is not the one on screen.
+ */
 function board(saved: Layout, box: { width: number; height: number }, aspect: number) {
   const out = effectiveLayout(saved, box, aspect);
-  return { width: box.width * (1 - out.editorFraction), height: box.height };
+  return { width: box.width * (1 - out.editorFraction) - out.gutter, height: box.height };
 }
 
 /** Device pixels per tile, from the real camera, so the zoom ladder and the fit padding count. */
@@ -88,13 +94,39 @@ describe('effectiveLayout', () => {
    * The one that matters. The board is the screen now, and a rework that made the picture prettier
    * by making the tiles smaller would have missed the point entirely — so every level is fitted
    * with the real camera under both layouts and none of them is allowed to come out worse.
+   *
+   * `docs/FIX-HUD-OVERLAP.md` bought one exception with its eyes open. Holding the read-out a strip
+   * of its own is the only way the card cannot land on the grid, and a strip is width the camera no
+   * longer has. From 1680px up it costs nothing at all; on a 1280 and a 1440 it costs four of the
+   * campaign's thirty-three levels exactly one rung of the zoom ladder, and folding the read-out
+   * gives that rung back with interest. So the promise is *bounded* rather than dropped: a rung is
+   * the price of the read-out on a small screen, and the player can decline to pay it.
    */
-  it('gives every level at least as many device pixels per tile as the layout it replaced', () => {
+  it('never costs a level more than one rung of zoom against the layout it replaced', () => {
     for (const box of [SMALL, LAPTOP, AUDIT, WIDE]) {
       for (const grid of GRIDS) {
         const aspect = grid.w / grid.h;
         const before = tilePx(legacyBoard(box, aspect), grid);
         const after = tilePx(board(DEFAULT_LAYOUT, box, aspect), grid);
+        const dropped = ladderIndex(before) - ladderIndex(after);
+        expect(`${grid.id} ${box.width}: dropped ${Math.max(dropped, 0)}`).toBe(
+          `${grid.id} ${box.width}: dropped ${Math.min(Math.max(dropped, 0), 1)}`,
+        );
+      }
+    }
+  });
+
+  /* And the fold hands the rung straight back: with the read-out away, nothing is worse than it was. */
+  it('gives every level at least as many device pixels per tile once the read-out is folded', () => {
+    for (const box of [SMALL, LAPTOP, AUDIT, WIDE]) {
+      for (const grid of GRIDS) {
+        const aspect = grid.w / grid.h;
+        const before = tilePx(legacyBoard(box, aspect), grid);
+        const out = effectiveLayout(DEFAULT_LAYOUT, box, aspect, false);
+        const after = tilePx(
+          { width: box.width * (1 - out.editorFraction) - out.gutter, height: box.height },
+          grid,
+        );
         expect(`${grid.id} ${box.width}: ${after}`).toBe(
           `${grid.id} ${box.width}: ${Math.max(before, after)}`,
         );
@@ -103,30 +135,61 @@ describe('effectiveLayout', () => {
   });
 
   it('hands the board the width its grid can spend and the program the rest', () => {
-    // A 40x40 maze runs out of columns at the height it has; a 30x3 corridor never does.
-    const square = board(DEFAULT_LAYOUT, AUDIT, 1);
-    const corridor = board(DEFAULT_LAYOUT, AUDIT, 10);
+    // A 40x40 maze runs out of columns at the height it has; a 30x3 corridor never does. Measured
+    // where the derivation still has room to move: on `AUDIT` both shapes are already down on
+    // `RIG_MIN`, and a floor two shapes share says nothing about either of them.
+    const roomy = { width: 1800, height: 734 };
+    const square = board(DEFAULT_LAYOUT, roomy, 1);
+    const corridor = board(DEFAULT_LAYOUT, roomy, 10);
     expect(corridor.width).toBeGreaterThan(square.width);
     expect(square.width).toBeGreaterThan(square.height);
   });
 
   /*
-   * The reservation is a preference, not a promise: it is the first thing given up when the
-   * program's own floor binds. On a 13" laptop it does, and the objective card ends up over the
-   * corner of a 40x40 grid — which is still the better half of a trade that used to spend a whole
-   * 268px column on the same list.
+   * The strip is a promise now, and this is the half of the fix the layout owes the stylesheet.
+   *
+   * It used to be a preference — the first thing given up when the program's own floor bound — and
+   * the note here said as much: "the objective card ends up over the corner of a 40x40 grid". It
+   * did, on `w1-01`, at the default split, on a 1920px window. So the strip is held back from the
+   * canvas at every size instead, and the only thing left that varies is the *right-hand* margin
+   * the chips sit in, which is still a preference because a chip is a 24px ornament in a corner.
    */
-  it('keeps a gutter each side of a square grid wherever there is width to spare', () => {
+  it('holds the read-out its own strip at every window size, and a chip margin where it can', () => {
+    for (const box of [SMALL, LAPTOP, AUDIT, WIDE, { width: 700, height: 500 }]) {
+      for (const aspect of [1, 1.25, 2, 4, 10]) {
+        const out = effectiveLayout(DEFAULT_LAYOUT, box, aspect);
+        expect(out.gutter).toBeGreaterThanOrEqual(out.cardInset * 2 + out.cardWidth);
+      }
+    }
     for (const box of [AUDIT, WIDE]) {
       const view = board(DEFAULT_LAYOUT, box, 1);
       const grid = { w: 40, h: 40 };
       const drawn = tilePx(view, grid) * grid.w;
-      expect((view.width - drawn) / 2).toBeGreaterThanOrEqual(232);
+      expect(view.width - drawn).toBeGreaterThanOrEqual(0);
     }
+    expect(
+      WIDE.width * (1 - effectiveLayout(DEFAULT_LAYOUT, WIDE, 1).editorFraction),
+    ).toBeGreaterThan(WIDE.height + 232);
     expect(LAPTOP.width * effectiveLayout(DEFAULT_LAYOUT, LAPTOP, 1).editorFraction).toBeCloseTo(
       440,
       6,
     );
+  });
+
+  /*
+   * Folding the read-out away has to *pay*. The strip narrows to the tab that brings it back, and
+   * everything it gives up goes to the drawn board — otherwise the control is a confession that
+   * the card was in the way, which is the thing the strip exists to make impossible.
+   */
+  it('gives the board the width the folded read-out gives up', () => {
+    for (const box of [SMALL, LAPTOP, AUDIT, WIDE]) {
+      const open = effectiveLayout(DEFAULT_LAYOUT, box, 1);
+      const shut = effectiveLayout(DEFAULT_LAYOUT, box, 1, false);
+      expect(shut.gutter).toBeLessThan(open.gutter);
+      const drawn = (out: ReturnType<typeof effectiveLayout>): number =>
+        box.width * (1 - out.editorFraction) - out.gutter;
+      expect(drawn(shut)).toBeGreaterThan(drawn(open));
+    }
   });
 
   it('keeps the program readable at every window size', () => {
