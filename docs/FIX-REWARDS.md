@@ -222,7 +222,7 @@ inert under that change. If `graded: false` levels can still record a medal, add
 **No, and I would cut roughly half of it.** Neither playtester opened it once, and that is the
 finding, not an accident of two sessions.
 
-What the screen is, structurally: a memo whose five tiers are the only content the player cannot
+What the screen is, structurally: a memo whose four tiers are the only content the player cannot
 get elsewhere, and a medal wall that restates the site map. The site map already shows points,
 closed count, gold/silver/bronze/star counts, per-world point totals, an `ALL AT PAR` badge per
 world and a completion bar — I photographed all of it while testing. The medal wall adds per-level

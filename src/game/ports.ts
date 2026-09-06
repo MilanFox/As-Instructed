@@ -7,7 +7,15 @@
  * subsystem is missing.
  */
 import type { Trace, Vec, Verdict } from '../engine/index.ts';
-import { FailureCode, Sim, buildVerdict, cloneWorld, isSimError } from '../engine/index.ts';
+import {
+  FailureCode,
+  Sim,
+  buildVerdict,
+  cloneWorld,
+  evaluateObjectives,
+  isSimError,
+  senseTotals,
+} from '../engine/index.ts';
 import type { RunResponse } from '../runtime/protocol.ts';
 import { getLevel } from '../levels/index.ts';
 
@@ -165,7 +173,8 @@ export class FakeRunner implements RunnerPort {
     }
 
     const trace = sim.finish();
-    const verdict: Verdict = buildVerdict({
+    const senses = senseTotals(trace);
+    const required: Verdict = buildVerdict({
       objectives: level.objectives,
       world: sim.world,
       trace,
@@ -173,8 +182,21 @@ export class FakeRunner implements RunnerPort {
       ops: sim.ops,
       seeds: submission.seeds.length,
       spend: sim.spendTotals(),
+      senses,
       ...(failure ? { failure } : {}),
     });
+
+    /* The real runtime grades bonuses on every seed and reports the worst (`aggregate.ts`). This
+       one has only ever run a single seed, so it can do no better than report that seed for all of
+       them — the same fiction it already tells about `results`. */
+    const bonus = evaluateObjectives(level.bonus ?? [], {
+      world: sim.world,
+      trace,
+      initialWorld,
+      ops: sim.ops,
+      senses,
+    });
+    const verdict: Verdict = { ...required, objectives: [...required.objectives, ...bonus] };
 
     return {
       ok: true,
@@ -186,7 +208,8 @@ export class FakeRunner implements RunnerPort {
         passed: verdict.passed,
         ticks: verdict.stats.ticks,
         ops: verdict.stats.ops,
-        objectives: verdict.objectives,
+        objectives: required.objectives,
+        ...(bonus.length > 0 ? { bonus } : {}),
       })),
       ...(verdict.passed ? {} : { failedSeed: seed }),
     };
