@@ -128,9 +128,14 @@ describe('a partly-correct program is credited per objective, per seed', () => {
 
     expect(response.verdict.passed).toBe(false);
 
-    const met = response.verdict.objectives.filter((entry) => entry.met).map((entry) => entry.id);
+    /* The verdict carries the level's bonus rows too, and a bonus is not banked work:
+       `objectivesOnEverySeed` is asked about the required list only. */
+    const required = new Set(level.objectives.map((objective) => objective.id));
+    const met = response.verdict.objectives
+      .filter((entry) => entry.met && required.has(entry.id))
+      .map((entry) => entry.id);
     const missed = response.verdict.objectives
-      .filter((entry) => !entry.met)
+      .filter((entry) => !entry.met && required.has(entry.id))
       .map((entry) => entry.id);
     expect(met.length, 'a partial run must not report a bare zero').toBeGreaterThan(0);
     expect(missed).toContain('grid-online');

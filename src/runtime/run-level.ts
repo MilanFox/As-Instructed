@@ -1,5 +1,5 @@
 import type { CostOverrides, Trace, Verdict } from '../engine/index.ts';
-import { Sim, buildVerdict, cloneWorld } from '../engine/index.ts';
+import { Sim, buildVerdict, cloneWorld, evaluateObjectives, senseTotals } from '../engine/index.ts';
 import type { LevelDef } from '../levels/index.ts';
 import type { LibraryRequest, LibraryUsage, PerSeedResult, RuntimeFailure } from './protocol.ts';
 import { buildPlayerScope } from './api-bindings.ts';
@@ -95,6 +95,7 @@ export function runSeed(options: SeedRunOptions): SeedRun {
   }
 
   const trace = sim.finish();
+  const senses = senseTotals(trace);
   const verdict = buildVerdict({
     objectives: level.objectives,
     world: sim.world,
@@ -103,6 +104,7 @@ export function runSeed(options: SeedRunOptions): SeedRun {
     ops: sim.ops,
     seeds: 1,
     spend: sim.spendTotals(),
+    senses,
     ...(failure ? { failure: toVerdictFailure(failure) } : {}),
   });
 
@@ -113,6 +115,18 @@ export function runSeed(options: SeedRunOptions): SeedRun {
     ops: verdict.stats.ops,
     objectives: verdict.objectives,
   };
+  /* A second pass rather than a second entry in the list above: `buildVerdict` derives `passed`
+     from every objective it is handed, and a bonus that is missed is not a failed run. */
+  const bonus = level.bonus ?? [];
+  if (bonus.length > 0) {
+    result.bonus = evaluateObjectives(bonus, {
+      world: sim.world,
+      trace,
+      initialWorld,
+      ops: sim.ops,
+      senses,
+    });
+  }
   if (failure) result.failure = failure;
   if (options.library) result.libraryUsage = linked.usage;
 

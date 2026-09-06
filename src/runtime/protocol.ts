@@ -71,6 +71,12 @@ export interface PerSeedResult {
   ticks: number;
   ops: number;
   objectives: ObjectiveReport[];
+  /**
+   * The level's bonus objectives on this seed, when it declares any. Kept apart from `objectives`
+   * because a bonus is optional by definition and must never move `passed`; the aggregate folds
+   * these across seeds under the same every-seed rule the required objectives get.
+   */
+  bonus?: ObjectiveReport[];
   failure?: RuntimeFailure;
   /** Present whenever a library was linked, even if the program never called it. */
   libraryUsage?: LibraryUsage;
