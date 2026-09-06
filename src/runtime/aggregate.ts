@@ -1,4 +1,4 @@
-import type { Verdict } from '../engine/index.ts';
+import type { ObjectiveReport, Verdict } from '../engine/index.ts';
 import { FailureCode } from '../engine/index.ts';
 import type { RunResponse } from './protocol.ts';
 import type { SeedRun } from './run-level.ts';
@@ -19,6 +19,10 @@ import type { SeedRun } from './run-level.ts';
  * reported from the worst seed *for that objective* — the first that missed it, with that seed's
  * own progress — so a run that closes four of five everywhere can say so, and the one that is
  * still open says which layout it is still open on.
+ *
+ * Bonus objectives are folded by the identical rule and appended to the same list. A bonus is a
+ * level objective that happens not to move `passed`; grading it on one seed made the star the one
+ * reward a solution that memorised a single layout could still win.
  */
 
 function maxOf(values: readonly number[]): number {
@@ -49,12 +53,13 @@ function mergeSenses(runs: readonly SeedRun[]): Record<string, number> {
  * One row per objective, taken from the first seed that failed it and from the reported seed when
  * every seed met it. Objective order follows the level's, which is the reported run's order.
  */
-function worstPerObjective(runs: readonly SeedRun[], reported: SeedRun): Verdict['objectives'] {
-  return reported.verdict.objectives.map((objective) => {
-    for (const run of runs) {
-      const missed = run.verdict.objectives.find(
-        (candidate) => candidate.id === objective.id && !candidate.met,
-      );
+function worstPerObjective(
+  reported: readonly ObjectiveReport[],
+  perSeed: readonly (readonly ObjectiveReport[])[],
+): Verdict['objectives'] {
+  return reported.map((objective) => {
+    for (const seed of perSeed) {
+      const missed = seed.find((candidate) => candidate.id === objective.id && !candidate.met);
       if (missed) return missed;
     }
     return objective;
@@ -83,7 +88,16 @@ export function aggregate(runs: SeedRun[]): RunResponse {
 
   const verdict: Verdict = {
     passed: failedIndex === -1,
-    objectives: worstPerObjective(runs, reported),
+    objectives: [
+      ...worstPerObjective(
+        reported.verdict.objectives,
+        runs.map((run) => run.verdict.objectives),
+      ),
+      ...worstPerObjective(
+        reported.result.bonus ?? [],
+        runs.map((run) => run.result.bonus ?? []),
+      ),
+    ],
     stats: {
       ticks: maxOf(runs.map((run) => run.verdict.stats.ticks)),
       ops: maxOf(runs.map((run) => run.verdict.stats.ops)),
