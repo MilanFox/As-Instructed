@@ -153,9 +153,12 @@ const orderedCount = (ctx: ObjectiveContext): number => {
 };
 
 /**
- * Par: the reference walks the line once and uses every substation, so its cost is fixed by the
- * layout — 37 ticks on the longest seed (18 moves plus nine 2-tick uses). There is no shorter
- * route, so par is that number rather than that number minus a shave.
+ * Par: the reference reads the chain off `probe` before it moves, so it walks the line once in
+ * the right direction — 22, 32 and 27 ticks across the three seeds, and par is the worst of them.
+ *
+ * It was 37, which is what the answer that never probes costs: walk to one end, find the reactor
+ * is at the other, and walk back switching as it goes. Par sat exactly on that program, so the
+ * level's own hardware bought nothing. 37 is now silver. `docs/FIX-PAR-3-8.md` §6.2 measured both.
  */
 export const w5_01: LevelDef = {
   id: 'w5-01',
@@ -200,7 +203,7 @@ export const w5_01: LevelDef = {
     },
   ],
   seeds: [1, 2, 3],
-  par: { ticks: 37 },
+  par: { ticks: 32 },
   build(seed: number): World {
     const { reactorAt, stations } = mainsLayout(seed);
     const world = createWorld({ w: WIDTH, h: HEIGHT, seed, fill: Terrain.Wall });

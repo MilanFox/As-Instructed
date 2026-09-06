@@ -916,7 +916,7 @@ export const w8_05: LevelDef = {
     ),
     Objectives.custom(
       'deadline',
-      'Finish inside the shift, in ticks',
+      'Finish inside the shift',
       (ctx) => ctx.trace.endTick <= deadlineFor(ctx.initialWorld),
       {
         progress: (ctx) => {
@@ -924,6 +924,8 @@ export const w8_05: LevelDef = {
           return [Math.min(ctx.trace.endTick, limit), limit];
         },
         divergence: (ctx) => overranBy(ctx, deadlineFor(ctx.initialWorld)),
+        meter: { kind: 'ticks' },
+        unit: 'ticks',
       },
     ),
   ],

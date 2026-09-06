@@ -56,13 +56,22 @@ interface Layout {
 
 /**
  * Seed 2 is the single chain, where the fleet buys pre-positioning and nothing else. Seed 3 is the
- * fan with no edges at all, where every station is ready at tick zero. The rest sit between them,
- * and the station-to-bot ratio moves as well, so the correct schedule is a function of both.
+ * flattest grid — three bands of six across six bots — where almost everything is ready at once.
+ * The rest sit between them, and the station-to-bot ratio moves as well, so the correct schedule
+ * is a function of both.
+ *
+ * Seed 3 was `layers: 1`, a fan with no edges at all, and that was two defects wearing one number.
+ * `precedence-held` is *vacuously true* on a grid with no edges, so the seed did not exercise the
+ * objective the level is about; and `deadlineFor` is a function of the chain, so the seed with no
+ * chain got the tightest shift in the set — 98 ticks, under the silver cut of a flat par. The
+ * level graded hardest on the one layout that had removed its own idea. `docs/FIX-PAR-REPAIRS.md`
+ * §2. Three bands keeps the anti-hardcode axis (a program that assumes a chain still breaks here)
+ * and gives the objective something to hold.
  */
 const LAYOUTS: Record<number, Layout> = {
   1: { stations: 14, bots: 4, layers: 4 },
   2: { stations: 14, bots: 4, layers: 14 },
-  3: { stations: 18, bots: 6, layers: 1 },
+  3: { stations: 18, bots: 6, layers: 3 },
   4: { stations: 20, bots: 8, layers: 4 },
   5: { stations: 16, bots: 5, layers: 6 },
 };
@@ -141,6 +150,17 @@ function deadlineFor(world: World): number {
   const hop = meanHop(world);
   return (criticalChain(world) + lanes(world)) * (USE_COST + hop) + hop;
 }
+
+/**
+ * The shift and the medal ladder are the same axis, so the shift has to sit above the ladder.
+ *
+ * Par is flat and `deadlineFor` is not, and for one seed the two disagreed: par 128 called a run
+ * gold up to 128 on a layout that failed it outright at 99. A ladder that promises a rung inside a
+ * band the verdict has already refused is not a ladder. `w8-03 grades and fails on one axis` in
+ * `src/levels/world-8/__tests__/divergence.test.ts` holds this on every seed, and it is what any
+ * future change to `deadlineFor`, to a `LAYOUTS` row or to par has to keep true.
+ */
+const PAR_TICKS = 84;
 
 /** The first station the audit will not sign off, and why. */
 function darkStation(ctx: ObjectiveContext): { id: string; at: Vec; reason: string } | undefined {
@@ -270,7 +290,7 @@ export const w8_03: LevelDef = {
     { label: 'Your score', value: 'The clock stops when the last bot stops.' },
   ],
   seeds: [1, 2, 3, 4, 5],
-  par: { ticks: 128 },
+  par: { ticks: PAR_TICKS },
   build(seed: number): World {
     const layout = layoutFor(seed);
     const world = createWorld({ w: WIDTH, h: HEIGHT, seed, fill: Terrain.Floor });
@@ -380,11 +400,13 @@ export const w8_03: LevelDef = {
     ),
     Objectives.custom(
       'within-shift',
-      "Finish the whole grid inside the shift's deadline, in ticks",
+      "Finish the whole grid inside the shift's deadline",
       (ctx) => ctx.trace.endTick <= deadlineFor(ctx.initialWorld),
       {
         progress: (ctx) => [ctx.trace.endTick, deadlineFor(ctx.initialWorld)],
         divergence: (ctx) => overranBy(ctx, deadlineFor(ctx.initialWorld)),
+        meter: { kind: 'ticks' },
+        unit: 'ticks',
       },
     ),
   ],

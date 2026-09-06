@@ -11,7 +11,9 @@ import {
   corridorPoll,
   fieldSweep,
   flatReader,
+  frontierScavenger,
   literalPlanFollower,
+  lockerCanvasser,
   rawRelay,
   roundRobinDispatch,
   rowSweep,
@@ -290,6 +292,28 @@ describe('par calibration', () => {
     expect(swept.passed).toBe(true);
     expect(swept.medal).toBe('silver');
     expect(reference('w2-05').worst).toBeLessThan(swept.worst);
+  });
+
+  /**
+   * `docs/FIX-PAR-REPAIRS.md` §1. This par used to be free: the workings held short cuts between
+   * the legs of the filed route, so the answer that never decoded a packet walked to the locker in
+   * a fifth of the ticks the plan costs and golded on every seed by 106 ticks. The repair is the
+   * map, not the number — no two corridors run side by side any more, so the filed route is the
+   * shortest walk there is and refusing to read it can only add ground.
+   *
+   * Both refusals are here because the second one is the better program and it is the one a
+   * player who has met `probe` will actually write. Neither may gold, and the assertion that the
+   * reference is *cheaper on every seed* is the one that would catch the defect coming back.
+   */
+  test('w8-04: ignoring the filed plan is correct, and is not gold either way', () => {
+    const plan = reference('w8-04');
+    for (const refusal of [frontierScavenger, lockerCanvasser]) {
+      const off = scored('w8-04', refusal);
+      expect(off.passed, refusal.levelId).toBe(true);
+      expect(off.medal).toBe('bronze');
+      expect(plan.worst).toBeLessThan(off.worst);
+    }
+    expect(plan.medal).toBe('gold');
   });
 
   /**

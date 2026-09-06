@@ -1,5 +1,13 @@
-import type { DieEvent, Divergence, ObjectiveContext, Vec, World } from '../../engine/index.ts';
+import type {
+  DieEvent,
+  Divergence,
+  ObjectiveContext,
+  Rng,
+  Vec,
+  World,
+} from '../../engine/index.ts';
 import {
+  ALL_DIRS,
   Dir,
   ItemKind,
   MachineKind,
@@ -28,6 +36,7 @@ import {
   point,
   sealPacket,
   tilesEntered,
+  worldDistance,
   worldDistances,
 } from './shared.ts';
 
@@ -35,6 +44,9 @@ const SIZE = 30;
 const LIFT: Vec = { x: 4, y: 4 };
 /** The route is kept inside this box so a collapse always has room for a way round it. */
 const EDGE = 3;
+/** How far a false trunk is driven, and the shortest one worth leaving in the ground. */
+const TRUNK_LENGTH = 30;
+const TRUNK_MINIMUM = 9;
 const LETTER: Readonly<Record<Dir, string>> = { 0: 'N', 1: 'E', 2: 'S', 3: 'W' };
 export interface Leg {
   from: Vec;
@@ -42,14 +54,21 @@ export interface Leg {
   length: number;
 }
 
+/** A leg whose middle has come down, and the perpendicular the way round bulges into. */
+export interface Collapse {
+  leg: number;
+  side: Dir;
+}
+
 export interface Survey {
   legs: Leg[];
-  /** Indices into `legs` whose middle has since come down. */
-  collapsed: number[];
+  collapsed: Collapse[];
   /** Section n holds `legs[sections[n] .. sections[n + 1] - 1]`. */
   sections: number[];
   cipherKey: number;
   decoys: number;
+  /** Dead-end workings driven off the route. Not on the plan, and not in the packets either. */
+  trunks: number;
   locker: Vec;
 }
 
@@ -58,82 +77,148 @@ interface Drift {
   stale: number;
   cipherKey: number;
   decoys: number;
+  trunks: number;
 }
 
 /**
  * Seed 1 is the zero-drift instance: the plan is perfect and following it literally works, which
- * is the only way a player ever gets to believe the plan. Seed 4 is heavy drift — three sections
- * of seven have come down — so anything that trusts the plan without checking walks into rock.
+ * is the only way a player ever gets to believe the plan. Seed 4 is heavy drift — five legs of
+ * twelve have come down — so anything that trusts the plan without checking walks into rock.
  * Neither blind trust nor blind distrust survives the set (CURRICULUM.md §10).
  */
 const DRIFTS: Readonly<Record<number, Drift>> = Object.freeze({
-  1: { legs: 13, stale: 0, cipherKey: 0, decoys: 2 },
-  2: { legs: 14, stale: 2, cipherKey: 41, decoys: 3 },
-  3: { legs: 15, stale: 3, cipherKey: 77, decoys: 3 },
-  4: { legs: 16, stale: 6, cipherKey: 13, decoys: 4 },
-  5: { legs: 14, stale: 4, cipherKey: 94, decoys: 3 },
+  1: { legs: 11, stale: 0, cipherKey: 0, decoys: 2, trunks: 7 },
+  2: { legs: 12, stale: 2, cipherKey: 41, decoys: 3, trunks: 7 },
+  3: { legs: 12, stale: 3, cipherKey: 77, decoys: 3, trunks: 7 },
+  4: { legs: 12, stale: 5, cipherKey: 13, decoys: 4, trunks: 7 },
+  5: { legs: 11, stale: 3, cipherKey: 94, decoys: 3, trunks: 7 },
 });
 
 function driftFor(seed: number): Drift {
-  return DRIFTS[seed] ?? { legs: 14, stale: 3, cipherKey: 29, decoys: 3 };
+  return DRIFTS[seed] ?? { legs: 12, stale: 3, cipherKey: 29, decoys: 3, trunks: 5 };
 }
 
 const inBox = (at: Vec): boolean =>
   at.x >= EDGE + 1 && at.y >= EDGE + 1 && at.x <= SIZE - EDGE - 2 && at.y <= SIZE - EDGE - 2;
 
-function endOf(leg: Leg): Vec {
-  let at = leg.from;
-  for (let i = 0; i < leg.length; i++) at = step(at, leg.dir);
+/** The filed route is held inside the box; the old workings may run anywhere on the site. */
+const onSite = (at: Vec): boolean =>
+  at.x >= 1 && at.y >= 1 && at.x <= SIZE - 2 && at.y <= SIZE - 2;
+
+const cell = (at: Vec): number => at.y * SIZE + at.x;
+
+function stepBy(from: Vec, dir: Dir, count: number): Vec {
+  let at = from;
+  for (let i = 0; i < count; i++) at = step(at, dir);
   return at;
 }
 
-/** The perpendicular the bypass is allowed to bulge into, or null when neither side has room. */
-function sideFor(leg: Leg): Dir | null {
-  const sides: Dir[] =
-    leg.dir === Dir.North || leg.dir === Dir.South ? [Dir.East, Dir.West] : [Dir.North, Dir.South];
-  for (const side of sides) {
-    let ok = true;
-    for (let along = 0; along <= leg.length && ok; along++) {
-      let at = leg.from;
-      for (let i = 0; i < along; i++) at = step(at, leg.dir);
-      for (let out = 1; out <= 3; out++) {
-        at = step(at, side);
-        if (!inBox(at)) ok = false;
-      }
+const acrossFrom = (dir: Dir): Dir[] =>
+  dir === Dir.North || dir === Dir.South ? [Dir.East, Dir.West] : [Dir.North, Dir.South];
+
+/** The tiles a leg carves, excluding the one it starts on. */
+function legTiles(leg: Leg): Vec[] {
+  const out: Vec[] = [];
+  let at = leg.from;
+  for (let i = 0; i < leg.length; i++) {
+    at = step(at, leg.dir);
+    out.push(at);
+  }
+  return out;
+}
+
+function endOf(leg: Leg): Vec {
+  return stepBy(leg.from, leg.dir, leg.length);
+}
+
+/**
+ * Whether a stretch can be carved without coming alongside anything already carved.
+ *
+ * Every corridor here is an induced path: two floor tiles are neighbours only where they are
+ * consecutive on the same corridor. That is what makes the filed plan worth having. The workings
+ * are a tree, so the route the plan describes is the *only* way to the locker, and a wrong turn
+ * is a walk back rather than a longer way round.
+ */
+function clearOf(taken: Set<number>, tiles: readonly Vec[], joins: readonly Vec[]): boolean {
+  const own = new Set([...tiles, ...joins].map(cell));
+  for (const at of tiles) {
+    if (!inBox(at) || taken.has(cell(at))) return false;
+    for (const dir of ALL_DIRS) {
+      const beside = step(at, dir);
+      if (!own.has(cell(beside)) && taken.has(cell(beside))) return false;
     }
-    if (ok) return side;
+  }
+  return true;
+}
+
+/** Around the fallen stretch: out three, along four, back three. Six moves more than the plan. */
+function bypassPath(leg: Leg, side: Dir): Vec[] {
+  const out: Vec[] = [];
+  let at = stepBy(leg.from, leg.dir, 2);
+  for (let i = 0; i < 3; i++) {
+    at = step(at, side);
+    out.push(at);
+  }
+  for (let i = 0; i < 4; i++) {
+    at = step(at, leg.dir);
+    out.push(at);
+  }
+  const back = opposite(side);
+  for (let i = 0; i < 3; i++) {
+    at = step(at, back);
+    out.push(at);
+  }
+  return out;
+}
+
+/** The two tiles of this leg that are under the fall. */
+function fallenOf(leg: Leg): Vec[] {
+  return [stepBy(leg.from, leg.dir, 3), stepBy(leg.from, leg.dir, 4)];
+}
+
+/** The perpendicular the way round fits into, or null when neither side is clear. */
+function sideFor(leg: Leg, taken: Set<number>): Dir | null {
+  const joins = [stepBy(leg.from, leg.dir, 2), stepBy(leg.from, leg.dir, 6)];
+  for (const side of acrossFrom(leg.dir)) {
+    const path = bypassPath(leg, side);
+    // The last tile is the leg's own, where the way round rejoins it.
+    if (clearOf(taken, path.slice(0, -1), joins)) return side;
   }
   return null;
 }
 
-export function surveyFor(seed: number): Survey {
-  const drift = driftFor(seed);
-  const rng = localRng(seed * 31 + 7);
+function layout(drift: Drift, salt: number): Survey | null {
+  const rng = localRng(salt);
+  const taken = new Set<number>([cell(LIFT)]);
 
   const legs: Leg[] = [];
   let at = LIFT;
   let previous: Dir | null = null;
-  for (let guard = 0; legs.length < drift.legs && guard < 400; guard++) {
+  for (let guard = 0; legs.length < drift.legs && guard < 600; guard++) {
     const dir = rng.pick<Dir>([Dir.East, Dir.East, Dir.South, Dir.South, Dir.North, Dir.West]);
     if (previous !== null && dir === opposite(previous)) continue;
-    const length = rng.int(6, 9);
-    let landing = at;
-    let ok = true;
-    for (let i = 0; i < length; i++) {
-      landing = step(landing, dir);
-      if (!inBox(landing)) ok = false;
-    }
-    if (!ok) continue;
-    legs.push({ from: at, dir, length });
-    at = landing;
+    const leg: Leg = { from: at, dir, length: rng.int(6, 9) };
+    const tiles = legTiles(leg);
+    if (!clearOf(taken, tiles, [at])) continue;
+    legs.push(leg);
+    for (const tile of tiles) taken.add(cell(tile));
+    at = tiles[tiles.length - 1] as Vec;
     previous = dir;
   }
+  if (legs.length < drift.legs) return null;
 
-  const eligible = legs
-    .map((leg, index) => ({ index, side: sideFor(leg) }))
-    .filter((entry) => entry.side !== null && (legs[entry.index] as Leg).length >= 7)
-    .map((entry) => entry.index);
-  const collapsed = rng.shuffle(eligible).slice(0, drift.stale).sort((a, b) => a - b);
+  const collapsed: Collapse[] = [];
+  for (const candidate of rng.shuffle(legs.map((_, index) => index))) {
+    if (collapsed.length >= drift.stale) break;
+    const leg = legs[candidate] as Leg;
+    if (leg.length < 7) continue;
+    const side = sideFor(leg, taken);
+    if (side === null) continue;
+    collapsed.push({ leg: candidate, side });
+    for (const tile of bypassPath(leg, side)) taken.add(cell(tile));
+  }
+  if (collapsed.length < drift.stale) return null;
+  collapsed.sort((a, b) => a.leg - b.leg);
 
   const sections: number[] = [];
   for (let i = 0; i < legs.length; i += 2) sections.push(i);
@@ -144,8 +229,18 @@ export function surveyFor(seed: number): Survey {
     sections,
     cipherKey: drift.cipherKey,
     decoys: drift.decoys,
+    trunks: drift.trunks,
     locker: endOf(legs[legs.length - 1] as Leg),
   };
+}
+
+export function surveyFor(seed: number): Survey {
+  const drift = driftFor(seed);
+  for (let salt = 0; salt < 200; salt++) {
+    const attempt = layout(drift, seed * 31 + 7 + salt * 1009);
+    if (attempt !== null) return attempt;
+  }
+  throw new Error(`w8-04: seed ${String(seed)} would not lay a route out`);
 }
 
 /** The plan as it was filed: one run per leg, run-length encoded, grouped into sections. */
@@ -169,31 +264,58 @@ function carveLeg(world: World, leg: Leg): void {
   }
 }
 
-/** Around the fallen stretch: out three, along four, back three. Six moves more than the plan. */
-function carveBypass(world: World, leg: Leg): Vec[] {
-  const side = sideFor(leg);
-  if (side === null) return [];
-  let at = leg.from;
-  for (let i = 0; i < 2; i++) at = step(at, leg.dir);
-  for (let i = 0; i < 3; i++) {
-    at = step(at, side);
-    setTerrain(world, at, Terrain.Floor);
+/** Whether a corridor may be extended onto `at`, having arrived from `from`. */
+function openFor(world: World, at: Vec, from: Vec): boolean {
+  if (!onSite(at)) return false;
+  if (tileAt(world, at)?.terrain !== Terrain.Rock) return false;
+  for (const dir of ALL_DIRS) {
+    const beside = step(at, dir);
+    if (eq(beside, from)) continue;
+    if (tileAt(world, beside)?.terrain === Terrain.Floor) return false;
   }
-  for (let i = 0; i < 4; i++) {
-    at = step(at, leg.dir);
-    setTerrain(world, at, Terrain.Floor);
+  return true;
+}
+
+/**
+ * One dead-end working, driven off the route until the rock runs out.
+ *
+ * It turns every few tiles, and that is the whole of its function. A straight stub is dismissed
+ * for nothing by a single `look` down it, so only a corridor that bends can charge a search the
+ * walk to its end and the walk back. Reverted rather than left where it came out too short to
+ * cost anybody anything.
+ */
+function driveTrunk(world: World, rng: Rng, anchor: Vec): Vec | null {
+  let at = anchor;
+  const opening = rng.shuffle(ALL_DIRS).find((dir) => openFor(world, step(at, dir), at));
+  if (opening === undefined) return null;
+  let heading: Dir = opening;
+
+  const carved: Vec[] = [];
+  let run = 0;
+  let straight = rng.int(3, 6);
+  for (let guard = 0; guard < TRUNK_LENGTH * 4 && carved.length < TRUNK_LENGTH; guard++) {
+    const ahead = step(at, heading);
+    if (run < straight && openFor(world, ahead, at)) {
+      setTerrain(world, ahead, Terrain.Floor);
+      carved.push(ahead);
+      at = ahead;
+      run++;
+      continue;
+    }
+    const turn: Dir | undefined = rng
+      .shuffle(acrossFrom(heading))
+      .find((dir) => openFor(world, step(at, dir), at));
+    if (turn === undefined) break;
+    heading = turn;
+    run = 0;
+    straight = rng.int(3, 6);
   }
-  const back = opposite(side);
-  for (let i = 0; i < 3; i++) {
-    at = step(at, back);
-    setTerrain(world, at, Terrain.Floor);
+
+  if (carved.length < TRUNK_MINIMUM) {
+    for (const tile of carved) setTerrain(world, tile, Terrain.Rock);
+    return null;
   }
-  const fallen: Vec[] = [];
-  let rock = leg.from;
-  for (let i = 0; i < 3; i++) rock = step(rock, leg.dir);
-  fallen.push(rock);
-  fallen.push(step(rock, leg.dir));
-  return fallen;
+  return carved[carved.length - 1] as Vec;
 }
 
 function build(seed: number): World {
@@ -204,29 +326,28 @@ function build(seed: number): World {
   for (const leg of survey.legs) carveLeg(world, leg);
 
   const fallen: Vec[] = [];
-  for (const index of survey.collapsed) {
-    fallen.push(...carveBypass(world, survey.legs[index] as Leg));
+  for (const collapse of survey.collapsed) {
+    const leg = survey.legs[collapse.leg] as Leg;
+    for (const at of bypassPath(leg, collapse.side)) setTerrain(world, at, Terrain.Floor);
+    fallen.push(...fallenOf(leg));
   }
 
   // Old workings. They are not on the plan and they do not go anywhere, which is the point.
-  const onRoute: Vec[] = [];
-  for (const leg of survey.legs) {
-    let at = leg.from;
-    for (let i = 0; i < leg.length; i++) {
-      at = step(at, leg.dir);
-      onRoute.push(at);
-    }
-  }
-  for (let i = 0; i < 14; i++) {
-    const from = rng.pick(onRoute);
-    const dir = rng.pick<Dir>([Dir.North, Dir.East, Dir.South, Dir.West]);
-    let at = from;
-    for (let n = 0; n < rng.int(3, 7); n++) {
-      at = step(at, dir);
-      if (!inBox(at)) break;
-      if (tileAt(world, at)?.terrain === Terrain.Floor) break;
-      setTerrain(world, at, Terrain.Floor);
-    }
+  // Driven off the near half of the route first, so the first fork arrives early enough that a
+  // search has to choose before it has any grounds to choose on.
+  const onRoute = survey.legs
+    .flatMap((leg) => legTiles(leg))
+    .filter((at) => !fallen.some((rock) => eq(rock, at)));
+  const near = Math.max(4, Math.floor(onRoute.length * 0.5));
+  const anchors = [
+    ...rng.shuffle(onRoute.slice(0, near)),
+    ...rng.shuffle(onRoute.slice(near, onRoute.length - 1)),
+  ];
+  const deadEnds: Vec[] = [];
+  for (const anchor of anchors) {
+    if (deadEnds.length >= survey.trunks) break;
+    const end = driveTrunk(world, rng, anchor);
+    if (end !== null) deadEnds.push(end);
   }
 
   for (const at of fallen) setTerrain(world, at, Terrain.Rock);
@@ -234,17 +355,26 @@ function build(seed: number): World {
 
   const locker = survey.locker;
   setTerrain(world, locker, Terrain.Floor);
-  addMachine(world, {
-    id: 'locker',
-    kind: MachineKind.Sink,
-    at: locker,
-    state: 'open',
-    inventory: [],
-    vars: {},
-  });
   addGroundItems(world, locker, ItemKind.Chip, 1);
   const lockerTile = tileAt(world, locker);
   if (lockerTile) lockerTile.mark = 'KD-0001-T (unsigned)';
+
+  // Every working ends in a locker, and the ids say nothing about which one the memo means.
+  // `probe(id)` reaches any machine on the site for nothing, so one locker with a guessable name
+  // would have handed the whole level away at tick zero.
+  rng.shuffle([locker, ...deadEnds]).forEach((at, ordinal) => {
+    addMachine(world, {
+      id: `locker-${String(ordinal)}`,
+      kind: MachineKind.Sink,
+      at,
+      state: 'open',
+      inventory: [],
+      vars: {},
+    });
+    if (eq(at, locker)) return;
+    const tile = tileAt(world, at);
+    if (tile) tile.mark = `KD-${String(rng.int(1000, 9999))}-${LETTER[rng.pick(ALL_DIRS)]} (signed)`;
+  });
 
   addMachine(world, {
     id: 'antenna',
@@ -276,6 +406,16 @@ function build(seed: number): World {
 
   if (!worldDistances(world, LIFT).has(locker.y * SIZE + locker.x)) {
     throw new Error(`w8-04: seed ${String(seed)} sealed the locker off`);
+  }
+  // The point of the level, asserted rather than hoped for: the filed route is the shortest walk
+  // to the locker there is, and a way round a fall is six moves dearer than the leg it replaces.
+  // Anything cheaper means a working joined two legs and handed the search a short cut.
+  const filed = survey.legs.reduce((total, leg) => total + leg.length, 0);
+  const walk = worldDistance(world, LIFT, locker);
+  if (walk !== filed + 6 * survey.collapsed.length) {
+    throw new Error(
+      `w8-04: seed ${String(seed)} walks to the locker in ${String(walk)}, plan says ${String(filed + 6 * survey.collapsed.length)}`,
+    );
   }
   return world;
 }
@@ -394,9 +534,14 @@ function died(ctx: ObjectiveContext): Divergence {
 
 /**
  * Par: measured from the reference, which drives the filed plan and only re-surveys where the
- * plan turns out to be wrong. That lands between 101 and 223 ticks across the five seeds and par
- * is the worst of them, because every seed has to clear it. Ignoring the plan and searching the
- * workings costs roughly twice that.
+ * plan turns out to be wrong. That lands between 83 and 116 ticks across the five seeds and par
+ * is the worst of them, because every seed has to clear it.
+ *
+ * The number only means anything because the workings are a tree (`clearOf`). The filed route is
+ * the shortest walk to the locker there is, so a program that throws the plan away cannot walk
+ * less than one that keeps it — it can only walk the same ground plus whichever dead ends it
+ * tried first. Measured, the two best off-plan programs cost 261–290 and 121–358 against par 116.
+ * docs/FIX-PAR-REPAIRS.md §1.
  */
 export const w8_04: LevelDef = {
   id: 'w8-04',
@@ -411,8 +556,9 @@ export const w8_04: LevelDef = {
     '**RE:** Countersignature',
     '',
     'There is a locker in the workings with a printed form in it and a spare chair caster. The',
-    'form is KD-0001-T and it has never been signed. The route to it was filed eleven months ago',
-    'by the contractor who put it there. Most of it is still true.',
+    'form is KD-0001-T and it has never been signed. There are lockers at the end of every other',
+    'working too, and every one of those is signed, filed and empty. The route to the one that is',
+    'not was filed eleven months ago by the contractor who put it there. Most of it is still true.',
     '',
     'Bring the form back up. The run ends with the form in the bot.',
   ].join('\n'),
@@ -438,6 +584,16 @@ export const w8_04: LevelDef = {
         'A count then `N`, `E`, `S` or `W`, groups run together. Section 0 starts at the lift; each section starts where the last one ended.',
     },
     {
+      label: 'The lockers',
+      value:
+        '`locker-0` upwards, one per working. `probe(id)` finds any of them from anywhere, and the numbering is shuffled every shift.',
+    },
+    {
+      label: 'The workings',
+      value:
+        'No two corridors ever run side by side, so there is exactly one way from the lift to any tile on the site.',
+    },
+    {
       label: 'What changed',
       value:
         'Between a sixth and a third of the sections cross tunnel that has since come down. There is always a way round, and the plan does not know about it.',
@@ -454,11 +610,11 @@ export const w8_04: LevelDef = {
     },
   ],
   seeds: [1, 2, 3, 4, 5],
-  par: { ticks: 223 },
+  par: { ticks: 116 },
   budget: { maxTicks: 3000 },
   build,
   objectives: [
-    Objectives.custom('form-recovered', 'Come back up holding KD-0001-T', holdsForm, {
+    Objectives.custom('form-recovered', 'Finish the shift holding KD-0001-T', holdsForm, {
       divergence: (ctx) => ({
         where: 'KD-0001-T at the end of the run',
         expected: 'in the bot',

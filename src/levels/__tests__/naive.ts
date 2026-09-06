@@ -1,7 +1,10 @@
 import type { Dir as DirType, Sim, Vec } from '../../engine/index.ts';
 import { Dir, ItemKind, step } from '../../engine/index.ts';
 import type { ReferenceSolution } from '../types.ts';
-import { KEY_SPACE, drainAntenna, readPacket } from '../world-8/shared.ts';
+import { KEY_SPACE, KnownMap, drainAntenna, follow, readPacket } from '../world-8/shared.ts';
+
+/** Every World 8 site is 30 x 30, and `look` is free, so a ray is never worth capping short. */
+const SITE = 30;
 
 /**
  * TEST FIXTURES. The first honest idea a player has on each of these levels, written out so the
@@ -324,6 +327,90 @@ export const serpentineHarvest: ReferenceSolution = {
       dir = dir === Dir.East ? Dir.West : Dir.East;
       sweep(dir);
     }
+  },
+  source: '',
+};
+
+/**
+ * w8-04, the answer that never turns the radio on: walk the workings until the form is in view,
+ * then go and lift it. Correct on every seed, and it is the program the level's par exists to
+ * rank — `docs/FIX-PAR-REPAIRS.md` §1.
+ */
+export const frontierScavenger: ReferenceSolution = {
+  levelId: 'w8-04',
+  run(sim: Sim, botId: number): void {
+    const map = new KnownMap({ w: SITE, h: SITE });
+    const observe = (): void => {
+      map.observe(sim, botId, SITE);
+    };
+    observe();
+    for (let guard = 0; guard < 400; guard++) {
+      const found = map.where((view) => view.items.some((held) => held.kind === ItemKind.Chip))[0];
+      if (found && follow(sim, botId, map, found.at, { onStep: observe })) break;
+      const outward = map.pathToFrontier(sim.pos(botId));
+      if (outward === null || outward.length === 0) break;
+      for (const dir of outward) {
+        if (!sim.canMove(botId, dir)) break;
+        sim.move(botId, dir);
+        observe();
+      }
+    }
+    sim.pickup(botId, ItemKind.Chip);
+  },
+  source: '',
+};
+
+/**
+ * w8-04, the same refusal played better. `probe(id)` reaches any machine on the site for nothing,
+ * so this one asks every locker where it is before it takes a step, and walks the list nearest
+ * first. It is the strongest program that ignores the plan, and it is the reason the lockers are
+ * numbered the way they are: the coordinates all come back, and not one of them says which locker
+ * holds the form.
+ */
+export const lockerCanvasser: ReferenceSolution = {
+  levelId: 'w8-04',
+  run(sim: Sim, botId: number): void {
+    const map = new KnownMap({ w: SITE, h: SITE });
+    const observe = (): void => {
+      map.observe(sim, botId, SITE);
+    };
+    const lockers: Vec[] = [];
+    for (let n = 0; n < 12; n++) {
+      const seen = sim.probe(botId, `locker-${String(n)}`);
+      if (seen) lockers.push(seen.at);
+    }
+    observe();
+    let goal: Vec = sim.pos(botId);
+    for (let guard = 0; guard < 400; guard++) {
+      observe();
+      const found = map.where((view) => view.items.some((held) => held.kind === ItemKind.Chip))[0];
+      if (found && follow(sim, botId, map, found.at, { onStep: observe })) break;
+
+      const from = sim.pos(botId);
+      const away = (at: Vec): number => Math.abs(at.x - from.x) + Math.abs(at.y - from.y);
+      const next = lockers.filter((at) => !map.known(at)).sort((a, b) => away(a) - away(b))[0];
+      goal = next ?? goal;
+      if (map.passable(goal) && follow(sim, botId, map, goal, { onStep: observe })) continue;
+
+      let outward: DirType[] | null = null;
+      let nearest = Number.POSITIVE_INFINITY;
+      for (const view of map.where((candidate) => map.isFrontier(candidate.at))) {
+        const route = map.pathTo(from, view.at);
+        if (route === null) continue;
+        const score = route.length + Math.abs(view.at.x - goal.x) + Math.abs(view.at.y - goal.y);
+        if (score < nearest) {
+          nearest = score;
+          outward = route;
+        }
+      }
+      if (outward === null || outward.length === 0) break;
+      for (const dir of outward) {
+        if (!sim.canMove(botId, dir)) break;
+        sim.move(botId, dir);
+        observe();
+      }
+    }
+    sim.pickup(botId, ItemKind.Chip);
   },
   source: '',
 };

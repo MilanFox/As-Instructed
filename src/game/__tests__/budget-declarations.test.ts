@@ -13,12 +13,17 @@
  *
  *  - **The declaration wins**, even against a label that says the opposite. That is the whole
  *    point; an objective that has said what it counts must not be re-read out of its prose.
- *  - **The set that has not declared is pinned exactly.** Two objectives across the campaign still
- *    get their meter from their words. Reword one so the inference changes — or add a third —
- *    and this fails, which is the notice nobody got last time.
+ *  - **The set that has not declared is pinned exactly, and it is now empty.** Every campaign
+ *    objective that counts anything says what it counts. Ship one that does not and this fails,
+ *    which is the notice nobody got last time.
  *
  * The inference *outcome* is what is asserted, not the label text. A reword that leaves the
  * meaning alone should not fail a test; a reword that moves the number off its meter must.
+ *
+ * **The fallback parse is not dead and must not be deleted.** It is what makes a *new* objective
+ * that forgot to declare read out approximately right instead of silently not scoring, and it is
+ * what the assertions below drive directly. What it is no longer allowed to be is load-bearing for
+ * anything the campaign ships.
  */
 import { describe, expect, test } from 'vitest';
 import { budgetFor, declaredUnit, meterFor } from '../budgets.ts';
@@ -38,21 +43,21 @@ interface Inferred {
 }
 
 /**
- * Every campaign objective whose meter comes from nowhere but its label.
+ * Every campaign objective whose meter comes from nowhere but its label. There are none.
  *
- * Both are tick deadlines phrased as shift deadlines, and both are *required* objectives — the four
- * bonuses that used to be here went with the bonus rework (`docs/FIX-BONUSES.md`), which is the
- * list getting shorter for the best possible reason: the objectives stopped existing.
+ * It was six, then two. Four went with the bonus rework (`docs/FIX-BONUSES.md`) — the list getting
+ * shorter for the best possible reason, because the objectives stopped existing. The last two,
+ * `w8-03 within-shift` and `w8-05 deadline`, were both `Objectives.custom` and were **blocked on
+ * the engine**: `CustomReport` was `{ progress?, divergence }` and had no path for a meter to reach
+ * the objective at all. It now carries `meter` and `unit` and `custom()` forwards them
+ * (DESIGN.md §11 A13, `docs/FIX-PAR-REPAIRS.md` §4), so both declare and both dropped the
+ * `…, in ticks` tail they were only carrying to feed the parser.
  *
- * These last two cannot be converted yet. Both are `Objectives.custom`, and `CustomReport` is
- * `{ progress?, divergence }` with no path for a meter to reach the objective — DESIGN.md §11 A13
- * records the gap and `docs/FIX-INVARIANTS.md` carries the engine diff that closes it. Until it
- * lands, the fallback parse is what keeps their readouts honest, which is what the fallback is for.
+ * An empty list is the strongest form this guard has ever been in, and it is the form to keep it
+ * in: the next objective that counts something and does not say what fails here on the day it is
+ * written.
  */
-const INFERRED_FROM_LABEL: readonly Inferred[] = [
-  { level: 'w8-03', objective: 'within-shift', kind: 'ticks', unit: 'ticks' },
-  { level: 'w8-05', objective: 'deadline', kind: 'ticks', unit: 'ticks' },
-];
+const INFERRED_FROM_LABEL: readonly Inferred[] = [];
 
 function inferredFromLabel(): Inferred[] {
   const found: Inferred[] = [];
@@ -78,7 +83,7 @@ function inferredFromLabel(): Inferred[] {
 }
 
 describe('budgets that are still read out of their own English', () => {
-  test('are exactly the two on record, inferring exactly what is on record', () => {
+  test('are exactly the set on record, inferring exactly what is on record', () => {
     expect(inferredFromLabel()).toEqual([...INFERRED_FROM_LABEL]);
   });
 
