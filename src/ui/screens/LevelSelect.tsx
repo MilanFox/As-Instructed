@@ -81,6 +81,13 @@ const MEDAL_KEY = [
   { medal: 'gold', rule: 'at par or under' },
   { medal: 'silver', rule: 'up to a quarter over par' },
   { medal: 'bronze', rule: 'a pass' },
+  /*
+   * The fourth mark, and the only one that is not a rung. The first two work orders on the site
+   * are ungraded (DESIGN.md §11 A7), so a first-time player's opening hour draws `✓` on the board
+   * and leaves gold, silver and bronze reading zero — and a key that stopped at bronze explained
+   * three of the four marks in front of them and none of the three zeros.
+   */
+  { medal: 'closed', rule: 'not graded' },
 ] as const;
 
 function medalWord(medal: Medal): string {
@@ -344,9 +351,13 @@ export function LevelSelect(): JSX.Element {
           {MEDAL_KEY.map((entry) => (
             <li className="medal-key__row" key={entry.medal}>
               <span className="medal-key__sample" aria-hidden="true">
-                <span className={`node node--${entry.medal}`}>
-                  <span className="node__disc" />
-                </span>
+                {entry.medal === 'closed' ? (
+                  <MedalBadge medal={null} />
+                ) : (
+                  <span className={`node node--${entry.medal}`}>
+                    <span className="node__disc" />
+                  </span>
+                )}
               </span>
               <span className="medal-key__word">{entry.medal}</span>
               <span className="medal-key__rule">{entry.rule}</span>

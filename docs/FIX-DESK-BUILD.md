@@ -485,3 +485,72 @@ live one takes it.
   ORDERS`. The desk's own new copy avoids the collision entirely — the door says `~/lib.ts` and
   `your subroutines`, never "Repository" — but `src/meta/copy.ts` is outside this lane and the
   collision is **reported, not fixed**. It is a naming defect and it wants a ruling.
+
+## 10. The ungraded work order says so
+
+A fresh-eyes tester closed `w1-01` and could not work out how scoring worked:
+
+> "I closed `w1-01` at exactly 90/90 ticks and got 3/11 points, with GOLD/SILVER/BRONZE all reading
+> 0 - while the site map header simultaneously said '1 AT PAR OR UNDER'. I still don't know what par
+> was for either level or what I'd have to do to earn a medal."
+
+Every number they read was correct. `w1-01` and `w1-03` declare `graded: false` - DESIGN.md §11 A7,
+and the ruling is right: the opening work orders teach rather than assess. **The defect was that
+nothing said so.** A7 was implemented entirely as *absence*: no par on the rail, no par on the
+certificate, no medal in the tally. Absence is only legible to someone who has seen the presence,
+and the first two work orders on the site are both ungraded - so a new contractor's whole
+introduction to scoring is three zeros and a par that never prints.
+
+Confirmed against the running game rather than inferred. The screen the tester described,
+reproduced from an empty save: `POINTS 3/133`, `CLOSED 1/33`, `GOLD 0 · SILVER 0 · BRONZE 0`,
+`3% OF THE SITE CLOSED · 1 AT PAR OR UNDER`, and the word *graded* nowhere on it. The 90 they
+quoted is the bay booking, not par - `w1-01` pars at 78 and books 90, and with par suppressed the
+limit was the only tick figure on the screen to mistake for one.
+
+### Three places, four words
+
+**The key was a key to three of the four marks.** The board draws `✓` on a closed ungraded node -
+`MedalBadge`'s stamp, a glyph so it survives greyscale and `signal` - and the medal key beside the
+three zeros defined gold, silver and bronze and stopped. It now carries a fourth row, drawn with the
+same badge the board draws: `✓ CLOSED — not graded`. The sample is the component, not a copy of it,
+for the reason the key's own docstring gives: a legend drawn differently from the thing it keys is
+not a legend.
+
+**The certificate names the slot par is missing from.** The facts block printed `TICKS 78 · best 78`
+and moved on. It now prints `TICKS 78 not graded · best 78`, in the `quiet` span par occupies on a
+graded order and in the register `RESULT closed` already established. The word "par" is still never
+printed on an ungraded order - `limit-and-par.test.ts` asserts that, and it still holds.
+
+**The standing sheet had a middle state it skipped.** `reportFor` counts medals, so a record holding
+two ungraded closes reads `0 of 0 over 0 closed work orders` and the sheet told that contractor
+*"Close a work order and a grade appears here"* - after they had closed two. `ReviewReport` gained
+`ungraded`, and that state now reads *"Nothing closed so far was graded. A grade appears with the
+first that is."* No arithmetic moved: `closed` is still medals only and still the grade's
+denominator.
+
+### Decided, and why
+
+- **The medal counters stay visible and stay at zero.** Dimming or hiding them teaches a new player
+  that the ladder is conditional. Three zeros are true; what was missing was the fourth row that
+  explains them.
+- **"At par or under" still counts an ungraded close.** That is A7's own arithmetic - a close there
+  weighs a gold's three - and `buildRows` already records why: without it `ALL AT PAR` is
+  unreachable in worlds 1, 5 and 6. The line reads as a contradiction only while the player does not
+  know the order was ungraded, which is the thing that was fixed. *Residual:* the label is a claim
+  about ticks, and an over-par ungraded close is still counted by it. Renaming it moves
+  `WorldRow.gold` and the `ALL AT PAR` stamp with it, so it is **reported, not fixed**.
+- **The node keeps the mark it had.** `✓` was already correct, already greyscale-safe and already in
+  the node's `aria-label` as *"Not graded"*. It did not need a second mark; it needed a key.
+- **The rail was left alone.** It says `ticks` where a graded order says `par` and it never claims a
+  grade, so it is not where the wrong story gets assembled. The certificate is the moment of
+  closure, and that is where the sentence belongs.
+
+### The guard was extended, not weakened
+
+`src/ui/screens/__tests__/medal-key.test.ts` pinned the key at exactly three rows in five
+assertions, including *"every rung of the ladder the game awards is on it, and nothing else"*. The
+key is now a key to marks rather than to rungs, so those assertions count `MARKS` instead of
+`MEDALS`, and the file gained a section of its own for the fourth: that the fixture really is
+ungraded, that the row is keyed `not graded` rather than as a rung, that its sample carries the same
+`medal--closed` mark the board stamps, and that the mark is the glyph `✓` and not a hue. Net +4
+tests, 2060 to 2064, across the same 97 files.

@@ -249,9 +249,14 @@ export function StandingSheet(): React.JSX.Element {
       </div>
 
       <p className="quiet">
+        {/* The middle state the sheet used to skip: work closed, none of it graded. Telling a
+            contractor who has closed two work orders to go and close a work order reads the
+            three zeros above as a failure rather than as A7 (DESIGN.md §11 A7). */}
         {report.graded
           ? 'A quality average over what is closed, not a progress bar. It moves both ways.'
-          : 'Close a work order and a grade appears here. Nothing is graded before that.'}
+          : report.ungraded > 0
+            ? 'Nothing closed so far was graded. A grade appears with the first that is.'
+            : 'Close a work order and a grade appears here. Nothing is graded before that.'}
       </p>
       <div className="ref">K&amp;D FORM 9 · RUNNING RECORD</div>
     </>

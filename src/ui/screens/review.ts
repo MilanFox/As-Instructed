@@ -21,7 +21,14 @@
  * DESIGN.md §11 A4 fixes what a medal is worth. This module changes what is counted, not that.
  */
 import type { SaveFile } from '../../game/save.ts';
-import { Medal, levelMaxPoints, levelPoints, reviewTier, starsFor } from '../../game/score.ts';
+import {
+  Medal,
+  isGraded,
+  levelMaxPoints,
+  levelPoints,
+  reviewTier,
+  starsFor,
+} from '../../game/score.ts';
 import type { ReviewTier } from '../../game/score.ts';
 import { campaignOrder } from '../../levels/index.ts';
 
@@ -35,6 +42,13 @@ export interface ReviewReport {
   stars: number;
   /** Work orders carrying a medal. The grade's denominator, in work orders. */
   closed: number;
+  /**
+   * Work orders closed that the site never graded (DESIGN.md §11 A7). Not in `closed`, because
+   * they are not in the fraction; counted at all because a record holding two of them and no
+   * medals is a record with work behind it, and the standing sheet was telling that player to go
+   * and close a work order.
+   */
+  ungraded: number;
   /** False until something has been closed. There is nothing to grade before that. */
   graded: boolean;
 }
@@ -49,6 +63,7 @@ export function reportFor(save: SaveFile): ReviewReport {
     bronze: 0,
     stars: 0,
     closed: 0,
+    ungraded: 0,
     graded: false,
   };
 
@@ -56,6 +71,7 @@ export function reportFor(save: SaveFile): ReviewReport {
     const progress = save.levels[level.id];
     if (!progress) continue;
     report.stars += starsFor(level.bonus, progress.stars);
+    if (!isGraded(level) && progress.completed) report.ungraded++;
     if (progress.medal === Medal.None) continue;
     report.points += levelPoints(progress.medal);
     report.maxPoints += levelMaxPoints(0);
