@@ -217,6 +217,10 @@ export function ReportSheet({
           <span className="numeric">
             {report.ticks ?? '—'}
             {report.par !== null ? <span className="quiet"> par {report.par}</span> : null}
+            {/* The slot par would have stood in, saying why it does not. Printing nothing here
+                is a fact the player can only read once they have seen a certificate that does
+                print one, and the first two work orders on the site are both ungraded. */}
+            {report.graded ? null : <span className="quiet"> not graded</span>}
             {report.bestTicks !== null ? (
               <span className="quiet"> · best {report.bestTicks}</span>
             ) : null}

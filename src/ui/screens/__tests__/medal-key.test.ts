@@ -46,7 +46,7 @@ vi.mock('zustand', async () => {
 const { LevelSelect } = await import('../LevelSelect.tsx');
 const { useGame } = await import('../../../game/store.ts');
 const { emptySave } = await import('../../../game/save.ts');
-const { Medal, SILVER_FACTOR, medalForLevel } = await import('../../../game/score.ts');
+const { Medal, SILVER_FACTOR, isGraded, medalForLevel } = await import('../../../game/score.ts');
 const { getLevel } = await import('../../../levels/index.ts');
 const { ART_IDS, DIRECTIONS, luminance } = await import('../../../render/theme.ts');
 
@@ -122,7 +122,10 @@ function keyRows(tree: Node[]): {
   const key = named(tree, 'Medal key');
   if (!key) return [];
   return key.children.map((row) => {
-    const sample = all([row], (node) => classes(node).includes('node'))[0];
+    const sample = all(
+      [row],
+      (node) => classes(node).includes('node') || classes(node).includes('medal'),
+    )[0];
     const spans = all([row], (node) => node.tag === 'span' && node.children.length > 0);
     const readable = spans.filter(
       (span) =>
@@ -152,6 +155,17 @@ function boardMark(tree: Node[], levelId: string): string[] {
   return classes(all([slot], (node) => classes(node).includes('node'))[0]);
 }
 
+/**
+ * The mark the board gives a work order the site never graded, read off the board itself. The
+ * `✓` is a badge in the status line rather than a class on the disc, so it is not `boardMark`'s
+ * to find — an ungraded close leaves the disc reading `node--none`, which is the whole point.
+ */
+function closedMark(tree: Node[], levelId: string): string[] {
+  const slot = all(tree, (node) => node.tag === 'li' && node.text.includes(levelId))[0];
+  if (!slot) return [];
+  return classes(all([slot], (node) => classes(node).includes('medal'))[0]);
+}
+
 function hueOf(hex: string): number {
   const value = Number.parseInt(hex.slice(1), 16);
   const r = ((value >> 16) & 255) / 255;
@@ -172,30 +186,36 @@ function apart(a: number, b: number): number {
 
 const MEDALS = ['gold', 'silver', 'bronze'] as const;
 
+/** Every mark the board can draw. `closed` is an ungraded work order (DESIGN.md §11 A7). */
+const MARKS = [...MEDALS, 'closed'] as const;
+
+/** Boot Sector's first work order, which the site does not grade. */
+const UNGRADED = 'w1-01';
+
 beforeEach(() => {
   useGame.setState({ save: emptySave(), screen: 'levels' });
   driver.reset();
 });
 
 describe('the site map says what the three discs mean', () => {
-  test('there is a key, and it has one row per medal', () => {
+  test('there is a key, and it has one row per mark the board draws', () => {
     const rows = keyRows(render());
 
-    expect(rows.map((row) => row.word)).toEqual([...MEDALS]);
+    expect(rows.map((row) => row.word)).toEqual([...MARKS]);
   });
 
-  test('every rung of the ladder the game awards is on it, and nothing else', () => {
+  test('every rung of the ladder is on it, plus the close that is not one, and nothing else', () => {
     const rows = keyRows(render());
     const awarded = Object.values(Medal).filter((value) => value !== Medal.None);
 
-    expect([...rows.map((row) => row.word)].sort()).toEqual([...awarded].sort());
+    expect([...rows.map((row) => row.word)].sort()).toEqual([...awarded, 'closed'].sort());
   });
 
   test('each row says what earns it, in its own words', () => {
     const rows = keyRows(render());
 
     expect(rows.every((row) => row.rule.length > 0)).toBe(true);
-    expect(new Set(rows.map((row) => row.rule)).size).toBe(3);
+    expect(new Set(rows.map((row) => row.rule)).size).toBe(MARKS.length);
   });
 
   test('and what it says is what the grader does', () => {
@@ -242,11 +262,54 @@ describe('the key is drawn in the marks the board is drawn in', () => {
   test('the samples are decoration; the words carry the meaning', () => {
     const rows = keyRows(render());
 
-    expect(rows).toHaveLength(3);
+    expect(rows).toHaveLength(MARKS.length);
     for (const row of rows) {
       expect(row.decorative, `${row.word} sample`).toBe(true);
       expect(row.word).not.toBe('');
     }
+  });
+});
+
+/**
+ * The fourth mark. The first two work orders on the site are ungraded (DESIGN.md §11 A7), so `✓`
+ * is the first mark a new contractor ever sees on the board and gold, silver and bronze all read
+ * zero underneath it. A key to three of the four is how that reads as three failures.
+ */
+describe('the key covers the mark that is not a medal', () => {
+  test('the fixture is a work order the site really does not grade', () => {
+    const level = getLevel(UNGRADED);
+
+    expect(level && isGraded(level)).toBe(false);
+  });
+
+  test('the ungraded close is on the key, and is keyed as ungraded rather than as a rung', () => {
+    const closed = keyRows(render()).find((row) => row.word === 'closed');
+
+    expect(closed?.rule).toBe('not graded');
+  });
+
+  test('its sample carries the mark the board stamps on an ungraded close', () => {
+    const save = emptySave();
+    save.levels[UNGRADED] = { completed: true, medal: Medal.None, stars: [], attempts: 1 };
+    useGame.setState({ save, screen: 'levels' });
+    const tree = render();
+
+    const board = closedMark(tree, UNGRADED);
+    const sample = classes(keyRows(tree).find((row) => row.word === 'closed')?.sample);
+
+    expect(board, 'the closed badge on the board').not.toHaveLength(0);
+    expect(sample.filter((mark) => board.includes(mark))).toContain('medal--closed');
+  });
+
+  test('and the word survives greyscale, because the mark is a glyph and not a hue', () => {
+    const save = emptySave();
+    save.levels[UNGRADED] = { completed: true, medal: Medal.None, stars: [], attempts: 1 };
+    useGame.setState({ save, screen: 'levels' });
+    const tree = render();
+    const badge = all(tree, (node) => classes(node).includes('medal--closed'))[0];
+
+    expect(badge?.text.trim()).toBe('✓');
+    expect(MEDALS.some((medal) => classes(badge).includes(`medal--${medal}`))).toBe(false);
   });
 });
 
@@ -290,7 +353,7 @@ describe('the three are distinguishable without colour', () => {
   test('and the words work when neither does', () => {
     const rows = keyRows(render());
 
-    expect(new Set(rows.map((row) => row.word)).size).toBe(3);
+    expect(new Set(rows.map((row) => row.word)).size).toBe(MARKS.length);
     expect(rows.every((row) => row.word.trim().length > 0)).toBe(true);
   });
 });
