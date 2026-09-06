@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kessler &amp; Daughters — Contractor Station 4471</title>
+<link rel="stylesheet" href="desk.css">
+</head>
+<body data-mode="write" data-doc="none">
+
+<!-- ============================ THE ROOM ============================ -->
+<div class="room" aria-hidden="true">
+  <div class="wall"></div>
+  <div class="wall-rail"></div>
+  <div class="desk">
+    <div class="desk-edge"></div>
+    <div class="desk-top"></div>
+  </div>
+  <div class="lamp"></div>
+  <div class="spill" id="spill"></div>
+  <div class="vignette"></div>
+</div>
+
+<!-- ============================ THE STATION ============================ -->
+<div class="station">
+
+  <!-- ---- YOUR TERMINAL. The work. Digital. --------------------------- -->
+  <section class="display display--term" id="term">
+    <div class="bezel">
+      <div class="screen">
+        <div class="term-bar">
+          <span class="tb-host">station-4471</span>
+          <span class="tb-sep">:</span>
+          <span class="tb-path">~/orders/w2-02</span>
+          <span class="tb-spacer"></span>
+          <span class="tb-state" id="tbState">EDIT</span>
+        </div>
+
+        <div class="term-body">
+          <div class="editor" id="editorPane">
+            <div class="gutter" id="gutter"></div>
+            <div class="code-stack">
+              <pre class="mirror" id="mirror" aria-hidden="true"></pre>
+              <textarea id="code" spellcheck="false" autocomplete="off"
+                        autocorrect="off" autocapitalize="off"
+                        aria-label="Program"></textarea>
+              <div class="exec-line" id="execLine" hidden></div>
+            </div>
+          </div>
+
+          <aside class="rail">
+            <div class="rail-block">
+              <h3>OBJECTIVES <em id="objCount">0/3</em></h3>
+              <ul class="objs" id="objs"></ul>
+            </div>
+            <div class="rail-block">
+              <h3>BONUS <em>worth a star</em></h3>
+              <ul class="objs objs--bonus" id="bonus"></ul>
+            </div>
+            <div class="rail-block rail-block--targets">
+              <h3>TARGETS</h3>
+              <dl class="targets">
+                <dt>ticks</dt><dd id="tTicks">— / 96</dd>
+                <dt>shift ends</dt><dd>2600</dd>
+                <dt>seeds</dt><dd id="tSeeds">3</dd>
+                <dt>closed on every seed</dt><dd id="tClosed">— / 3</dd>
+              </dl>
+            </div>
+          </aside>
+        </div>
+
+        <div class="term-log" id="log">
+          <div class="log-head"><span>OUTPUT</span><span id="logMeta">idle</span></div>
+          <div class="log-body" id="logBody"></div>
+        </div>
+
+        <div class="term-status">
+          <span id="problems">no problems</span>
+          <span class="ts-right">ctrl+enter dispatches</span>
+        </div>
+      </div>
+      <div class="glass"></div>
+    </div>
+    <div class="bezel-foot">
+      <span class="maker">ISOMER 21 · TERMINAL</span>
+      <button class="sizeknob" id="sizeKnob" aria-label="Character size">
+        <span class="sk-dial"><i></i></span>
+        <span class="sk-legend">SIZE <b id="sizeRead">1.0</b></span>
+      </button>
+      <button class="dispsw" id="dispSw" aria-label="Display mode">
+        <span class="dsw-track"><i></i></span>
+        <span class="dsw-legend">DISPLAY <b id="dispRead">DEEP SITE</b></span>
+      </button>
+      <span class="pwr" id="termLed"></span>
+    </div>
+    <div class="stand stand--term"></div>
+  </section>
+
+  <!-- ---- THE SITE FEED. The company's window. Also digital, and older. -->
+  <section class="display display--feed" id="feed">
+    <div class="bezel bezel--feed">
+      <div class="screen screen--feed">
+        <canvas id="board"></canvas>
+        <div class="feed-osd">
+          <span class="osd-id" id="osdId">NORTH FIELD · GRID 20&times;14</span>
+          <span class="osd-xy" id="osdXY"></span>
+          <span class="osd-lag">SIGNAL DELAY 41 MIN</span>
+        </div>
+        <div class="feed-stamp" id="feedStamp" hidden>LAST KNOWN STATE</div>
+        <div class="feed-tick" id="feedTick" hidden>0000</div>
+      </div>
+      <div class="glass glass--feed"></div>
+    </div>
+
+    <div class="feed-controls">
+      <div class="fc-keys">
+        <button class="fk" id="btnBack" aria-label="Step back">&#9664;</button>
+        <button class="fk fk-wide" id="btnPlay" aria-label="Play or pause">&#9654;</button>
+        <button class="fk" id="btnFwd" aria-label="Step forward">&#9654;</button>
+      </div>
+      <div class="fc-scrub">
+        <input type="range" id="scrub" min="0" max="1000" value="0" aria-label="Trace position">
+      </div>
+      <div class="fc-read"><em>TICK</em><span id="tickRead">0000</span><i>/</i><span id="tickMax">0000</span></div>
+      <div class="fc-lamp" id="feedLed"></div>
+    </div>
+
+    <div class="asset-tag">
+      <b>K&amp;D</b>
+      <span>ASSET 41-2207-B</span>
+      <span>SURVEY / DO NOT REMOVE</span>
+    </div>
+    <div class="stand stand--feed"></div>
+  </section>
+</div>
+
+<!-- ============================ THE DESKWARE ============================ -->
+
+<!-- documents arrive here, edge first -->
+<div class="slot" id="slot">
+  <div class="slot-mouth"></div>
+  <div class="slot-plate">DELIVERIES</div>
+</div>
+
+<!-- the copy stand. what you pin stays readable while you write. -->
+<div class="copystand" id="copystand">
+  <div class="cs-foot"></div>
+  <div class="cs-post"></div>
+  <div class="cs-board">
+    <div class="cs-clip"></div>
+    <div class="cs-page" id="csPage">
+      <div class="cs-empty">
+        <b>COPY STAND</b>
+        <span>nothing pinned</span>
+        <small>K&amp;D FORM 40/A · issued 2206</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="tray" id="tray">
+  <div class="tray-back"></div>
+  <div class="tray-floor"></div>
+  <div class="tray-front"><span>IN</span></div>
+  <div class="tray-items" id="trayItems"></div>
+</div>
+
+<!-- the commitment act for a run: a keyed dispatch switch on the desk -->
+<div class="dispatch" id="dispatch">
+  <button class="dsp-key" id="btnDispatch" aria-label="Dispatch program to site">
+    <span class="dsp-face"></span>
+    <span class="dsp-collar"></span>
+  </button>
+  <div class="dsp-legend">
+    <b>DISPATCH</b>
+    <span id="dspSub">program not yet sent</span>
+  </div>
+  <div class="dsp-lamps">
+    <i id="lampReady" class="lamp-r" title="ready"></i>
+    <i id="lampOut" class="lamp-o" title="in flight"></i>
+    <i id="lampBack" class="lamp-b" title="returned"></i>
+  </div>
+</div>
+
+<button class="binder" id="binder" aria-label="Open the Repository">
+  <div class="bnd-board">
+    <div class="bnd-plate">
+      <b>THE REPOSITORY</b>
+      <span>CLOSED WORK ORDERS</span>
+      <span class="bnd-vol">VOL. I &nbsp;·&nbsp; #4471</span>
+    </div>
+    <div class="bnd-tabs">
+      <i style="--t:0"></i><i style="--t:1"></i><i style="--t:2"></i><i style="--t:3"></i>
+      <i style="--t:4"></i><i style="--t:5"></i><i style="--t:6"></i><i style="--t:7"></i>
+    </div>
+  </div>
+  <div class="bnd-spine"></div>
+  <div class="bnd-pages"></div>
+</button>
+
+<button class="manual" id="manual" aria-label="Open the reference">
+  <div class="mn-block"></div>
+  <div class="mn-cover">
+    <b>REFERENCE</b>
+    <span>COMMANDS FITTED<br>TO THIS BOT</span>
+    <em>K&amp;D FORM 12 · REV 9</em>
+  </div>
+  <div class="mn-coil"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+</button>
+
+<div class="stampblock" id="stampblock">
+  <div class="pad"><div class="pad-felt"></div><span>K&amp;D</span></div>
+  <div class="rack" id="rack"></div>
+</div>
+
+<div class="pen" id="pen"><i class="pen-cap"></i><i class="pen-barrel"></i><i class="pen-clip"></i></div>
+
+<!-- the keyboard. cropped by the front edge of the desk, because you are sitting here. -->
+<div class="keyboard" id="keyboard">
+  <div class="kb-deck">
+    <div class="kb-row" data-row="0"></div>
+    <div class="kb-row" data-row="1"></div>
+    <div class="kb-row" data-row="2"></div>
+  </div>
+</div>
+
+<div class="mug" id="mug">
+  <div class="mug-handle"></div>
+  <div class="mug-body"><div class="mug-liquid"></div></div>
+  <div class="coaster"></div>
+</div>
+
+<!-- ============================ PAPER LAYER ============================ -->
+<div class="paper-layer" id="paperLayer"></div>
+
+<!-- ============================ THE BINDER, OPEN ============================ -->
+<div class="binder-open" id="binderOpen" hidden>
+  <div class="bo-sheet">
+    <div class="bo-holes"><i></i><i></i><i></i><i></i></div>
+    <header class="bo-head">
+      <div>
+        <b>THE REPOSITORY</b>
+        <span>Kessler &amp; Daughters Terraforming Ltd. — closed work orders, in order of closure</span>
+      </div>
+      <div class="bo-tally" id="boTally"></div>
+    </header>
+    <div class="bo-grid" id="boGrid"></div>
+    <footer class="bo-foot">
+      <span>Retained records may not be closed.<sup>3</sup></span>
+      <button class="bo-close" id="boClose">shut the binder</button>
+    </footer>
+  </div>
+</div>
+
+<!-- ============================ HELD STAMP ============================ -->
+<div class="held" id="held" hidden>
+  <div class="held-handle"></div>
+  <div class="held-neck"></div>
+  <div class="held-die" id="heldDie">BRONZE</div>
+</div>
+
+<!-- ============================ DIRECTOR (prototype only) ============ -->
+<nav class="director" id="director">
+  <b>PROTOTYPE · scenes</b>
+  <button data-scene="rest">1 · station at rest</button>
+  <button data-scene="order">2 · a work order arrives</button>
+  <button data-scene="write">3 · writing</button>
+  <button data-scene="run">4 · dispatch &amp; run</button>
+  <button data-scene="halt">5 · a HALT notice</button>
+  <button data-scene="result">6 · closure &amp; the stamp</button>
+  <button data-scene="req">7 · requisition &amp; the pen</button>
+  <button data-scene="review">8 · performance review</button>
+  <button data-scene="binder">9 · the binder</button>
+  <label><input type="checkbox" id="bigBoard"> 40&times;40 cave · legibility floor</label>
+  <label><input type="checkbox" id="noLamp"> lights up (flat)</label>
+  <label><input type="checkbox" id="hideDirector"> hide</label>
+</nav>
+
+<script src="board.js"></script>
+<script src="desk.js"></script>
+</body>
+</html>
