@@ -88,6 +88,9 @@ export const solution: ReferenceSolution = {
     for (const index of [...sections.keys()].sort((a, b) => a - b)) {
       plan.push(...(sections.get(index) as Run[]));
     }
+    // Filed before a step is taken: neither figure survives the walk, and neither is readable
+    // off the ground the walk covers.
+    sim.print(botId, `plan ${String(bestKey)} ${String(plan.length)}`);
 
     map.observe(sim, botId, SIZE);
 
@@ -180,6 +183,7 @@ export const solution: ReferenceSolution = {
     '}',
     'const plan = [];',
     'for (const i of [...sections.keys()].sort((a, b) => a - b)) plan.push(...sections.get(i));',
+    'print(`plan ${key} ${plan.length}`);',
     '',
     '// Everything seen so far, and nothing else.',
     'const seen = new Map();',

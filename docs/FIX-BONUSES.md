@@ -507,3 +507,341 @@ files untouched by this work (`src/levels/world-5/__solutions__/w5-01.ts` and
 in a non-React file). Every reference solution still passes its level on every seed inside par and
 still takes gold; none was modified. No par value, medal threshold or medal weight was changed, and
 nothing anywhere counts characters for score.
+
+---
+
+# 2026-09-06 — the second pass: does the bonus ask a second question?
+
+The rework above made the early star *failable*. It did not make it *interesting*, and the two
+playtests say so independently: the beginner called the stars "confetti", the veteran wrote "Dead
+bonus: most of them". Both named the same single exception, `w4-02`'s mark budget.
+
+**The diagnosis, and it is the binding test from here on:** most bonuses restate the required
+solution with a tighter number. They ask no question the level did not already ask. A star for
+doing the same thing slightly harder is not a second idea; it is the first idea with a smaller
+tolerance.
+
+> **The test:** does this bonus ask a question the required objective does not ask?
+
+The bar is World 6. `w6-02`'s `name-the-fault` asks the player to *report which byte was altered*,
+which the required objective never asks. `print` is available from World 1, so that mould
+generalises to any level in the campaign — a bonus can always ask the run to say out loud something
+it necessarily knew.
+
+Worlds 3–5 are covered in `docs/FIX-BONUSES-3-5.md`, Worlds 7–8 in `docs/FIX-BONUSES-7-8.md`.
+
+## Worlds 1, 2 and 6 — judged against the test, nothing moves
+
+Re-read against the test rather than against the failability criterion the first pass used. All
+eight surviving Worlds 1–2 bonuses pass, which is the first pass's rework doing its job: every one
+of them changed the *metric*, not the *tolerance*.
+
+| level | bonus | second question it asks | verdict |
+|---|---|---|---|
+| `w1-01` | — | — | no bonus, correctly |
+| `w1-03` | `rationedSurvey(7, 5)` | trade information against time — stride instead of per-tile sensing | KEEP |
+| `w1-05` | `oneMovePerFloorTile` | snake the sweep so no row is re-walked | KEEP |
+| `w2-01` | `parkedWithoutOvershoot` | commit on a reading instead of surveying then walking back | KEEP |
+| `w2-02` | `noWastedFieldwork` | scan before you swing — the metric is swings and seed, not ticks | KEEP |
+| `w2-04` | `withinSpoilage` | spoilage, a metric the clock cannot see at all | KEEP |
+| `w2-05` | `withinFootprint` | tiles stood on, not ticks spent | KEEP |
+| `w6-01` | — | — | no bonus, correctly |
+| `w6-02` | `name-the-fault` | *report which byte was altered* | KEEP — this is the bar |
+| `w6-03` | `shorter-encoding` | re-encode the route more compactly than the sender did | KEEP |
+| `w6-04` | `straggler` | recover the packet the protocol gave you no header for | KEEP |
+| `w6-05` | `repair-blocks` | repair the corruption instead of discarding it | KEEP |
+
+Not one of these is a tick tightening, and that is the whole finding: the worlds that were
+deliberately authored against a second-idea standard have no dead bonuses, and the worlds that were
+not are where every "finish in fewer ticks" bonus lives.
+
+## Handbacks taken in this pass, and two corrections owed to `docs/FIX-INVARIANTS.md`
+
+Two tidying items arrived from the invariants agent mid-pass. Both are recorded here because they
+are not bonus work and would otherwise be lost between reports.
+
+**Taken: `docs/DESIGN.md` §7 said "five grades". It is four.** Fixed, and written up as §11 **A12**
+so the next reader does not restore it — including the part that is not obvious from the code, that
+**the surviving ranks keep the numbers 2–5 and renumbering them 1–4 is a bug**: `save.reviewedRanks`
+is persisted, so renumbering re-points existing saves at the wrong memo and withholds one the player
+has never read.
+
+**Taken: a budget declares its unit.** Written up as §11 **A13**. The conversion of the six
+objectives that still infer is sequenced *after* the bonus rework rather than alongside it, because
+three of the six pinned rows — `w3-01 clean-run`, `w8-01 audit-tight`, `w8-03 tight-shift` — are
+objectives this very pass deletes or replaces. Converting them first would have been work thrown
+away and a race on the same lines in the same files.
+
+### Correction 1 — the campaign is 34 levels, not 40
+
+`docs/FIX-INVARIANTS.md` says "forty levels" at §214 and §505. `LEVELS.length` is 34, there are 34
+files matching `src/levels/world-*/w*.ts`, and both `SOLUTIONS` maps hold the same 34 ids. Forty is
+the pre-compression size, 8 worlds × 5. The six withdrawn work orders are `w1-02`, `w1-04`, `w2-03`,
+`w3-03`, `w3-05` and `w4-03` (`docs/FIX-COMPRESSION.md`), and `levels.test.ts` already guards it with
+`nothing still points at a withdrawn work order`.
+
+### Correction 2 — the difficulty evidence does not cover what it claims
+
+This is the one that matters. `docs/FIX-INVARIANTS.md` §505, under *Difficulty — unchanged, and
+checked rather than asserted*, reads:
+
+> `reference-solutions.test.ts` runs all forty levels through the real runtime against their pars:
+> 86 tests, unchanged.
+
+`par` appears in that file exactly once:
+
+```ts
+expect(response.verdict.stats.ticks, id).toBeLessThanOrEqual(level.par.ticks);
+```
+
+and that loop iterates `MULTI_BOT` — `LEVELS.filter((l) => l.world === 7 || l.build(l.seeds[0]).bots.length > 1)`.
+The per-level test that *does* cover all 34, `` `${level.id} passes every seed through the runtime` ``,
+asserts `failure`, `unmet` and `passed`. It never reads `ticks` and never reads `par`.
+
+**So the harness guards solvability campaign-wide and par on World 7 plus the other multi-bot levels
+only — about 6 of 34.** The claim is true for solvability and unsupported for par on the remaining
+~28. That is a documentation defect, not a code defect: the harness is genuinely valuable, because it
+drives `ReferenceSolution.source` — the player-facing TypeScript — through `runSeed`, which is a
+different program from the `.run` Sim driver everything else measures.
+
+It is recorded here rather than fixed in place because `docs/FIX-INVARIANTS.md` is another agent's
+report. The measurement behind it is in `docs/FIX-PAR-3-8.md`.
+
+Corrected once more by measurement rather than estimate: `MULTI_BOT` is `w7-01`, `w7-02`, `w7-03`,
+`w7-04`, `w7-05`, `w8-03`, `w8-05` — **7 of 34**, not the 6 I estimated and not the 40 the doc says.
+
+### Correction 3 — a `ReferenceSolution` is two hand-maintained programs, and on two levels they are different programs
+
+Found while cross-checking the par table. Every `ReferenceSolution` carries `run(sim, botId)`,
+TypeScript driving `Sim` directly, *and* `source`, a separate string of player-facing TypeScript.
+`levels.test.ts` and the bonus test execute `run`; `reference-solutions.test.ts` transpiles `source`
+and drives it through `runSeed`. **Nothing asserts the two cost the same, or implement the same
+algorithm.** They are edited independently, in the same file, by hand.
+
+32 of 34 levels agree tick for tick across 120 (level, seed) pairs. Two do not:
+
+| Level | Seed | `run` | `source` | Par |
+|---|---:|---:|---:|---:|
+| `w8-01` | 1 | 115 | 117 | 165 |
+| `w8-01` | 2 | 142 | 148 | 165 |
+| `w8-01` | 3 | 160 | 162 | 165 |
+| `w8-01` | 4 | 151 | 155 | 165 |
+| `w8-05` | 1 | 560 | 648 | 1050 |
+| `w8-05` | 4 | 806 | **739** | 1050 |
+| `w8-05` | 7 | 917 | 977 | 1050 |
+
+`w8-05` seed 4 is *cheaper* on `source` and dearer on the other two, so this is two algorithms, not
+drift or rounding.
+
+**Nothing is broken today** — both paths take gold on both levels. The damage is to the evidence.
+Headroom depends on which program you call the reference: `w8-01` is 3.0% on `run` and 1.8% on
+`source`; `w8-05` is 12.7% on `run` and 7.0% on `source`. And the sharp edge, which belongs in any
+future par work: **`w8-05` is in `MULTI_BOT`, so `reference-solutions.test.ts` asserts
+`stats.ticks <= par` against 977, while `FIX-PAR.md` §1 records 917.** Anyone tuning that par off
+the recorded table has 60 fewer ticks of room than they believe.
+
+This is the same bug class as the `BudgetMeter` duplicate the invariants branch closed: two copies
+of one fact in two layers with nothing comparing them, invisible because each half is only ever
+checked against the level and never against the other. The fix is a guard in `src/levels/__tests__/`
+asserting cost equality with `w8-01` and `w8-05` pinned as named exceptions — the `CLOCK_CANNOT_VARY`
+idiom, where the exception set is explicit and the only direction it may move is down. Reconciling
+the two implementations is content work and is deliberately not bundled with the bonus rework.
+
+## The exemplar was broken: `w4-02`'s mark budget pays a star for not using the mechanic
+
+This pass was briefed on the premise that `w4-02`'s `mark-budget` is the model of a good bonus —
+both playtesters named it independently as the one that worked. **The premise is false, and the
+evidence was already in the playtest that praised it.**
+
+`mark()` costs 1 tick, and the reference pays one per newly-entered tile. Measured move counts are
+*identical* between the reference route and a lazy route on every seed (112 / 204 / 236 / 178), so
+the entire 391-vs-236 tick gap is breadcrumb cost. DESIGN.md §11 A3 makes an ordinary JavaScript
+`Set` explicitly legitimate — it is taught, not smuggled — and a `Set` does the same job for free.
+**The level's own hardware is strictly dominated.**
+
+Then the bonus pays a star for placing *fewer than* `MARK_BUDGET` marks, which zero satisfies. So
+the medal ladder and the star both reward declining to use the mechanic the level exists to teach.
+
+`docs/PLAYTEST-VETERAN.md` §122 recorded it a week ago and nobody connected it:
+
+> gold 236/391 + star, 1st run… **I placed zero marks.**
+
+The constructed lazy route lands on 236 — the same number. A prediction that reproduces a recorded
+playtest to the tick is the strongest evidence in either document.
+
+**Ruling: `w4-02` is back in scope and the "exemplar, do not touch" instruction is withdrawn.** The
+replacement must ask for the half of the mechanic a `Set` cannot replace: a mark is *in the world*,
+so it survives what a closure does not and can be read by something that did not write it.
+`readMark` is the verb with no local-memory equivalent, and a bonus about what a second reader can
+reconstruct from the trail asks a question a `Set` cannot answer. Par, `mark`'s tick cost and the
+required objective are not changed here — the free par is a separate proposal in
+`docs/FIX-PAR-3-8.md`.
+
+The general lesson, which is the one worth keeping: **a bonus must be checked against the cheapest
+correct program, not against the reference.** Every bonus in this document was judged by asking
+whether it poses a second question; `w4-02` passes that test and still fails, because the question
+it poses is answered by refusing the level.
+
+### The sibling defect: a bonus that costs ticks inside a par that does not include them
+
+`w6-04` par is 14, the reference's cost *including* the bonus straggler transmit, and a lazy route
+costs 13. **Attempting the bonus costs gold-margin.** Found twice now, with `w1-03`, so it is a
+class rather than an incident: any bonus that spends ticks inside a par calibrated without it sets
+the star against the medal, and a player who notices is right to skip the star. Both bonus agents
+were told to check any new tick-spending bonus against worst-seed par before shipping it.
+
+### A third instance of the same bug class, from the par measurement
+
+`levels.test.ts` selects its A7 ungrade evidence with `CLOCK_CANNOT_VARY` — "the reference costs the
+same on every seed". That is **sufficient but not necessary** for A7's actual written criterion, *no
+correct program costs fewer ticks than another on the same seed*. `w4-01`, `w5-04` and `w6-02`
+satisfy the criterion and fail the proxy, because their cost varies with the **seed** and not with
+the **program** — so the proxy cannot see them, which is why a green test found nothing in Worlds
+3–8. A proxy standing in for a criterion with nothing recording that it is only a proxy is the same
+shape as the label-parsed budget and the two-copy reference solution. **Three instances this pass.**
+
+## The three tests a bonus must now pass
+
+The brief supplied one test. Two more were forced by measurement, each after a bonus passed the
+existing tests and still failed in play. All three are cheap and all three have caught something.
+
+1. **Does it ask a question the required objective does not ask?** Kills the tightenings — the whole
+   `w7-02` / `w7-04` / `w8-01` / `w8-03` family.
+2. **Is it earned by the cheapest correct program?** Kills `w4-02`'s mark budget, `w4-01`'s
+   `single-pass` and `w8-04`'s `no-resurvey`. A bonus judged against the *reference* rather than
+   against the cheapest correct program is judged against the wrong opponent.
+3. **Is it satisfied by a program that does nothing?** Kills `w8-05`'s `under-budget` and
+   `no-blocked-moves`.
+
+Test 3 needs its severity stated exactly, because it is easy to overstate. `src/game/store.ts:552`
+is `stars: verdict.passed ? [...previous.stars, ...earned] : previous.stars`, so **a failed run banks
+no stars** and no player ever collects points from a do-nothing program. **The defect is in the
+predicates, not in scoring.** Both are *absence* predicates and therefore vacuously true; the only
+thing between them and a program that never moves is a `passed` gate outside the objective. A bonus
+that is true of a program which does not play the level is not asking a question, whatever scoring
+does about it.
+
+**The design rule the three tests converge on:** *prefer a bonus that requires evidence of a thing
+done over one that requires the absence of a thing done.* A positive artefact — a trail that leads
+home, a byte named, a line reported — cannot be satisfied by inaction, cannot be satisfied by the
+lazy route, and cannot be satisfied by a smaller tolerance on the first idea.
+
+**Independent corroboration, from a direction none of this came from.** Bonus grading moved from
+seed one to a worst-seed conjunction while this pass was running. Three bonuses lost their star:
+`w7-02 within-ten-percent`, `w7-04 within-bound`, `w8-01 audit-tight`. **All three are budget
+bonuses, whose margin varies seed to seed; not one predicate bonus moved.** Those are three of the
+exact objectives already condemned here as pure tightenings, reached by an unrelated route.
+
+## `w8-04` is a second `w4-02`, and larger
+
+Ruled after the par measurement, reversing an earlier "looks real, keep". A program that never calls
+`receive()`, never cracks the 95-key cipher and never reads the filed plan finds the locker in
+**5–65 ticks** (9–117 with the walk home), against par 223 — **gold on every seed with 106–158 ticks
+of room.** The level's entire apparatus is optional.
+
+The bonus then makes it worse rather than catching it. `no-resurvey` counts tiles *off* the plan, and
+the short way is a **subsequence of the plan's own tiles**, so it strays **less** than the intended
+solution: **0 / 0 / 0 / 4 / 11 against the reference's 17 / 19 / 37 / 14.** The lazy route takes the
+star on all five seeds, more comfortably than the reference does. As with `w4-02`, the star pays for
+declining to use the level's idea.
+
+The replacement must demand a positive artefact only the decoded plan can produce — name the locker
+before reaching it, report the plan's leg count, state the key. Par, the required objectives and the
+cipher are untouched here; the free par is a separate content repair.
+
+## The engine fact underneath several of these
+
+`look`, `scan`, `probe`, `recv` and `print` are **absent from `DEFAULT_COSTS`: sensing and reporting
+are free.** Par therefore cannot rank a program for sensing less or planning better — which is why
+`w8-04` is free, and it is one fact wearing three hats across `w5-01`, `w8-03` and `w8-04`.
+
+Two consequences for bonus design, and both point the way this pass was already going:
+
+- An **information budget** (`Objectives.withinSenses`) is the only instrument in the game that can
+  price sensing at all. That is the argument for keeping `w8-01`'s and `w8-03`'s survey budgets when
+  their tick-tightening siblings are deleted, and for reaching for that shape again.
+- A **report-shaped bonus costs the player nothing in ticks**, so it can never trip the
+  "tick-spending bonus inside a par calibrated without it" class of `docs/FIX-PAR-3-8.md` §10. The
+  `w6-02` mould is structurally safe in a way a threshold bonus is not.
+
+## What changed, in one table
+
+Nine bonuses authored or deleted across five worlds. Detail in `docs/FIX-BONUSES-3-5.md` and
+`docs/FIX-BONUSES-7-8.md`; par evidence in `docs/FIX-PAR-3-8.md`.
+
+| Level | Was | Now | The second question |
+|---|---|---|---|
+| `w3-01` | `clean-run` | **`straight-runs`** | how do the two sidings line up by row? |
+| `w4-01` | `single-pass` (free) | **`within-60-look`** | did you read the ray as a ray? |
+| `w4-02` | `mark-budget` (paid for not using marks) | **`breadcrumb-trail`** | what could a bot that did not run your program reconstruct? |
+| `w4-05` | `fuel-reserve` | **`filed-return`** | do you know the way home before you drive it? |
+| `w5-05` | `tight` | **`name-the-weak-link`** | what happens when one substation goes down? |
+| `w7-01` | `no-slack` | **`name-the-idle`** | how long did each bot stand still? |
+| `w7-02` | `within-ten-percent` | **`even-share`** | did you split the work, or split the map? |
+| `w7-04` | `within-bound` | **`name-the-decider`** | which job was the critical path? |
+| `w8-01` | `audit-tight` | **`name-the-row`** | which row held the most ripe crop *at the open*? |
+| `w8-04` | `no-resurvey` (paid for ignoring the plan) | **`read-the-plan`** | what was the cipher, and how many legs? |
+| `w8-05` | `under-budget`, `no-blocked-moves`, `fleet-utilisation` | **`name-the-hold`** | which station waited longest on its feeders? |
+
+Kept, verified against all three tests: `w3-02`, `w3-04`, `w4-04`, `w5-01`, `w5-02`, `w5-03` (both),
+`w5-04`, `w7-03`, `w7-05`, `w8-02`, `w8-03`'s probe budget, `w8-01`'s look budget. Worlds 1, 2 and 6
+unchanged.
+
+**Star maximum: Worlds 7–8 fall 14 → 11.** `w8-05` loses two of three, one of which
+(`fleet-utilisation`) was **unreachable rather than hard** — World 8's `idleTicks` charges `sync`,
+so the predicate paid for *not coordinating* on the coordination finale, and the reference sat at
+85–90% against a 35% bar. Worlds 3–5 are unchanged at one star per level: every deletion there was
+matched by a replacement.
+
+**`w7-05 workers-busy` is kept but unproved** — 15–29% against a `<10%` bar. World 7's `idleTicks`
+counts only `wait` and `sync`, so it *is* reachable by a dispatcher that walks workers
+speculatively, but proving it needs a new reference solution and that is par-affecting. It is now
+the campaign's only never-earned bonus, which is the one `levels.test.ts` licenses by name.
+
+## Handover — two diffs I could not apply, and one I did
+
+**Applied: `src/game/__tests__/budget-declarations.test.ts`.** `INFERRED_FROM_LABEL` goes from six
+rows to two. Four of the six were the bonuses this pass deleted, so the pinned set shrank for the
+best possible reason — the objectives stopped existing. Only the set and its prose changed.
+
+**The remaining two cannot be converted, and this is the answer to that handback.** `w8-03
+within-shift` and `w8-05 deadline` are both required objectives built with `Objectives.custom`, and
+**`CustomReport` is `{ progress?, divergence }` with no path for a meter to reach the objective.**
+So the six-objective conversion is 4 done-by-deletion and 2 blocked on the engine. The unblocking
+diff, wanted verbatim in `src/engine/objectives.ts`:
+
+```diff
+ export interface CustomReport {
+   progress?(ctx: ObjectiveContext): [number, number];
+   divergence(ctx: ObjectiveContext): Divergence | undefined;
++  /** What `progress` counts, where it counts against a limit. DESIGN.md §11 A13. */
++  meter?: BudgetMeter;
++  unit?: string;
+ }
+```
+
+with `custom()` forwarding both onto the options it already passes to `define`. Nearly every bonus
+in the campaign is a `custom`, so until this lands A13 binds only the engine-minted objectives.
+
+**Not applied, and the one red test on this branch:
+`src/__tests__/confessed-invariants.test.ts:106`.** I was told not to edit `src/__tests__/**`
+because another agent is reconciling those guards against the art branch, and to say so rather than
+work around it. The entry is now stale:
+
+```diff
+-  {
+-    file: 'src/levels/world-4/objectives.ts',
+-    says: 'Mirrors the ledger `Sim.charge` keeps',
+-    guard: 'a constant that claims to be the only copy is the only copy',
+-  },
+```
+
+`fuelBurned` was `fuel-reserve`'s only consumer and went with the objective, so the comment it
+confessed no longer exists. **There is no fix on my side:** restoring the symbol to satisfy the
+guard would immediately fail `unused-exports.test.ts`, which is the same ratchet pointing the other
+way. Deleting those four lines makes the suite green.
+
+Worth recording as a property rather than an incident: **the ratchet caught a deletion, not an
+addition.** A guard that is exact in both directions notices when the *evidence* for an invariant
+disappears, not only when a new claim appears — which is exactly what you want and exactly what
+makes it fail on a branch that removes code.

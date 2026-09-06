@@ -10,7 +10,8 @@ import type { Objective, Sim, Vec } from '../../../engine/index.ts';
 import { ALL_DIRS, Terrain, eq, step } from '../../../engine/index.ts';
 import { must } from '../../../engine/__tests__/helpers.ts';
 import { runLevel } from '../../harness.ts';
-import type { LevelDef } from '../../types.ts';
+import { SOLUTIONS } from '../../__tests__/solutions.ts';
+import type { LevelDef, ReferenceSolution } from '../../types.ts';
 import { pathBetween } from '../caves.ts';
 import { tilesWithTerrain } from '../objectives.ts';
 import { w4_01 } from '../w4-01.ts';
@@ -147,20 +148,28 @@ describe('w4-04 prices the order the run took against the best one', () => {
 });
 
 describe('the rest of World 4 names a point too', () => {
-  test('w4-01 single-pass names the tick and tile the run stood on twice', () => {
-    const { met, divergence } = diverge(w4_01, 1, 'single-pass', (sim, botId) => {
-      const back = must(
-        ALL_DIRS.find((dir) => sim.canMove(botId, dir)),
-        'an open direction',
-      );
-      sim.move(botId, back);
-      sim.move(botId, ((back + 2) % 4) as (typeof ALL_DIRS)[number]);
+  test('w4-01 within-60-look counts the rays against the allowance', () => {
+    const drive = (SOLUTIONS[w4_01.id] as ReferenceSolution).run;
+    const { met, divergence } = diverge(w4_01, 1, 'within-60-look', (sim, botId) => {
+      for (let n = 0; n < 61; n++) sim.look(botId, ALL_DIRS[0] as (typeof ALL_DIRS)[number], 8);
+      drive(sim, botId);
     });
     expect(met).toBe(false);
     const shown = must(divergence, 'a divergence');
-    expect(shown.where).toMatch(/^tick \d+ · \(\d+, \d+\)$/);
-    expect(shown.expected).toBe('a tile the bot has not been on');
-    expect(shown.received).toBe('stood here at tick 0');
+    expect(shown.where).toBe('look()');
+    expect(shown.expected).toBe('60 rays');
+    expect(Number.parseInt(shown.received, 10)).toBeGreaterThan(60);
+  });
+
+  /* A run that never arrives is told where it stopped, not how many rays it had left. */
+  test('w4-01 within-60-look names the pad when the bot never got there', () => {
+    const world = w4_01.build(1);
+    const pad = must(tilesWithTerrain(world, Terrain.Pad)[0], 'the pad');
+    const { met, divergence } = diverge(w4_01, 1, 'within-60-look', () => undefined);
+    expect(met).toBe(false);
+    expect(must(divergence, 'a divergence').expected).toBe(
+      `(${String(pad.x)}, ${String(pad.y)})`,
+    );
   });
 
   test('w4-02 reach-vein names the vein and where the bot stopped', () => {
@@ -172,15 +181,18 @@ describe('the rest of World 4 names a point too', () => {
     );
   });
 
-  test('w4-02 mark-budget reports the marks placed against the allowance', () => {
-    const { met, divergence } = diverge(w4_02, 1, 'mark-budget', (sim, botId) => {
-      for (let n = 0; n < 200; n++) sim.mark(botId, 'x');
+  /*
+   * The trail report gives back the run's own breadcrumb and the tile it was written on, never
+   * the tile the bot actually arrived from — that is the whole of what the star asks for.
+   */
+  test('w4-02 breadcrumb-trail says a crumb is missing when nothing was left near the vein', () => {
+    const { met, divergence } = diverge(w4_02, 1, 'breadcrumb-trail', (sim, botId) => {
+      sim.mark(botId, 'v');
     });
     expect(met).toBe(false);
-    expect(divergence).toEqual({
-      where: 'marks placed',
-      expected: 'fewer than 180',
-      received: '200',
-    });
+    const shown = must(divergence, 'a divergence');
+    expect(shown.where).toMatch(/^\(\d+, \d+\)$/);
+    expect(shown.expected).toBe('a breadcrumb beside it');
+    expect(shown.received).toBe('(nothing)');
   });
 });

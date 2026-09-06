@@ -1,7 +1,6 @@
 import type {
   Divergence,
   Machine,
-  MoveEvent,
   ObjectiveContext,
   Vec,
   World,
@@ -11,11 +10,13 @@ import {
   ItemKind,
   MANUAL_ONLY,
   MachineKind,
+  NOTHING,
   Objectives,
   Terrain,
   addBot,
   addGroundItems,
   addMachine,
+  clipValue,
   createWorld,
   inventoryCount,
   machineById,
@@ -26,12 +27,10 @@ import {
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
 import {
-  blockedMoves,
   carveCaves,
   carveLine,
   criticalChain,
   dependenciesOf,
-  firstBlockedMove,
   groundCensus,
   itemsOnTile,
   key,
@@ -44,8 +43,6 @@ import {
   sealPacket,
   useLog as machineUseLog,
   worldDistances,
-  worstIdleFraction,
-  worstIdler,
 } from './shared.ts';
 
 const WIDTH = 48;
@@ -490,23 +487,6 @@ function quotaMiss(ctx: ObjectiveContext): Divergence | undefined {
 }
 
 /**
- * Why the sim refused a move, in the site's own words.
- *
- * A move into rock, a move into a bot that had not moved yet and a move at a door nobody has
- * paid the toll on are three different programs, and the tick count they cost is identical.
- */
-function blockedBy(ctx: ObjectiveContext, event: MoveEvent): string {
-  if (event.reason === 'bot') return 'another bot was standing there';
-  if (event.reason === 'bounds') return 'that is the edge of the site';
-  if (event.reason === 'dead') return 'the bot was no longer running';
-  const gates = machineById(ctx.initialWorld, 'airlock')?.links ?? [];
-  if (gates.some((gate) => gate.x === event.to.x && gate.y === event.to.y)) {
-    return 'the airlock had not been opened yet';
-  }
-  return 'rock';
-}
-
-/**
  * Stations that finished `on` *and* have somebody's `use` against them in the log.
  *
  * The brief has always said the audit reads the use log, and now it does. A station is only ever
@@ -614,6 +594,123 @@ function firstBreach(ctx: ObjectiveContext): Breach | undefined {
   );
 }
 
+const HOLD_KEYWORD = 'held';
+
+/**
+ * How long each fed station stood ready and unstarted.
+ *
+ * The gap between the last of a station's feeders going quiet and the station's own first use.
+ * `precedence` grades one side of this — nobody may start *early* — and nothing on the level has
+ * ever looked at the other side, which is where a schedule leaks. A station with no feeder has
+ * nothing to have waited for, and a station nobody started has no answer at all.
+ */
+function holdsIn(ctx: ObjectiveContext): Map<string, number> {
+  const firstUse = new Map<string, number>();
+  const lastDone = new Map<string, number>();
+  for (const record of machineUseLog(ctx)) {
+    const start = firstUse.get(record.machineId);
+    if (start === undefined || record.t < start) firstUse.set(record.machineId, record.t);
+    const done = lastDone.get(record.machineId);
+    if (done === undefined || record.done > done) lastDone.set(record.machineId, record.done);
+  }
+  const held = new Map<string, number>();
+  for (const station of machinesWithPrefix(ctx.initialWorld, STATION_PREFIX)) {
+    const start = firstUse.get(station.id);
+    if (start === undefined) continue;
+    let fed = -1;
+    for (const feeder of dependenciesOf(station)) {
+      const done = lastDone.get(feeder);
+      if (done !== undefined && done > fed) fed = done;
+    }
+    if (fed < 0) continue;
+    held.set(station.id, start - fed);
+  }
+  return held;
+}
+
+/** The longest hold on the site, and every station that can be said to have carried it. */
+function longestHold(ctx: ObjectiveContext): { ticks: number; stations: Set<string> } {
+  const held = holdsIn(ctx);
+  const stations = new Set<string>();
+  if (held.size === 0) return { ticks: -1, stations };
+  const ticks = Math.max(...held.values());
+  for (const [id, own] of held) if (own === ticks) stations.add(id);
+  return { ticks, stations };
+}
+
+/** `held <station> <n>` split back into its two halves, or null when it is not that shape. */
+function readHold(line: string): { station: string; ticks: number } | null {
+  const parts = line.split(' ');
+  if (parts.length !== 3) return null;
+  const ticks = Number(parts[2]);
+  if (!Number.isInteger(ticks)) return null;
+  return { station: parts[1] as string, ticks };
+}
+
+/** The lines the run filed under the hold keyword, in the order it printed them. */
+function holdLines(ctx: ObjectiveContext): string[] {
+  const prefix = `${HOLD_KEYWORD} `;
+  return ctx.trace.events
+    .filter((event) => event.kind === 'print' && event.text.startsWith(prefix))
+    .map((event) => (event.kind === 'print' ? event.text : ''));
+}
+
+function longestHoldFiled(ctx: ObjectiveContext): boolean {
+  const said = holdLines(ctx);
+  if (said.length !== 1) return false;
+  const claim = readHold(said[0] as string);
+  if (claim === null) return false;
+  const { ticks, stations } = longestHold(ctx);
+  return ticks >= 0 && stations.has(claim.station) && claim.ticks === ticks;
+}
+
+/**
+ * Where the hand-over note and the shift part company, without naming the station.
+ *
+ * Naming it is the whole bonus. A wrong claim comes back priced against itself — the station the
+ * note named, and what that station actually stood for — which rules one station out and leaves
+ * the bookkeeping that would find the right one exactly where it was.
+ */
+function misreadHold(ctx: ObjectiveContext): Divergence {
+  const said = holdLines(ctx);
+  const line = said[0];
+  if (line === undefined) {
+    return {
+      where: 'the hand-over note',
+      expected: 'a line naming the substation that stood',
+      received: NOTHING,
+    };
+  }
+  if (said.length > 1) {
+    return {
+      where: 'the hand-over note',
+      expected: 'one line',
+      received: `${String(said.length)} lines`,
+    };
+  }
+  const claim = readHold(line);
+  if (claim === null) {
+    return {
+      where: 'the hand-over note',
+      expected: 'a line reading `held <station> <n>`',
+      received: clipValue(line),
+    };
+  }
+  const own = holdsIn(ctx).get(claim.station);
+  if (own === undefined) {
+    return {
+      where: claim.station,
+      expected: 'a station this run started after its feeders',
+      received: 'nothing on the site answers to that',
+    };
+  }
+  return {
+    where: claim.station,
+    expected: own === claim.ticks ? 'the longest stand on the site' : `${String(own)} ticks`,
+    received: own === claim.ticks ? 'a shorter one' : `${String(claim.ticks)} claimed`,
+  };
+}
+
 /**
  * The shift, in ticks, sized from the instance the seed actually produced.
  *
@@ -714,6 +811,11 @@ const FACTS = [
     label: 'The form',
     value:
       'KD-0001-T is a chip on a marked tile in the workings. `probe` gives the positions of `slot-charter` and `slot-renewals`.',
+  },
+  {
+    label: 'Hand-over note',
+    value:
+      'One line, `held <station> <n>`: the substation that stood longest between its last feeder finishing and its own first `use()`, and how many ticks that was.',
   },
 ];
 
@@ -826,50 +928,13 @@ export const w8_05: LevelDef = {
     ),
   ],
   bonus: [
+    /* No `progress()`. The number is one edge's slack, not a run-wide total, so `budgetFor`
+       would have had to guess a meter for the bar and would have drawn the wrong one. */
     Objectives.custom(
-      'under-budget',
-      'Close the work order a fifth inside the shift, in ticks',
-      (ctx) => ctx.trace.endTick <= Math.floor(deadlineFor(ctx.initialWorld) * 0.8),
-      {
-        progress: (ctx) => {
-          const limit = Math.floor(deadlineFor(ctx.initialWorld) * 0.8);
-          return [Math.min(ctx.trace.endTick, limit), limit];
-        },
-        divergence: (ctx) => overranBy(ctx, Math.floor(deadlineFor(ctx.initialWorld) * 0.8)),
-      },
-    ),
-    Objectives.custom(
-      'fleet-utilisation',
-      'Keep every bot working for at least two thirds of the shift',
-      (ctx) => worstIdleFraction(ctx) <= 0.35,
-      {
-        divergence: (ctx) => {
-          const worst = worstIdler(ctx);
-          if (worst === undefined) return undefined;
-          return {
-            where: worst.name,
-            expected: 'idle for 35% of the shift at most',
-            received: `idle for ${String(Math.round(worst.fraction * 100))}% of it`,
-          };
-        },
-      },
-    ),
-    Objectives.custom(
-      'no-blocked-moves',
-      'Finish the shift without one blocked move',
-      (ctx) => blockedMoves(ctx) === 0,
-      {
-        divergence: (ctx) => {
-          const blocked = firstBlockedMove(ctx);
-          if (blocked === undefined) return undefined;
-          const bot = ctx.world.bots.find((each) => each.id === blocked.botId);
-          return {
-            where: `tick ${String(blocked.t)} · ${bot?.name ?? `bot #${String(blocked.botId)}`}`,
-            expected: `${point(blocked.to)} open to step into`,
-            received: blockedBy(ctx, blocked),
-          };
-        },
-      },
+      'name-the-hold',
+      'Name the substation your order left standing longest',
+      longestHoldFiled,
+      { divergence: misreadHold },
     ),
   ],
   starter: STARTER,
@@ -885,6 +950,9 @@ export const w8_05: LevelDef = {
     'Until somebody has stood at the airlock and paid every stage of it, your route ' +
       'planner sees a wall. The toll is the same size whoever pays it, so let the bot ' +
       'that was going that way anyway pay it early.',
+    'Nothing in the grid records when a station could have started, only when it did. ' +
+      'If you want to know which one your order kept standing about, you have to read ' +
+      'the clock as you throw each one.',
   ],
   docs: ['fuel', 'refuel', 'power', 'use', 'receive', 'probe'],
 };

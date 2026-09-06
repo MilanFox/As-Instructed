@@ -1,10 +1,12 @@
 import type { Divergence, ObjectiveContext, World } from '../../engine/index.ts';
 import {
   Dir,
+  NOTHING,
   Objectives,
   Rng,
   Terrain,
   addBot,
+  clipValue,
   createWorld,
   setTile,
   tileAt,
@@ -13,11 +15,12 @@ import {
 import type { LevelDef } from '../types.ts';
 import {
   at,
-  blockedMoves,
   botsOnPads,
-  firstBump,
   heardFromAnother,
+  idleTicks,
   localSeed,
+  matchingPrefix,
+  reportedLines,
 } from './shared.ts';
 
 const HEIGHT = 5;
@@ -47,16 +50,21 @@ function padColumn(world: World, row: number): number {
 }
 
 /**
- * The cheapest run possible: both walks happen at once, so the fleet pays for the longer one,
- * plus the single `send` the last bot still owes.
+ * The idle report the run owes, one line per bot, in id order.
+ *
+ * Idle is read from the trace rather than from the corridor lengths on purpose: it is a fact
+ * about the *schedule the player wrote*, not about the site. Two programs that both park both
+ * bots can stand still for wildly different amounts of time, and only one of them knows it.
  */
-function floorTicks(ctx: ObjectiveContext): number {
-  let longest = 0;
-  for (const bot of ctx.initialWorld.bots) {
-    const pad = padColumn(ctx.initialWorld, bot.at.y);
-    if (pad >= 0) longest = Math.max(longest, Math.abs(pad - bot.at.x));
-  }
-  return longest + 1;
+function idleReport(ctx: ObjectiveContext): string[] {
+  return ctx.initialWorld.bots.map(
+    (bot) => `idle ${String(bot.id)} ${String(idleTicks(ctx.trace.events, new Set([bot.id])))}`,
+  );
+}
+
+/** Which bot line `n` of the report is about, taken from the answer rather than from the run. */
+function botOfLine(line: string): string {
+  return line.split(' ')[1] ?? '';
 }
 
 /** The first bot the run did not leave standing on the pad at the end of its own corridor. */
@@ -104,17 +112,46 @@ function unheard(ctx: ObjectiveContext): Divergence | undefined {
 }
 
 /**
- * A blocked move first, because it names a tick and a tile. Only a run that never bumped into
- * anything and was simply slow gets priced against the floor the label already promises.
+ * Where the idle report and the run part company, without ever handing over an idle count.
+ *
+ * The number is the whole bonus, so a wrong figure is answered with the run's own figure and the
+ * fact that it is wrong. That still tells the player which bot they mis-read, which is the thing
+ * a bare `not met` on a two-line report cannot.
  */
-function slack(ctx: ObjectiveContext): Divergence {
-  return (
-    firstBump(ctx.trace.events) ?? {
-      where: 'the whole run',
-      expected: `${String(floorTicks(ctx))} ticks`,
-      received: `${String(ctx.trace.endTick)} ticks`,
-    }
-  );
+function misreportedIdle(ctx: ObjectiveContext): Divergence | undefined {
+  const wanted = idleReport(ctx);
+  const said = reportedLines(ctx.trace.events, 'idle');
+  const i = matchingPrefix(said, wanted);
+  const want = wanted[i];
+  const got = said[i];
+  if (want === undefined) {
+    if (got === undefined) return undefined;
+    return {
+      where: `report line ${String(i + 1)}`,
+      expected: 'no more bots',
+      received: clipValue(got),
+    };
+  }
+  const subject = botOfLine(want);
+  if (got === undefined) {
+    return {
+      where: `bot #${subject}`,
+      expected: 'a line saying how long it stood still',
+      received: NOTHING,
+    };
+  }
+  if (botOfLine(got) === subject) {
+    return {
+      where: `bot #${subject}`,
+      expected: 'a different figure',
+      received: clipValue(got),
+    };
+  }
+  return {
+    where: `report line ${String(i + 1)}`,
+    expected: `a line about bot #${subject}`,
+    received: clipValue(got),
+  };
 }
 
 export const w7_01: LevelDef = {
@@ -146,6 +183,11 @@ export const w7_01: LevelDef = {
         "`recv()` gives back `null` until the reader's own clock reaches the tick the message was sent at.",
     },
     { label: '`sync()`', value: 'Raises every living bot to the highest clock in the fleet.' },
+    {
+      label: 'Idle report',
+      value:
+        'One line per bot, in id order: `idle <bot> <n>`, where `n` is the ticks that bot spent waiting — its own `wait` calls plus whatever a `sync()` cost it.',
+    },
   ],
   seeds: [1, 2, 3],
   par: { ticks: 10 },
@@ -189,10 +231,20 @@ export const w7_01: LevelDef = {
   ],
   bonus: [
     Objectives.custom(
-      'no-slack',
-      'Finish at the theoretical minimum with no blocked moves',
-      (ctx) => ctx.trace.endTick <= floorTicks(ctx) && blockedMoves(ctx.trace.events) === 0,
-      { divergence: slack },
+      'name-the-idle',
+      'Report how long each bot stood idle',
+      (ctx) => {
+        const wanted = idleReport(ctx);
+        const said = reportedLines(ctx.trace.events, 'idle');
+        return said.length === wanted.length && matchingPrefix(said, wanted) === wanted.length;
+      },
+      {
+        progress: (ctx) => {
+          const wanted = idleReport(ctx);
+          return [matchingPrefix(reportedLines(ctx.trace.events, 'idle'), wanted), wanted.length];
+        },
+        divergence: misreportedIdle,
+      },
     ),
   ],
   starter: [
@@ -207,6 +259,7 @@ export const w7_01: LevelDef = {
     'Both corridors are dead ends. A bot does not need to know how long its corridor is. It needs to know when it can no longer walk.',
     'Nothing you write makes one bot wait for another. Only sync() does that. So the question is not how to run them in parallel; it is where you are accidentally stopping them.',
     'A bot that is behind in time has not heard anything yet. When you call sync(), how far along is the shorter walk, and what does the other bot still have left?',
+    'sync() hands back the tick it dragged everyone up to. A bot that asks its own clock first knows exactly how much of the shift it just lost.',
   ],
   docs: ['ticks', 'bot', 'bots', 'sync', 'send', 'recv'],
 };

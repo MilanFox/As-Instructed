@@ -96,6 +96,8 @@ export const solution: ReferenceSolution = {
       }
     };
 
+    let decider = '';
+    let decidedAt = -1;
     for (const job of jobs) {
       let hand = fleet[0] as Hand;
       let best = Number.POSITIVE_INFINITY;
@@ -112,7 +114,15 @@ export const solution: ReferenceSolution = {
         hand.clock++;
       }
       hand.at = job.at;
+      // The board is worked longest-first, so the job that closes the shift is rarely the last
+      // one dispatched: it is whichever bot's clock ends up highest when its own job comes off.
+      const closed = sim.clock(hand.id);
+      if (closed > decidedAt) {
+        decidedAt = closed;
+        decider = job.id;
+      }
     }
+    sim.print(0, `last ${decider} ${String(decidedAt)}`);
   },
   source: [
     'const board = probe("board");',
@@ -168,6 +178,8 @@ export const solution: ReferenceSolution = {
     '    if (moved === 0) { bot(hand.id).wait(1); hand.clock++; }',
     '  }',
     '};',
+    'let decider = "";',
+    'let decidedAt = -1;',
     'for (const job of jobs) {',
     '  let hand = fleet[0];',
     '  let best = Infinity;',
@@ -178,6 +190,9 @@ export const solution: ReferenceSolution = {
     '  walk(hand, job.at);',
     '  for (let i = 0; i < job.cost; i++) { bot(hand.id).use(); hand.clock++; }',
     '  hand.at = job.at;',
+    '  const closed = bot(hand.id).clock();',
+    '  if (closed > decidedAt) { decidedAt = closed; decider = job.id; }',
     '}',
+    'bot(0).print(`last ${decider} ${decidedAt}`);',
   ].join('\n'),
 };

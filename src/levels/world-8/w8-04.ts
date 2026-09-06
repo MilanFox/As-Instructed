@@ -280,62 +280,83 @@ function build(seed: number): World {
   return world;
 }
 
-/** Tiles the filed plan describes. Standing anywhere else is re-surveying. */
-function plannedTiles(seed: number): Set<string> {
-  const survey = surveyFor(seed);
-  const tiles = new Set<string>([key(LIFT)]);
-  for (const leg of survey.legs) {
-    let at = leg.from;
-    tiles.add(key(at));
-    for (let i = 0; i < leg.length; i++) {
-      at = step(at, leg.dir);
-      tiles.add(key(at));
-    }
-  }
-  return tiles;
+const PLAN_KEYWORD = 'plan';
+
+/** The lines the run filed as its reading of the plan, in the order it printed them. */
+function planLines(ctx: ObjectiveContext): string[] {
+  const prefix = `${PLAN_KEYWORD} `;
+  return ctx.trace.events
+    .filter((event) => event.kind === 'print' && event.text.startsWith(prefix))
+    .map((event) => (event.kind === 'print' ? event.text : ''));
 }
 
-function offPlan(ctx: ObjectiveContext): number {
-  const planned = plannedTiles(ctx.initialWorld.vars.seed ?? 1);
-  let strayed = 0;
-  for (const id of tilesEntered(ctx)) {
-    if (!planned.has(id)) strayed++;
-  }
-  return strayed;
+/** `plan <cipher> <legs>` split back into its two halves, or null when it is not that shape. */
+function readPlanNote(line: string): { cipher: number; legs: number } | null {
+  const parts = line.split(' ');
+  if (parts.length !== 3) return null;
+  const cipher = Number(parts[1]);
+  const legs = Number(parts[2]);
+  if (!Number.isInteger(cipher) || !Number.isInteger(legs)) return null;
+  return { cipher, legs };
 }
 
-/** Ten tiles of slack for each section that has come down, and nothing for the ones that stand. */
-function strayAllowance(ctx: ObjectiveContext): number {
-  return surveyFor(ctx.initialWorld.vars.seed ?? 1).collapsed.length * 10 + 4;
+function planRead(ctx: ObjectiveContext): boolean {
+  const said = planLines(ctx);
+  if (said.length !== 1) return false;
+  const claim = readPlanNote(said[0] as string);
+  if (claim === null) return false;
+  const survey = surveyFor(ctx.initialWorld.vars.seed ?? 1);
+  return claim.cipher === survey.cipherKey && claim.legs === survey.legs.length;
+}
+
+/**
+ * Where the reading and the filed plan part company, without handing either number over.
+ *
+ * Both figures are the whole bonus: the shift is only recoverable by trying all ninety-five
+ * against the checksum, and the leg count is only recoverable by throwing the traffic that does
+ * not add up away and reading what is left in section order. A wrong claim comes back as the
+ * claim, so it rules one answer out and leaves the work that finds the right one where it was.
+ */
+function misreadPlan(ctx: ObjectiveContext): Divergence {
+  const said = planLines(ctx);
+  const line = said[0];
+  if (line === undefined) {
+    return {
+      where: 'the reading',
+      expected: 'a line reading `plan <cipher> <legs>`',
+      received: NOTHING,
+    };
+  }
+  if (said.length > 1) {
+    return { where: 'the reading', expected: 'one line', received: `${String(said.length)} lines` };
+  }
+  const claim = readPlanNote(line);
+  if (claim === null) {
+    return {
+      where: 'the reading',
+      expected: 'a line reading `plan <cipher> <legs>`',
+      received: clipValue(line),
+    };
+  }
+  const survey = surveyFor(ctx.initialWorld.vars.seed ?? 1);
+  if (claim.cipher !== survey.cipherKey) {
+    return {
+      where: 'the cipher',
+      expected: 'the shift every filed packet adds up under',
+      received: `shift ${String(claim.cipher)} of the ninety-five`,
+    };
+  }
+  return {
+    where: 'the plan',
+    expected: 'the legs the filed sections describe',
+    received: `${String(claim.legs)} legs`,
+  };
 }
 
 const holdsForm = (ctx: ObjectiveContext): boolean => {
   const bot = ctx.world.bots[0];
   return bot !== undefined && inventoryCount(bot, ItemKind.Chip) > 0;
 };
-
-/**
- * The distinct tiles the plan does not describe, in the order the run first stood on them.
- *
- * The same set `offPlan` counts, kept ordered and dated so the objective can point at the one
- * that spent the allowance rather than at the total.
- */
-function strayTrail(ctx: ObjectiveContext): { at: Vec; t: number }[] {
-  const planned = plannedTiles(ctx.initialWorld.vars.seed ?? 1);
-  const seen = new Set<string>();
-  const trail: { at: Vec; t: number }[] = [];
-  const note = (at: Vec, t: number): void => {
-    const id = key(at);
-    if (planned.has(id) || seen.has(id)) return;
-    seen.add(id);
-    trail.push({ at, t });
-  };
-  for (const bot of ctx.initialWorld.bots) note(bot.at, 0);
-  for (const event of ctx.trace.events) {
-    if (event.kind === 'move' && event.ok) note(event.to, event.t + event.dt);
-  }
-  return trail;
-}
 
 /**
  * Where KD-0001-T ended the shift, in words the run has already earned.
@@ -426,6 +447,11 @@ export const w8_04: LevelDef = {
       value: 'Everywhere else, including where each group of moves was meant to finish.',
     },
     { label: 'A move into rock', value: 'Goes nowhere and still costs a tick.' },
+    {
+      label: 'The reading',
+      value:
+        'One line, `plan <cipher> <legs>`: the shift the filed traffic decodes under, and how many groups of moves the plan describes once the decoys are thrown away. Neither is anywhere in the workings.',
+    },
   ],
   seeds: [1, 2, 3, 4, 5],
   par: { ticks: 223 },
@@ -447,29 +473,14 @@ export const w8_04: LevelDef = {
     ),
   ],
   bonus: [
+    /* No `progress()`. Neither figure is a running total of anything the trace counts, so
+       `budgetFor` would have had to guess a meter for the bar and would have drawn the wrong
+       one. `docs/FIX-BONUSES-7-8.md` states the rule. */
     Objectives.custom(
-      'no-resurvey',
-      'Stay inside the allowance for ground the plan already described, in tiles',
-      (ctx) => offPlan(ctx) <= strayAllowance(ctx),
-      {
-        /* Unclamped on purpose. The clamp is what turned an overrun into `44 / 44` and a blank
-           box, which says a budget was missed and nothing about by how much. */
-        progress: (ctx) => [offPlan(ctx), strayAllowance(ctx)],
-        /* The tile named is one of the run's own footprints — never a leg of the plan, never a
-           stretch that has come down, never a count of either. The allowance is already the
-           denominator on the progress bar, so repeating it gives nothing else away. */
-        divergence: (ctx) => {
-          const allowance = strayAllowance(ctx);
-          const trail = strayTrail(ctx);
-          const over = trail[allowance];
-          if (over === undefined) return undefined;
-          return {
-            where: `tick ${String(over.t)} · ${point(over.at)}`,
-            expected: `inside ${String(allowance)} tiles off the plan`,
-            received: `tile ${String(allowance + 1)} of ${String(trail.length)} off it`,
-          };
-        },
-      },
+      'read-the-plan',
+      'Report the shift the plan was filed under, and how many legs it describes',
+      planRead,
+      { divergence: misreadPlan },
     ),
   ],
   starter: [
@@ -491,6 +502,7 @@ export const w8_04: LevelDef = {
     'A group of moves says two things: how to get somewhere, and where you end up. Only one of those has stopped being true.',
     'When the way is shut, you already know where you were trying to get to. That turns a lost run into a short local problem.',
     'Throwing the plan away is a correct program. Count how much of the workings it makes you walk.',
+    'Nothing in the tunnel will ever tell you what shift the traffic came in under. The only thing that knows is the checksum, and there are only ninety-five things to ask it.',
   ],
   docs: ['decode', 'receive', 'look', 'canMove', 'pickup'],
 };

@@ -366,19 +366,54 @@ describe('w5-05 — the island, the drum and the dead cable', () => {
   });
 
   /**
-   * The star prices the run against the shortest one and never draws it — the trade `w4-04`'s
-   * bonus makes. A `where` or an `expected` that named a station would be handing over an edge
-   * of the tree the star exists to make the player find.
+   * The star never names the station and never gives the figure. A run that filed nothing is told
+   * a line was wanted; a run that named the wrong station gets its own line back and no hint at
+   * which one it should have been.
    */
-  test('tight prices the run against the shortest one without naming a single cable', () => {
+  test('name-the-weak-link says a line was wanted when the run filed none', () => {
     const world = w5_05.build(1);
     const stations = world.machines.filter((machine) => machine.id.startsWith('sub-'));
-    const { met, divergence } = diverge(w5_05, 1, 'tight', starDriver(stations.length));
+    const { met, divergence } = diverge(w5_05, 1, 'name-the-weak-link', starDriver(stations.length));
+    expect(met).toBe(false);
+    expect(divergence).toEqual({
+      where: 'the outage report',
+      expected: 'a line naming what the district hangs off',
+      received: '(nothing)',
+    });
+  });
+
+  test('name-the-weak-link hands a wrong station back without naming the right one', () => {
+    const world = w5_05.build(1);
+    const count = world.machines.filter((machine) => machine.id.startsWith('sub-')).length;
+    const { met, divergence } = diverge(w5_05, 1, 'name-the-weak-link', (sim, botId) => {
+      const api = playerApi(sim, botId, 'w5-05');
+      // One long chain: the far end of it carries the district, and sub-1 is the leaf.
+      api.link('reactor', `sub-${String(count)}`);
+      for (let i = count - 1; i >= 1; i--) api.link(`sub-${String(i + 1)}`, `sub-${String(i)}`);
+      api.print('weak sub-1 99');
+    });
     expect(met).toBe(false);
     const shown = must(divergence, 'a divergence');
-    expect(shown.where).toBe('the whole run');
-    expect(shown.expected).toBe(`${String(world.vars.tightBudget ?? 0)} of cable`);
-    expect(shown.received).toMatch(/^\d+ of cable$/);
-    expect(`${shown.where} ${shown.expected} ${shown.received}`).not.toMatch(/sub-|reactor|\(/);
+    expect(shown.where).toBe('the outage report');
+    expect(shown.expected).toBe('a different station');
+    expect(shown.received).toBe('weak sub-1 99');
+  });
+
+  /* Naming the right station and miscounting it is told only that the figure is wrong. */
+  test('name-the-weak-link confirms nothing but the station when the count is off', () => {
+    const world = w5_05.build(1);
+    const count = world.machines.filter((machine) => machine.id.startsWith('sub-')).length;
+    const { met, divergence } = diverge(w5_05, 1, 'name-the-weak-link', (sim, botId) => {
+      const api = playerApi(sim, botId, 'w5-05');
+      api.link('reactor', `sub-${String(count)}`);
+      for (let i = count - 1; i >= 1; i--) api.link(`sub-${String(i + 1)}`, `sub-${String(i)}`);
+      api.print(`weak sub-${String(count)} 1`);
+    });
+    expect(met).toBe(false);
+    expect(divergence).toEqual({
+      where: `sub-${String(count)}`,
+      expected: 'a different figure',
+      received: '1',
+    });
   });
 });

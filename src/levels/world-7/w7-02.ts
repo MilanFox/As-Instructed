@@ -9,7 +9,6 @@ import {
   addMachine,
   createWorld,
   machineById,
-  manhattan,
   setTile,
   vec,
 } from '../../engine/index.ts';
@@ -66,27 +65,6 @@ function ripeCrops(world: World): number {
 }
 
 /**
- * A floor for the makespan: somebody has to walk to the nearest crop at all, and the harvest
- * cost plus one pass along the crop tour is shared between the whole requisitioned fleet.
- * It ignores the cost of raising the fleet and of every bot's own approach, so it is a floor
- * and not a target.
- */
-export function lowerBound(ctx: ObjectiveContext): number {
-  const world = ctx.initialWorld;
-  const fleet = Math.max(1, machineById(world, 'depot')?.vars['requisition'] ?? 1);
-  const crops: Vec[] = [];
-  for (let i = 0; i < world.tiles.length; i++) {
-    if (world.tiles[i]?.crop !== undefined) crops.push(vec(i % world.w, Math.floor(i / world.w)));
-  }
-  if (crops.length === 0) return 0;
-  crops.sort((a, b) => a.x - b.x || a.y - b.y);
-  let tour = 0;
-  for (let i = 1; i < crops.length; i++) tour += manhattan(crops[i - 1] as Vec, crops[i] as Vec);
-  const approach = Math.min(...crops.map((crop) => manhattan(ORIGIN, crop)));
-  return approach + Math.ceil((2 * crops.length + tour) / fleet);
-}
-
-/**
  * The first crop the run left standing, and how many are behind it.
  *
  * The tile is not a secret to keep: the depot publishes every crop position as `vars.c0` upward
@@ -104,12 +82,55 @@ function standingCrop(ctx: ObjectiveContext): Divergence | undefined {
   return undefined;
 }
 
-/** The allowance the label promises, against the clock the last bot actually stopped on. */
-function overFloor(ctx: ObjectiveContext): Divergence {
+/** Crops each bot actually pulled, keyed by bot id. A bot that pulled none is absent. */
+function harvestsPerBot(ctx: ObjectiveContext): Map<number, number> {
+  const tally = new Map<number, number>();
+  for (const event of ctx.trace.events) {
+    if (event.kind !== 'harvest' || !event.ok) continue;
+    tally.set(event.botId, (tally.get(event.botId) ?? 0) + event.count);
+  }
+  return tally;
+}
+
+/**
+ * The most crops any one bot may pull: the field divided by the fleet that was actually on it.
+ *
+ * `requisition` is the floor of that divisor rather than the whole of it, so the cap tightens as
+ * bots are added. That is what makes one number do two jobs — raise fewer bots than Finance
+ * approved and the share is impossible; raise more and every extra one has to earn its place.
+ */
+function fairShare(ctx: ObjectiveContext): number {
+  const requisition = Math.max(1, machineById(ctx.initialWorld, 'depot')?.vars['requisition'] ?? 1);
+  const raised = Math.max(requisition, ctx.world.bots.length);
+  return Math.ceil(ripeCrops(ctx.initialWorld) / raised);
+}
+
+function heaviestShare(ctx: ObjectiveContext): number {
+  return Math.max(0, ...harvestsPerBot(ctx).values());
+}
+
+/**
+ * The bot that came back heaviest, and what its share was allowed to be.
+ *
+ * The cap is not a secret worth keeping: the depot publishes the crop count and the requisition
+ * before anything moves, so both halves of the division are the player's own input read back.
+ * What the report does not say is which crops should have gone to whom.
+ */
+function overShare(ctx: ObjectiveContext): Divergence | undefined {
+  const cap = fairShare(ctx);
+  let worst = -1;
+  let took = 0;
+  for (const [botId, crops] of harvestsPerBot(ctx)) {
+    if (crops > took) {
+      worst = botId;
+      took = crops;
+    }
+  }
+  if (worst < 0 || took <= cap) return undefined;
   return {
-    where: 'the whole run',
-    expected: `${String(Math.ceil(lowerBound(ctx) * 1.1))} ticks`,
-    received: `${String(ctx.trace.endTick)} ticks`,
+    where: `bot #${String(worst)}`,
+    expected: `${String(cap)} crops or fewer`,
+    received: `${String(took)} crops`,
   };
 }
 
@@ -151,6 +172,11 @@ export const w7_02: LevelDef = {
       value: `Starts with its own clock at the parent's clock plus ${String(SPAWN_COST)}.`,
     },
     { label: 'Carrying', value: 'Every bot holds up to 99 crops. No hauling on this order.' },
+    {
+      label: 'Fair share',
+      value:
+        '`Math.ceil(vars.crops / n)` crops per bot, where `n` is however many bots you raised — never counted below `vars.requisition`.',
+    },
   ],
   seeds: [1, 2, 3, 4],
   par: { ticks: 55 },
@@ -203,10 +229,10 @@ export const w7_02: LevelDef = {
   ],
   bonus: [
     Objectives.custom(
-      'within-ten-percent',
-      'Finish within 10% of the shared-work floor for this field',
-      (ctx) => ctx.trace.endTick <= Math.ceil(lowerBound(ctx) * 1.1),
-      { divergence: overFloor },
+      'even-share',
+      'Split the crop evenly across the requisitioned fleet',
+      (ctx) => heaviestShare(ctx) <= fairShare(ctx),
+      { divergence: overShare },
     ),
   ],
   starter: [

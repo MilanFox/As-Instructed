@@ -1,15 +1,16 @@
-import type { Divergence, MoveEvent, ObjectiveContext, Rng, Vec, World } from '../../engine/index.ts';
+import type { ObjectiveContext, Rng, World } from '../../engine/index.ts';
 import {
   Objectives,
   Terrain,
   addBot,
   createWorld,
+  senseTotals,
   setTerrain,
   tileAt,
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
 import { carveTunnel, cellTile, paintCave } from './caves.ts';
-import { at, endedOn } from './objectives.ts';
+import { botEndsOn, endedOn } from './objectives.ts';
 
 const CELLS = 11;
 const SIZE = 2 * CELLS + 1;
@@ -32,39 +33,21 @@ function build(seed: number): World {
   return world;
 }
 
-/** Every tile the bot stood on, in order, reconstructed from the trace. DESIGN.md §4.5. */
-function standingTiles(start: Vec, events: readonly { kind: string }[]): Vec[] {
-  const out: Vec[] = [start];
-  for (const event of events) {
-    if (event.kind !== 'move') continue;
-    const move = event as MoveEvent;
-    if (move.ok) out.push(move.to);
-  }
-  return out;
-}
+/**
+ * The allowance for the whole shift, in rays.
+ *
+ * Measured, not guessed. A run that looks one tile ahead before every step casts 85, 108 and 101
+ * rays on the three declared seeds; a run that looks *down* each corridor and drives the straight
+ * stretch it sees casts 35, 41 and 34 for the identical route and the identical tick count. Sixty
+ * sits between the two families with room on both sides: it admits a bot that checks all four
+ * directions at every bend rather than stopping at the first opening, and refuses anything that
+ * treats the ray as a one-tile feeler.
+ */
+const LOOK_BUDGET = 60;
 
-/** The first tile the run stood on twice, and the tick it first stood there. */
-function firstRepeat(ctx: ObjectiveContext): Divergence | undefined {
-  const start = ctx.initialWorld.bots[0];
-  if (!start) return undefined;
-  const seen = new Map<string, number>([[`${String(start.at.x)},${String(start.at.y)}`, 0]]);
-  for (const event of ctx.trace.events) {
-    if (event.kind !== 'move') continue;
-    const move = event as MoveEvent;
-    if (!move.ok) continue;
-    const key = `${String(move.to.x)},${String(move.to.y)}`;
-    const first = seen.get(key);
-    if (first !== undefined) {
-      return {
-        where: `tick ${String(move.t)} · ${at(move.to)}`,
-        expected: 'a tile the bot has not been on',
-        received: `stood here at tick ${String(first)}`,
-      };
-    }
-    seen.set(key, move.t);
-  }
-  return undefined;
-}
+/** Rays cast this run. Counted off the trace, which is exact — `Verdict.stats.senses` is too. */
+const raysCast = (ctx: ObjectiveContext): number =>
+  ctx.senses?.['look'] ?? senseTotals(ctx.trace)['look'] ?? 0;
 
 /**
  * A single tunnel with no branches and no cycles, so the only decision on each tile is "which way
@@ -100,6 +83,10 @@ export const w4_01: LevelDef = {
     },
     { label: 'Looking', value: 'Free, and as often as you like.' },
     { label: 'The pad', value: 'The only tile in the tunnel that is not plain floor.' },
+    {
+      label: 'The lamp',
+      value: `For the star: reach the pad having cast at most ${String(LOOK_BUDGET)} rays in the whole shift. One ray reports a whole corridor.`,
+    },
   ],
   seeds: [1, 2, 3],
   par: { ticks: 52 },
@@ -117,16 +104,36 @@ export const w4_01: LevelDef = {
     ),
   ],
   bonus: [
+    /*
+     * `single-pass` — reach the pad without entering a tile twice — was measured free. The tunnel
+     * does not fork, so any program that arrives has already walked it once and nothing else; the
+     * reference took the star on all three seeds and so does every correct program in
+     * `docs/FIX-PAR-3-8.md` §6.1, which records this board as the one level in Worlds 3–8 where
+     * the route is forced and par cannot rank anything.
+     *
+     * That is what makes an information budget the only honest star here. Ticks are identical for
+     * every correct program; rays are not. The id is minted in the engine's `within-<n>-<meter>`
+     * shape on purpose, so the readout takes the meter from the id and never from the label
+     * (DESIGN.md §11 A13) — this level counts the whole of the `look` meter, so the bar is honest.
+     *
+     * The arrival conjunct is not decoration. A budget alone is satisfied by a program that never
+     * runs: nought rays is inside any allowance. A star has to be earned by playing.
+     */
     Objectives.custom(
-      'single-pass',
-      'Reach the pad without entering a tile twice',
-      (ctx) => {
-        const bot = ctx.initialWorld.bots[0];
-        if (!bot) return false;
-        const tiles = standingTiles(bot.at, ctx.trace.events);
-        return new Set(tiles.map((tile) => `${tile.x},${tile.y}`)).size === tiles.length;
+      'within-60-look',
+      `Reach the pad on ${String(LOOK_BUDGET)} rays or fewer`,
+      (ctx) => botEndsOn(ctx, Terrain.Pad) && raysCast(ctx) <= LOOK_BUDGET,
+      {
+        progress: (ctx) => [Math.min(raysCast(ctx), LOOK_BUDGET), LOOK_BUDGET],
+        divergence: (ctx) =>
+          botEndsOn(ctx, Terrain.Pad)
+            ? {
+                where: 'look()',
+                expected: `${String(LOOK_BUDGET)} rays`,
+                received: `${String(raysCast(ctx))} rays`,
+              }
+            : endedOn(ctx, Terrain.Pad),
       },
-      { divergence: firstRepeat },
     ),
   ],
   starter: [
@@ -141,6 +148,7 @@ export const w4_01: LevelDef = {
     'Standing anywhere in the middle of the tunnel there are exactly two openings, and you arrived through one of them.',
     'So you already know one direction you do not want. Hold on to it across the loop, rather than working it out again.',
     'The pad is the only tile in the tunnel that is not plain floor. Check what is under the bot before you decide to move again.',
+    'A ray is not a feeler. `look(dir)` hands back the whole straight run of corridor at once, so one call is worth as many steps as the corridor is long — and the next call is only needed where it bends.',
   ],
   docs: ['look', 'coordinates', 'memory'],
 };

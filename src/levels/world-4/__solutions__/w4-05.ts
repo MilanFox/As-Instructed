@@ -10,6 +10,10 @@ import type { ReferenceSolution } from '../../types.ts';
  * the route home computable, so before each errand the bot prices the trip *and* the trip back
  * and refuses anything it cannot pay for. Not an optimal tour — deliberately: the level is
  * priced against reserving a route home, not against the best survey.
+ *
+ * The last leg is costed out of that same map and filed before the wheels turn. The star asks for
+ * the price of the trip home *in advance*, and a program that already refuses errands it cannot
+ * pay for is a program that has the number.
  */
 
 const RANGE = 14;
@@ -140,11 +144,13 @@ export const solution: ReferenceSolution = {
       walk(pathTo(via, at, frontier));
     }
 
+    // The map is already good enough to price the way back, so the price is filed before a wheel
+    // turns. Costing the route and then driving it is one order of operations; driving it and
+    // then reporting what it took is another, and only the first one is a reservation.
     const at = sim.pos(botId);
-    if (key(at) !== key(home)) {
-      const { via } = reachable(survey, at);
-      walk(pathTo(via, at, home));
-    }
+    const route = key(at) === key(home) ? [] : pathTo(reachable(survey, at).via, at, home);
+    sim.print(botId, `home ${String(route.length)}`);
+    walk(route);
   },
   source: [
     '// Four free rays at every stop; the map they build is what makes the way home a number.',
@@ -235,7 +241,10 @@ export const solution: ReferenceSolution = {
     '  if (!front) break;',
     '  drive(route(here.via, at, front));',
     '}',
+    '// Cost the way back, say what it costs, then drive it. That order is the reservation.',
     'const at = pos();',
-    'if (k(at) !== k(home)) drive(route(flood(at).via, at, home));',
+    'const back2 = k(at) === k(home) ? [] : route(flood(at).via, at, home);',
+    'print(`home ${back2.length}`);',
+    'drive(back2);',
   ].join('\n'),
 };

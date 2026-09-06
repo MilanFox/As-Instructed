@@ -162,6 +162,92 @@ const unreached = (ctx: ObjectiveContext): Divergence | undefined => {
   };
 };
 
+/**
+ * How many substations go dark if `id` does — itself included.
+ *
+ * Stated as "remove the node and see what the reactor can still reach" rather than as a subtree
+ * size, because the run's grid is whatever the run laid: a tree on the intended answer, but a
+ * player is free to close a loop with the drum they have left, and a loop is exactly the thing
+ * that makes a station *not* load-bearing. Cutting the node is the definition that survives both.
+ */
+function darkWithout(world: World, id: string): number {
+  const graph = neighbourhood(world.machines);
+  const seen = new Set<string>(['reactor', id]);
+  const queue: string[] = ['reactor'];
+  while (queue.length > 0) {
+    const at = queue.shift() as string;
+    for (const next of graph.get(at) ?? []) {
+      if (seen.has(next)) continue;
+      seen.add(next);
+      queue.push(next);
+    }
+  }
+  return substations(world).filter((machine) => machine.id === id || !seen.has(machine.id)).length;
+}
+
+/** Every station the district hangs off hardest, and how many go with it. */
+function weakestLinks(world: World): { ids: Set<string>; load: number } {
+  const load = new Map<string, number>();
+  for (const machine of substations(world)) load.set(machine.id, darkWithout(world, machine.id));
+  const worst = Math.max(0, ...load.values());
+  const ids = new Set<string>();
+  for (const [id, n] of load) if (n === worst) ids.add(id);
+  return { ids, load: worst };
+}
+
+/** `weak sub-6 8` split into the claim it makes, or null when it is not that shape. */
+function readClaim(line: string): { id: string; load: number } | null {
+  const parts = line.split(' ');
+  if (parts.length !== 3) return null;
+  const load = Number(parts[2]);
+  if (!Number.isInteger(load)) return null;
+  return { id: parts[1] as string, load };
+}
+
+/** Every outage line the run filed, in the order it filed them. */
+const outageReport = (ctx: ObjectiveContext): string[] =>
+  ctx.trace.events
+    .filter((event) => event.kind === 'print')
+    .map((event) => (event.kind === 'print' ? event.text : ''))
+    .filter((line) => line.startsWith('weak '));
+
+/**
+ * Where the outage report and the district part company, without naming either half of the answer.
+ *
+ * A run that named a station gets told that the station is wrong and nothing about which one is
+ * right; a run that named the right station and miscounted gets told only that the figure is wrong,
+ * which is the same trade `w6-02`'s fault report makes — one fact back, the arithmetic still the
+ * player's.
+ */
+const misread = (ctx: ObjectiveContext): Divergence | undefined => {
+  const lines = outageReport(ctx);
+  const said = lines[0];
+  if (said === undefined) {
+    return {
+      where: 'the outage report',
+      expected: 'a line naming what the district hangs off',
+      received: NOTHING,
+    };
+  }
+  if (lines.length > 1) {
+    return {
+      where: 'the outage report',
+      expected: 'one line about the district',
+      received: `${String(lines.length)} of them`,
+    };
+  }
+  const claim = readClaim(said);
+  const { ids } = weakestLinks(ctx.world);
+  if (claim !== null && ids.has(claim.id)) {
+    return { where: claim.id, expected: 'a different figure', received: String(claim.load) };
+  }
+  return {
+    where: 'the outage report',
+    expected: 'a different station',
+    received: clipValue(said),
+  };
+};
+
 export function cableSpent(ctx: ObjectiveContext): number {
   let total = 0;
   for (const event of ctx.trace.events) {
@@ -310,6 +396,11 @@ export const w5_05: LevelDef = {
       value:
         '2 ticks. A substation only comes up if a cable already joins it to the reactor through machines that are already on.',
     },
+    {
+      label: 'The outage report',
+      value:
+        'For the star: file one line, `weak <id> <n>` — a substation whose loss would cut the most of the district off from the reactor, and how many stations go dark with it, counting itself.',
+    },
   ],
   seeds: [1, 2, 3, 4, 5],
   par: { ticks: 56 },
@@ -320,7 +411,7 @@ export const w5_05: LevelDef = {
       h: HEIGHT,
       seed,
       fill: Terrain.Floor,
-      vars: { mstWeight: weight, cableBudget, tightBudget: Math.ceil(weight * 1.02) },
+      vars: { mstWeight: weight, cableBudget },
     });
 
     setTerrain(world, REACTOR_AT, Terrain.Cable);
@@ -388,25 +479,28 @@ export const w5_05: LevelDef = {
   ],
   bonus: [
     /*
-     * The star reports what the shortest run costs and never how it is laid out — the same trade
-     * `w4-04`'s bonus makes. The tight allowance is the one number in the district the reactor
-     * does not report, and it is a number the player could have worked out from positions that
-     * are free to read; the tree that achieves it is the star.
+     * `tight` was the required `budget` with a smaller number on it — 102% of the minimum spanning
+     * weight instead of 108% — and the level's own third hint hands the player Prim, which lands
+     * on the exact minimum. So the reference met it on every seed and the star was the medal axis
+     * one notch in. It was also true of a bot that never laid a cable: nothing spent is inside any
+     * allowance.
+     *
+     * The shape of the tree is the thing the required objectives cannot see. `connected` asks
+     * whether every station is joined, `energised` asks whether the order held; neither asks what
+     * the grid would do if one station went down, and that is the question a district reconnecting
+     * after a blackout would actually be asked.
      */
     Objectives.custom(
-      'tight',
-      'Finish within 2% of the shortest possible run',
+      'name-the-weak-link',
+      'Report which substation the district most hangs off',
       (ctx) => {
-        const tight = ctx.world.vars.tightBudget ?? 0;
-        return cableSpent(ctx) <= tight;
+        const lines = outageReport(ctx);
+        const claim = lines.length === 1 ? readClaim(lines[0] as string) : null;
+        if (claim === null) return false;
+        const { ids, load } = weakestLinks(ctx.world);
+        return ids.has(claim.id) && claim.load === load;
       },
-      {
-        divergence: (ctx) => ({
-          where: 'the whole run',
-          expected: `${String(ctx.world.vars.tightBudget ?? 0)} of cable`,
-          received: `${String(cableSpent(ctx))} of cable`,
-        }),
-      },
+      { divergence: misread },
     ),
   ],
   starter: [
@@ -422,6 +516,7 @@ export const w5_05: LevelDef = {
     "Every cable you lay either connects something new, or it doesn't.",
     'Grow one network outward from the reactor. At each step there is a cheapest cable that reaches something not yet on the network, and it is not always the one that starts where you finished.',
     'The tree you laid is also the order to switch things on. A station can only come up once whatever joins it to the reactor is already on.',
+    'You know which station you cabled each new one on to. Follow those links back towards the reactor and every station on the way is one the newcomer depends on — the district hangs off whichever of them collects the most.',
   ],
   docs: ['probe', 'link', 'power'],
 };

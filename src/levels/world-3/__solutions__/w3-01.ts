@@ -7,6 +7,10 @@ import { goTo, key, surveyYard } from './driver.ts';
  *
  * Survey the shed once, then run one crate per trip. The clamp holds one item, so the trips
  * cannot be merged; the only thing worth getting right is not asking a full bot to pick up.
+ *
+ * The survey already knows which row every crate and every pad is in, so the flat-trip count is
+ * arithmetic over two lists the run was keeping anyway — and filing it costs nothing, because
+ * `print` is free.
  */
 export const solution: ReferenceSolution = {
   levelId: 'w3-01',
@@ -21,6 +25,14 @@ export const solution: ReferenceSolution = {
       if (tile.items.some((stack) => stack.kind === 'crate')) crates.push(tile.at);
       if (tile.terrain === 'pad') pads.push(tile.at);
     });
+
+    const inRow = (tiles: readonly Vec[], row: number): number =>
+      tiles.filter((tile) => tile.y === row).length;
+    let straight = 0;
+    for (const row of new Set(crates.map((tile) => tile.y))) {
+      straight += Math.min(inRow(crates, row), inRow(pads, row));
+    }
+    sim.print(botId, `straight ${String(straight)}`);
 
     for (let i = 0; i < crates.length; i++) {
       const crate = crates[i];
@@ -72,6 +84,13 @@ export const solution: ReferenceSolution = {
     '  if (canMove(Dir.South)) move(Dir.South);',
     '  along = along === Dir.East ? Dir.West : Dir.East;',
     '}',
+    '',
+    'const inRow = (tiles: Vec[], row: number) => tiles.filter((t) => t.y === row).length;',
+    'let straight = 0;',
+    'for (const row of new Set(crates.map((t) => t.y))) {',
+    '  straight += Math.min(inRow(crates, row), inRow(pads, row));',
+    '}',
+    'print(`straight ${straight}`);',
     '',
     'for (let i = 0; i < crates.length; i++) {',
     '  goTo(crates[i]);',

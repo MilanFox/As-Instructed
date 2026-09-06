@@ -3,6 +3,7 @@ import {
   Dir,
   ItemKind,
   MachineKind,
+  NOTHING,
   Objectives,
   Terrain,
   addBot,
@@ -118,19 +119,6 @@ const carried = (ctx: ObjectiveContext): number => {
   return bot === undefined ? 0 : inventoryCount(bot, ItemKind.Crop);
 };
 
-/** Crops that reached the silo tile on or before `tick`, read off the drop log. */
-const deliveredBy = (ctx: ObjectiveContext, tick: number): number => {
-  const silo = siloTile(ctx.initialWorld);
-  let total = 0;
-  for (const event of ctx.trace.events) {
-    if (event.kind !== 'drop' || !event.ok || event.item !== ItemKind.Crop) continue;
-    if (event.at.x !== silo.x || event.at.y !== silo.y) continue;
-    if (event.t + event.dt > tick) continue;
-    total += event.count;
-  }
-  return total;
-};
-
 /** The first crop that was ripe when the shift opened and is still in the ground at the end. */
 const stillStanding = (ctx: ObjectiveContext): Vec | undefined =>
   ripeTiles(ctx.initialWorld).find((at) => {
@@ -173,9 +161,102 @@ function harvestMiss(ctx: ObjectiveContext): Divergence {
  */
 const PAR_TICKS = 165;
 const SHIFT_TICKS = 215;
-const TIGHT_TICKS = Math.floor(PAR_TICKS * 0.83);
 const SURVEY_BUDGET = 16;
 const TIGHT_SURVEY = FIELD_H;
+
+const AUDIT_KEYWORD = 'row';
+
+/** How much ripe crop each row of the field carried when the shift opened. */
+function ripePerRow(world: World): number[] {
+  const rows = new Array<number>(world.h).fill(0);
+  for (const at of ripeTiles(world)) rows[at.y] = (rows[at.y] ?? 0) + 1;
+  return rows;
+}
+
+/** The rows that carried the most of it, and how much that was. Ties are all correct answers. */
+function heaviestRows(world: World): { count: number; rows: Set<number> } {
+  const rows = ripePerRow(world);
+  const count = Math.max(0, ...rows);
+  const winners = new Set<number>();
+  rows.forEach((held, y) => {
+    if (held === count) winners.add(y);
+  });
+  return { count, rows: winners };
+}
+
+/** The lines the run filed as its audit note, in the order it printed them. */
+function auditLines(ctx: ObjectiveContext): string[] {
+  const prefix = `${AUDIT_KEYWORD} `;
+  return ctx.trace.events
+    .filter((event) => event.kind === 'print' && event.text.startsWith(prefix))
+    .map((event) => (event.kind === 'print' ? event.text : ''));
+}
+
+/** `row <y> <n>` split back into its two halves, or null when it is not that shape. */
+function readAudit(line: string): { row: number; count: number } | null {
+  const parts = line.split(' ');
+  if (parts.length !== 3) return null;
+  const row = Number(parts[1]);
+  const count = Number(parts[2]);
+  if (!Number.isInteger(row) || !Number.isInteger(count)) return null;
+  return { row, count };
+}
+
+function auditFiled(ctx: ObjectiveContext): boolean {
+  const said = auditLines(ctx);
+  if (said.length !== 1) return false;
+  const claim = readAudit(said[0] as string);
+  if (claim === null) return false;
+  const { count, rows } = heaviestRows(ctx.initialWorld);
+  return count > 0 && rows.has(claim.row) && claim.count === count;
+}
+
+/**
+ * Where the audit note and the field part company, without naming the row.
+ *
+ * Naming it is the whole bonus, so a wrong claim comes back priced against itself: the row the
+ * note named, and what that row actually carried. That rules one row out and leaves the survey
+ * that would find the right one exactly where it was.
+ */
+function misreadAudit(ctx: ObjectiveContext): Divergence {
+  const said = auditLines(ctx);
+  const line = said[0];
+  if (line === undefined) {
+    return {
+      where: 'the audit note',
+      expected: 'a line naming the row that carried the most',
+      received: NOTHING,
+    };
+  }
+  if (said.length > 1) {
+    return {
+      where: 'the audit note',
+      expected: 'one line',
+      received: `${String(said.length)} lines`,
+    };
+  }
+  const claim = readAudit(line);
+  if (claim === null) {
+    return {
+      where: 'the audit note',
+      expected: 'a line reading `row <y> <n>`',
+      received: clipValue(line),
+    };
+  }
+  const held = ripePerRow(ctx.initialWorld)[claim.row];
+  if (held === undefined) {
+    return {
+      where: 'the audit note',
+      expected: `a row between 0 and ${String(FIELD_H - 1)}`,
+      received: `row ${String(claim.row)}`,
+    };
+  }
+  return {
+    where: `row ${String(claim.row)}`,
+    expected: claim.count === held ? 'the heaviest row on the field' : `${String(held)} ripe`,
+    received: claim.count === held ? 'a lighter row' : `${String(claim.count)} claimed`,
+  };
+}
 
 /**
  * A World 2 job on a World 2 field, priced by Finance rather than by Field Engineering.
@@ -220,6 +301,11 @@ export const w8_01: LevelDef = {
       label: 'The bot',
       value: 'Carries a fixed number of crops. The number changes between shifts.',
     },
+    {
+      label: 'Audit note',
+      value:
+        'One line, `row <y> <n>`: the row that held the most ripe crop **when the shift opened**, and how much that was. The field will not still say so once you have worked it.',
+    },
   ],
   seeds: [1, 2, 3, 4],
   par: { ticks: PAR_TICKS },
@@ -248,25 +334,14 @@ export const w8_01: LevelDef = {
     }),
   ],
   bonus: [
+    /* No `progress()` on purpose. What this counts is one row's share of the field, which is not
+       any run-wide total, so `budgetFor` would have had to guess a meter for the bar and would
+       have drawn the wrong one. `docs/FIX-BONUSES-7-8.md` states the rule. */
     Objectives.custom(
-      'audit-tight',
-      `Close the shift in ${String(TIGHT_TICKS)} ticks or fewer`,
-      (ctx) => ctx.trace.endTick <= TIGHT_TICKS,
-      {
-        progress: (ctx) => [Math.min(ctx.trace.endTick, TIGHT_TICKS), TIGHT_TICKS],
-        /* The target tick is a place in the run, not just a number, so the report stands at it
-           and says what the field looked like from there. A load that was all in by then and a
-           load that was half in are the same overrun and two different fixes. */
-        divergence: (ctx) => ({
-          where: `tick ${String(TIGHT_TICKS)}`,
-          expected: 'every ripe crop already in the silo',
-          received: clipValue(
-            `${String(deliveredBy(ctx, TIGHT_TICKS))} of ${String(
-              ripeAtStart(ctx.initialWorld),
-            )} in; the run ended at ${String(ctx.trace.endTick)}`,
-          ),
-        }),
-      },
+      'name-the-row',
+      'Name the row that held the most ripe crop',
+      auditFiled,
+      { divergence: misreadAudit },
     ),
     Objectives.withinSenses('look', TIGHT_SURVEY, {
       label: `Survey the field on ${String(TIGHT_SURVEY)} beams — one a row`,
@@ -287,6 +362,7 @@ export const w8_01: LevelDef = {
     'A green crop is two ticks and nothing to show for it. Check how ripe a crop is, not just that it is there.',
     'The bot carries a fixed number of crops. Decide which ones travel together before you set off.',
     'Nothing on the field changes except what you harvest. Keep what a beam told you, and never spend a second beam on the same row.',
+    'The field will not still say which row was heaviest once you have worked it. Anything you mean to report about how the shift opened has to be counted while the survey is still fresh.',
   ],
   docs: ['look', 'harvest', 'probe'],
 };

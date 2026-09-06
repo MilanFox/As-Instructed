@@ -52,6 +52,27 @@ export function at(pos: Vec): string {
   return `(${String(pos.x)}, ${String(pos.y)})`;
 }
 
+/**
+ * The lines the run filed under one report keyword, in the order it printed them.
+ *
+ * A fleet knows things the required objective never asks it to say — which bot was the long pole,
+ * how much of the shift it stood still for. `print` is the channel for those, and a keyword is
+ * what keeps a report separable from a player's own debugging output.
+ */
+export function reportedLines(events: readonly TraceEvent[], keyword: string): string[] {
+  const prefix = `${keyword} `;
+  return events
+    .filter((event) => event.kind === 'print' && event.text.startsWith(prefix))
+    .map((event) => (event.kind === 'print' ? event.text : ''));
+}
+
+/** How many leading entries of `actual` match `expected`. Every report's progress bar wants this. */
+export function matchingPrefix(actual: readonly string[], expected: readonly string[]): number {
+  let i = 0;
+  while (i < actual.length && i < expected.length && actual[i] === expected[i]) i++;
+  return i;
+}
+
 /** What the engine's own `reason` on a refused move means, in the words the briefs use. */
 const BLOCKED_BY: Readonly<Record<string, string>> = Object.freeze({
   bot: 'another bot was already there',

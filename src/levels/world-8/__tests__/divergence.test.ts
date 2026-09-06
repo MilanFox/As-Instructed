@@ -16,9 +16,9 @@ import {
   DIVERGENCE_VALUE_CHARS,
   Dir,
   ItemKind,
+  NOTHING,
   Terrain,
   cloneWorld,
-  eq,
   isPassable,
   machineById,
   step,
@@ -127,17 +127,30 @@ describe('w8-01 separates a crop left in the ground from a crop left in the arms
     });
   });
 
-  test('the World 2 sweep is told what the field looked like at the target tick', () => {
-    const { met, divergence } = report(w8_01, seed, 'audit-tight', (sim, botId) => {
+  test('the World 2 sweep is told its audit note is missing, and not which row', () => {
+    const { met, divergence } = report(w8_01, seed, 'name-the-row', (sim, botId) => {
       fieldSweep.run(sim, botId);
     });
 
     expect(met).toBe(false);
     expect(divergence).toEqual({
-      where: 'tick 136',
-      expected: 'every ripe crop already in the silo',
-      received: '8 of 12 in; the run ended at 220',
+      where: 'the audit note',
+      expected: 'a line naming the row that carried the most',
+      received: NOTHING,
     });
+  });
+
+  test('a note naming the wrong row is priced against that row, not against the right one', () => {
+    const { met, divergence } = report(w8_01, seed, 'name-the-row', (sim, botId) => {
+      sim.print(botId, 'row 6 3');
+      fieldSweep.run(sim, botId);
+    });
+
+    expect(met).toBe(false);
+    const shown = must(divergence, 'a divergence');
+    expect(shown.where).toBe('row 6');
+    expect(`${shown.expected} ${shown.received}`).toMatch(/\d/);
+    expect(`${shown.expected} ${shown.received}`).not.toMatch(/row \d/);
   });
 });
 
@@ -230,20 +243,6 @@ describe('w8-03 pins an overrun on the bot that was still going', () => {
     expect(shown.where).toMatch(/^RIG-8\d+, the last to stop$/);
     expect(shown.expected).toMatch(/^tick \d+$/);
     expect(shown.received).toBe(`tick ${String(LOITER)}`);
-  });
-
-  test('tight-shift measures the same run against the tighter number', () => {
-    const drive = (sim: Sim, botId: number): void => {
-      sim.wait(botId, LOITER);
-    };
-    const loose = must(report(w8_03, seed, 'within-shift', drive).divergence, 'a divergence');
-    const tight = must(report(w8_03, seed, 'tight-shift', drive).divergence, 'a divergence');
-
-    expect(tight.where).toBe(loose.where);
-    expect(tight.received).toBe(loose.received);
-    expect(Number.parseInt(tight.expected.slice(5), 10)).toBeLessThan(
-      Number.parseInt(loose.expected.slice(5), 10),
-    );
   });
 });
 
@@ -357,24 +356,39 @@ describe('w8-04 charges the re-survey to the run’s own footprints', () => {
     };
   }
 
-  test('the tile named is the one that spent the allowance', () => {
-    const { met, divergence } = report(w8_04, seed, 'no-resurvey', wander(12));
+  test('a run that walked the workings and filed nothing is told only that', () => {
+    const { met, divergence } = report(w8_04, seed, 'read-the-plan', wander(12));
 
     expect(met).toBe(false);
-    const shown = must(divergence, 'a divergence');
-    expect(shown.where).toMatch(/^tick \d+ · \(\d+, \d+\)$/);
-    expect(shown.expected).toBe('inside 4 tiles off the plan');
-    expect(shown.received).toMatch(/^tile 5 of \d+ off it$/);
-
-    const named = must(/\((\d+), (\d+)\)/.exec(shown.where), 'a coordinate');
-    const at = { x: Number(named[1]), y: Number(named[2]) };
-    expect(planned().has(key(at))).toBe(false);
+    expect(divergence).toEqual({
+      where: 'the reading',
+      expected: 'a line reading `plan <cipher> <legs>`',
+      received: NOTHING,
+    });
   });
 
-  test('it reports the run’s tile count and never a section of the plan', () => {
-    const shown = must(report(w8_04, seed, 'no-resurvey', wander(12)).divergence, 'a divergence');
-    expect(`${shown.expected} ${shown.received}`).not.toMatch(/[NESW]/);
-    expect(`${shown.expected} ${shown.received}`).not.toMatch(/section|leg|collapse/i);
+  /**
+   * The two figures are the whole bonus, so neither may come back in the report. A wrong shift is
+   * priced as the shift that was claimed, and a wrong leg count says only that it was wrong.
+   */
+  test('a wrong reading is told it is wrong and never told the right one', () => {
+    const survey = surveyFor(seed);
+    const wrongShift = report(w8_04, seed, 'read-the-plan', (sim, botId) => {
+      sim.print(botId, `plan ${String((survey.cipherKey + 7) % 95)} ${String(survey.legs.length)}`);
+    });
+    expect(wrongShift.met).toBe(false);
+    const cipher = must(wrongShift.divergence, 'a divergence');
+    expect(cipher.where).toBe('the cipher');
+    expect(`${cipher.expected} ${cipher.received}`).not.toContain(String(survey.cipherKey));
+
+    const wrongLegs = report(w8_04, seed, 'read-the-plan', (sim, botId) => {
+      sim.print(botId, `plan ${String(survey.cipherKey)} ${String(survey.legs.length + 2)}`);
+    });
+    expect(wrongLegs.met).toBe(false);
+    const legs = must(wrongLegs.divergence, 'a divergence');
+    expect(legs.where).toBe('the plan');
+    expect(`${legs.expected} ${legs.received}`).not.toContain(String(survey.legs.length));
+    expect(`${legs.expected} ${legs.received}`).not.toMatch(/[NESW]/);
   });
 });
 
@@ -395,52 +409,49 @@ describe('w8-05 reports the finale without driving the finale', () => {
     expect(shown.received).toMatch(/^no [a-z]+ there$/);
   });
 
-  test('the deadline and the bonus name the same bot and differ only in the number', () => {
-    const drive = (sim: Sim, botId: number): void => {
-      sim.wait(botId, 3200);
-    };
-    const shift = must(report(w8_05, seed, 'deadline', drive).divergence, 'a divergence');
-    const tight = must(report(w8_05, seed, 'under-budget', drive).divergence, 'a divergence');
+  test('the deadline names the bot that was still going, and the tick it stopped on', () => {
+    const shift = must(
+      report(w8_05, seed, 'deadline', (sim: Sim, botId: number) => {
+        sim.wait(botId, 3200);
+      }).divergence,
+      'a divergence',
+    );
 
     expect(shift.where).toMatch(/^KD-\d+, the last to stop$/);
     expect(shift.received).toBe('tick 3200');
-    expect(tight.where).toBe(shift.where);
-    expect(Number.parseInt(tight.expected.slice(5), 10)).toBeLessThan(
-      Number.parseInt(shift.expected.slice(5), 10),
-    );
-  });
-
-  test('fleet-utilisation names the idlest bot and its share of the shift', () => {
-    const { met, divergence } = report(w8_05, seed, 'fleet-utilisation', (sim, botId) => {
-      sim.wait(botId, 100);
-    });
-
-    expect(met).toBe(false);
-    const shown = must(divergence, 'a divergence');
-    expect(shown.where).toMatch(/^KD-\d+$/);
-    expect(shown.expected).toBe('idle for 35% of the shift at most');
-    expect(shown.received).toBe('idle for 100% of it');
+    expect(shift.expected).toMatch(/^tick \d+$/);
   });
 
   /**
-   * The one that looks binary and is not. A move into rock, a move into another bot and a move at
-   * a door nobody has paid the toll on cost the identical tick and are three different bugs.
+   * The star that replaced two vacuous ones. A run that walked to the airlock and stopped has
+   * energised nothing, so there is no hold to name and the report says exactly that — and, when
+   * a station *is* named wrongly, prices it against itself rather than handing over the answer.
    */
-  test('no-blocked-moves names the tick, the bot, the tile and the reason', () => {
+  test('name-the-hold says the note is missing, and never which station it wanted', () => {
     const airlock = must(machineById(w8_05.build(seed), 'airlock'), 'the airlock');
-    const gate = must(airlock.links?.[0], 'a gate tile');
-
-    const { met, divergence } = report(w8_05, seed, 'no-blocked-moves', (sim, botId) => {
+    const { met, divergence } = report(w8_05, seed, 'name-the-hold', (sim, botId) => {
       walkTo(sim, botId, airlock.at);
       sim.move(botId, Dir.East);
     });
 
     expect(met).toBe(false);
+    expect(divergence).toEqual({
+      where: 'the hand-over note',
+      expected: 'a line naming the substation that stood',
+      received: NOTHING,
+    });
+  });
+
+  test('a note naming a station nothing started is told that, in the run’s own terms', () => {
+    const { met, divergence } = report(w8_05, seed, 'name-the-hold', (sim, botId) => {
+      sim.print(botId, 'held sub-3 40');
+    });
+
+    expect(met).toBe(false);
     const shown = must(divergence, 'a divergence');
-    expect(shown.where).toMatch(/^tick \d+ · KD-\d+$/);
-    expect(shown.expected).toBe(`${point(gate)} open to step into`);
-    expect(shown.received).toBe('the airlock had not been opened yet');
-    expect(eq(gate, step(airlock.at, Dir.East))).toBe(true);
+    expect(shown.where).toBe('sub-3');
+    expect(shown.expected).toBe('a station this run started after its feeders');
+    expect(shown.received).toBe('nothing on the site answers to that');
   });
 });
 
