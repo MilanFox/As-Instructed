@@ -2033,3 +2033,55 @@ ratchet guards exist to catch, sitting inside the test suite. It could not extra
 constant unreserved and this instruction: **a correct duplicate beats a shared lie.** If a shared
 driver cannot preserve errors propagating out of the root render, keep the duplication and explain
 why.
+
+---
+
+## 2026-09-06 — the rail and the report now agree, and the sweep found more than was reported
+
+**Merged.** Main green at **1904 tests / 90 files**, tsc, build and eslint clean but for the known
+`w5-01.ts:32` false positive.
+
+**The reachable set was larger than the previous agent measured**, and the difference is
+methodological rather than a slip: those three cases were measured against a **synthetic empty
+source**. Swept against **real runs**, `w8-03 within-shift` and `w8-05 deadline` disagree **on an
+ordinary first run** — the report says `LIMIT 0 / 160 ticks`, the rail says `0 / 160` with neither
+tag nor unit.
+
+Those two are the `Objectives.custom` budgets that the par repair converted to declared meters hours
+earlier, dropping their `…, in ticks` tail **exactly as A13 invites**. So the trap A13 sets was not
+hypothetical — **it was already being paid for**, by the change made the same night, in the same
+repo, by an agent doing precisely what the amendment told it to do. That is the argument for fixing
+the rail rather than documenting the hazard.
+
+The agreement test sweeps every work order **twice** — a do-nothing program and the reference — and
+drives each through `runLevel`, so the store holds a verdict the game could really have produced
+rather than a fixture. It compares gauge-or-tick-box, `over`, the `LIMIT` tag and the readout. Red
+against the unfixed rail: **3 of 4.**
+
+### It corrected the diff it was handed, which is what "verify before applying" is for
+
+**`resolve.mainFields` configures vite's *client* environment; vitest resolves through the SSR one**,
+so the handed-over diff changed nothing. The working form is
+`ssr: { resolve: { mainFields: ['module', 'main'] } }`. It also corrected the diagnosis: on vitest
+3.2.7 a file whose whole body is `vi.mock('monaco-editor', …)` **collects fine** — the wall only
+appears when a module that imports monaco is loaded. Cost: nothing. `npm run build` reads
+`vite.config.ts` and cannot see it. Bought 5 tests over `typescriptRegistered`'s internals,
+mutation-checked by breaking `monaco-setup.ts` three ways and watching each go red.
+
+### The driver was shared for four of five, and the two refusals are the right ones
+
+The four copies were byte-identical but for one hook, so the shared module is a **superset** and
+nothing was weakened. **`modal-boundary.test.ts` keeps its own and should**: it is an error-path
+instrument with no hooks, and its fidelity floor needs errors to escape the root render, which the
+hooks driver cannot carry. `publish-dialog.test.ts` keeps its own too — folding it in would mean
+either a fifth-wheel export or giving the shared driver effect semantics the four callers rely on
+**not** having. *A correct duplicate beats a shared lie*, applied twice and argued both times.
+
+`KNOWN_TEST_ONLY` `[69, 32]` → `[70, 32]`, measured before bumping, and the only edit anywhere in
+`src/__tests__/`.
+
+### Open
+
+`docs/AUDIT-UI.md`'s held styling findings still await re-triage against whichever art direction the
+user picks. `DEFAULT_ART` is `survey` pending that call — the one decision on this project that is
+not mine.
