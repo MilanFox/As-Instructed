@@ -48,7 +48,7 @@ const TRAIL_HOT_VISITS = 6;
  * level this exists for. Luminance first, hue second.
  *
  * §7 wrote that down as "the cold end is a darkening", which was the correct fix for a board with
- * a mid-value floor and is still what `standard`, `survey` and `deepsite` do. It is not the
+ * a mid-value floor and is still what `standard` and `deepsite` do. It is not the
  * general rule: `signal` paints a near-black phosphor floor, where a darkening fails for exactly
  * the reason `inkDim` did, and has to brighten instead. So each direction declares its own cold
  * and hot ends and the *contrast* against `referenceFloor` is what the test enforces.
