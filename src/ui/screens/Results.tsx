@@ -23,6 +23,7 @@ import {
   VERDICT_PASS,
   codeForKind,
   failureLineAt,
+  libraryUsageLine,
   personalBestLine,
   successLine,
 } from '../copy.ts';
@@ -108,6 +109,7 @@ function ResultsReport(): JSX.Element | null {
   const jumpToFailure = useGame((state) => state.jumpToFailure);
   const trace = useGame((state) => state.trace);
   const progress = useGame((state) => (level ? state.save.levels[level.id] : undefined));
+  const traceSeed = useGame((state) => state.traceSeed);
   const notice = useLibrary((state) => state.notice);
   const muteNotice = useLibrary((state) => state.muteNotice);
   const primaryRef = useRef<HTMLButtonElement | null>(null);
@@ -151,6 +153,18 @@ function ResultsReport(): JSX.Element | null {
   const closedEverywhere = required.filter((objective) =>
     seedMarks(objective.id).every((mark) => mark.met),
   ).length;
+  /*
+   * The Repository's own line, read off the seed the report is describing.
+   *
+   * `libraryUsage` rides on every seed that linked `lib.ts`, so this is measurement, not an
+   * estimate — and a run that linked the library and never called it says nothing rather than
+   * "0 routines", because a zero is a scoreline and this is not one.
+   */
+  const reportedSeed = seedResults.find((result) => result.seed === traceSeed) ?? seedResults[0];
+  const usage = reportedSeed?.libraryUsage;
+  const routinesUsed = usage
+    ? Object.values(usage.calls).filter((entry) => entry.calls > 0).length
+    : 0;
   const causes = passed
     ? []
     : failureCauses(required, { trace, ...(verdict ? { stats: verdict.stats } : {}) }, sourceFor);
@@ -375,7 +389,7 @@ function ResultsReport(): JSX.Element | null {
               <div className="score-cell__label">ticks</div>
               <div className="score-cell__value">{ticks}</div>
               <div className="score-cell__note">
-                par {level.par.ticks}
+                {level.graded === false ? '' : `par ${level.par.ticks}`}
                 {progress?.bestTicks !== undefined ? ` · best ${progress.bestTicks}` : ''}
               </div>
             </div>
@@ -418,6 +432,12 @@ function ResultsReport(): JSX.Element | null {
               </div>
             </div>
           </div>
+
+          {usage && routinesUsed > 0 ? (
+            <p className="modal__line modal__line--quiet">
+              {libraryUsageLine(routinesUsed, usage.ticks)}
+            </p>
+          ) : null}
 
           {commendations.length > 0 ? (
             <section className="report-section">
@@ -648,6 +668,14 @@ function ReportObjective({
         {!shown ? '' : over ? '!' : objective.met && !budget ? '✓' : ''}
       </span>
       <span className="objective__label">{objective.label}</span>
+      {/*
+        The same word the rail uses, for the same reason: par is a medal, a limit is a failure.
+        Never on a bonus — a bonus threshold costs a star and ends nothing, so calling it a limit
+        would be the confusion this word exists to undo, pointed the other way.
+      */}
+      {!bonus && budget?.meter?.kind === 'ticks' ? (
+        <span className="objective__gate">limit</span>
+      ) : null}
       {budget ? (
         <span className={`objective__progress${over ? ' objective__progress--over' : ''}`}>
           {budgetReadout(budget)}

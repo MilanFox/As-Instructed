@@ -69,4 +69,48 @@ export function setupMonaco(): typeof monaco {
   return monaco;
 }
 
+/** The throwaway file that asks Monaco for TypeScript. Never shown, never compiled against. */
+const WARM_UP_PATH = 'inmemory://bootstrap/typescript.ts';
+
+const REGISTRATION_POLL_MS = 20;
+const REGISTRATION_ATTEMPTS = 100;
+
+let registration: Promise<void> | null = null;
+
+/**
+ * Resolves once Monaco's TypeScript language service will actually answer.
+ *
+ * Monaco installs that service lazily: `languages.onLanguage('typescript')` starts a dynamic
+ * import of `tsMode.js`, and until it lands `getTypeScriptWorker()` rejects — with the bare string
+ * `TypeScript not registered!`, which is why the failure reached the console as an `Uncaught (in
+ * promise)` carrying no message at all. Every caller in this app is downstream of `ready()`, and
+ * the first of them is the Repository publishing `declare module 'lib'` before any editor has
+ * mounted, so on a cold load it lost that race and the declaration it exists to install was never
+ * installed — the player's own `import` stayed red until the next Run.
+ *
+ * Asking for the language is half of it: nothing sets the service up until something wants it, so
+ * the warm-up model is what makes the wait terminate rather than sit out its budget.
+ */
+export function typescriptRegistered(): Promise<void> {
+  registration ??= (async () => {
+    const uri = monaco.Uri.parse(WARM_UP_PATH);
+    const model =
+      monaco.editor.getModel(uri) ?? monaco.editor.createModel('export {};', 'typescript', uri);
+    try {
+      for (let attempt = 0; attempt < REGISTRATION_ATTEMPTS; attempt++) {
+        try {
+          await monaco.languages.typescript.getTypeScriptWorker();
+          return;
+        } catch {
+          await new Promise((resolve) => setTimeout(resolve, REGISTRATION_POLL_MS));
+        }
+      }
+      console.error('Monaco never registered its TypeScript language service.');
+    } finally {
+      model.dispose();
+    }
+  })();
+  return registration;
+}
+
 export { monaco };

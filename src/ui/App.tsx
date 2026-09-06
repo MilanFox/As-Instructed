@@ -7,10 +7,11 @@ import { worldMeta } from '../levels/index.ts';
 // Deep import on purpose: `src/meta/ui/index.ts` also re-exports `LibraryPanel`, which pulls
 // Monaco back into the entry chunk and undoes the split below.
 import { PublishDialog } from '../meta/ui/PublishDialog.tsx';
+import { useLibrary } from '../meta/store.ts';
 import { mountAudio } from './audio.ts';
 import { mountLibrary } from './library.ts';
 import { IconBook, IconMap, IconSound } from './components/Icons.tsx';
-import { PanelBoundary } from './components/PanelBoundary.tsx';
+import { ModalBoundary } from './components/ModalBoundary.tsx';
 import { useKeyboard } from './hooks/useKeyboard.ts';
 import { AudioSettings } from './screens/AudioSettings.tsx';
 import { LevelSelect } from './screens/LevelSelect.tsx';
@@ -18,6 +19,7 @@ import { RepositoryIssue } from './screens/RepositoryIssue.tsx';
 import { Requisition } from './screens/Requisition.tsx';
 import { Results } from './screens/Results.tsx';
 import { ReviewMemo } from './screens/ReviewMemo.tsx';
+import { reviewOwed } from './screens/review.ts';
 // Side effect: sets `data-art` and the palette custom properties before the first render.
 import './art.ts';
 import './styles/fonts.css';
@@ -31,6 +33,13 @@ import './styles/art/deepsite.css';
  * it out is what keeps the site map — the screen the game opens on — a small download.
  */
 const Workspace = lazy(async () => ({ default: (await import('./Workspace.tsx')).Workspace }));
+
+/** The memo files itself by rank, so closing a broken one has to look the rank up the same way. */
+function fileOwedReview(): void {
+  const state = useGame.getState();
+  const tier = reviewOwed(state.save);
+  if (tier) state.fileReview(tier.rank);
+}
 
 export function App(): React.JSX.Element {
   useKeyboard();
@@ -69,27 +78,38 @@ export function App(): React.JSX.Element {
         A throw in any of these used to unmount the whole tree — the site map, the editor and the
         player's unsaved program went with it, for a fault in a dialog they did not open
         (docs/AUDIT-UI.md F21). They are boundaried separately because they stack: a publish offer
-        that falls over must still leave the run report that raised it on the screen.
+        that falls over must still leave the run report that raised it on the screen. Each one
+        hands the boundary its own close, because a modal the store still thinks is open is a modal
+        the next run raises again.
       */}
       <div className="modal-layer">
-        <PanelBoundary label="The run report">
+        <ModalBoundary label="The run report" onDismiss={() => useGame.getState().dismissResults()}>
           <Results />
-        </PanelBoundary>
-        <PanelBoundary label="The publish offer">
+        </ModalBoundary>
+        <ModalBoundary
+          label="The publish offer"
+          onDismiss={() => useLibrary.getState().skipPublish(false)}
+        >
           <PublishDialog />
-        </PanelBoundary>
+        </ModalBoundary>
         {/* The Repository note waits for the hardware crate itself, so order here is cosmetic. */}
-        <PanelBoundary label="The Repository note">
+        <ModalBoundary
+          label="The Repository note"
+          onDismiss={() => useLibrary.getState().markBriefed()}
+        >
           <RepositoryIssue />
-        </PanelBoundary>
+        </ModalBoundary>
         {/* Last, so the delivery note stacks above a publish offer raised by the same transition. */}
-        <PanelBoundary label="The delivery note">
+        <ModalBoundary
+          label="The delivery note"
+          onDismiss={() => useGame.getState().signRequisition()}
+        >
           <Requisition />
-        </PanelBoundary>
+        </ModalBoundary>
         {/* Site map only, and it checks the other four are gone. Nothing here shares its screen. */}
-        <PanelBoundary label="The performance memo">
+        <ModalBoundary label="The performance memo" onDismiss={fileOwedReview}>
           <ReviewMemo />
-        </PanelBoundary>
+        </ModalBoundary>
       </div>
     </div>
   );

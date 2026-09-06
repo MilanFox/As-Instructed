@@ -36,6 +36,7 @@ function Row({ row, node }: { row: StructureRow; node: LibraryFunction }): React
         </span>
         {note ? <span className="lib__note"> — {note}</span> : null}
       </td>
+      <td className="numeric">{node.levels.length > 0 ? node.levels.length : '—'}</td>
       <td className="numeric">{node.measured ? node.callCount : '—'}</td>
       <td className="numeric">{node.measured ? node.ticks : '—'}</td>
       <td className="numeric">
@@ -71,6 +72,7 @@ export function StructureScreen(): React.JSX.Element {
               <thead>
                 <tr>
                   <th>{STRUCTURE.columns.name}</th>
+                  <th className="numeric">{STRUCTURE.columns.orders}</th>
                   <th className="numeric">{STRUCTURE.columns.calls}</th>
                   <th className="numeric">{STRUCTURE.columns.ticks}</th>
                   <th className="numeric">{STRUCTURE.columns.self}</th>

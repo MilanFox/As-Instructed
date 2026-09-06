@@ -1771,3 +1771,147 @@ thrown away: routines-used and ticks-inside-them on the results screen, reuse co
 the Repository panel. Explicitly **not** priced into anything — the veteran playtester used the
 Repository heavily with no extrinsic reward at all, so the argument for the feature should be made
 by the save file rather than by a brief.
+
+---
+
+## 2026-09-06 — eleven bonuses now ask a second question
+
+**Merged** (`61626cb`). Main green at **1831 tests / 82 files**, tsc, build and eslint clean but for
+the known `w5-01.ts:32` false positive.
+
+Every replacement is **report-shaped**, earned by the reference on **every** seed, and
+**tick-neutral** — `print`, `look` and `clock` are free — so **no medal moved anywhere.**
+
+| level | was | now | the second question |
+|---|---|---|---|
+| `w3-01` | `clean-run` | `straight-runs` | how do the two sidings line up by row? |
+| `w4-01` | `single-pass` | `within-60-look` | did you read the ray as a ray? |
+| `w4-02` | `mark-budget` | `breadcrumb-trail` | what could a bot that never ran your program reconstruct? |
+| `w4-05` | `fuel-reserve` | `filed-return` | do you know the way home before you drive it? |
+| `w5-05` | `tight` | `name-the-weak-link` | what happens when one substation goes down? |
+| `w7-01` | `no-slack` | `name-the-idle` | how long did each bot stand still? |
+| `w7-02` | `within-ten-percent` | `even-share` | did you split the work, or split the map? |
+| `w7-04` | `within-bound` | `name-the-decider` | which job was the critical path? |
+| `w8-01` | `audit-tight` | `name-the-row` | which row held most ripe crop *at the open*? |
+| `w8-04` | `no-resurvey` | `read-the-plan` | what was the cipher, and how many legs? |
+| `w8-05` | three bonuses | `name-the-hold` | which station waited longest on its feeders? |
+
+### The brief gave one test; measurement forced three
+
+1. Does it ask a second question? — kills the tightenings.
+2. **Is it earned by the cheapest correct program?** — kills `w4-02`, `w4-01`, `w8-04`.
+3. **Is it satisfied by a program that does nothing?** — kills `w8-05`'s absence predicates.
+
+**The agent reversed three of its own rulings as evidence arrived** — `w4-02` from *"exemplar, do
+not touch"*, and `w8-05 under-budget` and `w8-04 no-resurvey` from *"looks real, keep"*. `w4-02` and
+`w8-04` turned out to be **the same defect: a star paid for declining to use the level's own idea**,
+and on `w8-04` the lazy route took the star **more comfortably than the reference** (0/0/0/4/11
+off-plan against 17/19/37/14).
+
+They converge on a rule worth keeping: **prefer a bonus requiring evidence of a thing done over one
+requiring the absence of a thing done.** Independently corroborated hours earlier from the other
+direction — when grading moved to worst-seed, the three bonuses that lost their star were all budget
+bonuses and **not one predicate bonus moved.**
+
+`w8-05` loses all three of its bonuses and gains one. `fleet-utilisation` was **unreachable rather
+than hard**: World 8's `idleTicks` charges `sync`, so it paid for *not coordinating* — on the
+coordination finale. World 7–8 star maximum falls 14 → 11; Worlds 3–5 unchanged, every deletion
+matched by a replacement. Worlds 1, 2 and 6 already met the standard.
+
+### The ratchet caught a deletion, and that is the point
+
+The one red test was `confessed-invariants.test.ts` — the entry confessed a comment on `fuelBurned`,
+which was `fuel-reserve`'s only consumer and went with the objective. **There was no fix on the
+agent's side**: restoring the symbol would have failed `unused-exports.test.ts`, the same ratchet
+pointing the other way. It reserved the file as instructed and handed me the four-line diff, which I
+applied. A guard exact in both directions notices when the **evidence** for an invariant leaves, not
+just when a new one appears.
+
+### Par: measured, and one real content bug
+
+**No impossible pars. 19 of 23 graded levels discriminate; Worlds 3 and 7 are clean.** Seven free
+pars, headline **`w8-04`, free by 106–158 ticks — skipping the cipher entirely golds on every
+seed.** The level's whole idea is the cipher and the cheapest way to gold is to ignore it. Same
+defect the bonus work found from the other side.
+
+**`w8-03` admits no scalar par**: silver must sit inside seed 3's own deadline of 98 while the
+reference costs 84.
+
+### Spawned: the par repairs
+
+**Ruled: par stays a scalar. No per-seed par machinery.** A scalar par is a promise the whole game
+makes — site map, results, Refactor projection and Performance Review all read one number per level
+— so a second shape buys one level and taxes every screen. **`w8-03` has a seed problem, not a par
+problem**; the agent is to bring seed 3 into line, and to stop and report with numbers rather than
+implement per-seed par if it cannot.
+
+`w8-04` is a **content repair, not a par tune** — told explicitly not to lower par until only the
+cipher route fits, because that makes the level harder without making the idea load-bearing and
+punishes the player who found the shortcut. **Make the cipher the cheap route.** Also carrying
+`w5-01` 37 → 32 and the four-line `CustomReport` engine diff that unblocks the last two objectives
+still inferring their unit from their label.
+
+### Recorded so it is not rediscovered as a bug
+
+`look`, `scan`, `probe`, `recv` and `print` are **absent from `DEFAULT_COSTS` — sensing and
+reporting are free.** That is deliberate and stays: it is why par can never rank a program for
+sensing less, and why an **information budget is the only instrument in the game that can price
+sensing at all.**
+
+---
+
+## 2026-09-06 — the UI defects merged, and a coverage gap I am not letting stand
+
+**Merged** (`7a24e80`). Main green at **1831 tests / 82 files**, tsc, build and eslint clean but for
+the known `w5-01.ts:32` false positive.
+
+**What a player can now do:** tell which tick number ends their shift — `w8-01` showed 215 and 165
+both labelled "ticks", and the objective now carries a `LIMIT` tag against a rail row labelled
+`par`, with one seven-word line where both appear: *"par sets the medal. the limit ends the work
+order."* Read long dialogs to the end. See what the Repository actually did. Know what a medal
+means. Get back to their work after a dialog falls over.
+
+### Item 1 was a real bug, not noise
+
+The rejection value was the bare **string** `'TypeScript not registered!'`, which is why it printed
+as `Uncaught (in promise)` with nothing after it. Monaco installs its TypeScript mode lazily behind
+`languages.onLanguage`, and `installTypes` asked for the worker **in the same tick as mount, before
+any editor existed** — losing the race on a cold module cache. Twice per entry because `StrictMode`
+mounts twice; both captured rejections had `levelId === undefined`, i.e. both were the mount path.
+
+**The consequence was not cosmetic:** the `declare module 'lib'` that `installTypes` exists to
+publish was silently never installed on that pass, so **a player's own `import` stayed red until the
+next Run.** Verified against a forced-cold `vite --force` cache three times.
+
+### The a11y item needed no change, and the reasoning is the standard
+
+The speed control already has an associated `<label class="sr-only">` and `select.labels` returns
+`["Playback speed"]`. The accessibility tree prints `combobox "1x"` because that is its **value** —
+proved by setting `aria-label="ZZPROBE"` and re-reading the tree, which still printed `"1x"`.
+**Adding the attribute would have been a second name for a control that already has one.** Pulling
+the tree rather than reading the DOM is exactly why this was caught.
+
+### Three routed back, all applied
+
+`LibraryEditor.tsx` had **the same Monaco race on the path the guard was not on** — it called
+`compileLibrary` directly, and does not reproduce today only because a 400ms debounce hides it and
+the panel cannot open before the workspace editor. Fixed rather than noted, because "does not
+reproduce today" is not a property anyone maintains. An **ungraded work order no longer prints a
+par** — the last place the two tick numbers could still read as one kind of thing. Dead
+`.sitemap .screen-stat__best` deleted.
+
+**Left as intended, recorded so it is not mistaken for a defect:** `ModalBoundary` renders nothing
+for the rest of the session after a dismissal. Remounting the child that threw is a loop.
+
+### The gap: that whole pass shipped with zero tests
+
+Every fix above was verified by hand in a browser. That is good and it is not durable.
+**`ModalBoundary.tsx` is new code whose entire purpose is to catch a crash, and nothing asserts that
+it catches one** — a safety net nobody has jumped into. Spawned a coverage agent, told to prove each
+test **fails against the unfixed code** by checking the pre-fix source back out under it, because
+this task exists precisely because that check was skipped.
+
+Two standing instructions in that brief worth keeping: **test behaviour, not markup** — four art
+directions ship and the front end may be rebuilt again, so a class-name assertion is noise by next
+week — and the medal key must be proved distinguishable **under `signal`**, since a key that only
+works in colour fails the direction it was rebuilt for.

@@ -2,7 +2,7 @@ import Editor, { type OnMount } from '@monaco-editor/react';
 import { useEffect, useRef } from 'react';
 import type * as React from 'react';
 import { LIB_FILE_PATH, compileLibrary, setLibraryTypes } from '../../runtime/index.ts';
-import { THEME, monaco, setupMonaco } from '../../ui/monaco-setup.ts';
+import { THEME, monaco, setupMonaco, typescriptRegistered } from '../../ui/monaco-setup.ts';
 import { LIBRARY_PANEL_HINT, NO_EXPORTS_WARNING } from '../copy.ts';
 import { publishableDeclarations } from '../publish.ts';
 import { useLibrary } from '../store.ts';
@@ -42,32 +42,35 @@ export function LibraryEditor(): React.JSX.Element {
     const timer = setTimeout(() => {
       const model = monaco.editor.getModel(monaco.Uri.parse(LIB_FILE_PATH));
       if (!model) return;
-      void compileLibrary(monaco, model).then((result) => {
-        if (!live) return;
-        if (result.ok) {
-          setLibraryTypes(monaco, result.declaration);
-          monaco.editor.setModelMarkers(model, MARKER_OWNER, []);
-          if (warnRef.current) {
-            const owed = result.exports.length === 0 && publishableDeclarations(source).length > 0;
-            warnRef.current.textContent = owed ? NO_EXPORTS_WARNING : '';
+      void typescriptRegistered()
+        .then(() => compileLibrary(monaco, model))
+        .then((result) => {
+          if (!live) return;
+          if (result.ok) {
+            setLibraryTypes(monaco, result.declaration);
+            monaco.editor.setModelMarkers(model, MARKER_OWNER, []);
+            if (warnRef.current) {
+              const owed =
+                result.exports.length === 0 && publishableDeclarations(source).length > 0;
+              warnRef.current.textContent = owed ? NO_EXPORTS_WARNING : '';
+            }
+            return;
           }
-          return;
-        }
-        monaco.editor.setModelMarkers(
-          model,
-          MARKER_OWNER,
-          result.diagnostics
-            .filter((diagnostic) => diagnostic.severity === 'error')
-            .map((diagnostic) => ({
-              severity: monaco.MarkerSeverity.Error,
-              message: diagnostic.message,
-              startLineNumber: diagnostic.line,
-              endLineNumber: diagnostic.line,
-              startColumn: diagnostic.column,
-              endColumn: diagnostic.column + Math.max(1, diagnostic.length),
-            })),
-        );
-      });
+          monaco.editor.setModelMarkers(
+            model,
+            MARKER_OWNER,
+            result.diagnostics
+              .filter((diagnostic) => diagnostic.severity === 'error')
+              .map((diagnostic) => ({
+                severity: monaco.MarkerSeverity.Error,
+                message: diagnostic.message,
+                startLineNumber: diagnostic.line,
+                endLineNumber: diagnostic.line,
+                startColumn: diagnostic.column,
+                endColumn: diagnostic.column + Math.max(1, diagnostic.length),
+              })),
+          );
+        });
     }, COMPILE_DEBOUNCE_MS);
 
     return () => {

@@ -196,6 +196,15 @@ export const STRUCTURE = {
     'assembly.',
   columns: {
     name: 'Subroutine',
+    /*
+     * Reuse, per routine, read off the save rather than off a run.
+     *
+     * The argument for the whole Repository is a routine six work orders import, and until this
+     * column the number was computed on every run and shown nowhere (docs/FIX-INCENTIVES.md §I).
+     * It buys nothing — no point, no star, no medal — which is the point: the veteran used the
+     * Repository heavily with no extrinsic reward at all, and the fact was already there.
+     */
+    orders: 'Work orders',
     calls: 'Calls',
     ticks: 'Ticks',
     self: 'Its own',
