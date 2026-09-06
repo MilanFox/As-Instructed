@@ -1694,3 +1694,80 @@ I edited one hunk in the levels agent's territory — `finale.test.ts` compared 
 every met objective, which held only while the verdict carried required objectives alone. It was
 the only red test on main and main does not stay red overnight. The agent has been told, and told
 that its version wins if they collide.
+
+---
+
+## 2026-09-06 — the art rebuild is on main, guards and all
+
+**Merged** (`a8cd0a6`). Main green at **1772 tests / 77 files**, tsc, build and eslint clean but
+for the known `w5-01.ts:32` false positive. The four art directions ship as selectable modules;
+**`DEFAULT_ART` is `survey`**, which is the spike's own recommendation and **not the user's
+decision** — that is still open and it is one line to change.
+
+### The geometry guard was retargeted, not deleted, and the argument is the interesting part
+
+The old invariant was **vertical**: the hook subtracted chrome height from the viewport and CSS
+declared that height. Making the board full-height with a floating timeline removed the subtraction,
+so both constants are genuinely gone. But the restructure **reintroduced the same shape on the other
+axis** — `HUD_GUTTER = 232` is the width held back beside the board, and `.hud-card { width: 232px }`
+is what has to fit in it. Same two files, same failure mode: widen the card alone and the objective
+read-out goes back over the grid, *which is the exact defect the float was introduced to fix.* The
+number was written twice with nothing holding it. So the invariant is alive at a different pair of
+constants rather than designed out. Verified by perturbation.
+
+**No guard was deleted. None earned it.**
+
+### The confession triage held the line
+
+Four new hits, **one real**: the canvas copy of the twelve colours moved from `theme.ts` into
+`art/standard.ts`, so the registration moved with it. The other three were the word in its ordinary
+English sense — *"mirrors a dead bot rather than hiding it"* means **reports** it; *"mirrors the
+direction onto the document"* means **writes** it, on a line describing the mechanism that
+*prevents* a duplication — and were **reworded rather than registered**. The index is now 15 hits
+holding 10 invariants, from 24 holding 9. That ratio was the whole point.
+
+### A guard that was passing by accident, found and hardened unasked
+
+`the palette is the same twelve colours everywhere it is written down` read the **live** `palette`
+binding — which is `standard`'s only because that test file happens not to import `src/ui/art.ts`
+and so never triggers its module-load `applyArtDirection(storedArt())`. Any future change to the
+test graph would have made it compare **survey**'s palette against `tokens.css` and **fail on
+correct work**. It now names `DIRECTIONS.standard.palette` explicitly. That makes the guard
+independent of which direction ships as default — deliberately, because **a test must not be able to
+veto the user's choice.**
+
+### One export deleted, one listed, and the honest reason for a count that moved
+
+`deepsite.ts LIGHT` was written once on the line declaring it and read nowhere — deleted, because an
+unreferenced constant cannot move a pixel. `src/ui/art.ts chooseArt` was **listed rather than
+deleted**: it is the write half of a read/write pair and there is no live twin doing its job, so no
+edit to it can silently no-op — it is not the `BONUS_STAR_WEIGHT` shape. Building the picker it
+implies would have been a behaviour change.
+
+The test-only pin moved `[68, 32]` → `[67, 32]` **for a bad reason, flagged rather than buried**:
+`Workspace.tsx` now sets the inline custom property `'--rig-w'`, and the scan's identifier regex
+tokenises that string literal into `rig`, so a shipping file *appears* to read a test fixture named
+`rig`. Stripping string bodies would fix it and would take real reads with it, since template
+literals hold reads inside `${}`. Pinned at the honest number with the limitation written into the
+file's existing "Known limits of a name-based scan" paragraph.
+
+### Spawned: the direction-independent UI defects
+
+Everything on this list must be correct under **all four** directions, and is checked under `signal`
+specifically — it is monochrome, so anything fixed by adding a colour fails there. `AUDIT-UI.md`'s
+held styling list is **still held** and explicitly out of scope until the user picks.
+
+The three real bugs: `src/ui/library.ts:90` throwing `Uncaught (in promise)` from `installTypes`
+twice per level entry (told to find out *why* — a swallowed rejection is a symptom and a bare
+`.catch` is not a fix); the missing modal-layer error boundary, since the publish loop once
+unmounted the whole app and nothing contains the next one; and the dead `award('no-regressions')`
+call.
+
+Then the legibility work: **a limit and a budget are not the same object** — `w1-01` shows `90` in
+the rail, which ends the run, and `78` as par, which is a medal boundary, and both are labelled
+"ticks". The engine now carries `Objective.meter` and `unit`, so the information exists and is
+simply not being said. And **spending `LibraryUsage`**, which is computed on every meta run and
+thrown away: routines-used and ticks-inside-them on the results screen, reuse count per routine on
+the Repository panel. Explicitly **not** priced into anything — the veteran playtester used the
+Repository heavily with no extrinsic reward at all, so the argument for the feature should be made
+by the save file rather than by a brief.
