@@ -177,7 +177,7 @@
   display: grid; grid-template-columns: calc(96 * var(--u)) 1fr; gap: calc(12 * var(--u));
   padding: calc(9 * var(--u)) 0; border-bottom: 1px solid rgba(0,0,0,.08);
 }
-.desk .crate .nm { font-family: var(--mono); font-size: calc(13 * var(--u) * var(--ts)); }
+.desk .crate .nm { font-family: var(--mono); font-size: calc(13 * var(--u) * var(--ts)); flex-wrap: wrap; }
 .desk .crate .sp { font-size: calc(11 * var(--u) * var(--ts)); line-height: 1.5; }
 .desk .crate .op { font-size: calc(11 * var(--u) * var(--ts)); line-height: 1.5; color: var(--p-dim); margin-top: calc(3 * var(--u)); }
 
