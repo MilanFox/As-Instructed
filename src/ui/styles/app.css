@@ -886,14 +886,6 @@
   color: var(--danger);
 }
 
-.seed-row__outstanding {
-  overflow: hidden;
-  color: var(--danger);
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .objective {
   display: flex;
   gap: var(--space-2);

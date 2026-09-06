@@ -1,6 +1,6 @@
 # Playtest — desk UI, campaign run
 
-**Coverage so far: w1-05, w2-02, w2-04, w2-05, w3-01, w3-02, w3-04, w4-01, w4-02, w4-04.** Reference solutions used: 0.
+**Coverage so far: w1-05, w2-02..w2-05, w3-01..w3-04, w4-01..w4-05, w5-01..w5-05, w6-01..w6-05, w7-01..w7-05, w8-01..w8-04.** Reference solutions used: 7 (w7-02..w7-05, w8-02, w8-03, w8-04) — all "understood it, the code was the work".
 
 Run: fresh localStorage, viewport 1280x684 (window would not resize past this), Chrome.
 Convention: findings are written before any source file for that level is opened.
@@ -18,9 +18,9 @@ Closed in 78 ticks, first try. Recorded only for the ceremony, which is new to m
   focusable, no accessible name. It is only reachable with a mouse. The lift/put-down control on
   the desk *is* a proper button. So the ceremony is half keyboard-operable.
 - Closing w1-01 unlocked **both** w1-03 and w1-05, so the chain is not strictly linear.
-- Objective 2 ("Clear the bay within 90 ticks") shows an **empty checkbox** in the objectives panel
-  while the header reads `2/2` and the certificate says closed. Objective 1 shows a filled green
-  box. Two readouts disagree at a glance.
+- Objective 2 ("Clear the bay within 90 ticks") shows an outline box in the objectives panel while
+  the header reads `2/2`. **This is not a bug — see the w5-02 entry, where I checked the code and
+  the accessibility tree.** Budget-shaped rows are drawn with a bar rather than a tick on purpose.
 
 ## w1-05 Floor Inspection — GOLD, 50 ticks (par 50), no reference solution
 
@@ -339,4 +339,511 @@ correctly. **A human with a mouse will be fine.** Flagging only so nobody reads 
 - Lore: MEMO KD-2429, a bot at depth "running a program with no deployment record ... for eleven
   months. It is not malfunctioning. Facilities have classified it as 'existing infrastructure' so
   that it does not require a decision."
+
+## w4-05 The Deep Shaft — GOLD + star, 582 ticks (par 700), 5/5 seeds. Two dispatches.
+
+This is the Repository payoff level and the biggest new-surface level in the run. Everything worked.
+
+- **Solvable?** Yes. First dispatch got 4/5 ore on one seed (my exploration loop had a guard of 300
+  iterations and a 40x40 cave needs more); raising the guard and marking a vein spent when
+  `inventory('ore')` did not move fixed it. Second dispatch: gold, star, 5/5 seeds.
+- **Objective clear before running?** Yes, including the fuel model, which is the risky part:
+  "Acting spends fuel equal to the ticks it costs. Looking, reading and waiting spend none" and
+  "A different size every shift. `fuel()` reads it; `refuel()` fills it, but only on the depot."
+  That is a complete specification of a new resource in two sentences. I never had to test it.
+- **The Repository hand-off across three levels is the best-taught thing in the game.** w4-04's
+  field note said "the two halves you write get names later: survey and pathTo"; w4-05's work order
+  then lists them as if they were already mine —
+  `SURVEY  survey(): void` / `PATHTO  pathTo(x, y): boolean` — under the heading "Taken from your
+  Repository. Not in there yet? Write it in this work order." I wrote both into `~/lib.ts`,
+  committed, and `import { survey, pathTo, distTo } from 'lib';` worked first time in the work
+  order. No instruction anywhere told me the import syntax except the greyed-out first line of the
+  starter program, and that was enough.
+- **The bonus is the third one this run that specifies its answer exactly** ("the moment the 5th ore
+  is cut, and before the bot moves again, file one line `home <n>` ... Then take exactly that many")
+  and, like w4-02's, I got it first time. The pattern is now clear: bonuses that state the format
+  and the acceptance condition get taken; bonuses that say "the best order" or "how many trips"
+  (w3-01, w4-04) do not, and give no feedback.
+- **New certificate line, understood without help:** "3 routines from the Repository, 562 ticks
+  inside them." Good — it prices the "charged at the point of use" warning from memo KD-2338.
+
+### The `~/lib.ts` surface — works, with one wrong readout
+
+- Tabs LIB.TS / COST / STRUCTURE / REGRESSION / DISCREPANCIES, plus a COMMIT button with an
+  `uncommitted` / `committed` state next to it. The commit worked and the exports were immediately
+  importable.
+- **STRUCTURE parsed my file correctly** and listed each exported subroutine with WORK ORDERS /
+  CALLS / TICKS / ITS OWN / SHARE columns, all dashes until a run has been through them. Clear.
+- **Bug: the tab and the status bar both said the Repository was empty when it was not.** After I
+  committed four exported functions — and STRUCTURE listed them by name — the editor tab still read
+  `~/lib.ts · YOUR SUBROUTINES · EMPTY` and the status bar still read "Shared Subroutines is empty.
+  This is a supported configuration and no memo will be raised about it." It only changed to
+  `· 1 PUBLISHED` after I used the PUBLISH TO REPOSITORY modal. So the counter appears to count
+  modal-published routines, not what is actually in the file, and two readouts contradict a third.
+- STRUCTURE also said "Nothing in Shared Subroutines calls anything else in it. Filed as a parts
+  list rather than an assembly", while my `pathTo` calls my `search` and `key`. Possibly it only
+  tracks exported-to-exported calls; either way the sentence is not true of the file as written.
+- **PUBLISH TO REPOSITORY modal** fired after the successful run, offering `k`, `absorb`, `bfsFrom`
+  by name with line ranges, a "Publish as" rename field, and PUBLISH / NOT THIS TIME / STOP
+  OFFERING. The copy — "you can publish it later. it stays in the work order either way" — removes
+  exactly the anxiety the moment creates. I understood all of it without being told.
+  Minor: ticking the first checkbox reveals the "Publish as" input, which shifts the rows below it
+  down by a couple of pixels; my next two clicks landed between rows and did nothing.
+
+## w5-01 Mains — GOLD + star, 32 ticks (par 32 exactly), no reference solution
+
+- **Solvable?** Yes, one probe dispatch to learn the machine record shape, then gold + star.
+- **Objective clear before running?** Yes. The trap is named in the memo — "laid by two crews
+  working inward from opposite ends. Neither crew recorded which end it started from" — and then
+  the mechanism is handed over: "index — its place in the chain, the reactor being 0. feed — the
+  index of the machine that feeds it." So you know not to trust the `sub-N` ids and to walk the
+  feed chain instead. I built the chain from `feed` and never had to guess a direction.
+- **I did need one throwaway dispatch** to find out that `probe(id)` returns
+  `{id, kind, at, state, vars, inventory}` — specifically that it carries `at`, so you can walk to
+  a machine you have only read. The work order names `vars.index` and `vars.feed` but not `at`.
+  That is a smaller gap than it sounds (the level is solvable without knowing, by walking the line
+  and scanning), but it is the second time a new noun arrived without its shape.
+- **PUBLISH TO REPOSITORY, second outing, and it is excellent.** Ticking `goto` showed a warning I
+  did not expect and immediately trusted: *"This calls `move()`, `pos()`. A work order before w5-01
+  has no such hardware installed, and the call will fail there."* After publishing, the editor
+  **rewrote my program in place** — the function body was replaced by `import { goto } from 'lib';`
+  on line 1. No explanation needed; it was obvious what had happened and it was what I wanted.
+
+## w5-02 Continuity Test — closed in 2 ticks, 8/10 probes, bonus 8/8 taken
+
+- **Solvable?** Yes, first dispatch, 5/5 seeds. Binary search over 200 relays, 8 probes.
+- **Objective clear before running?** Completely, and this is a model of how to state a puzzle:
+  "probe(id).vars.live is 1 while the run is still whole that far and 0 once it is not. The first 0
+  is the break", with a budget of ten readings and a bonus at eight. `ceil(log2(200)) = 8`. The
+  level tells you the algorithm is a binary search without ever using the words.
+- The memo earns the budget in-fiction: "The test set is rated for ten readings per shift. It is
+  rated for ten readings because it is rated for ten readings."
+- **I called this a defect and then checked, and it is not one — recorded so nobody acts on it.**
+  See `docs/shots/playtest/objective-checkbox-not-filled-when-met.png`. In one panel: objective 1
+  is a filled green tick, objective 2 (`8 / 10 probes`, met) is an outline box, and the bonus
+  (`8 / 8 probes`, met) looks like a filled amber box — while the header reads `OBJECTIVES 2/2`.
+  I read it as "a met objective drawing as unmet" and I was wrong twice over:
+  1. `Rail.tsx` is explicit that this is deliberate — a budget gets a bar instead of a tick, because
+     "a full box is the goal and a full bar is the failure". Both the objective and the bonus draw
+     the same `☐` glyph; only the row colour differs.
+  2. The accessibility tree is correct and unambiguous: `img "8 / 10 probes, within budget"` and a
+     status of `met`.
+
+  What is left is small and only about legibility: at this size an amber outline box reads as
+  *filled* and a grey outline box reads as *empty*, so two rows in identical states look like
+  different states, and a met budget row looks the same as an unmet one apart from its bar. That is
+  a perception note, not a bug, and I have not touched it. Same story on w1-01, where I made the
+  same wrong call — that earlier entry should be read with this one.
+
+## w5-03 Order of Operations — GOLD + **2 stars**, 76 ticks (par 76 exactly), first dispatch
+
+- **Solvable?** Yes, first dispatch, 4/4 seeds, all three objectives, both bonuses. Crew walk came
+  in at 104/104 steps — exactly the allowance.
+- **Objective clear before running?** Yes, and this is the densest brief so far without being
+  confusing. Three objectives, two bonuses, four new verbs (`link`, `power`, `probe` budgeting,
+  `vars.travelBudget`), and every one of them defined on the sheet: prerequisites arrive as `vars`
+  keys named `prereq:<id>`, cabling is `link(prereqId, stationId)`, energising is
+  `power(stationId, "on")` and "only latches once every prerequisite is on, and a futile call costs
+  the same as a useful one". I wrote a topological order with a nearest-station tiebreak straight
+  off the sheet.
+- **Two bonuses on one work order, and they pull in different directions** — travel allowance vs
+  read budget — which is the first time the game asks for two things at once. Both readouts are
+  live in the rail (`104 / 104 steps`, `12 / 20 reads`) and both appear on the certificate with
+  their numbers. No ambiguity anywhere.
+- **The Repository hand-off fires again and is again explicit:** "keep whatever turns that list
+  into a workable order — later briefs call it waves, and expect the groups back." I declined the
+  publish offer this time (it only offered my `pre` helper, which is not that), and NOT THIS TIME
+  behaved exactly as its copy promised — the program was left untouched.
+- Lore: "Energising a station before its upstream is not dangerous. It is merely futile, and
+  futility is reportable under the site metrics framework, which I am measured on."
+
+## w5-04 Load Balance — GOLD + star, 38 ticks (par 40), first dispatch
+
+- **Solvable?** Yes, 5/5 seeds. Bin packing: best-fit-decreasing, run once with the largest feeder
+  removed from the pool (that is the bonus) and falling back to the full pool if that fails.
+- **Objective clear before running?** Yes. "Put every consumer on a feeder. Take no feeder over its
+  ceiling", plus CABLE IS PERMANENT spelling out the two ways to get it wrong ("A consumer cabled
+  to two feeders draws on both, and every consumer must end on exactly one"). Nothing to discover.
+- The bonus — "Leave the highest-capacity feeder cold" — is a clean second constraint on the same
+  algorithm rather than a separate task. Took it on the first try.
+- Lore: "The ceilings are defined in Appendix C. The index entry for Appendix C is a reference to
+  Appendix C. I have requested a copy of that." Appendix C is now a running joke across three
+  worlds and it is still funny.
+- **UI in the way?** No.
+
+## w5-05 Blackout — GOLD + star, 56 ticks (par 56 exactly), first dispatch. **World 5 complete.**
+
+- **Solvable?** Yes, 5/5 seeds, all three objectives, bonus taken. Minimum spanning tree by
+  Manhattan distance (Prim), cable the tree, power breadth-first from the reactor so every station
+  comes up on live cable, then report the largest subtree as the weak point.
+- **Objective clear before running?** Yes, and it is doing three things at once — a spanning
+  structure, a budget, and an ordering — with each named separately as its own objective. The
+  cable cost rule is given exactly ("spends cable equal to the grid distance: the difference in x
+  plus the difference in y") and the double-spend trap is named ("Laying the same one twice spends
+  the drum twice"). I did not have to test anything.
+- **The star bonus is the *fourth* report-style bonus and the first hard one, and it is specified
+  properly:** "file one line, `weak <id> <n>` — a substation whose loss would cut the most of the
+  district off from the reactor, and how many stations go dark with it, counting itself." Exact
+  format, exact tie-handling implied by "a substation" rather than "the substation". I filed
+  `weak sub-10 5` and it was accepted. This is the pattern that works; w3-01's `straight <n>` and
+  w4-04's "best order" are the same idea without the definition.
+- **The `waves` hand-off did not fire for me.** The work order lists `waves(deps)` under REPOSITORY
+  as if I had written it in w5-03, but a minimum spanning tree plus a breadth-first power order
+  does not need it, so the promised payoff from w5-03's field note landed as an unused offer. Not
+  a fault — just noting that the one Repository promise that did *not* pay off is the one for the
+  routine I declined to publish, which is the correct behaviour.
+- Lore: "Stores have issued a drum against the works order. The drum holds what the works order
+  says the job takes, which is what it took the last time anybody measured it."
+
+### World 5 summary
+Five levels, five first-or-second-dispatch closes, four golds and one ungraded close, six stars.
+World 5 is the strongest run of briefs in the game: every level states its verbs, its costs, its
+failure modes and its bonus acceptance condition on the sheet, and none of them needed a hint, a
+reference solution or a guess. If the rest of the campaign reads like world 5, the writing is done.
+
+## w6-01 Carrier Wave — closed, 0 ticks, ungraded, one line of code
+
+- Solvable, obvious, first dispatch: `for (let p = receive(); p !== null; p = receive()) print(p);`
+- The brief is one sentence and the field notes are two entries. The only thing it needs to tell
+  you is that the queue can be empty and that this still counts — "some shifts there is nothing on
+  it at all, and nothing is still a reading" — and it does. Correct size for a world-opening level.
+
+## w6-02 Checksum — GOLD + star, 37 ticks (par 37 exactly), first dispatch
+
+- **Solvable?** Yes, 4/4 seeds. 25/25 packets relayed, 7/7 corrupt bytes located.
+- **Objective clear before running?** Yes. The packet grammar (`b0,b1,...,bn*S,W`), both checksum
+  formulas, the salt's source (`probe('mast').vars.salt`) and — crucially — the guarantee that
+  corruption is *exactly one byte* are all on the sheet. That guarantee is what makes the bonus
+  tractable: the sum delta gives you the byte's change, the weighted delta gives you `(i+1)` times
+  it, and you can just try each index. Nothing had to be discovered.
+- The fault-report format is specified to the same standard as w4-02 and w5-05 — "One line per
+  corrupt packet, in arrival order: `bad <packet> <byte>`. Both counted from 0, and `<packet>`
+  counts the clean ones too" — and the last clause is exactly the off-by-one a player would hit.
+- **One thing I had to look up in the reference rather than the work order:** the verb for relaying.
+  The brief says "Relay every packet..." four times and never names `transmit()`. The reference's
+  "For this order" chips (`transmit`, `probe`, `receive`) gave it to me in one glance, so this cost
+  seconds — but it is the only verb in the run that the work order asks you to use without naming.
+- Lore, and it is the darkest joke in the game: "In 2207 an unverified packet was actioned and the
+  south field harvested itself on schedule."
+
+## w6-03 Compression — CLOSED + star, 38 ticks (ungraded), first dispatch
+
+- **Solvable?** Yes, 4/4 seeds, both objectives and the star.
+- **Objective clear before running?** Yes. The route grammar is given by example (`4E12S1W`), the
+  bonus is given as a transformation ("the same moves, the same format, fewer characters than
+  arrived"), and WATCH FOR tells you the exact input quirk that makes the bonus possible: "The same
+  direction can turn up in two groups in a row." So the compression is merging adjacent runs, and
+  the sheet says so without saying so. `decode(raw, key)` is handed to you in the starter.
+- OFF THE ROUTE — "Every tile that is not on the route is a pit" — is a one-line statement of why
+  the second objective exists. No ambiguity.
+
+## w6-04 The Cipher — GOLD + star, 14 ticks (par 14 exactly), first dispatch
+
+- **Solvable?** Yes, 4/4 seeds. Caesar over the 95 printable characters: recover the common shift
+  from the `KD//` header, then brute-force the straggler's own shift and pick the decoding that
+  scores best as English.
+- **Objective clear before running?** Yes, and the level is carefully fair about the hard half:
+  THE CIPHER gives the exact key space ("shifted by the same whole number from 0 to 94. That is the
+  whole space"), THE HEADER gives the crib ("begins with `KD//` at position 0, in the plain text.
+  It never changes"), and THE STRAGGLER states plainly that the last packet has no crib and a
+  different shift. So you know before you start that one packet needs a different method, which is
+  the entire point of the bonus.
+- **This is the only level so far whose bonus has no mechanical acceptance test I could see** — you
+  have to decide which of 95 decodings is English. Unlike w3-04, that is fine, because the
+  difficulty is the puzzle rather than missing information: a space-and-letter frequency score got
+  it first try, and the recovered text ("repeater 9 relayed this without a header again, the aerial
+  has been listed for replacement since 220...") confirms it in the output pane immediately.
+- Lore: "Procurement bought the radios on a framework that priced the cipher separately, and we did
+  not buy the cipher. There is no key anywhere on this site." The starter comment answers it:
+  "NOTE(4470): there is no key on this site. i looked. i looked for a week."
+
+## w6-05 Telemetry — CLOSED + star, 60 ticks (ungraded), first dispatch. **World 6 complete.**
+
+- **Solvable?** Yes, 5/5 seeds, both objectives and the star, in one go. This is the hardest single
+  program in the run — nested macro expansion, two checksums, a Caesar-shifted packet mixed in with
+  the rest, and corrupt blocks to repair rather than discard — and the work order carries all of it.
+- **Objective clear before running?** Yes. Every one of the eight field notes removes exactly one
+  thing you would otherwise have to guess: the block grammar, the call syntax, the nesting depth
+  ("up to four deep"), what the checks cover ("Over the characters of `name|body`"), that corrupt
+  blocks each duplicate an intact one, that exactly one block is shifted and *its checks are over
+  the plain text*, and that arrival order means nothing. That last pair is what makes the level
+  tractable: without "its checks are over the plain text" you could not tell a shifted block from
+  a corrupt one.
+- **This is the payoff level for the whole world** — w6-02's checksum, w6-03's route grammar and
+  w6-04's cipher all reappear as parts. The Repository entries it offers (`findKey`, `unpack`) are
+  precisely the two things worlds 6-02..6-04 had you write. I had not published them, so I wrote
+  them again inline, and the game let me without complaint.
+- **UI in the way?** No, but this is the level where the terminal pane starts to feel small: a
+  29-line program with heavy nesting scrolls, and at 1280x684 you see roughly 20 wrapped lines at
+  a time. It never blocked me.
+
+### World 6 summary
+Five levels, five first-dispatch closes, two golds and three ungraded closes, five stars, no hints,
+no reference solutions. Worlds 5 and 6 together are ten levels without a single brief I had to
+re-read.
+
+## w7-01 Two Bots — GOLD + star, 10 ticks (par 10 exactly). Three probe dispatches first.
+
+- **Solvable?** Yes, both objectives and the star. But this is the first level where I spent
+  dispatches on API archaeology rather than on the puzzle.
+- **Objective clear before running?** The *goal* yes — "Park each bot on the pad at the end of its
+  own corridor, and have each one hear from the other", plus a genuinely good statement of the new
+  scoring rule ("The clock stops when the last bot stops. Not the total") and of the message
+  ordering rule ("recv() gives back null until the reader's own clock reaches the tick the message
+  was sent at"). The reference's `send` entry even hands you the idiom: "send, then sync(), then
+  recv() on the receiving side."
+- **What cost me three dispatches was finding the name of the bot's clock.** The bonus asks for
+  `idle <bot> <n>` where n is ticks spent waiting, so I need to read a bot's tick count. The
+  reference's "For this order" chips are `ticks, bot, bots, sync, send, recv` — so I tried `ticks()`
+  ("Cannot find name 'ticks'") and then `bot(id).ticks()` ("Property 'ticks' does not exist on type
+  'Bot'"). The actual name is `bot(id).clock()`, which I found by printing `Object.keys(bot(id))`.
+  **A chip in the reference names a verb that does not exist under that name.** That is the clearest
+  single defect I have hit since the requisition crate colours.
+- Good news either side of it: the editor's TypeScript checking is real and the messages are exact
+  ("Cannot find name 'ticks'", "Property 'ticks' does not exist on type 'Bot'"), and the problem
+  count in the status bar ("3 problems" / "no problems") updates live. That is what let me diagnose
+  it in two tries rather than ten.
+- Lore: "the number Finance reads is the finish time of the last one. not the total. the total is a
+  much larger number that nobody upstairs has ever asked for."
+
+### The `ticks` chip — diagnosed, **not fixed** (src/levels is outside my lane)
+
+- Player-visible symptom: the reference's "For this order" row on w7-01 offers a chip labelled
+  `ticks`. There is no such verb. `ticks()` fails to compile ("Cannot find name 'ticks'") and
+  `bot(id).ticks()` fails ("Property 'ticks' does not exist on type 'Bot'"). The real name is
+  `bot(id).clock()`.
+- Cause: `src/levels/world-7/w7-01.ts:264` declares `docs: ['ticks', 'bot', 'bots', 'sync', 'send',
+  'recv']` while the same file's `hardware:` (line 162) correctly lists `'clock'`.
+  `src/levels/world-7/w7-03.ts:175` has the same mistake: `docs: ['ticks', 'wait', ...]`.
+- `src/runtime/api-spec.ts` has no entry named `ticks`, and `Manual.tsx` renders a chip per `docs`
+  id and focuses that id on click — so the chip is a dead link as well as a wrong name.
+- **Fix is one word in each of two files** (`'ticks'` -> `'clock'`). I have not made it because
+  `src/levels/**` was ruled out of my lane. Two levels are affected; both are otherwise fine.
+
+## w7-02 Divide the Field — GOLD + star, 52 ticks (par 55). **REFERENCE SOLUTION USED (1st).**
+
+- **Which kind of stuck was I?** The second kind, and it matters: **I understood exactly what was
+  wanted.** Read the depot manifest, raise the fleet, split the crops so no bot takes more than
+  `ceil(crops / n)`, harvest. I wrote that twice and both times the objective failed on one seed
+  (27/44 then 28/44) with the tick count blowing out to 147 and then 1226.
+- **What I got wrong was traffic, not the task.** I split the crop list into equal *row* bands.
+  Every bot then had to travel along the same rows to reach its band, and because each bot has its
+  own clock, a bot that has already passed through a tile still holds it at that virtual time —
+  so the followers stalled, waited, and eventually gave up. The reference splits by **columns**, so
+  each bot owns a vertical strip nobody else ever enters, and it raises the fleet as a chain
+  (`bot(last).spawn(Dir.East)`) that spreads the bots along the apron as they are created.
+- **That distinction is the whole level and nothing on the sheet points at it.** The work order
+  explains `spawn`, clocks, fair share and scoring precisely, but the one fact that decides whether
+  your program works — *two bots contend for a tile if their clocks overlap on it, so partition
+  space, not the worklist* — is only stated obliquely in the reference's `move()` doc ("held by
+  another bot at an overlapping time"). w7-01 does not teach it because two bots in two separate
+  corridors can never collide. This is the first difficulty spike in the campaign that is not
+  signposted.
+- Having taken the reference, it closed at 52/55 with the star on the first run.
+- Lore: "The requisition has been approved at the level Finance considered appropriate this week.
+  It will be a different level on Monday. Please do not write the number down."
+
+## w7-03 Right of Way — GOLD + star, 165 ticks (par 200). **REFERENCE SOLUTION USED (2nd).**
+
+- **Which kind of stuck?** Again the second kind — I understood it completely and did not write it.
+  One-wide tunnel on row 7; opposing bots cannot pass; same-way bots can run one tick apart; every
+  crate from the east yard to column 1. The solution shape is obvious from the sheet: convoys, one
+  direction at a time, with the return convoy held until the outbound one is clear.
+- **I skipped straight to the reference because of what w7-02 had just taught me** — that the
+  scheduling arithmetic here is the level, and I had just spent two dispatches losing to exactly
+  this class of problem. The reference confirms it: it is 50 lines of explicit per-bot clock
+  bookkeeping (`clock[id]`, `hold(id, t)`, departure offsets of `2 * k`) with not a single
+  collision left to chance. Closed at 165/200 with the star on the first run.
+- **This is a fair, well-signposted level**, unlike w7-02. THE TUNNEL and NOSE TO TAIL between them
+  state the exact rule you have to schedule around ("A bot that leaves a tile frees it on that same
+  tick, so bots going the same way can run one tick apart"), and the bonus — "Complete the run
+  without a single blocked move" — tells you that a correct answer is a *plan*, not a retry loop.
+  Nothing was hidden; it is simply hard.
+- Lore, and it is the best paragraph in world 7: "two bots that each stand aside for the other
+  stand aside all shift. the framework calls that a sustained mutual courtesy."
+
+## w7-04 Dispatch — GOLD + star, 79 ticks (par 79 exactly). **REFERENCE SOLUTION USED (3rd).**
+
+- **Which kind of stuck?** The second kind again, and this time I went to the reference *without*
+  writing my own, deliberately: after w7-02 and w7-03 it was clear that every world-7 level is the
+  same class of problem (per-bot clocks plus tile contention) and that my budget is better spent
+  reaching world 8's untested surfaces than re-deriving convoy arithmetic three times.
+- **Objective clear before running?** Completely, and the sheet is unusually generous: it gives the
+  job model (`vars.cost`, `use()` exactly `cost` times), the failure mode ("ONE USE TOO MANY — the
+  state wraps and the job goes back to open"), the report format, *and* LOAD BOUND, which spells
+  out the theoretical makespan you are being measured against — "the longer of the longest single
+  job, or every job plus two ticks of walking shared out across the fleet, plus the walk out from
+  Depot 0". That is a level telling you what good looks like before you start.
+- The reference is longest-job-first onto the earliest-available bot, with a BFS route that treats
+  other bots' current tiles as walls. Closed at par with the star on the first run.
+- Lore: "Some of them are a minute. Some of them are the rest of the shift. The board does not
+  distinguish between these, and neither, historically, have we."
+
+## w7-05 Chain of Command — GOLD, 100 ticks (par 100 exactly), bonus missed. **REFERENCE (4th).**
+
+- **Which kind of stuck?** Second kind. World 7's finale: unlisted relay sites you have to find by
+  looking, scouts and workers drawn from the same fleet, and a rule that a worker may only light a
+  site it has *received a message about* — so the level is explore, dispatch, and message-ordering
+  at once. Understood on one read; not written by me, for the same budget reason as w7-04.
+- **Objective clear before running?** Yes, and SENT TO is a model of stating a constraint you would
+  otherwise never guess: "Before a bot uses a site it must already have read a message another bot
+  sent it. `send` stamps the sender's clock, and a bot running behind sees an empty inbox." That is
+  the causality rule from w7-01 turned into a scoring condition.
+- The reference closed at par on the first run but **missed the bonus** ("Keep the workers waiting
+  for under a tenth of the shift") — worth knowing that the shipped solution does not take this one
+  either. Same shape as w3-04: a bonus counting *absence* (idleness) rather than evidence of a
+  thing done, and the shipped reference does not earn it.
+
+### World 7 summary
+Five levels, all closed, five golds, three stars, **three reference solutions used** (w7-02, w7-03,
+w7-04 — plus w7-05). Every one was "I understood it and the code was the work", never "I could not
+tell what was wanted". The one structural finding is that **w7-02 is where the campaign's
+difficulty steps without warning**: worlds 1-6 are single-bot puzzles where a correct idea gives a
+correct program, and from w7-02 onward a correct idea gives a program that deadlocks unless you
+also partition space between bots. w7-01 cannot teach that, because its two bots are in separate
+corridors and can never meet.
+
+### w7-02 — the sentence that was missing — **RULED: not a finding, a decided task**
+
+**Decision taken by the orchestrator: the sentence goes on the requisition that issues the second
+bot.** Whoever picks this up should execute it, not re-argue it. Do not change the level.
+
+The puzzle is fine and the difficulty is earned. What was withheld is that two bots share space and
+that a bot holds a tile *in its own time*, so a second bot arriving at the same virtual moment is
+refused. Written as a field note in the game's register, it would be one of these:
+
+> **TWO ON ONE TILE**
+> A bot holds the tile it is on for the tick it is there, and holds it against its own clock, not
+> yours. A second bot that wants that tile at that moment does not wait — its move fails. Give each
+> bot ground of its own and they never queue.
+
+or, if it should arrive with the fleet rather than with the field, on the requisition:
+
+> The fleet is cheap because the bots do not talk to each other. Two of them sent down the same
+> aisle will not take turns; the second one simply does not move. Split the ground, not the list.
+
+**Where it should live — my read:** it cannot be w7-01. w7-01's two bots are in separate corridors
+and can never meet, so any sentence about contention there is a rule about something the player
+cannot observe, and it will not stick. It also cannot be a w7-02 hint, because by the time you open
+hints you have already written the wrong program.
+
+It belongs on **the requisition that issues the second bot** — the same document that has, all
+campaign, been the place where a new capability arrives with its price attached. "A bot can spawn a
+bot" is delivered as hardware; "two bots cannot stand in the same place at the same time" is the
+cost of that hardware, and the requisition is where costs are stated. The w7-02 work order could
+then reference it in one clause ("the fleet does not queue — see the delivery note") without
+re-teaching it.
+
+## w8-01 Efficiency Audit — SILVER + 2 stars + a commendation, 182 ticks (par 165). Five dispatches.
+
+- **Solvable?** Yes, mine, no reference solution. Both stars, and it fired my first commendation.
+- **Objective clear before running?** Yes. Three objectives at once — deliver, 215 ticks, 16 beams —
+  and the sheet is explicit that "Both budgets are hard, and missing either one is a fail". ONE
+  BEAM ("Every look() is one beam, however far it reaches") plus THE FIELD ("Nothing on it blocks a
+  beam") plus the bonus ("Survey the field on 10 beams — one a row") together *hand you the survey*:
+  stand at the west end of each row, look east once. I did that and it was right.
+- **My four failures were all my own**, and worth recording because of what they cost: I assumed the
+  bot starts at (0,0) because it did on the seed I could see. It does not on every seed, so on the
+  others my `look(Dir.East)` from the silo saw nothing and the survey came back empty. Walking to
+  the north-west corner first fixed it. The work order says "The bot starts on it [the silo]" and
+  never says where the silo is — which is correct, and the lesson is mine.
+- **`capacity()` does not exist.** The reference's `pickup()` entry says a zero can mean "the bot is
+  already full (`inventory()` against `capacity()`)", and this level's THE BOT says "Carries a fixed
+  number of crops. The number changes between shifts" — so I wrote `capacity()` and got "Cannot find
+  name 'capacity'". I had to detect the limit by harvesting until `inventory()` stopped rising.
+  **The reference documents a function the runtime does not have.** Same class of defect as the
+  `ticks` chip.
+- **Two different tick numbers on the same certificate.** TICKS reads `182 par 165`, while the
+  objective row two lines above reads `LIMIT 119 / 215 ticks`. The targets caption explains which is
+  which ("par sets the medal, the limit ends the work order") but not why the same run has two
+  figures — I believe par grades the worst seed and the limit meter shows the replayed seed, but the
+  certificate does not say so.
+
+### HALT NOTICE — the discrepancy surface. It is very good, with one clipped readout.
+
+Failing a dispatch files a HALT NOTICE into the in-tray. I did not know this existed until I opened
+the tray after five failed runs and found five of them. It contains:
+- a THIS IS WHY block naming **one specific tile** and stating the difference in the game's own
+  terms — `(10, 0)` / `want: harvested and taken to the silo` / `got: still standing; it was ripe at
+  the start`. That is exactly the information I needed and could not get from the console line.
+- every objective with its per-seed chips, and a per-seed verdict list with each seed's reason.
+- `ON RECORD  still open · nothing to lose` and, at the foot, "Nothing was billed. Attempts are not
+  recorded against you. This notice is issued for completeness." Which is both funny and the exact
+  reassurance a player needs at that moment.
+
+Two problems with it:
+1. **The per-seed reasons are clipped, not wrapped.** See
+   `docs/shots/playtest/halt-notice-seed-reason-clipped.png` — every SEED row reads "Deliver every
+   crop that was ripe at the st" and stops at the sheet edge. The page text shows the full line
+   including the count (`(0/12)`, `(0/13)`, `(0/11)`, `(0/11)`) — those counts differ per seed and
+   are the most useful thing in the block, and none of them are visible. This is on the **enlarged**
+   sheet, i.e. the one you open specifically to read it.
+2. **The in-tray lists them as five rows all labelled `HALT NOTICE`**, with no work order id, no
+   time and no seed. Same problem I noted at world 2 with three identical `HARDWARE REQUISITION`
+   rows, but worse, because halt notices accumulate one per failed dispatch.
+
+**Fixed (verified in browser):** the clipped seed reasons. `src/ui/styles/app.css` carried an
+orphaned `.seed-row__outstanding { overflow: hidden; text-overflow: ellipsis; white-space: nowrap }`
+from the pre-desk UI. The class is rendered **only** by `src/ui/desk/paper/ReportSheet.tsx`, and the
+desk's own rule (`.desk .doc .seed-row { flex-wrap: wrap }`) was being defeated by the `nowrap`.
+Deleted the app.css block; the four seed reasons now wrap onto two lines each and the per-seed
+counts `(0/12) (0/13) (0/11) (0/11)` are readable. This is the **third** app.css leak into the desk
+I have hit (after `.crate`'s background and `.crate`'s border) — the header of
+`src/ui/__tests__/monitor-margin.test.ts` claims "the desk uses none of app.css", and that claim is
+now wrong in at least two places. Someone should sweep app.css for classes only the desk renders.
+
+## w8-02 Full Stack — GOLD + star, 632 ticks (par 700). **REFERENCE SOLUTION USED (5th).**
+
+- **Which kind of stuck?** Second kind, and taken deliberately: from here I am spending budget on
+  reaching the finale and the performance review rather than on re-deriving explore-while-you-work.
+- **Objective clear before running?** Yes, and THE BUDGET is the line that makes the level: "Par
+  does not allow a full survey and then a delivery round." That single sentence tells you the shape
+  of the answer — interleave — which is the entire difficulty. THE ARMS does the same job for
+  capacity: "Hold a fixed number of crates, with no gauge. A pickup that takes fewer than the tile
+  offered means full." No gauge, and the sheet tells you how to build one.
+- **Retrieving a document from the in-tray works.** Putting the halt notice away also cleared the
+  work order off the desk; I found it again under `WORK ORDER` in the in-tray and it came back
+  intact. Nothing is lost, and I did not have to be told.
+- Lore: "Shipping hold a manifest for it. It lists quantities and no locations, which Shipping have
+  described as sufficient."
+
+## w8-03 The Grid Goes Down — GOLD + star, 84 ticks (par 84 exactly). **REFERENCE (6th).**
+
+- **Objective clear before running?** Yes, and THE ORDER RULE is the most precisely written
+  constraint in the game: "A station may not start until every feeder has finished. A use at tick
+  40 finishes at 42, so 42 is legal and 41 is not. Read off the log, not the final state." It gives
+  the rule, a worked example of the boundary, *and* tells you which artefact it is judged from.
+  There is no way to misread that.
+- Three objectives plus a read budget, all live in the rail. The reference is list-scheduling: pick
+  whichever ready station some bot can finish soonest. Closed at par with the star, first run.
+- The reference's own comment names the trap I would have fallen into: "No `sync()` anywhere: it
+  would pull every bot up to the clock of the one furthest ahead." That is world 7's lesson used in
+  anger, and it is the sort of thing that would have cost me two dispatches.
+- Certificate copy for landing exactly on par: "At par. Somebody upstairs will assume par was set
+  wrong." Third distinct gold message I have seen — the certificate varies its line by how you got
+  there, which is a nice touch nobody would notice unless they played the whole campaign.
+
+## w8-04 Signal from 4470 — GOLD + star, 116 ticks (par 116 exactly). **REFERENCE (7th).**
+
+- **Objective clear before running?** Yes, and this is the narrative payoff as well as the
+  mechanical one: the plan you follow was filed eleven months ago by contractor #4470, the thread
+  that has run through starter comments and memos since world 1. WHAT CHANGED — "Between a sixth
+  and a third of the sections cross tunnel that has since come down. There is always a way round,
+  and the plan does not know about it" — plus STILL TRUE ("including where each group of moves was
+  meant to finish") is the entire algorithm: follow the plan, and when it walks into rock, route
+  yourself to where that group was *supposed* to end. Elegant, and completely stated.
+- THE WORKINGS gives you the one topological fact that makes it tractable: "No two corridors ever
+  run side by side, so there is exactly one way from the lift to any tile on the site."
+- **UI note:** this is the level where I lost a dispatch to the desk rather than the puzzle. My
+  click landed outside the editor, so `cmd+A` selected the whole *document* rather than the editor
+  buffer, my typing went nowhere, and `ctrl+Enter` dispatched the untouched starter program — and
+  somewhere in that sequence the reference manual opened over the desk with every element on the
+  page highlighted blue. Recoverable (Escape, click in the editor, retype) and arguably my fault
+  for clicking imprecisely, but "the editor is not focused" has no visible state, and cmd+A silently
+  means something completely different depending on it.
+- Lore, and the best paragraph in the game: "There is a locker in the workings with a printed form
+  in it and a spare chair caster. The form is KD-0001-T and it has never been signed. There are
+  lockers at the end of every other working too, and every one of those is signed, filed and empty.
+  The route to the one that is not was filed eleven months ago by the contractor who put it there.
+  Most of it is still true."
 
