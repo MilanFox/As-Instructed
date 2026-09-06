@@ -235,6 +235,17 @@ const MACHINE_KINDS: readonly string[] = Object.values(MachineKind);
 const ITEM_KINDS: readonly string[] = Object.values(ItemKind);
 
 /**
+ * The directions that author their own crop.
+ *
+ * `standard` takes one plant out of the tile atlas and there is no second frame there to reach
+ * for, so the crop-against-scrub property is asked of the two directions a player can actually
+ * pick. That is the line the cost section already draws, and it is drawn here for the same reason.
+ */
+const AUTHORED_CROP: readonly ArtId[] = ART_IDS.filter(
+  (id) => DIRECTIONS[id].drawCrop !== undefined,
+);
+
+/**
  * The state each kind is shown in, and its opposite.
  *
  * Kinds are compared against each other in the same state, because a player looking at a board of
@@ -316,6 +327,7 @@ function cropStream(
   tilePx: number,
   reduced = false,
   dpr = 2,
+  kind: string = ItemKind.Crop,
 ): string {
   setArtDirection(art.id);
   const painter = art.drawCrop;
@@ -332,6 +344,7 @@ function cropStream(
     x: 3,
     y: 2,
     tilePx,
+    kind,
     growth,
     max,
     stage,
@@ -577,6 +590,73 @@ describe.each(ART_IDS)('%s', (id) => {
 });
 
 /**
+ * Two things grow on the same soil and only one of them is the harvest.
+ *
+ * `w2-05` is entirely this reading — a field of crop mixed with ice-scrub, a sensor that tells
+ * them apart for free, an arm that does not, and a shift too short to visit everything. Until
+ * `docs/FIX-SPRITES.md` §16 the kind never reached a painter at all: `CropPaint` did not carry it,
+ * so the two were one plant drawn twice and the level could not be solved by looking at it.
+ *
+ * Asserted as a collision check over the **union of the two ladders** rather than kind against
+ * kind at the same rung. A scrub tile that draws what a crop three rungs down the ladder draws is
+ * the same defect wearing a different number, and it is exactly the shape a "make the weed
+ * smaller" fix produces.
+ *
+ * Hue is removed for every case here, not only at the floor. `signal` is one phosphor and Deep
+ * Site holds the scrub at the leaf's own luminance on purpose, so a distinction that leaned on
+ * colour would have nothing left to stand on in either of them.
+ */
+describe.each(AUTHORED_CROP)('crop against scrub: %s', (id) => {
+  const art = DIRECTIONS[id];
+
+  /** `max = last * 2` puts `growth = i * 2` in the middle of bucket `i` at every rung. */
+  const LADDER_MAX = (PLANT_STAGES.length - 1) * 2;
+
+  function ladder(
+    tilePx: number,
+    reduced: boolean,
+    clean: (stream: string) => string,
+  ): (readonly [string, string])[] {
+    const entries: (readonly [string, string])[] = [];
+    PLANT_STAGES.forEach((_frame, i) => {
+      const growth = i * 2;
+      for (const kind of [ItemKind.Crop, ItemKind.Ice])
+        entries.push([
+          `${kind} stage${String(i)}`,
+          clean(grey(cropStream(art, growth, LADDER_MAX, tilePx, reduced, 2, kind))),
+        ]);
+    });
+    return entries;
+  }
+
+  it.each(TILE_SIZES)('tells crop from ice-scrub, at every maturity, at %ipx', (tilePx) => {
+    expect(collisions(ladder(tilePx, false, (stream) => stream))).toEqual([]);
+  });
+
+  it('tells crop from ice-scrub with motion off and no type, at the smallest tile', () => {
+    expect(collisions(ladder(SMALLEST_TILE_PX, true, unlabelled))).toEqual([]);
+  });
+
+  /**
+   * Ripeness is the crop's, and separating the two kinds may not cost it.
+   *
+   * `w2-02` is a field of one kind at three maturities and is unsolvable if ripe cannot be told
+   * from unripe, so the ripe crop is checked against every unripe crop **and** against every rung
+   * of scrub in the same breath. The second half is the one that matters here: a weed wearing the
+   * harvest mark would pass the first check and still send the arm to the wrong tile.
+   */
+  it.each(TILE_SIZES)('keeps ripe crop apart from every scrub rung at %ipx', (tilePx) => {
+    const ripe = grey(cropStream(art, LADDER_MAX, LADDER_MAX, tilePx));
+    for (let i = 0; i < PLANT_STAGES.length; i++) {
+      const scrub = grey(cropStream(art, i * 2, LADDER_MAX, tilePx, false, 2, ItemKind.Ice));
+      expect(`scrub${String(i)} ${scrub === ripe ? 'ripe' : 'not ripe'}`).toBe(
+        `scrub${String(i)} not ripe`,
+      );
+    }
+  });
+});
+
+/**
  * The three authored directions answer all three layers, or they are still half atlas.
  *
  * Written as a set rather than as three assertions so that a direction added later shows up here
@@ -689,6 +769,12 @@ describe('cost', () => {
           drawCalls(cropStream(art, growth, max, SMALLEST_TILE_PX, false, dpr)),
           drawCalls(cropStream(art, growth, max, NEAR_TILE_PX, false, dpr)),
         );
+      for (let growth = 0; growth <= max; growth++)
+        at(
+          `scrub ${String(growth)}/${String(max)}`,
+          drawCalls(cropStream(art, growth, max, SMALLEST_TILE_PX, false, dpr, ItemKind.Ice)),
+          drawCalls(cropStream(art, growth, max, NEAR_TILE_PX, false, dpr, ItemKind.Ice)),
+        );
       for (const kind of ITEM_KINDS)
         at(
           `item ${kind}`,
@@ -727,6 +813,12 @@ describe('cost', () => {
         crops: (t) =>
           PLANT_STAGES.reduce(
             (sum, _frame, i) => sum + drawCalls(cropStream(art, i * 2, ladderMax, t, false, dpr)),
+            0,
+          ),
+        scrub: (t) =>
+          PLANT_STAGES.reduce(
+            (sum, _frame, i) =>
+              sum + drawCalls(cropStream(art, i * 2, ladderMax, t, false, dpr, ItemKind.Ice)),
             0,
           ),
         items: (t) =>
@@ -800,6 +892,7 @@ function boardStream(art: ArtDirection, world: World, tilePx: number, dpr: numbe
           x,
           y,
           tilePx,
+          kind: tile.crop ?? ItemKind.Crop,
           growth,
           max,
           stage,

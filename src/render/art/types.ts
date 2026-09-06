@@ -170,12 +170,19 @@ export interface MachinePaint {
  * that re-derived it could quietly ship five steps. `ripe` is the bit w2-02 is played on and is
  * handed over separately, because `stage === stages - 1` is true for authored-grown tiles whose
  * `max` is zero as well, and both of those really are ready to harvest.
+ *
+ * `kind` is the bit w2-05 is played on. Two things grow on that soil — the crop, and ice-scrub
+ * that likes the same ground and is worth nothing — and the level is entirely the reading that
+ * tells them apart. It was missing from this bag until `docs/FIX-SPRITES.md` §16, so no direction
+ * could draw the difference however it wanted to, and the field was one plant painted twice.
  */
 export interface CropPaint {
   ctx: CanvasRenderingContext2D;
   x: number;
   y: number;
   tilePx: number;
+  /** `ItemKind` of what is growing. `crop` is the harvest; `ice` is the weed. */
+  kind: string;
   growth: number;
   max: number;
   /** Bucket index, 0..`stages - 1`. */

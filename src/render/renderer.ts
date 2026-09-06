@@ -281,6 +281,7 @@ export class Renderer {
     x: 0,
     y: 0,
     tilePx: 0,
+    kind: '',
     growth: 0,
     max: 0,
     stage: 0,
@@ -1384,6 +1385,9 @@ export class Renderer {
       if (painter) {
         paint.x = x;
         paint.y = y;
+        /* A tile carrying growth but no authored kind is the crop. `w2-05` is the only level that
+         * sows anything else, and it names both. */
+        paint.kind = tile.crop ?? 'crop';
         paint.growth = growth;
         paint.max = max;
         paint.stage = plantStageIndex(growth, max);

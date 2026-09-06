@@ -2997,6 +2997,94 @@ function cropBrackets(c: Ctx, ox: number, oy: number, T: number): void {
 }
 
 /**
+ * Ice-scrub: the other thing that grows on this soil, and the whole of `w2-05`.
+ *
+ * Not a smaller crop and not a paler one. A crop is *cultivated* — it stands in a mound somebody
+ * turned, its stems are vertical, its plants sit at an even pitch down a row, and when it is ready
+ * it wears the harvest brackets. Scrub is volunteer growth. It sprawls, it has no stem, it is not
+ * on the row, it turns no ground, and it never wears the brackets however ripe the tile says it
+ * is — a bracket means "worth the two ticks" and this never is.
+ *
+ * The tell is the one `docs/LIGHT.md` §2 already spends on the three obstacle classes: **height,
+ * and the light that comes with it.** A crop is a volume — lit west shoulder, dark east flank, a
+ * shadow cast south-east. Scrub lies flat on the plate, so it has no shoulder, no flank and
+ * nothing to cast: one value, no faces, no shadow. A field of it reads as scribble on the floor
+ * standing next to things that stand up, which is a silhouette claim rather than a colour one and
+ * survives both the greyscale pass and 16 device pixels.
+ *
+ * Its own colour is held at the leaf's luminance on purpose. Reduced to grey the two are the same
+ * value, so nothing in this mark can be passing on hue while looking like form.
+ */
+const SCRUB_INK = '#55707d';
+
+/**
+ * The splay, as unit steps from the node. Five arms, no two the same length, and not one of them
+ * the vertical the crop's stems all are.
+ */
+const SCRUB_ARMS: readonly (readonly [number, number, number])[] = [
+  [-1, -0.62, 1],
+  [1, -0.78, 0.9],
+  [-1, 0.24, 0.72],
+  [1, 0.2, 0.66],
+  [-0.5, -0.86, 0.55],
+];
+
+/**
+ * Weeds spread. Maturity is arms and reach, never height and never a head.
+ *
+ * The reach fractions are authored rather than stepped evenly, for the same reason `CROP_FAR_W`
+ * is: they have to round to six *different* integers at 16 device px, where the whole ladder lives
+ * inside six pixels and an even 0.05 step would collapse three pairs of rungs into one mark.
+ */
+const SCRUB_ARM_COUNT: readonly number[] = [2, 3, 3, 4, 4, 5];
+const SCRUB_REACH: readonly number[] = [0.13, 0.19, 0.25, 0.31, 0.36, 0.42];
+
+/**
+ * One arm, stepped along its own direction.
+ *
+ * `w` never drops below two device pixels, which is the bound `docs/LIGHT.md` §7 puts on a stepped
+ * line: the step count is `reach / w`, so it falls with the tile instead of holding at a hairline.
+ */
+function scrubArm(
+  c: Ctx,
+  nx: number,
+  ny: number,
+  dx: number,
+  dy: number,
+  reach: number,
+  w: number,
+): void {
+  const steps = Math.max(1, Math.round(reach / w));
+  const half = w >> 1;
+  for (let s = 1; s <= steps; s++) {
+    const t = (s * reach) / steps;
+    c.fillRect(nx + Math.round(dx * t) - half, ny + Math.round(dy * t) - half, w, w);
+  }
+}
+
+function paintScrub(paint: CropPaint): void {
+  const c = paint.ctx;
+  const T = paint.tilePx;
+  const ox = paint.x * T;
+  const oy = paint.y * T;
+  const stage = Math.max(0, Math.min(5, paint.stage));
+  const arms = SCRUB_ARM_COUNT[stage] ?? 5;
+  const reach = tileSpan(T, SCRUB_REACH[stage] ?? 0.34);
+  const w = Math.max(2, Math.round(T * 0.055));
+  /* Off the centre of the tile and low in it. A crop is planted where the row says; this came up
+   * where it landed. */
+  const nx = ox + tileAt(T, 0.46);
+  const ny = oy + tileAt(T, 0.74);
+
+  c.fillStyle = SCRUB_INK;
+  c.fillRect(nx - w, ny - (w >> 1), w * 2, w);
+  for (let a = 0; a < arms; a++) {
+    const arm = SCRUB_ARMS[a] as readonly [number, number, number];
+    scrubArm(c, nx, ny, arm[0], arm[1], reach * arm[2], w);
+  }
+}
+
+/**
  * One crop tile, sprite and maturity readout in the same mark.
  *
  * The default path draws a frame from the ladder and then a separate bar underneath it. This
@@ -3011,6 +3099,10 @@ function cropBrackets(c: Ctx, ox: number, oy: number, T: number): void {
  * green rectangle, and it is four rectangles per plant.
  */
 function paintCrop(paint: CropPaint): void {
+  if (paint.kind === 'ice') {
+    paintScrub(paint);
+    return;
+  }
   const c = paint.ctx;
   const T = paint.tilePx;
   const ox = paint.x * T;
