@@ -17,6 +17,7 @@ import {
   Dir,
   ItemKind,
   NOTHING,
+  SILVER_FACTOR,
   Terrain,
   cloneWorld,
   isPassable,
@@ -246,22 +247,55 @@ describe('w8-03 pins an overrun on the bot that was still going', () => {
   });
 });
 
+/**
+ * `docs/FIX-PAR-REPAIRS.md` §2. `within-shift` and the medal ladder read the same clock, and this
+ * level is the only one in the campaign where one of them varies by seed and the other does not.
+ * When they disagree the grade is a lie in one direction or the other: par used to be 128 while
+ * seed 3's shift ended at 98, so the ladder promised gold up to 128 in a band the verdict had
+ * already refused at 99 — and the bronze rung, which lives entirely above the silver cut, did not
+ * exist at all on two of the five layouts.
+ *
+ * Asserted per seed rather than as one number, because the failure it caught was per seed.
+ */
+describe('w8-03 grades and fails on one axis, so the ladder sits under the shift', () => {
+  const silverCut = Math.max(w8_03.par.ticks + 1, Math.floor(w8_03.par.ticks * SILVER_FACTOR));
+
+  test('every rung is inside the shift on every seed', () => {
+    for (const seed of w8_03.seeds) {
+      const world = w8_03.build(seed);
+      const shift = must(
+        objectiveIn(w8_03, 'within-shift').progress?.({
+          world,
+          initialWorld: world,
+          trace: { initialWorld: world, events: [], keyframes: [], endTick: 0 },
+        }),
+        'a progress pair',
+      )[1];
+      /* Gold and silver have to be awardable, and bronze has to have somewhere to live. */
+      expect([seed, silverCut < shift]).toEqual([seed, true]);
+    }
+  });
+});
+
 // ---------------------------------------------------------------------------
 // w8-04 — the filed plan
 // ---------------------------------------------------------------------------
 
 describe('w8-04 says whether the run reached the locker, and never says where it is', () => {
   /**
-   * Two seeds, two different failures out of the same program. Seed 5's drift throws the literal
-   * follower off before it ever gets there; seed 3's puts it over the locker tile and out the
-   * other side, so it is standing somewhere else when it reaches for the form.
+   * Two ways to end a shift without the form, and they are completely different bugs. Seed 5's
+   * drift throws the literal follower off before it ever gets there. The second run walks the
+   * whole way and never reaches for what it is standing on.
    */
-  test('the literal plan follower is told which of the two it did', () => {
-    const drive = (sim: Sim, botId: number): void => {
+  const arrivedEmptyHanded = (sim: Sim, botId: number): void => {
+    walkTo(sim, botId, surveyFor(5).locker);
+  };
+
+  test('a run that never arrived and a run that arrived are told apart', () => {
+    const never = report(w8_04, 5, 'form-recovered', (sim, botId) => {
       literalPlanFollower.run(sim, botId);
-    };
-    const never = report(w8_04, 5, 'form-recovered', drive);
-    const passed = report(w8_04, 3, 'form-recovered', drive);
+    });
+    const stood = report(w8_04, 5, 'form-recovered', arrivedEmptyHanded);
 
     expect(never.met).toBe(false);
     expect(never.divergence).toEqual({
@@ -269,15 +303,19 @@ describe('w8-04 says whether the run reached the locker, and never says where it
       expected: 'in the bot',
       received: 'still in the locker; nobody reached it',
     });
-    expect(passed.divergence?.received).toBe('still in the locker; the bot stood on it');
+    expect(stood.met).toBe(false);
+    expect(stood.divergence?.received).toBe('still in the locker; the bot stood on it');
   });
 
   test('no coordinate of the locker appears in either report', () => {
-    const drive = (sim: Sim, botId: number): void => {
-      literalPlanFollower.run(sim, botId);
-    };
-    for (const seed of [3, 5]) {
-      const shown = must(report(w8_04, seed, 'form-recovered', drive).divergence, 'a divergence');
+    const drives = [
+      (sim: Sim, botId: number): void => {
+        literalPlanFollower.run(sim, botId);
+      },
+      arrivedEmptyHanded,
+    ];
+    for (const drive of drives) {
+      const shown = must(report(w8_04, 5, 'form-recovered', drive).divergence, 'a divergence');
       expect(`${shown.where} ${shown.expected} ${shown.received}`).not.toMatch(/\(\d/);
     }
   });

@@ -459,15 +459,20 @@ declared. **A new objective whose progress counts anything must declare its mete
 label is free to say whatever reads best; `src/game/__tests__/budget-declarations.test.ts` pins the
 set that still infers, and the correct direction for that set is down.
 
-**`Objectives.custom` cannot declare one yet, and that is the gap to close first.** `CustomReport`
-is `{ progress?, divergence }`, and `custom()` passes `{ id, label }` as its options, so there is no
-path for a meter to reach the objective. Nearly every bonus in the campaign is a `custom`, so in
-practice the rule above binds only the engine-minted objectives until `CustomReport` gains
-`meter?` / `unit?` and `custom()` forwards them. Until then, two interim rules, and both are better
-practice than the thing they stand in for:
+**`Objectives.custom` can declare one, as of 2026-09-06.** `CustomReport` carries `meter?` /
+`unit?` and `custom()` forwards them onto the options it already passes to `define`, which closes
+the gap this amendment was originally written around. **The rule above now binds every objective in
+the campaign, not only the engine-minted ones**, and `budget-declarations.test.ts` pins the set that
+still infers at **empty** — the correct direction for that set was down and it reached the floor.
+`docs/FIX-PAR-REPAIRS.md` §4.
 
-- **Keep a new label clear of the words the fallback parses** — `tick`, `op`, any sense name, any
-  trace event kind — so that nothing is inferred rather than something wrong being inferred.
+The fallback parse stays. It is what makes an objective that forgot to declare read out
+approximately right instead of silently not scoring, and deleting it would trade a loud guess for a
+quiet nothing. What it may not be again is load-bearing for anything that ships.
+
+One interim rule survives the unblocking, because it was never about the parser:
+
 - **Omit `progress()` rather than ship a bar pointed at the wrong meter.** Where the honest quantity
   is not a run-wide total — `w7-02`'s heaviest single bot's share, for instance — a progress bar the
   readout attributes to a run-wide meter is the `6 / 1 pickups` bug, and no bar beats a wrong bar.
+  A declared meter answers "which total", not "is there one".

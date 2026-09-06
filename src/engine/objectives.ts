@@ -452,6 +452,9 @@ export function withinOps(n: number, options?: ObjectiveOptions): Objective {
 export interface CustomReport {
   progress?(ctx: ObjectiveContext): [number, number];
   divergence(ctx: ObjectiveContext): Divergence | undefined;
+  /** What `progress` counts, where it counts against a limit. DESIGN.md §11 A13. */
+  meter?: BudgetMeter;
+  unit?: string;
 }
 
 /**
@@ -466,7 +469,10 @@ export function custom(
   fn: (ctx: ObjectiveContext) => boolean,
   report: CustomReport,
 ): Objective {
-  return define(id, label, { id, label }, fn, report.progress?.bind(report), (ctx) =>
+  const options: ObjectiveOptions = { id, label };
+  if (report.meter) options.meter = report.meter;
+  if (report.unit) options.unit = report.unit;
+  return define(id, label, options, fn, report.progress?.bind(report), (ctx) =>
     report.divergence(ctx),
   );
 }
