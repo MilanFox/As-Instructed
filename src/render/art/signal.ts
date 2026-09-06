@@ -26,6 +26,9 @@ import type {
   ArtDirection,
   BackdropPaint,
   BotDrawOptions,
+  CropPaint,
+  ItemPaint,
+  MachinePaint,
   PostPaint,
   TerrainPaint,
 } from './types.ts';
@@ -140,6 +143,9 @@ export const signal: ArtDirection = {
 
   paintTerrain,
   drawBot,
+  drawMachine,
+  drawCrop,
+  drawItem,
   backdrop,
   post,
 };
@@ -899,7 +905,7 @@ const BOT_ANGLE = [-Math.PI / 2, 0, Math.PI / 2, Math.PI] as const;
  * label is drawn on *every* bot at every zoom rather than only when there is room, so the table
  * matters more here than it does in `sprites.ts`.
  */
-const NUMERALS: readonly string[] = Array.from({ length: 64 }, (_, i) => String(i));
+const NUMERALS: readonly string[] = Array.from({ length: 100 }, (_, i) => String(i));
 
 function numeral(value: number): string {
   const n = value | 0;
@@ -1312,5 +1318,716 @@ function drawBotFuel(
   for (let i = 0; i < cells; i++) {
     ctx.fillStyle = i < lit ? (level > 0.3 ? INK : BURN) : alpha(INK, 0.14);
     ctx.fillRect(x + i * step, y, w, Math.max(2, 5 * s));
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The plant
+// ---------------------------------------------------------------------------
+
+/**
+ * Rows a machine glyph is rasterised into, and the two spans a row may carry.
+ *
+ * Eight rows because that is the same eight-lines-per-tile target `rasterPitch` aims the terrain
+ * at — a machine drawn on a coarser grid than the floor it stands on reads as a different device.
+ * Two spans because a door is a slab with a seam down it and a furnace has a mouth, and a gap in
+ * the middle of a run is the only way a raster says "hollow" without an outline.
+ */
+const GLYPH_ROWS = 8;
+const ITEM_ROWS = 6;
+const SPAN = 4;
+
+/**
+ * The second channel. Silhouette says which machine; the pattern its runs are broken with says it
+ * again in texture, so two kinds seen at the edge of vision still differ when the outline is a
+ * smudge. Monochrome deleted hue and this is a third of what buys it back.
+ */
+const PAT_SOLID = 0;
+const PAT_HALF = 1;
+const PAT_THIRD = 2;
+const PAT_STAGGER = 3;
+
+/**
+ * Below this *CSS* tile size the interior pattern is dropped and every run is filled solid.
+ *
+ * At 12 CSS px a glyph row is a pixel and a half of device height and a one-in-three dash is a
+ * single dot inside it, which is not a texture, it is grain. The silhouette is what survives that
+ * far out, so the far form spends its whole budget on making the outline continuous. Stated in CSS
+ * px and multiplied by `dpr` at the call site, the same way `botDetailTilePx` is.
+ */
+const PATTERN_CSS = 12;
+
+/**
+ * Below this CSS tile size a crop stops being countable and becomes a gauge.
+ *
+ * The near form is a stack of separated runs and the player reads it by counting. Six rungs need
+ * six pitches; at 13 CSS px the pitch is under two device pixels and the gaps close, so counting
+ * fails silently — which on `w2-02` is the difference between a solvable level and a guess. A
+ * filled column has no such floor: the lit boundary is one edge and an edge is locatable to a
+ * single pixel, so six steps stay apart all the way down to the smallest rung the campaign asks
+ * for.
+ */
+const CROP_COUNT_CSS = 13;
+
+/** A stack count needs a glyph with a body in it. Below this the badge is not drawn at all. */
+const ITEM_BADGE_CSS = 12;
+
+const M_DOOR = 0;
+const M_DOOR_OPEN = 1;
+const M_LEVER = 2;
+const M_LEVER_ON = 3;
+const M_FURNACE = 4;
+const M_PRESS = 5;
+const M_SINK = 6;
+const M_SOURCE = 7;
+const M_NODE = 8;
+const M_ANTENNA = 9;
+const M_CHARGER = 10;
+const M_ROUTER = 11;
+
+/**
+ * Ten silhouettes, in `a0 a1 b0 b1` per row, top row first, as fractions of the glyph box.
+ *
+ * Written as extents rather than as paths because extents are what the device draws. Every pair
+ * that could plausibly be confused is opposed rather than merely made different: the sink is a
+ * funnel and the source is that funnel upside down, so the two ends of a delivery chain read as a
+ * pair and never as each other; the press is a waisted column between two plates and the furnace
+ * is a stack that only narrows, so neither can be taken for the other's outline at speed. `door`
+ * and `lever` carry two profiles each — a door that opens and a lever that throws are the two
+ * machines whose state *is* a movement, and giving them a separate tell instead would be inventing
+ * a signal for something that already has one.
+ */
+const MACHINE_GLYPHS = new Float32Array([
+  // door — closed: a slab with a seam. The only glyph split from top to bottom.
+  0.1, 0.48, 0.52, 0.9, 0.1, 0.48, 0.52, 0.9, 0.1, 0.48, 0.52, 0.9, 0.1, 0.48, 0.52, 0.9, 0.1, 0.48,
+  0.52, 0.9, 0.1, 0.48, 0.52, 0.9, 0.1, 0.48, 0.52, 0.9, 0.1, 0.48, 0.52, 0.9,
+  // door — open: the leaves withdrawn into the jambs.
+  0.08, 0.22, 0.78, 0.92, 0.08, 0.22, 0.78, 0.92, 0.08, 0.22, 0.78, 0.92, 0.08, 0.22, 0.78, 0.92,
+  0.08, 0.22, 0.78, 0.92, 0.08, 0.22, 0.78, 0.92, 0.08, 0.22, 0.78, 0.92, 0.08, 0.22, 0.78, 0.92,
+  // lever — off: a stalk thrown left off a wide foot.
+  0.2, 0.34, 0, 0, 0.24, 0.38, 0, 0, 0.29, 0.43, 0, 0, 0.34, 0.48, 0, 0, 0.39, 0.53, 0, 0, 0.44,
+  0.58, 0, 0, 0.24, 0.76, 0, 0, 0.18, 0.82, 0, 0,
+  // lever — on: thrown right.
+  0.66, 0.8, 0, 0, 0.62, 0.76, 0, 0, 0.57, 0.71, 0, 0, 0.52, 0.66, 0, 0, 0.47, 0.61, 0, 0, 0.42,
+  0.56, 0, 0, 0.24, 0.76, 0, 0, 0.18, 0.82, 0, 0,
+  // furnace — a stack over a firebox, with the mouth knocked out of the last two rows.
+  0.38, 0.62, 0, 0, 0.38, 0.62, 0, 0, 0.28, 0.72, 0, 0, 0.2, 0.8, 0, 0, 0.16, 0.84, 0, 0, 0.16,
+  0.36, 0.64, 0.84, 0.16, 0.36, 0.64, 0.84, 0.12, 0.88, 0, 0,
+  // press — two plates and a waist. Narrow exactly where the furnace is wide.
+  0.14, 0.86, 0, 0, 0.14, 0.86, 0, 0, 0.42, 0.58, 0, 0, 0.42, 0.58, 0, 0, 0.34, 0.66, 0, 0, 0.34,
+  0.66, 0, 0, 0.1, 0.9, 0, 0, 0.1, 0.9, 0, 0,
+  // sink — a funnel closing downward. Things end here.
+  0.1, 0.9, 0, 0, 0.14, 0.86, 0, 0, 0.2, 0.8, 0, 0, 0.27, 0.73, 0, 0, 0.34, 0.66, 0, 0, 0.41, 0.59,
+  0, 0, 0.45, 0.55, 0, 0, 0.45, 0.55, 0, 0,
+  // source — the same funnel inverted. Things start here.
+  0.45, 0.55, 0, 0, 0.45, 0.55, 0, 0, 0.41, 0.59, 0, 0, 0.34, 0.66, 0, 0, 0.27, 0.73, 0, 0, 0.2,
+  0.8, 0, 0, 0.14, 0.86, 0, 0, 0.1, 0.9, 0, 0,
+  // node — a diamond: widest in the middle, so it is neither funnel and reads as a junction.
+  0.44, 0.56, 0, 0, 0.34, 0.66, 0, 0, 0.22, 0.78, 0, 0, 0.1, 0.9, 0, 0, 0.1, 0.9, 0, 0, 0.22, 0.78,
+  0, 0, 0.34, 0.66, 0, 0, 0.44, 0.56, 0, 0,
+  // antenna — a mast under two arms opening upward. The only glyph that is empty in the middle at
+  // the top, which is what "this one talks to the sky" has to look like.
+  0.1, 0.24, 0.76, 0.9, 0.18, 0.3, 0.7, 0.82, 0.26, 0.38, 0.62, 0.74, 0.34, 0.46, 0.54, 0.66, 0.44,
+  0.56, 0, 0, 0.44, 0.56, 0, 0, 0.44, 0.56, 0, 0, 0.28, 0.72, 0, 0,
+  // charger — a box with a socket bitten out of one side. Held narrower than the door and bitten
+  // three rows deep, because at the far end of the zoom a slab and a slab with a nick in it are
+  // the one pair of these ten that could still converge.
+  0.18, 0.82, 0, 0, 0.18, 0.82, 0, 0, 0.18, 0.54, 0, 0, 0.18, 0.54, 0, 0, 0.18, 0.54, 0, 0, 0.18,
+  0.82, 0, 0, 0.18, 0.82, 0, 0, 0.18, 0.82, 0, 0,
+  // router — a dish with a feed horn standing off it. Curved on one side and flat on the other,
+  // which no other machine is.
+  0.3, 0.44, 0, 0, 0.22, 0.42, 0, 0, 0.16, 0.4, 0, 0, 0.14, 0.4, 0.56, 0.74, 0.14, 0.4, 0.56, 0.74,
+  0.16, 0.4, 0, 0, 0.22, 0.42, 0, 0, 0.3, 0.44, 0, 0,
+]);
+
+/**
+ * Intensity as hierarchy, not as name.
+ *
+ * Ten brightnesses is not something a player can name, and this file already says so about
+ * `botAccents`. What a ramp can do is rank, so it ranks by reach: the machines a bot has to
+ * physically arrive at — a door in its path, a charger it parks on, a press it stands beside — sit
+ * at the top, and the ones it only ever addresses down a wire sit at the bottom. The board's
+ * brightest structures are then the ones worth driving to, and identity is still the silhouette's
+ * job.
+ */
+const MACHINE_INK: readonly string[] = [
+  alpha(INK, 0.86),
+  alpha(INK, 0.7),
+  alpha(INK, 0.78),
+  alpha(INK, 0.82),
+  alpha(INK, 0.66),
+  alpha(INK, 0.74),
+  alpha(INK, 0.62),
+  alpha(INK, 0.58),
+  alpha(INK, 0.9),
+  alpha(INK, 0.54),
+];
+
+/** The same ramp on the hot phosphor. Every entry outruns its cold twin in value, not in hue. */
+const MACHINE_LIT: readonly string[] = [
+  alpha(HOT, 0.98),
+  alpha(HOT, 0.86),
+  alpha(HOT, 0.92),
+  alpha(HOT, 0.95),
+  alpha(HOT, 0.82),
+  alpha(HOT, 0.88),
+  alpha(HOT, 0.78),
+  alpha(HOT, 0.74),
+  alpha(HOT, 1),
+  alpha(HOT, 0.7),
+];
+
+const MACHINE_BACKING = alpha(TUBE, 0.72);
+const MACHINE_FOOT = alpha(INK, 0.26);
+const MACHINE_FOOT_LIT = alpha(HOT, 0.94);
+const MACHINE_LAMP_OFF = alpha(INK, 0.34);
+
+/** Kind order, and the index every per-kind table above is read at. */
+function machineIndex(kind: string): number {
+  switch (kind) {
+    case 'door':
+      return 0;
+    case 'lever':
+      return 1;
+    case 'furnace':
+      return 2;
+    case 'press':
+      return 3;
+    case 'sink':
+      return 4;
+    case 'source':
+      return 5;
+    case 'node':
+      return 6;
+    case 'antenna':
+      return 7;
+    case 'charger':
+      return 8;
+    default:
+      return 9;
+  }
+}
+
+function machineGlyph(kind: string, powered: boolean): number {
+  switch (kind) {
+    case 'door':
+      return powered ? M_DOOR_OPEN : M_DOOR;
+    case 'lever':
+      return powered ? M_LEVER_ON : M_LEVER;
+    case 'furnace':
+      return M_FURNACE;
+    case 'press':
+      return M_PRESS;
+    case 'sink':
+      return M_SINK;
+    case 'source':
+      return M_SOURCE;
+    case 'node':
+      return M_NODE;
+    case 'antenna':
+      return M_ANTENNA;
+    case 'charger':
+      return M_CHARGER;
+    default:
+      return M_ROUTER;
+  }
+}
+
+/**
+ * Which break each kind's runs carry.
+ *
+ * Paired against the silhouettes rather than handed out in rotation: the funnel that swallows is
+ * the sparsest raster on the board and the funnel that emits is the densest, so sink and source
+ * differ in texture as well as in outline; the furnace is broken and offset because that is what
+ * fire looks like on a tube; the door and the lever are solid because a slab and a stick have no
+ * interior to break at any zoom this game is played at.
+ */
+function machinePattern(kind: string): number {
+  switch (kind) {
+    case 'door':
+    case 'lever':
+    case 'source':
+      return PAT_SOLID;
+    case 'furnace':
+      return PAT_STAGGER;
+    case 'press':
+    case 'node':
+    case 'charger':
+      return PAT_HALF;
+    case 'sink':
+    case 'antenna':
+      return PAT_THIRD;
+    default:
+      return PAT_STAGGER;
+  }
+}
+
+/** Power drives the raster one step denser. A running machine is a fuller picture, literally. */
+function denser(pattern: number): number {
+  return pattern === PAT_THIRD ? PAT_HALF : PAT_SOLID;
+}
+
+/**
+ * A glyph, rasterised into horizontal runs.
+ *
+ * The one primitive both machines and items are made of, so the two layers cannot drift into
+ * different mark languages the way the shared atlas let them. `flip` reflects the extents about the
+ * box centre, which is how a dish points the way the level authored it without a second table.
+ */
+function rasterRuns(
+  ctx: CanvasRenderingContext2D,
+  table: Float32Array,
+  base: number,
+  rows: number,
+  bx: number,
+  by: number,
+  bw: number,
+  bh: number,
+  scan: number,
+  pattern: number,
+  cell: number,
+  flip: boolean,
+): void {
+  for (let r = 0; r < rows; r++) {
+    const top = by + Math.round((r * bh) / rows);
+    const h = by + Math.round(((r + 1) * bh) / rows) - top;
+    const lit = Math.max(1, Math.round(h * scan));
+    for (let s = 0; s < 2; s++) {
+      const i = base + r * SPAN + s * 2;
+      const rawA = table[i] ?? 0;
+      const rawB = table[i + 1] ?? 0;
+      if (rawB <= rawA) continue;
+      const a = flip ? 1 - rawB : rawA;
+      const b = flip ? 1 - rawA : rawB;
+      const x0 = bx + Math.round(a * bw);
+      const end = Math.max(x0 + 1, bx + Math.round(b * bw));
+      if (pattern === PAT_SOLID) {
+        ctx.fillRect(x0, top, end - x0, lit);
+        continue;
+      }
+      let k = Math.floor((x0 - bx) / cell);
+      for (let x = bx + k * cell; x < end; x += cell, k++) {
+        const on =
+          pattern === PAT_HALF
+            ? k % 2 === 0
+            : pattern === PAT_THIRD
+              ? k % 3 === 0
+              : (k + r) % 2 === 0;
+        if (!on) continue;
+        const left = x < x0 ? x0 : x;
+        const right = x + cell > end ? end : x + cell;
+        if (right > left) ctx.fillRect(left, top, right - left, lit);
+      }
+    }
+  }
+}
+
+/**
+ * One machine, as a rasterised glyph block.
+ *
+ * Four marks in a fixed order, each doing a different job. The backing knocks the terrain raster
+ * out of the cell, because a glyph drawn straight onto a dotted floor is a glyph with the floor's
+ * texture running through it. The runs are the identity. The footing and the lamp are the state,
+ * and they are deliberately the two marks that do not move: `powered` is the one bit every kind
+ * carries, a player who has asked the system for stillness still has to see it, and a pulse is not
+ * an answer to that. So power is a bar that goes from barely lit to the brightest run in the cell,
+ * a lamp that changes from a dash to a block, a raster that closes up, and a value step across the
+ * whole glyph — four still tells, and not one of them a hue.
+ */
+function drawMachine(paint: MachinePaint): void {
+  const { ctx, tilePx, kind, powered, dpr } = paint;
+  const px = paint.x * tilePx;
+  const py = paint.y * tilePx;
+  const index = machineIndex(kind);
+  const detail = tilePx >= PATTERN_CSS * dpr;
+
+  const inset = Math.max(1, Math.round(tilePx * 0.06));
+  const foot = Math.max(1, Math.round(tilePx * 0.07));
+  const gap = Math.max(1, Math.round(tilePx * 0.03));
+
+  ctx.fillStyle = MACHINE_BACKING;
+  ctx.fillRect(px + inset, py + inset, tilePx - inset * 2, tilePx - inset * 2);
+
+  const pattern = machinePattern(kind);
+  ctx.fillStyle = (powered ? MACHINE_LIT[index] : MACHINE_INK[index]) as string;
+  rasterRuns(
+    ctx,
+    MACHINE_GLYPHS,
+    machineGlyph(kind, powered) * GLYPH_ROWS * SPAN,
+    GLYPH_ROWS,
+    px + inset,
+    py + inset,
+    tilePx - inset * 2,
+    tilePx - inset * 2 - foot - gap,
+    detail ? 0.72 : 1,
+    detail ? (powered ? denser(pattern) : pattern) : PAT_SOLID,
+    Math.max(1, Math.round(tilePx / 10)),
+    kind === 'router' && paint.facing === 3,
+  );
+
+  ctx.fillStyle = powered ? MACHINE_FOOT_LIT : MACHINE_FOOT;
+  ctx.fillRect(px + inset, py + tilePx - inset - foot, tilePx - inset * 2, foot);
+
+  const lamp = Math.max(2, Math.round(tilePx * 0.14));
+  const lx = px + tilePx - inset - lamp;
+  const ly = py + inset;
+  if (powered) {
+    ctx.fillStyle = MACHINE_FOOT_LIT;
+    ctx.fillRect(lx, ly, lamp, lamp);
+    /* The flicker is a fifth tell and the only one allowed to be motion, so it only ever adds. */
+    if (!paint.reduced) {
+      ctx.fillStyle = alpha(HOT, 0.4 + 0.35 * Math.sin(paint.time * 3.1 + px + py));
+      ctx.fillRect(lx, ly, lamp, lamp);
+    }
+  } else {
+    ctx.fillStyle = MACHINE_LAMP_OFF;
+    ctx.fillRect(lx, ly + lamp - Math.max(1, lamp >> 2), lamp, Math.max(1, lamp >> 2));
+  }
+}
+
+/**
+ * Six intensities to go with six lengths, so maturity is told twice.
+ *
+ * The last entry is the hot phosphor and every other one is the cold: ripe is not the top of a
+ * ramp, it is a different colour of light. On a board with one hue that is the strongest claim a
+ * value channel can be asked to make.
+ */
+const CROP_INK: readonly string[] = [
+  alpha(INK, 0.46),
+  alpha(INK, 0.53),
+  alpha(INK, 0.6),
+  alpha(INK, 0.67),
+  alpha(INK, 0.74),
+  alpha(HOT, 0.95),
+];
+const CROP_STALK = alpha(INK, 0.34);
+const CROP_SOIL = alpha(INK, 0.2);
+const CROP_EMPTY = alpha(INK, 0.14);
+const CROP_GAUGE = alpha(INK, 0.88);
+const CROP_BRACKET = alpha(INK, 0.9);
+
+/**
+ * Ripe, and it is not the sixth rung of anything.
+ *
+ * The ladder below this counts runs and its runs are separated; this is one solid block with no
+ * gap anywhere in it, inside a bracket, on the hot phosphor. Three categorical changes at once —
+ * texture, enclosure and value — because `w2-02` is a field of these mixed in with unripe ones and
+ * the player is scanning it, not studying it. A crop that was merely the tallest stack would be a
+ * thing you have to compare against a neighbour to read, and on the edge of the field there is no
+ * neighbour to compare it against.
+ */
+function drawCropRipe(paint: CropPaint, px: number, py: number): void {
+  const { ctx, tilePx } = paint;
+  const inset = Math.round(tilePx * 0.24);
+  ctx.fillStyle = CROP_INK[5] as string;
+  ctx.fillRect(px + inset, py + inset, tilePx - inset * 2, tilePx - inset * 2);
+
+  const arm = Math.max(1, Math.round(tilePx * 0.07));
+  const edge = Math.round(tilePx * 0.07);
+  const top = py + Math.round(tilePx * 0.13);
+  const height = tilePx - Math.round(tilePx * 0.26);
+  const left = px + edge;
+  const right = px + tilePx - edge - arm;
+  ctx.fillStyle = CROP_BRACKET;
+  ctx.fillRect(left, top, arm, height);
+  ctx.fillRect(right, top, arm, height);
+  if (tilePx >= CROP_COUNT_CSS * paint.dpr) {
+    const reach = Math.max(2, Math.round(tilePx * 0.14));
+    ctx.fillRect(left, top, reach, arm);
+    ctx.fillRect(right + arm - reach, top, reach, arm);
+    ctx.fillRect(left, top + height - arm, reach, arm);
+    ctx.fillRect(right + arm - reach, top + height - arm, reach, arm);
+  }
+}
+
+/**
+ * One crop tile.
+ *
+ * The soil rule is drawn at every stage including the first, so a sown-but-bare tile is never an
+ * empty cell — "nothing has come up yet" and "nothing was ever planted here" are different facts
+ * and a player acts on them differently.
+ */
+function drawCrop(paint: CropPaint): void {
+  const { ctx, tilePx, stage, stages } = paint;
+  const px = paint.x * tilePx;
+  const py = paint.y * tilePx;
+
+  const foot = py + Math.round(tilePx * 0.84);
+  const rule = Math.max(1, Math.round(tilePx * 0.05));
+  ctx.fillStyle = CROP_SOIL;
+  ctx.fillRect(px + Math.round(tilePx * 0.16), foot, Math.round(tilePx * 0.68), rule);
+
+  if (paint.ripe) {
+    drawCropRipe(paint, px, py);
+    return;
+  }
+
+  const step = Math.min(stage, CROP_INK.length - 2);
+  const cx = px + Math.round(tilePx / 2);
+
+  if (tilePx < CROP_COUNT_CSS * paint.dpr) {
+    /*
+     * The far form: a column, part of it lit. Height instead of count, because what a gauge asks
+     * the eye to find is one boundary and what a stack asks it to do is arithmetic.
+     */
+    const w = Math.max(2, Math.round(tilePx * 0.3));
+    const top = py + Math.round(tilePx * 0.15);
+    const h = Math.max(stages, Math.round(tilePx * 0.68));
+    const x = cx - (w >> 1);
+    ctx.fillStyle = CROP_EMPTY;
+    ctx.fillRect(x, top, w, h);
+    const lit = Math.max(1, Math.round((h * (stage + 1)) / stages));
+    ctx.fillStyle = CROP_GAUGE;
+    ctx.fillRect(x, top + h - lit, w, lit);
+    return;
+  }
+
+  const top = py + Math.round(tilePx * 0.16);
+  const slot = (foot - top) / stages;
+  const height = Math.max(1, Math.round(slot * 0.62));
+  const pitch = Math.max(height + 1, Math.round(slot));
+  const runs = stage + 1;
+
+  ctx.fillStyle = CROP_STALK;
+  const stalk = Math.max(1, Math.round(tilePx * 0.05));
+  ctx.fillRect(cx - (stalk >> 1), foot - runs * pitch, stalk, runs * pitch);
+
+  ctx.fillStyle = CROP_INK[step] as string;
+  for (let i = 0; i < runs; i++) {
+    const w = Math.max(2, Math.round(tilePx * (0.2 + step * 0.055) * (1 - i * 0.12)));
+    ctx.fillRect(cx - (w >> 1), foot - (i + 1) * pitch, w, height);
+  }
+}
+
+const I_REGOLITH = 0;
+const I_STONE = 1;
+const I_ORE = 2;
+const I_ICE = 3;
+const I_SCRAP = 4;
+const I_SEED = 5;
+const I_CROP = 6;
+const I_CRATE = 7;
+const I_PART = 8;
+const I_CELL = 9;
+const I_CHIP = 10;
+
+/**
+ * Eleven small glyphs, six rows each, in the same `a0 a1 b0 b1` extents the machines use.
+ *
+ * The atlas told several of these apart by hue alone — a red ore chunk beside a grey stone one —
+ * and there is no hue here, so every pair that shared a shape had to be given a different one.
+ * Regolith is a scatter and stone is a mass, which is the actual difference between dust and rock;
+ * ore is the only diamond and the only glyph with a hot core; ice is the only sheared stack; the
+ * crate is the only thing you can see through and the chip is the only thing with legs under it.
+ */
+const ITEM_GLYPHS = new Float32Array([
+  // regolith — loose, scattered, never one body.
+  0, 0, 0, 0, 0.1, 0.3, 0.62, 0.82, 0, 0, 0, 0, 0.34, 0.56, 0.8, 1, 0.04, 0.22, 0.44, 0.66, 0.2,
+  0.44, 0.62, 0.96,
+  // stone — a squat mass widening to the ground.
+  0, 0, 0, 0, 0, 0, 0, 0, 0.3, 0.72, 0, 0, 0.2, 0.82, 0, 0, 0.12, 0.9, 0, 0, 0.08, 0.94, 0, 0,
+  // ore — a diamond, with the vein laid over it.
+  0.42, 0.58, 0, 0, 0.28, 0.72, 0, 0, 0.14, 0.86, 0, 0, 0.14, 0.86, 0, 0, 0.28, 0.72, 0, 0, 0.42,
+  0.58, 0, 0,
+  // ice — every row the same width and every row offset. The only sheared glyph on the board.
+  0.44, 0.86, 0, 0, 0.38, 0.8, 0, 0, 0.32, 0.74, 0, 0, 0.26, 0.68, 0, 0, 0.2, 0.62, 0, 0, 0.14,
+  0.56, 0, 0,
+  // scrap — a body that has been broken. No two rows agree.
+  0.34, 0.52, 0, 0, 0.22, 0.58, 0, 0, 0.16, 0.46, 0.6, 0.8, 0.1, 0.72, 0, 0, 0.24, 0.9, 0, 0, 0.06,
+  0.56, 0.68, 0.86,
+  // seed — the smallest mark in the game, and it lies on the floor.
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.4, 0.6, 0, 0, 0.32, 0.68, 0, 0, 0.38, 0.62, 0, 0,
+  // crop — the ripe tile in miniature, so a harvested crop is the object it was in the field.
+  0.3, 0.7, 0, 0, 0.3, 0.7, 0, 0, 0.3, 0.7, 0, 0, 0.3, 0.7, 0, 0, 0.3, 0.7, 0, 0, 0.2, 0.8, 0, 0,
+  // crate — hollow, with one band across it.
+  0.08, 0.92, 0, 0, 0.08, 0.2, 0.8, 0.92, 0.08, 0.92, 0, 0, 0.08, 0.2, 0.8, 0.92, 0.08, 0.2, 0.8,
+  0.92, 0.08, 0.92, 0, 0,
+  // part — a machined cross. Nothing else is wide only in the middle.
+  0.4, 0.6, 0, 0, 0.4, 0.6, 0, 0, 0.06, 0.94, 0, 0, 0.06, 0.94, 0, 0, 0.4, 0.6, 0, 0, 0.4, 0.6, 0,
+  0,
+  // cell — a capped can, with the charge block laid over it.
+  0.36, 0.64, 0, 0, 0.22, 0.78, 0, 0, 0.22, 0.78, 0, 0, 0.22, 0.78, 0, 0, 0.22, 0.78, 0, 0, 0.22,
+  0.78, 0, 0,
+  // chip — a flat body standing on legs.
+  0, 0, 0, 0, 0.16, 0.84, 0, 0, 0.16, 0.84, 0, 0, 0.16, 0.84, 0, 0, 0.04, 0.16, 0.84, 0.96, 0.04,
+  0.16, 0.84, 0.96,
+]);
+
+/**
+ * The third channel, and on this layer the load-bearing one.
+ *
+ * Items are drawn at half a tile, so at the far end of the zoom there are twenty device pixels
+ * between eleven of them and a silhouette is six rows of two. Value carries what the outline
+ * cannot, and the ramp is ordered by what the player is usually hunting for: a crop or a chip at
+ * the top, tailings and rubble at the bottom, so a floor covered in mining spoil never out-shouts
+ * the one crate that matters.
+ */
+const ITEM_INK: readonly string[] = [
+  alpha(INK, 0.44),
+  alpha(INK, 0.56),
+  alpha(INK, 0.86),
+  alpha(INK, 0.5),
+  alpha(INK, 0.62),
+  alpha(INK, 0.7),
+  alpha(INK, 0.92),
+  alpha(INK, 0.66),
+  alpha(INK, 0.74),
+  alpha(INK, 0.8),
+  alpha(INK, 0.58),
+];
+
+const ITEM_HOT = alpha(HOT, 0.95);
+const ITEM_GROUND = alpha(INK, 0.18);
+const ITEM_BRACKET = alpha(HOT, 0.8);
+const ITEM_BADGE_RULE = alpha(WARM, 0.9);
+
+function itemGlyph(kind: string): number {
+  switch (kind) {
+    case 'regolith':
+      return I_REGOLITH;
+    case 'stone':
+      return I_STONE;
+    case 'ore':
+      return I_ORE;
+    case 'ice':
+      return I_ICE;
+    case 'scrap':
+      return I_SCRAP;
+    case 'seed':
+      return I_SEED;
+    case 'crop':
+      return I_CROP;
+    case 'crate':
+      return I_CRATE;
+    case 'part':
+      return I_PART;
+    case 'cell':
+      return I_CELL;
+    default:
+      return I_CHIP;
+  }
+}
+
+/** Ice and the chip are half-lit because both are things you see through; the cell is sparsest. */
+function itemPattern(glyph: number): number {
+  switch (glyph) {
+    case I_ICE:
+    case I_CHIP:
+      return PAT_HALF;
+    case I_SCRAP:
+      return PAT_STAGGER;
+    case I_CELL:
+      return PAT_THIRD;
+    default:
+      return PAT_SOLID;
+  }
+}
+
+/**
+ * A second cached font slot.
+ *
+ * `fontAt` holds one, and the bot label and this badge want different sizes at the same zoom — one
+ * slot shared between them would rebuild a template string on every alternation, which is the
+ * per-frame allocation the single slot exists to prevent in the first place.
+ */
+let badgePx = -1;
+let badgeFace = '';
+
+function badgeFont(px: number): string {
+  if (px !== badgePx) {
+    badgePx = px;
+    badgeFace = `600 ${px}px 'JetBrains Mono', ui-monospace, monospace`;
+  }
+  return badgeFace;
+}
+
+/**
+ * One ground stack, glyph and count both.
+ *
+ * There is no cast shadow, because a tube has no light to cast one with — the "this is lying on
+ * the floor" cue is a dim rule under the glyph, which is what the device would draw and which
+ * costs one run rather than an ellipse. The bob is the only motion here and is the first thing
+ * `reduced` deletes; the rule stays put while the glyph rides, which is what sells the lift.
+ */
+function drawItem(paint: ItemPaint): void {
+  const { ctx, tilePx, count, dpr } = paint;
+  const px = paint.x * tilePx;
+  const py = paint.y * tilePx;
+  const glyph = itemGlyph(paint.kind);
+  const detail = tilePx >= PATTERN_CSS * dpr;
+
+  ctx.fillStyle = ITEM_GROUND;
+  ctx.fillRect(
+    px + Math.round(tilePx * 0.28),
+    py + Math.round(tilePx * 0.8),
+    Math.round(tilePx * 0.44),
+    Math.max(1, Math.round(tilePx * 0.045)),
+  );
+
+  const bob = paint.reduced
+    ? 0
+    : Math.round(Math.sin(paint.time * 2 + paint.x * 3 + paint.y * 5) * tilePx * 0.03);
+  const bx = px + Math.round(tilePx * 0.2);
+  const bw = tilePx - Math.round(tilePx * 0.2) * 2;
+  const by = py + Math.round(tilePx * 0.26) + bob;
+  const bh = Math.round(tilePx * 0.5);
+
+  ctx.fillStyle = ITEM_INK[glyph] as string;
+  rasterRuns(
+    ctx,
+    ITEM_GLYPHS,
+    glyph * ITEM_ROWS * SPAN,
+    ITEM_ROWS,
+    bx,
+    by,
+    bw,
+    bh,
+    detail ? 0.82 : 1,
+    detail ? itemPattern(glyph) : PAT_SOLID,
+    Math.max(1, Math.round(tilePx / 14)),
+    false,
+  );
+
+  if (glyph === I_ORE) {
+    ctx.fillStyle = ITEM_HOT;
+    ctx.fillRect(
+      bx + Math.round(bw * 0.34),
+      by + Math.round(bh * 0.42),
+      Math.max(1, Math.round(bw * 0.32)),
+      Math.max(1, Math.round(bh * 0.18)),
+    );
+  } else if (glyph === I_CELL) {
+    ctx.fillStyle = ITEM_HOT;
+    ctx.fillRect(
+      bx + Math.round(bw * 0.32),
+      by + Math.round(bh * 0.56),
+      Math.max(1, Math.round(bw * 0.36)),
+      Math.max(1, Math.round(bh * 0.3)),
+    );
+  } else if (glyph === I_CROP) {
+    const arm = Math.max(1, Math.round(bw * 0.1));
+    ctx.fillStyle = ITEM_BRACKET;
+    ctx.fillRect(bx, by + Math.round(bh * 0.12), arm, Math.round(bh * 0.76));
+    ctx.fillRect(bx + bw - arm, by + Math.round(bh * 0.12), arm, Math.round(bh * 0.76));
+  }
+
+  if (count > 1 && tilePx >= ITEM_BADGE_CSS * dpr) {
+    const w = Math.round(tilePx * 0.36);
+    const h = Math.round(tilePx * 0.3);
+    const x = px + tilePx - w - Math.round(tilePx * 0.05);
+    const y = py + tilePx - h - Math.round(tilePx * 0.05);
+    const rule = Math.max(1, Math.round(tilePx * 0.03));
+    ctx.fillStyle = TUBE;
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = ITEM_BADGE_RULE;
+    ctx.fillRect(x, y, w, rule);
+    ctx.fillRect(x, y + h - rule, w, rule);
+    ctx.save();
+    ctx.font = badgeFont(Math.max(8, Math.round(tilePx * 0.22)));
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = INK;
+    ctx.fillText(numeral(count > 99 ? 99 : count), x + w / 2, y + h / 2);
+    ctx.restore();
   }
 }

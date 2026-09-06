@@ -19,7 +19,7 @@ import {
   setTile,
   vec,
 } from '../../engine/index.ts';
-import type { Trace, World } from '../../engine/index.ts';
+import type { ItemKind, MachineKind, Trace, World } from '../../engine/index.ts';
 import { w1_01 } from '../../levels/world-1/w1-01.ts';
 import { solution as w1_01_solution } from '../../levels/world-1/__solutions__/w1-01.ts';
 
@@ -57,6 +57,35 @@ export function sceneW101(): Scene {
   });
   return { id: 'w1-01', label: 'w1-01 · reference solution', world: 1, trace, highlights: [vec(5, 2)] };
 }
+
+/** Every `MachineKind`, each in the state a level most often parks it in. */
+const MACHINE_ROW: readonly (readonly [MachineKind, string])[] = [
+  ['door', 'closed'],
+  ['lever', 'off'],
+  ['furnace', 'busy'],
+  ['press', 'idle'],
+  ['sink', 'idle'],
+  ['source', 'on'],
+  ['node', 'on'],
+  ['antenna', 'idle'],
+  ['charger', 'on'],
+  ['router', 'idle'],
+];
+
+/** Every `ItemKind`. */
+const ITEM_ROW: readonly ItemKind[] = [
+  'regolith',
+  'stone',
+  'ore',
+  'ice',
+  'scrap',
+  'seed',
+  'crop',
+  'crate',
+  'part',
+  'cell',
+  'chip',
+];
 
 const SHOWCASE_MAP = [
   '##############',
@@ -351,9 +380,94 @@ export function sceneMaze(): Scene {
   };
 }
 
+/**
+ * The identity case: every machine kind, the whole maturity ladder and every item kind at once.
+ *
+ * `docs/FIX-SPRITES.md` claims three things and this is the grid all three are checked on. Two of
+ * them only fail in company — a furnace and a press are each fine on their own board and converge
+ * the moment they are side by side, and ripe reads perfectly against bare soil and stops reading
+ * against a crop one bucket short of it. So the ten kinds sit in one row and the crops alternate
+ * ripe with unripe rather than running the ladder in order.
+ *
+ * Static on purpose: no `plantedAt`, so `maturity` returns the authored `growth` and the row means
+ * the same thing at every tick (`sim.ts:102`). A shot of this scene can be compared against a shot
+ * of it taken a month later.
+ */
+export function sceneSprites(): Scene {
+  const world = createWorld({ w: 13, h: 8, seed: 5, fill: Terrain.Floor });
+  for (let x = 0; x < 13; x++) {
+    setTile(world, vec(x, 0), { terrain: Terrain.Wall });
+    setTile(world, vec(x, 7), { terrain: Terrain.Wall });
+  }
+  for (let y = 0; y < 8; y++) {
+    setTile(world, vec(0, y), { terrain: Terrain.Wall });
+    setTile(world, vec(12, y), { terrain: Terrain.Wall });
+  }
+
+  MACHINE_ROW.forEach(([kind, state], i) => {
+    addMachine(world, {
+      id: `m-${kind}`,
+      kind,
+      at: vec(1 + i, 1),
+      state,
+      inventory: [],
+      vars: {},
+      facing: Dir.South,
+    });
+  });
+
+  // Alternating, so every ripe tile has an unripe neighbour on both sides. The unripe values walk
+  // the ladder from bare to one tick short of ready, which is the reading w2-02 is lost on.
+  const unripe = [0, 2, 4, 6, 7];
+  for (let i = 0; i < 5; i++) {
+    setTile(world, vec(1 + i * 2, 3), {
+      terrain: Terrain.Soil,
+      crop: 'crop',
+      growth: 8,
+      maxGrowth: 8,
+    });
+    setTile(world, vec(2 + i * 2, 3), {
+      terrain: Terrain.Soil,
+      crop: 'crop',
+      growth: unripe[i] as number,
+      maxGrowth: 8,
+    });
+  }
+  // The ladder in order underneath it, so a reader can name which bucket an alternating tile is in.
+  for (let i = 0; i < 6; i++) {
+    setTile(world, vec(1 + i, 5), {
+      terrain: Terrain.Soil,
+      crop: 'crop',
+      growth: i === 5 ? 10 : i * 2,
+      maxGrowth: 10,
+    });
+  }
+
+  ITEM_ROW.forEach((kind, i) => {
+    addGroundItems(world, vec(1 + i, 6), kind, i === 3 ? 4 : 1);
+  });
+
+  addBot(world, { at: vec(11, 5), facing: Dir.West, name: 'RIG-01' });
+  rebuildOccupancy(world);
+
+  const trace = finish(world, (sim) => {
+    const botId = sim.world.bots[0]?.id ?? 0;
+    sim.print(botId, 'sprite legend');
+  });
+
+  return {
+    id: 'sprites',
+    label: 'sprites - every machine, maturity, item',
+    world: 2,
+    trace,
+    highlights: [vec(1, 3)],
+  };
+}
+
 export function allScenes(): Scene[] {
   return [
     sceneW101(),
+    sceneSprites(),
     sceneShowcase(),
     sceneMaze(),
     sceneStress(),

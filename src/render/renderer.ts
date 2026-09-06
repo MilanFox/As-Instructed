@@ -61,13 +61,15 @@ import type { BotDrawOptions } from './sprites.ts';
 import { TerrainLayer } from './terrain.ts';
 import { applyArtDirection, artDirection, botAccent, palette } from './theme.ts';
 import type { ArtId } from './theme.ts';
-import type { PostPaint } from './art/types.ts';
+import type { CropPaint, ItemPaint, MachinePaint, PostPaint } from './art/types.ts';
 import {
   CONVEYOR_PHASES,
   TileSet,
   biomeForWorld,
   itemTileName,
   machineTileName,
+  PLANT_STAGES,
+  plantStageIndex,
   plantStageName,
   terrainArt,
 } from './tiles.ts';
@@ -252,6 +254,53 @@ export class Renderer {
    * that paints a scanline pass would otherwise cost one object per frame for a whole replay.
    */
   private paint: PostPaint | null = null;
+
+  /**
+   * The bags handed to a direction's `drawMachine`, `drawCrop` and `drawItem`.
+   *
+   * One each, rewritten in place per call. A 25-tile field at 60 fps is 1500 object literals a
+   * second if these are built inline, which is the allocation shape `this.fx` and `this.paint`
+   * were already hoisted for. `ctx` is assigned on every call because the preview and the replay
+   * hand in different contexts.
+   */
+  private readonly machinePaint: MachinePaint = {
+    ctx: null as unknown as CanvasRenderingContext2D,
+    x: 0,
+    y: 0,
+    tilePx: 0,
+    kind: '',
+    state: '',
+    powered: false,
+    facing: -1,
+    time: 0,
+    dpr: 1,
+    reduced: false,
+  };
+  private readonly cropPaint: CropPaint = {
+    ctx: null as unknown as CanvasRenderingContext2D,
+    x: 0,
+    y: 0,
+    tilePx: 0,
+    growth: 0,
+    max: 0,
+    stage: 0,
+    stages: PLANT_STAGES.length,
+    ripe: false,
+    time: 0,
+    dpr: 1,
+    reduced: false,
+  };
+  private readonly itemPaint: ItemPaint = {
+    ctx: null as unknown as CanvasRenderingContext2D,
+    x: 0,
+    y: 0,
+    tilePx: 0,
+    kind: '',
+    count: 0,
+    time: 0,
+    dpr: 1,
+    reduced: false,
+  };
 
   private readonly poses = new Map<number, BotPose>();
   private readonly drawOrder: number[] = [];
@@ -1209,22 +1258,7 @@ export class Renderer {
     this.drawMarks(ctx, world, tilePx);
 
     // --- items -------------------------------------------------------------
-    for (let i = 0; i < world.items.length; i++) {
-      const stack = world.items[i] as GroundStack;
-      if (stack.count <= 0) continue;
-      if (!this.inRange(stack.at.x, stack.at.y)) continue;
-      drawGroundStack(
-        ctx,
-        tiles,
-        itemTileName(stack.kind),
-        stack.at.x,
-        stack.at.y,
-        stack.count,
-        tilePx,
-        this.elapsed,
-        this.camera.dpr,
-      );
-    }
+    this.drawItems(ctx, world, tilePx);
 
     // --- fx under ----------------------------------------------------------
     this.particles.draw(ctx, FX_LAYER_UNDER, tilePx);
@@ -1327,9 +1361,17 @@ export class Renderer {
     tilePx: number,
     tick: number,
   ): void {
+    if (this.cropCells.length === 0) return;
     const tiles = this.tiles;
-    if (!tiles || this.cropCells.length === 0) return;
+    const painter = artDirection().drawCrop;
+    if (!tiles && !painter) return;
     const t = Math.floor(tick);
+    const paint = this.cropPaint;
+    paint.ctx = ctx;
+    paint.tilePx = tilePx;
+    paint.time = this.elapsed;
+    paint.dpr = this.camera.dpr;
+    paint.reduced = this.reducedMotion;
     for (let c = 0; c < this.cropCells.length; c++) {
       const index = this.cropCells[c] as number;
       const x = index % world.w;
@@ -1339,27 +1381,91 @@ export class Renderer {
       if (!tile) continue;
       const max = tile.maxGrowth ?? 0;
       const growth = maturity(tile, t);
-      tiles.draw(ctx, plantStageName(growth, max), x * tilePx, y * tilePx, tilePx);
+      if (painter) {
+        paint.x = x;
+        paint.y = y;
+        paint.growth = growth;
+        paint.max = max;
+        paint.stage = plantStageIndex(growth, max);
+        paint.ripe = growth >= max;
+        painter(paint);
+        continue;
+      }
+      (tiles as TileSet).draw(ctx, plantStageName(growth, max), x * tilePx, y * tilePx, tilePx);
       drawPlantGauge(ctx, x, y, tilePx, growth, max, this.elapsed, this.camera.dpr);
     }
   }
 
   private drawMachines(ctx: CanvasRenderingContext2D, world: World, tilePx: number): void {
     const tiles = this.tiles;
-    if (!tiles) return;
+    const painter = artDirection().drawMachine;
+    if (!tiles && !painter) return;
+    const paint = this.machinePaint;
+    paint.ctx = ctx;
+    paint.tilePx = tilePx;
+    paint.time = this.elapsed;
+    paint.dpr = this.camera.dpr;
+    paint.reduced = this.reducedMotion;
     for (let m = 0; m < world.machines.length; m++) {
       const machine = world.machines[m] as Machine;
       if (!this.inRange(machine.at.x, machine.at.y)) continue;
       const powered =
         machine.state === 'on' || machine.state === 'open' || machine.state === 'busy';
+      if (painter) {
+        paint.x = machine.at.x;
+        paint.y = machine.at.y;
+        paint.kind = machine.kind;
+        paint.state = machine.state;
+        paint.powered = powered;
+        paint.facing = machine.facing ?? -1;
+        painter(paint);
+        continue;
+      }
       drawMachine(
         ctx,
-        tiles,
+        tiles as TileSet,
         machineTileName(machine.kind, machine.state),
         machine.at.x,
         machine.at.y,
         tilePx,
         powered,
+        this.elapsed,
+        this.camera.dpr,
+      );
+    }
+  }
+
+  private drawItems(ctx: CanvasRenderingContext2D, world: World, tilePx: number): void {
+    if (world.items.length === 0) return;
+    const tiles = this.tiles;
+    const painter = artDirection().drawItem;
+    if (!tiles && !painter) return;
+    const paint = this.itemPaint;
+    paint.ctx = ctx;
+    paint.tilePx = tilePx;
+    paint.time = this.elapsed;
+    paint.dpr = this.camera.dpr;
+    paint.reduced = this.reducedMotion;
+    for (let i = 0; i < world.items.length; i++) {
+      const stack = world.items[i] as GroundStack;
+      if (stack.count <= 0) continue;
+      if (!this.inRange(stack.at.x, stack.at.y)) continue;
+      if (painter) {
+        paint.x = stack.at.x;
+        paint.y = stack.at.y;
+        paint.kind = stack.kind;
+        paint.count = stack.count;
+        painter(paint);
+        continue;
+      }
+      drawGroundStack(
+        ctx,
+        tiles as TileSet,
+        itemTileName(stack.kind),
+        stack.at.x,
+        stack.at.y,
+        stack.count,
+        tilePx,
         this.elapsed,
         this.camera.dpr,
       );

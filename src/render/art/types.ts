@@ -121,6 +121,88 @@ export interface TerrainPaint {
 }
 
 /**
+ * The three live layers a direction may take over, one interface each.
+ *
+ * Terrain is cached and machines, crops and items are not — maturity is derived from the tick
+ * (ENGINE.md §6.4) and a machine's state changes without a rebuild — so these cannot ride the
+ * `paintTerrain` hook and need a contract of their own. Until they had one, a direction that
+ * rewrote the ground still had 48 px atlas sprites standing on it, which is the half-committed
+ * board `docs/FIX-SPRITES.md` was opened against.
+ *
+ * Each is passed as one object the renderer owns and rewrites in place per call. A painter reads
+ * it and returns; retaining it captures the next machine's values. That is the same
+ * nothing-allocates rule the rest of the draw path runs under, expressed as a single object
+ * rather than as eight positional arguments that would each have to be threaded through.
+ */
+export interface MachinePaint {
+  ctx: CanvasRenderingContext2D;
+  /** Tile coordinates. Multiply by `tilePx` for the cell's top-left corner. */
+  x: number;
+  y: number;
+  /** On-screen tile size, device px. Every "is there room for this" test is in screen px. */
+  tilePx: number;
+  /** `MachineKind`. Ten of them, and a player links, powers and transmits to a named one. */
+  kind: string;
+  /** 'idle' | 'on' | 'off' | 'open' | 'closed' | 'busy', stable per kind. */
+  state: string;
+  /** `on`, `open` or `busy`. The one bit of machine state every kind shares. */
+  powered: boolean;
+  /** `Dir`, or -1 where the level did not author one. */
+  facing: number;
+  time: number;
+  dpr: number;
+  /**
+   * Honour `prefers-reduced-motion`. Every tell has to survive it.
+   *
+   * A machine that says "running" only by pulsing says nothing at all to a player who has asked
+   * the system for stillness, and `powered` is the one state every kind carries. So the flag is
+   * on all three bags rather than on the bot alone: the ripe pip, the busy lamp and the item bob
+   * are each a motion a direction might reach for, and each needs a still form.
+   */
+  reduced: boolean;
+}
+
+/**
+ * One crop tile.
+ *
+ * `stage` is bucketed by the renderer against `PLANT_STAGES` rather than by the direction: the
+ * six-step ladder is the thing DESIGN.md §11 A5 requires to be visually distinct, and a direction
+ * that re-derived it could quietly ship five steps. `ripe` is the bit w2-02 is played on and is
+ * handed over separately, because `stage === stages - 1` is true for authored-grown tiles whose
+ * `max` is zero as well, and both of those really are ready to harvest.
+ */
+export interface CropPaint {
+  ctx: CanvasRenderingContext2D;
+  x: number;
+  y: number;
+  tilePx: number;
+  growth: number;
+  max: number;
+  /** Bucket index, 0..`stages - 1`. */
+  stage: number;
+  stages: number;
+  /** Harvestable now. The distinction w2-02 cannot be solved without. */
+  ripe: boolean;
+  time: number;
+  dpr: number;
+  reduced: boolean;
+}
+
+export interface ItemPaint {
+  ctx: CanvasRenderingContext2D;
+  x: number;
+  y: number;
+  tilePx: number;
+  /** `ItemKind`. */
+  kind: string;
+  /** Stack size. Above one the painter owns the count badge as well. */
+  count: number;
+  time: number;
+  dpr: number;
+  reduced: boolean;
+}
+
+/**
  * Everything a bot painter is told about one bot on one frame.
  *
  * Declared here rather than in `sprites.ts` and re-exported from there: a direction has to name
@@ -227,6 +309,33 @@ export interface ArtDirection {
     tilePx: number,
     options: BotDrawOptions,
   ) => void;
+  /**
+   * Takes over one machine, both zoom forms, its state tell and its lamp.
+   *
+   * When absent the atlas pipeline runs: `machineTileName` picks a frame and `sprites.ts` draws
+   * the plate, the shadow and the `lighter`-composited glow. A direction that implements this
+   * gets no atlas frame at all, so it owns machine *identity* — ten kinds that a level's link,
+   * power and transmit verbs address by name, and any two of them that converge turn the level
+   * into guesswork.
+   */
+  drawMachine?: (paint: MachinePaint) => void;
+  /**
+   * Takes over one crop tile, sprite and maturity readout both.
+   *
+   * The default path is the six-frame `PLANT_STAGES` ladder plus `drawPlantGauge`'s bar and ripe
+   * ring. A direction that implements this replaces both, and inherits the constraint the ladder
+   * exists for: w2-02 is unsolvable if ripe and unripe cannot be told apart at the tile size the
+   * field is actually played at.
+   */
+  drawCrop?: (paint: CropPaint) => void;
+  /**
+   * Takes over one ground stack, count badge included.
+   *
+   * The default path is `drawGroundStack` — a soft shadow, an atlas frame, a bob and a numbered
+   * pip. Eleven kinds, several of which differ only by hue on the atlas, which is a distinction
+   * that does not survive a monochrome direction.
+   */
+  drawItem?: (paint: ItemPaint) => void;
   /** Fills behind the board before the world transform is applied. Screen space. */
   backdrop?: (paint: BackdropPaint) => void;
   /** Runs after everything, in screen space, still inside the canvas. */

@@ -21,6 +21,9 @@ import type {
   ArtDirection,
   BackdropPaint,
   BotDrawOptions,
+  CropPaint,
+  ItemPaint,
+  MachinePaint,
   PostPaint,
   TerrainPaint,
 } from './types.ts';
@@ -1203,6 +1206,672 @@ function drawBotFuel(
   ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
 }
 
+// ---------------------------------------------------------------------------
+// The legend: machines, crops and items, drawn as plan symbols
+// ---------------------------------------------------------------------------
+
+/**
+ * A drafting department that draws everything up has a symbol legend, so the board has one too.
+ *
+ * A legend is not a set of little pictures. It is a set of *keyed outlines*: every entry is a
+ * different silhouette first, and only then carries an internal diacritic saying which member of
+ * the family it is. That ordering is the whole point. The outline is the part that survives to
+ * `w8-05`, and `link`, `power` and `transmit` each address one machine by name — two kinds that
+ * converge to the same blob do not cost prettiness, they turn the level into guesswork.
+ *
+ * Every symbol is authored in a unit frame of -1..1 on both axes and held as a flat table of
+ * numbers, scaled about the cell centre at the call site. Flat tables because a symbol built from
+ * object literals would allocate once per machine per frame, and there is no draw path in this
+ * renderer allowed to do that.
+ */
+
+/**
+ * Half-extent of a machine's symbol box, as a fraction of the tile.
+ *
+ * Two thirds of the cell, which leaves the outer sixth for the live rule and the facing tick and
+ * still keeps a hatched neighbour's boundary line visible round the outside. Any larger and the
+ * symbol starts to read as terrain.
+ */
+const MACHINE_BOX = 0.33;
+
+/**
+ * Below this the diacritic is dropped and the keyed outline carries the kind on its own.
+ *
+ * A diacritic occupies roughly half the symbol box, which is a third of a tile; at 22 device px
+ * that is seven device pixels for a two-stroke mark, and under it the mark stops being a mark and
+ * becomes a smudge laid over the outline that was already doing the work. The same trade
+ * `HATCH_MIN_TILE_PX` makes for material, one layer up. It is affordable precisely because the
+ * outlines were designed to differ from each other and not to be labels for what is inside them.
+ */
+const MACHINE_DETAIL_TILE_PX = 22;
+
+/**
+ * Below this the drill row loses its stems and the plot becomes a plotted quantity instead.
+ *
+ * Three stems span 0.68 of a tile, so their pitch is about `0.23 * tilePx`; under five device px
+ * of pitch the three merge into one bar and the maturity ladder — the thing w2-02 is *played* on
+ * — stops existing. 24 is the first rung that clears that with the heads still sitting on top.
+ * Below it the crop is not the same mark shrunk, it is a different mark: a bar against a track,
+ * and for ripe a solid block. Shrinking the near form is what would lose the level.
+ */
+const CROP_DETAIL_TILE_PX = 24;
+
+/**
+ * Below this the tag frame is dropped and the glyph takes the whole cell.
+ *
+ * The frame costs about a third of the tag in margin and rule. At 26 device px the glyph inside a
+ * framed tag is under nine device pixels across — smaller than the frame around it — at which
+ * point the frame is spending the pixels the identity needed.
+ */
+const ITEM_DETAIL_TILE_PX = 26;
+
+/** Below this a stack count is set as a corner rule rather than as a numeral nobody can read. */
+const COUNT_MIN_TILE_PX = 22;
+
+/**
+ * The ten silhouettes, closed, in the unit frame.
+ *
+ * Chosen so that no two share a bounding shape even before the diacritics arrive: a portrait leaf,
+ * a plinth with a raised arm, a peaked kiln, a two-platen press, a triangle down, a triangle up, a
+ * diamond, a mast on splayed legs, a cell with a terminal tab, and a hexagon. The two triangles
+ * are the one deliberate near-pair, and they are near because they are opposites — a sink takes in
+ * and a source gives out, and a reader who confuses them has still learnt the axis.
+ */
+const SYMBOL: Readonly<Record<string, readonly number[]>> = {
+  door: [-0.52, -1, 0.52, -1, 0.52, 1, -0.52, 1],
+  lever: [-0.95, 1, 0.95, 1, 0.95, 0.5, 0.72, 0.5, 0.98, -0.85, 0.62, -1, 0.3, 0.5, -0.95, 0.5],
+  furnace: [-1, 1, 1, 1, 1, -0.2, 0, -1, -1, -0.2],
+  press: [
+    -1, -1, 1, -1, 1, -0.48, 0.3, -0.48, 0.3, 0.48, 1, 0.48, 1, 1, -1, 1, -1, 0.48, -0.3, 0.48,
+    -0.3, -0.48, -1, -0.48,
+  ],
+  sink: [-1, -0.85, 1, -0.85, 0, 1],
+  source: [-1, 0.85, 1, 0.85, 0, -1],
+  node: [0, -1, 1, 0, 0, 1, -1, 0],
+  antenna: [
+    -0.14, -0.55, 0.14, -0.55, 0.14, 0.35, 0.95, 1, 0.5, 1, 0, 0.62, -0.5, 1, -0.95, 1, -0.14, 0.35,
+  ],
+  charger: [
+    -0.7, -0.72, -0.26, -0.72, -0.26, -1, 0.26, -1, 0.26, -0.72, 0.7, -0.72, 0.7, 1, -0.7, 1,
+  ],
+  router: [-0.5, -1, 0.5, -1, 1, 0, 0.5, 1, -0.5, 1, -1, 0],
+};
+
+/** A kind the level authored but the legend has not been drawn for yet. Square, and obviously so. */
+const SYMBOL_UNKEYED: readonly number[] = [-0.85, -0.85, 0.85, -0.85, 0.85, 0.85, -0.85, 0.85];
+
+/**
+ * The second-level mark inside each outline, as open rules: `x0, y0, x1, y1` per segment.
+ *
+ * These say what the machine *does*, in the same shorthand a plan uses — a grate for a firebox,
+ * two facing chevrons for a ram, radiating waves for a mast, a switch matrix for a router. They
+ * are the part that goes away first, which is why none of them is load-bearing for identity.
+ */
+const MARK: Readonly<Record<string, readonly number[]>> = {
+  door: [-0.52, -0.4, 0.52, -0.4, -0.52, 0.4, 0.52, 0.4],
+  lever: [-0.6, 0.75, 0.6, 0.75],
+  furnace: [-0.7, 0.3, 0.7, 0.3, -0.35, 0.3, -0.35, 0.82, 0, 0.3, 0, 0.82, 0.35, 0.3, 0.35, 0.82],
+  press: [-0.18, -0.28, 0, -0.06, 0, -0.06, 0.18, -0.28, -0.18, 0.28, 0, 0.06, 0, 0.06, 0.18, 0.28],
+  sink: [-0.62, -0.5, 0.62, -0.5, -0.4, -0.32, 0, 0.42, 0, -0.32, 0, 0.42, 0.4, -0.32, 0, 0.42],
+  source: [0, -0.4, -0.45, 0.5, 0, -0.4, 0, 0.52, 0, -0.4, 0.45, 0.5],
+  node: [-0.52, 0, 0.52, 0, 0, -0.52, 0, 0.52],
+  antenna: [
+    -0.34, -1, -0.6, -0.72, -0.6, -0.72, -0.34, -0.44, 0.34, -1, 0.6, -0.72, 0.6, -0.72, 0.34,
+    -0.44,
+  ],
+  charger: [0.2, -0.45, -0.18, 0.14, -0.18, 0.14, 0.18, 0.14, 0.18, 0.14, -0.16, 0.74],
+  router: [
+    -0.6, -0.28, 0.6, -0.28, -0.6, 0.28, 0.6, 0.28, -0.28, -0.6, -0.28, 0.6, 0.28, -0.6, 0.28, 0.6,
+  ],
+};
+
+/**
+ * The kinds whose diacritic sits *outside* the inked body.
+ *
+ * A mast's waves radiate off the mast — that is what makes it a mast and not a post — so they land
+ * on paper in either state. Knocking them out in paper the way the inside marks are knocked out
+ * would erase the antenna's one distinguishing mark at the moment it came on.
+ */
+const MARK_OUTSIDE: Readonly<Record<string, boolean>> = { antenna: true };
+
+/** A single filled centre for the kinds whose diacritic needs a fixed point: `x, y, half`. */
+const PIP: Readonly<Record<string, readonly number[]>> = {
+  lever: [0.29, 0.5, 0.14],
+  node: [0, 0, 0.17],
+  source: [0, 0.3, 0.15],
+};
+
+/**
+ * The kinds whose facing the level actually authors something through.
+ *
+ * A door has a side you walk in from, a press and a sink and a source have a throat, a router has
+ * an outbound face. A furnace does not, and drawing a tick on one would be a claim the level does
+ * not make.
+ */
+const FACED: Readonly<Record<string, boolean>> = {
+  door: true,
+  press: true,
+  sink: true,
+  source: true,
+  router: true,
+};
+
+/** One closed outline from a flat unit-frame table, scaled about a point. */
+function symbolPath(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  r: number,
+  pts: readonly number[],
+): void {
+  ctx.beginPath();
+  ctx.moveTo(cx + (pts[0] as number) * r, cy + (pts[1] as number) * r);
+  for (let i = 2; i < pts.length; i += 2) {
+    ctx.lineTo(cx + (pts[i] as number) * r, cy + (pts[i + 1] as number) * r);
+  }
+  ctx.closePath();
+}
+
+/** A family of open rules from a flat unit-frame table. Left open; the caller strokes it. */
+function rulePath(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  r: number,
+  seg: readonly number[],
+): void {
+  ctx.beginPath();
+  for (let i = 0; i + 3 < seg.length; i += 4) {
+    ctx.moveTo(cx + (seg[i] as number) * r, cy + (seg[i + 1] as number) * r);
+    ctx.lineTo(cx + (seg[i + 2] as number) * r, cy + (seg[i + 3] as number) * r);
+  }
+}
+
+/**
+ * One machine, as its entry in the legend.
+ *
+ * Two things carry `powered`, and neither of them is hue or motion. **Ink is matter**: a machine
+ * that is running is inked solid and one that is not is left as paper inside a keyed outline, so
+ * the state is a value inversion of the largest area on the symbol and survives to the smallest
+ * rung the campaign asks for. The door inverts that, because for a door the body being drawn is
+ * the leaf and not the housing — a shut door is a piece of wall and an open one is a gap, and
+ * inking an open door solid would say the opposite of what it means. Alongside it, and identical
+ * on all ten, a heavy blue-pencil rule is struck under the symbol: the run is live, in the one
+ * colour this direction reserves for live. It reads as *present or absent* rather than as a hue,
+ * which is what makes it survive a monochrome reading of the board.
+ */
+function drawMachine(paint: MachinePaint): void {
+  const ctx = paint.ctx;
+  const t = paint.tilePx;
+  const kind = paint.kind;
+  const powered = paint.powered;
+  const cx = (paint.x + 0.5) * t;
+  const cy = (paint.y + 0.5) * t;
+  const r = t * MACHINE_BOX;
+  const pts = SYMBOL[kind] ?? SYMBOL_UNKEYED;
+  const weight = Math.max(1, t * 0.055);
+  const solid = kind === 'door' ? !powered : powered;
+
+  ctx.save();
+  ctx.lineJoin = 'miter';
+  ctx.lineCap = 'butt';
+
+  /*
+   * The same out-of-register second impression the bot gets, and for the same reason: a printed
+   * sheet has no light on it, so the only way a symbol lifts off the hatching is a doubled edge.
+   */
+  const off = (REGISTER * t) / BOT_FRAME;
+  symbolPath(ctx, cx + off, cy + off, r, pts);
+  ctx.fillStyle = alpha(INK, 0.18);
+  ctx.fill();
+
+  symbolPath(ctx, cx, cy, r, pts);
+  ctx.fillStyle = solid ? INK : PAPER;
+  ctx.fill();
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = weight;
+  ctx.stroke();
+
+  if (t >= MACHINE_DETAIL_TILE_PX) {
+    const marks = MARK[kind];
+    if (marks) {
+      ctx.strokeStyle =
+        solid && MARK_OUTSIDE[kind] !== true ? alpha(PAPER, 0.88) : alpha(INK, 0.82);
+      ctx.lineWidth = Math.max(1, weight * 0.6);
+      rulePath(ctx, cx, cy, r, marks);
+      ctx.stroke();
+    }
+    const pip = PIP[kind];
+    if (pip) {
+      const half = (pip[2] as number) * r;
+      ctx.fillStyle = solid ? PAPER : INK;
+      ctx.fillRect(
+        cx + (pip[0] as number) * r - half,
+        cy + (pip[1] as number) * r - half,
+        half * 2,
+        half * 2,
+      );
+    }
+    if (paint.facing >= 0 && FACED[kind] === true) {
+      const fx = STEP_X[paint.facing] ?? 0;
+      const fy = STEP_Y[paint.facing] ?? 0;
+      ctx.strokeStyle = alpha(INK, 0.85);
+      ctx.lineWidth = Math.max(1, weight * 0.8);
+      ctx.beginPath();
+      ctx.moveTo(cx + fx * r * 1.05, cy + fy * r * 1.05);
+      ctx.lineTo(cx + fx * r * 1.3, cy + fy * r * 1.3);
+      ctx.stroke();
+    }
+  }
+
+  if (powered) {
+    const y = cy + r * 1.4;
+    ctx.strokeStyle = PENCIL;
+    ctx.lineWidth = Math.max(1.5, t * 0.07);
+    ctx.beginPath();
+    ctx.moveTo(cx - r * 0.8, y);
+    ctx.lineTo(cx + r * 0.8, y);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Stem height by maturity bucket, as a fraction of the tile. Bucket 0 has not broken ground yet,
+ * so it is the drill row's own sown ticks and nothing above them.
+ */
+const CROP_STEM: readonly number[] = [0, 0.1, 0.17, 0.24, 0.3, 0.33];
+
+/**
+ * One crop tile: a plot symbol standing on a drill row, and its own maturity readout.
+ *
+ * The readout is the drawing. Stems rise, then put out leaves, then set heads — five rungs of
+ * shape before any of them is inked in — and the sixth is the one the level is played on, so the
+ * sixth is not a taller version of the fifth. Ripe is *signed off*: the heads go solid ink, the
+ * drill row is re-ruled at three times the weight, an oxide rule is struck over the top of the
+ * plot in the colour this direction reserves for what the order is asking of you, and the corner
+ * of the cell carries a checked-off bracket. Four channels, only one of which is a colour.
+ */
+function drawCrop(paint: CropPaint): void {
+  const ctx = paint.ctx;
+  const t = paint.tilePx;
+  const stage = paint.stage;
+  const ripe = paint.ripe;
+  const x0 = paint.x * t;
+  const y0 = paint.y * t;
+  const inset = t * 0.16;
+  const left = x0 + inset;
+  const right = x0 + t - inset;
+  const row = y0 + t * 0.74;
+  const hair = Math.max(1, t * 0.045);
+
+  ctx.save();
+  ctx.lineJoin = 'miter';
+  ctx.lineCap = 'butt';
+
+  if (t < CROP_DETAIL_TILE_PX) {
+    drawCropFar(ctx, t, left, right, y0, row, stage, paint.stages, ripe, hair);
+    ctx.restore();
+    return;
+  }
+
+  ctx.strokeStyle = ripe ? INK : alpha(INK, 0.6);
+  ctx.lineWidth = ripe ? Math.max(1.5, t * 0.055) : hair;
+  ctx.beginPath();
+  ctx.moveTo(left, row);
+  ctx.lineTo(right, row);
+  ctx.stroke();
+
+  const pitch = (right - left) / 3;
+  const height = (CROP_STEM[stage] ?? 0) * t;
+
+  if (height <= 0) {
+    /* Sown and nothing up yet: the row is struck three times where the drill went in. */
+    ctx.strokeStyle = alpha(INK, 0.8);
+    ctx.lineWidth = hair;
+    ctx.beginPath();
+    for (let i = 0; i < 3; i++) {
+      const sx = left + pitch * (i + 0.5);
+      ctx.moveTo(sx, row - t * 0.05);
+      ctx.lineTo(sx, row + t * 0.05);
+    }
+    ctx.stroke();
+  } else {
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = Math.max(1, t * 0.045);
+    ctx.beginPath();
+    for (let i = 0; i < 3; i++) {
+      const sx = left + pitch * (i + 0.5);
+      ctx.moveTo(sx, row);
+      ctx.lineTo(sx, row - height * (i === 1 ? 1 : 0.82));
+    }
+    ctx.stroke();
+
+    if (stage >= 2) {
+      ctx.lineWidth = Math.max(1, t * 0.032);
+      ctx.beginPath();
+      for (let i = 0; i < 3; i++) {
+        if (stage < 3 && i !== 1) continue;
+        const sx = left + pitch * (i + 0.5);
+        const ly = row - height * (i === 1 ? 1 : 0.82) * 0.55;
+        ctx.moveTo(sx, ly);
+        ctx.lineTo(sx - t * 0.07, ly - t * 0.05);
+        ctx.moveTo(sx, ly);
+        ctx.lineTo(sx + t * 0.07, ly - t * 0.05);
+      }
+      ctx.stroke();
+    }
+
+    if (stage >= 4) {
+      const head = t * (ripe ? 0.11 : 0.08);
+      for (let i = 0; i < 3; i++) {
+        const sx = left + pitch * (i + 0.5);
+        const hy = row - height * (i === 1 ? 1 : 0.82) - head * 0.5;
+        if (ripe) {
+          ctx.fillStyle = INK;
+          ctx.fillRect(sx - head * 0.5, hy - head * 0.5, head, head);
+        } else {
+          ctx.fillStyle = PAPER;
+          ctx.fillRect(sx - head * 0.5, hy - head * 0.5, head, head);
+          ctx.strokeStyle = INK;
+          ctx.lineWidth = hair;
+          ctx.strokeRect(sx - head * 0.5, hy - head * 0.5, head, head);
+        }
+      }
+    }
+  }
+
+  if (ripe) {
+    const capY = y0 + t * 0.2;
+    ctx.strokeStyle = OXIDE;
+    ctx.lineWidth = Math.max(1.5, t * 0.055);
+    ctx.beginPath();
+    ctx.moveTo(left, capY);
+    ctx.lineTo(right, capY);
+    ctx.stroke();
+
+    /* The corner a signed-off sheet carries: a bracket, struck through. */
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = Math.max(1, t * 0.04);
+    ctx.beginPath();
+    ctx.moveTo(right - t * 0.16, y0 + t * 0.05);
+    ctx.lineTo(right, y0 + t * 0.05);
+    ctx.lineTo(right, y0 + t * 0.17);
+    ctx.moveTo(right - t * 0.14, y0 + t * 0.15);
+    ctx.lineTo(right + t * 0.02, y0 + t * 0.02);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+/**
+ * The far form, which is a different mark rather than the near one shrunk.
+ *
+ * At eight CSS pixels a stem is one pixel and a head is one pixel and the whole ladder is a single
+ * grey smudge, so maturity is plotted instead of grown: a bar against its track, which is how a
+ * drafting sheet states a quantity anyway. Ripe abandons the scale entirely and becomes a solid
+ * block with the sign-off corner bitten out of it — one filled area against five outlined ones is
+ * the largest difference available at this size, and it is the one w2-02 is decided by.
+ */
+function drawCropFar(
+  ctx: CanvasRenderingContext2D,
+  t: number,
+  left: number,
+  right: number,
+  y0: number,
+  row: number,
+  stage: number,
+  stages: number,
+  ripe: boolean,
+  hair: number,
+): void {
+  const capY = y0 + t * 0.26;
+  if (ripe) {
+    ctx.fillStyle = INK;
+    ctx.fillRect(left, capY, right - left, row - capY);
+    ctx.fillStyle = PAPER;
+    ctx.beginPath();
+    ctx.moveTo(right, capY);
+    ctx.lineTo(right, capY + t * 0.17);
+    ctx.lineTo(right - t * 0.17, capY);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = OXIDE;
+    ctx.lineWidth = Math.max(1.5, t * 0.07);
+    ctx.beginPath();
+    ctx.moveTo(left, row + t * 0.07);
+    ctx.lineTo(right, row + t * 0.07);
+    ctx.stroke();
+    return;
+  }
+  const barH = Math.max(2, t * 0.18);
+  const barY = row - barH;
+  ctx.strokeStyle = alpha(INK, 0.5);
+  ctx.lineWidth = hair;
+  ctx.strokeRect(left + hair * 0.5, barY + hair * 0.5, right - left - hair, barH - hair);
+  ctx.fillStyle = alpha(INK, 0.85);
+  ctx.fillRect(left, barY, ((right - left) * (stage + 1)) / stages, barH);
+}
+
+/** Half-extent of an item's tag, as a fraction of the tile. */
+const ITEM_BOX = 0.44;
+
+/**
+ * The tag every item hangs on: a rectangle with the top-left corner keyed off.
+ *
+ * The key is not decoration. It is what tells a reader that the mark inside is an *entry in a
+ * legend* rather than a thing standing on the ground, which is the distinction between an item
+ * lying in a cell and the machine symbol next to it.
+ */
+const ITEM_TAG: readonly number[] = [-0.4, -0.5, 0.62, -0.5, 0.62, 0.5, -0.62, 0.5, -0.62, -0.28];
+
+/** Loose grains, as `x, y, half` triples in the glyph's own unit frame. */
+const GRAINS: readonly number[] = [
+  -0.62, 0.4, 0.3, 0.05, -0.15, 0.4, 0.62, 0.5, 0.26, -0.2, 0.78, 0.22,
+];
+const STONE_GLYPH: readonly number[] = [
+  -0.9, 0.6, -0.55, -0.55, 0.45, -0.85, 0.95, 0.15, 0.55, 0.85,
+];
+const ORE_GLYPH: readonly number[] = [0, -0.95, 0.85, 0, 0, 0.95, -0.85, 0];
+const ICE_RULES: readonly number[] = [
+  -0.95, 0, 0.95, 0, -0.48, -0.82, 0.48, 0.82, -0.48, 0.82, 0.48, -0.82,
+];
+const SCRAP_RULES: readonly number[] = [
+  -0.9, -0.62, 0.55, -0.62, 0.55, -0.62, -0.55, 0.62, -0.55, 0.62, 0.9, 0.62,
+];
+const CRATE_RULES: readonly number[] = [-0.85, -0.72, 0.85, 0.72, 0.85, -0.72, -0.85, 0.72];
+const PART_RULES: readonly number[] = [
+  -0.62, -0.85, -0.62, 0.85, 0.62, -0.85, 0.62, 0.85, -0.62, 0, 0.62, 0,
+];
+const CHIP_LEGS: readonly number[] = [
+  -0.62, -0.38, -1, -0.38, -0.62, 0, -1, 0, -0.62, 0.38, -1, 0.38, 0.62, -0.38, 1, -0.38, 0.62, 0,
+  1, 0, 0.62, 0.38, 1, 0.38,
+];
+
+/**
+ * The eleven glyphs, keyed by what the thing *is* rather than by what colour the atlas gave it.
+ *
+ * Four of the eleven differ only by hue on the shared atlas, which is a distinction that does not
+ * exist on a sheet printed in one ink. So they are separated by construction instead: loose grains
+ * against a solid block against a lozenge with its centre cleared — the same shorthand the terrain
+ * layer already uses for regolith, rock and ore, so a player who has read the ground has already
+ * been taught this alphabet.
+ */
+function drawItemGlyph(
+  ctx: CanvasRenderingContext2D,
+  kind: string,
+  cx: number,
+  cy: number,
+  g: number,
+  weight: number,
+): void {
+  ctx.lineWidth = weight;
+  ctx.strokeStyle = INK;
+  ctx.fillStyle = INK;
+  switch (kind) {
+    case 'regolith':
+      for (let i = 0; i + 2 < GRAINS.length; i += 3) {
+        const half = (GRAINS[i + 2] as number) * g;
+        ctx.fillRect(
+          cx + (GRAINS[i] as number) * g - half,
+          cy + (GRAINS[i + 1] as number) * g - half,
+          half * 2,
+          half * 2,
+        );
+      }
+      return;
+    case 'stone':
+      symbolPath(ctx, cx, cy, g, STONE_GLYPH);
+      ctx.fill();
+      return;
+    case 'ore':
+      symbolPath(ctx, cx, cy, g, ORE_GLYPH);
+      ctx.fill();
+      ctx.fillStyle = PAPER;
+      ctx.fillRect(cx - g * 0.26, cy - g * 0.26, g * 0.52, g * 0.52);
+      return;
+    case 'ice':
+      rulePath(ctx, cx, cy, g, ICE_RULES);
+      ctx.stroke();
+      return;
+    case 'scrap':
+      rulePath(ctx, cx, cy, g, SCRAP_RULES);
+      ctx.stroke();
+      return;
+    case 'seed':
+      ctx.fillRect(cx - g * 0.3, cy - g * 0.72, g * 0.6, g * 0.6);
+      ctx.beginPath();
+      ctx.moveTo(cx, cy + g * 0.02);
+      ctx.lineTo(cx, cy + g * 0.9);
+      ctx.stroke();
+      return;
+    case 'crop':
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - g * 0.2);
+      ctx.lineTo(cx, cy + g * 0.9);
+      ctx.moveTo(cx, cy + g * 0.35);
+      ctx.lineTo(cx - g * 0.55, cy + g * 0.05);
+      ctx.moveTo(cx, cy + g * 0.35);
+      ctx.lineTo(cx + g * 0.55, cy + g * 0.05);
+      ctx.stroke();
+      ctx.fillStyle = OXIDE;
+      ctx.fillRect(cx - g * 0.36, cy - g * 0.92, g * 0.72, g * 0.72);
+      return;
+    case 'crate':
+      ctx.strokeRect(cx - g * 0.85, cy - g * 0.72, g * 1.7, g * 1.44);
+      rulePath(ctx, cx, cy, g, CRATE_RULES);
+      ctx.stroke();
+      return;
+    case 'part':
+      rulePath(ctx, cx, cy, g, PART_RULES);
+      ctx.stroke();
+      return;
+    case 'cell':
+      ctx.fillRect(cx - g * 0.24, cy - g * 0.98, g * 0.48, g * 0.26);
+      ctx.strokeRect(cx - g * 0.52, cy - g * 0.72, g * 1.04, g * 1.6);
+      ctx.fillStyle = PENCIL;
+      ctx.fillRect(cx - g * 0.32, cy - g * 0.06, g * 0.64, g * 0.78);
+      return;
+    case 'chip':
+      ctx.fillRect(cx - g * 0.6, cy - g * 0.6, g * 1.2, g * 1.2);
+      rulePath(ctx, cx, cy, g, CHIP_LEGS);
+      ctx.stroke();
+      return;
+    default:
+      /* An item kind the legend has not been drawn for: an empty tag, struck, so it is obvious. */
+      ctx.strokeRect(cx - g * 0.7, cy - g * 0.7, g * 1.4, g * 1.4);
+      ctx.beginPath();
+      ctx.moveTo(cx - g * 0.7, cy + g * 0.7);
+      ctx.lineTo(cx + g * 0.7, cy - g * 0.7);
+      ctx.stroke();
+      return;
+  }
+}
+
+/**
+ * One ground stack, as a keyed tag lying on the sheet.
+ *
+ * It owns the whole mark, which on the default path is a soft radial shadow, a bob and a numbered
+ * pip. There is no shadow here because there is no light here — the lift is the out-of-register
+ * second impression the bot and the machines already use — and the count is set in type where
+ * there is room for type and as a corner rule where there is not, rather than as a numeral that
+ * degrades into two grey pixels and says nothing at all.
+ */
+function drawItem(paint: ItemPaint): void {
+  const ctx = paint.ctx;
+  const t = paint.tilePx;
+  const x0 = paint.x * t;
+  const y0 = paint.y * t;
+  const cx = x0 + t * 0.5;
+  /* Phased per cell rather than globally, so a row of stacks is a scatter and not a wave. */
+  const bob = paint.reduced
+    ? 0
+    : Math.sin(paint.time * 2.2 + paint.x * 1.7 + paint.y * 2.9) * t * 0.018;
+  const cy = y0 + t * 0.5 + bob;
+  const detail = t >= ITEM_DETAIL_TILE_PX;
+  const r = t * ITEM_BOX;
+  const weight = Math.max(1, t * 0.04);
+
+  ctx.save();
+  ctx.lineJoin = 'miter';
+  ctx.lineCap = 'butt';
+
+  if (detail) {
+    const off = (REGISTER * t) / BOT_FRAME;
+    symbolPath(ctx, cx + off, cy + off, r, ITEM_TAG);
+    ctx.fillStyle = alpha(INK, 0.16);
+    ctx.fill();
+    symbolPath(ctx, cx, cy, r, ITEM_TAG);
+    ctx.fillStyle = PAPER;
+    ctx.fill();
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = weight;
+    ctx.stroke();
+    /* The punch the tag would hang by. It is also what keeps the tag from reading as a crate. */
+    ctx.fillStyle = alpha(INK, 0.7);
+    ctx.fillRect(cx - r * 0.5, cy - r * 0.36, r * 0.12, r * 0.12);
+  }
+
+  drawItemGlyph(ctx, paint.kind, cx, cy, detail ? t * 0.15 : t * 0.24, weight);
+
+  if (paint.count > 1) {
+    if (t >= COUNT_MIN_TILE_PX) {
+      const px = Math.max(8, Math.round(t * 0.26));
+      const label = numeral(paint.count);
+      ctx.font = labelFontAt(px);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const w = ctx.measureText(label).width + px * 0.55;
+      const h = px * 1.15;
+      const bx = x0 + t - w * 0.85;
+      const by = y0 + t - h * 0.95;
+      ctx.fillStyle = PAPER;
+      ctx.fillRect(bx, by, w, h);
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = weight;
+      ctx.strokeRect(bx, by, w, h);
+      ctx.fillStyle = INK;
+      ctx.fillText(label, bx + w * 0.5, by + h * 0.5);
+    } else {
+      /* More than one, said as a stack of rules in the corner: countable to three, then just many. */
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = Math.max(1, t * 0.06);
+      ctx.beginPath();
+      const n = Math.min(3, paint.count - 1);
+      for (let i = 0; i < n; i++) {
+        const y = y0 + t * 0.9 - i * t * 0.13;
+        ctx.moveTo(x0 + t * 0.62, y);
+        ctx.lineTo(x0 + t * 0.92, y);
+      }
+      ctx.stroke();
+    }
+  }
+
+  ctx.restore();
+}
+
 export const survey: ArtDirection = {
   id: 'survey',
   label: 'Survey',
@@ -1296,6 +1965,9 @@ export const survey: ArtDirection = {
 
   paintTerrain,
   drawBot,
+  drawMachine,
+  drawCrop,
+  drawItem,
   backdrop,
   post,
 };
