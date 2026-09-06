@@ -161,8 +161,8 @@ export function meterFor(objective: ObjectiveReading, source: BudgetSource): Met
  * The match has to be made against `history` — the objective's progress sampled through the run —
  * and not against the final figure alone, because a clamped budget reads `limit / limit` from the
  * moment it is overrun and at that point every large number in the run reproduces it. Sampled
- * before the clamp bit, only the real meter tracks it: `w8-04` allows four steps off-plan, and at
- * the tick the bot had taken two of them the clock said thirty, which rules the clock out. A
+ * before the clamp bit, only the real meter tracks it: a budget of four allows two spent halfway
+ * through, and at the tick the meter read two the clock said thirty, which rules the clock out. A
  * budget that never got below its limit, or whose meter is genuinely ambiguous, is left
  * unattributed and shows the clamped figure — an unlabelled number beats a confident wrong one.
  */

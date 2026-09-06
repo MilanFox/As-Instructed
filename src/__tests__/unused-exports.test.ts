@@ -96,7 +96,6 @@ const KNOWN_DEAD: readonly string[] = [
   'src/levels/world-8/shared.ts followPath',
   'src/levels/world-8/shared.ts moveCount',
   'src/levels/world-8/shared.ts pickupLog',
-  'src/levels/world-8/shared.ts worldDistance',
 
   // --- Reference-solution helpers no reference solution calls. ---
   'src/levels/world-3/__solutions__/driver.ts nearestNeighbourTour',
@@ -143,7 +142,7 @@ const KNOWN_DEAD: readonly string[] = [
 ];
 
 /** Exports whose only readers are tests, split as `[every file, files outside `__tests__`]`. */
-const KNOWN_TEST_ONLY: readonly [number, number] = [67, 32];
+const KNOWN_TEST_ONLY: readonly [number, number] = [69, 32];
 
 /** A floor under the scan itself: a regex that quietly stops matching passes every set test. */
 const SCANNED_EXPORTS_AT_LEAST = 1500;
