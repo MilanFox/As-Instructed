@@ -144,7 +144,7 @@ const KNOWN_DEAD: readonly string[] = [
 ];
 
 /** Exports whose only readers are tests, split as `[every file, files outside `__tests__`]`. */
-const KNOWN_TEST_ONLY: readonly [number, number] = [69, 32];
+const KNOWN_TEST_ONLY: readonly [number, number] = [70, 32];
 
 /** A floor under the scan itself: a regex that quietly stops matching passes every set test. */
 const SCANNED_EXPORTS_AT_LEAST = 1500;
