@@ -45,9 +45,19 @@ export class RuntimeRunner implements RunnerPort {
     void this.ready();
   }
 
-  /** Monaco, loaded and configured for the current work order. */
+  /**
+   * Monaco, loaded and configured for the current work order.
+   *
+   * "Loaded" includes its TypeScript language service, which Monaco installs lazily and which
+   * every caller here needs: the transpile, the library compile and the metagame all reach for it
+   * the moment this resolves. `typescriptRegistered` is what makes that true rather than likely.
+   */
   async ready(): Promise<MonacoApi> {
-    this.loading ??= import('./monaco-setup.ts').then((module) => module.setupMonaco());
+    this.loading ??= import('./monaco-setup.ts').then(async (module) => {
+      const monaco = module.setupMonaco();
+      await module.typescriptRegistered();
+      return monaco;
+    });
     const monaco = await this.loading;
     if (this.levelId && this.configuredFor !== this.levelId) {
       configurePlayerLanguage(monaco, { levelId: this.levelId });

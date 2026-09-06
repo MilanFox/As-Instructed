@@ -75,6 +75,13 @@ function progressOf(save: SaveFile, levelId: string): LevelProgress {
   return save.levels[levelId] ?? emptyProgress();
 }
 
+/** DESIGN.md §7: gold at par, silver inside `SILVER_FACTOR`, bronze for finishing at all. */
+const MEDAL_KEY = [
+  { medal: 'gold', rule: 'at par or under' },
+  { medal: 'silver', rule: 'up to a quarter over par' },
+  { medal: 'bronze', rule: 'a pass' },
+] as const;
+
 function medalWord(medal: Medal): string {
   return medal === Medal.None ? 'no medal' : `${medal} medal`;
 }
@@ -315,6 +322,27 @@ export function LevelSelect(): JSX.Element {
             <dd>{commendations}</dd>
           </div>
         </dl>
+
+        {/*
+          The key to the discs.
+          Every medal in the game is drawn as a ring on a node and named nowhere, so the three
+          words the whole scoring ladder runs on were on the screen forty times over and defined
+          zero times. The samples are real nodes with the real modifier classes, so whichever art
+          direction is loaded, the key is drawn in the same marks the board is.
+        */}
+        <ul className="medal-key" aria-label="Medal key">
+          {MEDAL_KEY.map((entry) => (
+            <li className="medal-key__row" key={entry.medal}>
+              <span className="medal-key__sample" aria-hidden="true">
+                <span className={`node node--${entry.medal}`}>
+                  <span className="node__disc" />
+                </span>
+              </span>
+              <span className="medal-key__word">{entry.medal}</span>
+              <span className="medal-key__rule">{entry.rule}</span>
+            </li>
+          ))}
+        </ul>
 
         <div className="sitemap__progress">
           <div className="campaign-bar" style={campaignStyle}>

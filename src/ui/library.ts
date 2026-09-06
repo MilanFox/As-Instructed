@@ -176,25 +176,18 @@ export function mountLibrary(runner: RuntimeRunner): () => void {
     if (state.save.source !== previous.save.source) void installTypes();
 
     /*
-     * Two commendations the campaign cannot see for itself.
+     * The one commendation the campaign cannot see for itself.
      *
-     * Publishing the first shared subroutine and getting a whole regression pass back clean are
-     * both real moments, and both happen entirely inside `src/meta`. They are recognised here
-     * rather than there, because the metagame does not know the campaign exists and should not
-     * start now.
+     * Publishing the first shared subroutine is a real moment and it happens entirely inside
+     * `src/meta`. It is recognised here rather than there, because the metagame does not know the
+     * campaign exists and should not start now.
+     *
+     * A clean regression pass used to be recognised beside it and no longer is (DESIGN.md §11 A9):
+     * refactoring is supposed to break things so you find out, and paying for the run that broke
+     * nothing prices the wrong half of it.
      */
     if (state.save.published.length > previous.save.published.length) {
       useGame.getState().award('repository');
-    }
-    const summary = state.suite?.summary;
-    if (
-      summary &&
-      state.suite !== previous.suite &&
-      summary.total > 0 &&
-      summary.broken === 0 &&
-      !state.suite?.run.cancelled
-    ) {
-      useGame.getState().award('no-regressions');
     }
   });
 

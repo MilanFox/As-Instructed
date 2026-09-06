@@ -105,8 +105,20 @@ export function ObjectiveRail(): React.JSX.Element {
   const total = rows.filter((row) => !row.bonus).length;
 
   const graded = isGraded(level);
-  const gradesTicks = level.objectives.some((objective) => TICK_OBJECTIVE.test(objective.label));
+  const gradesTicks = level.objectives.some(
+    (objective) => objective.meter?.kind === 'ticks' || TICK_OBJECTIVE.test(objective.label),
+  );
   const hardStop = gradesTicks ? undefined : level.budget?.maxTicks;
+  /*
+   * Two tick numbers, two words for them (docs/FIX-INCENTIVES.md §H).
+   *
+   * `w8-01` asks for 215 and pars at 165, and until this line both were called ticks — so the one
+   * that ends the work order and the one that moves the medal were indistinguishable. The
+   * objective keeps the number, because a limit is something the level asked for; `targets` keeps
+   * par, because a medal is something the site awards. The note is only drawn where both are on
+   * the screen at once, which is the only place the confusion exists.
+   */
+  const hasTickLimit = gradesTicks || level.budget?.maxTicks !== undefined;
 
   return (
     <section className="hud-card rail" aria-label="Objectives and targets">
@@ -153,7 +165,7 @@ export function ObjectiveRail(): React.JSX.Element {
           the lesson A7 exists to stop teaching.
         */}
         <div className="par-row">
-          <span className="par-row__label">ticks</span>
+          <span className="par-row__label">{graded ? 'par' : 'ticks'}</span>
           {graded ? (
             <span
               className={
@@ -181,6 +193,9 @@ export function ObjectiveRail(): React.JSX.Element {
               {hardStop}
             </span>
           </div>
+        ) : null}
+        {graded && hasTickLimit ? (
+          <p className="par-note">par sets the medal. the limit ends the work order.</p>
         ) : null}
         <div className="par-row">
           <span className="par-row__label">seeds</span>
@@ -232,6 +247,9 @@ function ObjectiveItem({ row }: { row: ObjectiveRow }): React.JSX.Element {
         {over ? '!' : row.met && !budget ? '✓' : row.active ? '▸' : ''}
       </span>
       <span className="objective__label">{row.label}</span>
+      {!row.bonus && budget?.meter?.kind === 'ticks' ? (
+        <span className="objective__gate">limit</span>
+      ) : null}
       {budget ? (
         <span className={`objective__progress${over ? ' objective__progress--over' : ''}`}>
           {budgetReadout(budget)}

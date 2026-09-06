@@ -561,8 +561,60 @@
   color: var(--gold);
 }
 
-.sitemap .screen-stat__streak {
-  color: var(--accent-2);
+/*
+ * The key sits with the medal tallies it explains, and reuses `.node` so it is drawn by whatever
+ * the loaded direction does to a disc — a ring, a fill, a dotted edge. Scaled down here rather
+ * than given marks of its own, because a legend drawn differently from the thing it keys is not a
+ * legend.
+ */
+.medal-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.medal-key__row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.medal-key__sample {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+}
+
+/*
+ * Scaled, not resized. Each direction sets the disc's own geometry — Signal's is a 46px square
+ * where the shipped look draws a 44px circle — so a legend that hardcoded a size would be drawn
+ * in marks the board does not use, under whichever direction the user picks. A transform shrinks
+ * whatever is there, and the overflowing layout box is what keeps the row 22px tall.
+ */
+.medal-key__sample .node {
+  flex: none;
+  background: none;
+  cursor: default;
+  transform: scale(0.34);
+}
+
+.medal-key__word {
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.medal-key__rule {
+  color: var(--ink-dim);
+  font-size: 11px;
 }
 
 .sitemap .screen-stat__best {
@@ -620,11 +672,6 @@
   font-family: var(--font-mono);
   font-size: 13px;
   letter-spacing: 0.22em;
-}
-
-.shelf__count {
-  color: var(--gold);
-  font-size: 13px;
 }
 
 .shelf__aside {

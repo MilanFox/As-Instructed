@@ -60,6 +60,17 @@ export function personalBestLine(previous: number, now: number): string {
   return `Your own record, lowered by ${previous - now}. The old figure has been retained.`;
 }
 
+/**
+ * What the Repository did on this run, as a fact rather than as a score.
+ *
+ * `LibraryUsage` is measured on every run that links `lib.ts` and was thrown away unread. Nothing
+ * here adds a point to anything, which is the point: the veteran playtester used the Repository
+ * heavily for no extrinsic reward at all, and the honest number was already being computed.
+ */
+export function libraryUsageLine(routines: number, ticks: number): string {
+  const called = `${routines} routine${routines === 1 ? '' : 's'} from the Repository`;
+  return `${called}, ${ticks} tick${ticks === 1 ? '' : 's'} inside ${routines === 1 ? 'it' : 'them'}.`;
+}
 
 /**
  * A failed run costs the player nothing but the time it took, and the report says so in as many
