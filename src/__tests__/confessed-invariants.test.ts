@@ -32,8 +32,11 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
+import { DEFAULT_LAYOUT } from '../game/save.ts';
 import { REVIEW_TIERS } from '../game/score.ts';
+import { Camera } from '../render/camera.ts';
 import { DIRECTIONS } from '../render/theme.ts';
+import { effectiveLayout } from '../ui/hooks/useWorkspaceLayout.ts';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const SRC = join(ROOT, 'src');
@@ -85,11 +88,6 @@ const REGISTRY: readonly Confession[] = [
     file: 'src/game/ports.ts',
     says: 'Mirrors `CelebrationKind` in `src/render/renderer.ts`',
     guard: 'CelebrationKind is spelled the same on both sides of the port',
-  },
-  {
-    file: 'src/ui/hooks/useWorkspaceLayout.ts',
-    says: "Mirrors `.hud-card`'s width in app.css",
-    guard: 'the workspace default geometry matches the stylesheet it is derived from',
   },
   {
     file: 'src/engine/verdict.ts',
@@ -447,26 +445,113 @@ test('CelebrationKind is spelled the same on both sides of the port', () => {
 });
 
 /**
- * The workspace's first-load default is computed from the viewport, and one piece of the chrome it
- * reserves room for is sized in CSS.
+ * The objective read-out against the board it floats over.
  *
- * The pair this guard was written against — `TIMELINE_H` against `--timeline-h`, `SPLITTER_PX`
- * against `.splitter--horizontal` — no longer exists. The board is now the full height of the
- * workspace and the timeline floats over it, so the hook subtracts no chrome height at all and
- * both constants are gone from it. What survived the restructure is the other half of the same
- * shape: `HUD_GUTTER` is the width the derivation holds back on each side of the board so the
- * objective read-out and the panel chips land on background, and the card that has to fit in it is
- * sized in `app.css`. Widen `.hud-card` alone and the read-out goes back over the grid, which is
- * the defect the float was introduced to avoid. Blast radius is still cosmetic and still first-load
- * only — once a save exists the splitter wins — and it still costs one regex.
+ * This guard used to compare `HUD_GUTTER` against `.hud-card`'s width in `app.css` and say, in so
+ * many words, that widening the card alone would put the read-out back over the grid. Both numbers
+ * were 232, the guard was green, and the read-out was over the grid on `w1-01` — the game's first
+ * work order — at the default split on a 1920px window. `docs/FIX-HUD-OVERLAP.md` has the numbers.
+ *
+ * The equality was never the mechanism. What put the card on the grid was the *reservation being a
+ * preference*: it was discarded whenever `RIG_MIN` bound or the player dragged the splitter, and it
+ * said nothing about where the camera actually drew the grid inside the space that was left. Two
+ * rectangles, four independent variables, and a scalar comparison could not see any of them.
+ *
+ * So this asserts the property instead. Every workspace size, every grid shape the campaign ships
+ * and every splitter position the player can reach, fitted with the real `Camera` — the zoom
+ * ladder, the fit padding and the step-back-up rung all count — and the card's right edge is never
+ * allowed past the grid's left edge. It is stated horizontally on purpose: how *tall* the card is
+ * depends on how many objectives a level has and how their labels wrap, which is the variable that
+ * made the bug read as "sometimes", and a guarantee that does not depend on it is a better one.
  */
-test('the workspace default geometry matches the stylesheet it is derived from', () => {
-  const hook = read('src/ui/hooks/useWorkspaceLayout.ts');
-  const css = read('src/ui/styles/app.css');
-  const constant = (name: string): string | undefined =>
-    new RegExp(`const ${name} = (\\d+)`).exec(hook)?.[1];
+/** Grid shapes at the extremes the campaign ships: a corridor, a slab, a square, a small room. */
+const GRID_SHAPES: readonly (readonly [number, number])[] = [
+  [30, 3],
+  [22, 5],
+  [25, 14],
+  [14, 8],
+  [5, 4],
+  [30, 24],
+  [48, 40],
+  [40, 40],
+];
 
-  const carded = /\.hud-card\s*\{[^}]*\bwidth:\s*(\d+)px/.exec(css)?.[1];
-  expect(['.hud-card width', carded]).toEqual(['.hud-card width', expect.any(String)]);
-  expect(['HUD_GUTTER', constant('HUD_GUTTER')]).toEqual(['HUD_GUTTER', carded]);
+/** Workspace boxes: window width, and window height less the top bar. */
+const WORKSPACE_BOXES: readonly { width: number; height: number }[] = [
+  { width: 1024, height: 600 },
+  { width: 1280, height: 674 },
+  { width: 1440, height: 854 },
+  { width: 1680, height: 734 },
+  { width: 1920, height: 726 },
+  { width: 2560, height: 1394 },
+];
+
+/** Every splitter position the player can reach, plus the untouched default. */
+const SPLITS = [DEFAULT_LAYOUT.editorFraction, 0.2, 0.3, 0.5, 0.58, 0.68];
+
+test('the objective read-out is never over the drawn grid', () => {
+  const failures: string[] = [];
+  for (const box of WORKSPACE_BOXES) {
+    for (const [cols, rows] of GRID_SHAPES) {
+      for (const editorFraction of SPLITS) {
+        for (const railOpen of [true, false]) {
+          const layout = effectiveLayout(
+            { ...DEFAULT_LAYOUT, editorFraction },
+            box,
+            cols / rows,
+            railOpen,
+          );
+          const rig = box.width * layout.editorFraction;
+          const canvasLeft = rig + layout.gutter;
+          const camera = new Camera();
+          camera.setViewport(Math.max(1, box.width - canvasLeft), box.height, 1);
+          camera.setBounds({ cols, rows });
+          camera.fit();
+          const gridLeft = canvasLeft + camera.originX();
+          const cardRight = rig + layout.cardInset + layout.cardWidth;
+          if (cardRight > gridLeft) {
+            failures.push(
+              `${cols}x${rows} at ${box.width}x${box.height} split ${editorFraction} ` +
+                `rail ${railOpen ? 'open' : 'shut'}: card ends at ${Math.round(cardRight)}, ` +
+                `grid starts at ${Math.round(gridLeft)}`,
+            );
+          }
+        }
+      }
+    }
+  }
+  expect(failures).toEqual([]);
+});
+
+/**
+ * The other half: the stylesheet has to take the strip and the card from the layout rather than
+ * from literals of its own. The geometry above is arithmetic on `WorkspaceLayout`, and it proves
+ * nothing at all if `app.css` goes back to writing `232px` next to a canvas that fills its box.
+ */
+test('the stylesheet takes the strip and the card from the layout', () => {
+  const css = read('src/ui/styles/app.css');
+  const rule = (selector: string): string =>
+    new RegExp(`\\${selector}\\s*\\{[^}]*\\}`).exec(css)?.[0] ?? '';
+
+  const canvas = rule('.viewport__canvas');
+  expect(['canvas inset', /margin-left:\s*var\(--hud-gutter/.test(canvas)]).toEqual([
+    'canvas inset',
+    true,
+  ]);
+  expect(['canvas width', /width:\s*calc\(100% - var\(--hud-gutter/.test(canvas)]).toEqual([
+    'canvas width',
+    true,
+  ]);
+
+  const card = rule('.hud-card');
+  expect(['card width', /width:\s*var\(--hud-card-w/.test(card)]).toEqual(['card width', true]);
+  expect(['card offset', /left:\s*calc\([^;]*var\(--hud-card-inset/.test(card)]).toEqual([
+    'card offset',
+    true,
+  ]);
+
+  const workspace = read('src/ui/Workspace.tsx');
+  for (const property of ['--hud-gutter', '--hud-card-w', '--hud-card-inset']) {
+    expect([property, workspace.includes(property)]).toEqual([property, true]);
+  }
 });

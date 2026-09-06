@@ -7,6 +7,7 @@ import { isGraded } from '../../game/score.ts';
 import { currentLevel, levelUsesFuel, useGame } from '../../game/store.ts';
 import { BudgetBar } from '../components/BudgetBar.tsx';
 import { FuelGauge } from '../components/FuelGauge.tsx';
+import { setRailOpen, useRail } from '../hooks/useRail.ts';
 
 const TICK_OBJECTIVE = /\bticks?\b/i;
 
@@ -31,6 +32,7 @@ export function ObjectiveRail(): React.JSX.Element {
   const verdict = useGame((state) => state.verdict);
   const trace = useGame((state) => state.trace);
   const tick = useGame((state) => state.tick);
+  const open = useRail();
 
   const flooredTick = Math.floor(tick);
   const playback = useMemo(() => playbackFor(level, trace), [level, trace]);
@@ -104,11 +106,13 @@ export function ObjectiveRail(): React.JSX.Element {
     return bot ? { fuel: bot.fuel, max: bot.fuelMax } : null;
   }, [showFuel, trace, flooredTick]);
 
-  if (!level) return <div className="hud-card rail" />;
+  if (!level) return open ? <div className="hud-card rail" /> : <RailTab met={0} total={0} />;
 
   const ticks = verdict?.stats.ticks;
   const met = rows.filter((row) => !row.bonus && row.met).length;
   const total = rows.filter((row) => !row.bonus).length;
+
+  if (!open) return <RailTab met={met} total={total} />;
 
   const graded = isGraded(level);
   const gradesTicks = level.objectives.some(
@@ -139,6 +143,16 @@ export function ObjectiveRail(): React.JSX.Element {
           {met}
           <span className="hud-card__of">/{total}</span>
         </span>
+        <button
+          type="button"
+          className="hud-card__fold"
+          aria-expanded={true}
+          aria-label="Fold the objectives away"
+          title="Fold away (O) — the board takes the width"
+          onClick={() => setRailOpen(false)}
+        >
+          <span aria-hidden="true">‹</span>
+        </button>
       </header>
 
       <div className="rail__section">
@@ -224,6 +238,31 @@ export function ObjectiveRail(): React.JSX.Element {
         </div>
       ) : null}
     </section>
+  );
+}
+
+/**
+ * The folded read-out: the count, and the way back to the rest of it.
+ *
+ * It keeps the score visible, because "3/5" is the one thing on the card worth reading from across
+ * the room and losing it would make folding a real cost rather than a trade. It sits in the strip
+ * the layout still holds back, so pressing it never means hunting for a control over the grid.
+ */
+function RailTab({ met, total }: { met: number; total: number }): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      className="rail-tab"
+      aria-expanded={false}
+      aria-label={`Objectives, ${met} of ${total} met — unfold`}
+      title="Unfold the objectives (O)"
+      onClick={() => setRailOpen(true)}
+    >
+      <span className="rail-tab__count numeric" aria-hidden="true">
+        {met}/{total}
+      </span>
+      <span aria-hidden="true">objectives</span>
+    </button>
   );
 }
 
