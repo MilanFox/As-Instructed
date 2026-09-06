@@ -17,7 +17,7 @@ import {
   importsLibrary,
 } from '../runtime/index.ts';
 import { Renderer } from '../render/index.ts';
-import type { Trace, Vec } from '../engine/index.ts';
+import type { Trace, Vec, World } from '../engine/index.ts';
 import { LIBRARY_FAILURE, prepareLibrary, useLibrary } from '../meta/index.ts';
 import type { CelebrationKind, RendererPort, RunSubmission, RunnerPort } from '../game/ports.ts';
 
@@ -135,6 +135,18 @@ export class CanvasRenderer implements RendererPort {
 
   setTrace(trace: Trace | null): void {
     this.renderer.setTrace(trace);
+  }
+
+  /**
+   * The level's board before anything has run. A trace outranks it; `null` clears it.
+   *
+   * Deliberately not on `RendererPort`. The port is shared with `FakeRenderer`, which exists so
+   * the store can be tested without a canvas, and a preview is a purely visual concern that the
+   * fake would only ever no-op. The one caller narrows structurally instead, which keeps the
+   * headless path from growing a method that means nothing to it.
+   */
+  setPreview(world: World | null): void {
+    this.renderer.setPreview(world);
   }
 
   setWorld(world: number): void {

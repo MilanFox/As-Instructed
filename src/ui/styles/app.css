@@ -7,6 +7,7 @@
 :root {
   --topbar-h: 46px;
   --panel-head-h: 30px;
+  /* The transport is content-height now; this is its floor, and the art directions still set it. */
   --timeline-h: 46px;
 }
 
@@ -242,33 +243,45 @@
   color: var(--accent);
 }
 
-/* -------------------------------------------------------------- workspace */
+/* -------------------------------------------------------------- workspace
+ *
+ * The site is the screen. `.viewport` is the whole workspace less the program rig, with nothing
+ * framing it on the other three sides, and every other thing here is positioned over the top of
+ * it. `--rig-w` is set inline from the saved split and is the one number the two agree on: the
+ * rig's width, and the canvas's left edge. Nothing is inset from the board's edge, so the seam
+ * between the CSS surface and the drawn one is always under the rig and never in open board.
+ */
 
 .workspace {
-  display: flex;
+  position: relative;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 
-.workspace__column {
+/*
+ * The equipment the program is bolted to: the editor slab and the transport under it.
+ *
+ * Solid, not translucent. The board behind it is terrain now — on one direction it is a pale
+ * paper sheet — and code read against texture is the one trade this layout will not make.
+ */
+.rig {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
   display: flex;
   flex-direction: column;
+  gap: var(--space-2);
+  width: var(--rig-w, 40%);
   min-width: 0;
-  min-height: 0;
+  padding: var(--space-2);
+  background: var(--bg-void);
 }
 
-.workspace__editor {
-  position: relative;
-  flex: none;
-}
-
-.workspace__right {
+.rig > .panel {
   flex: 1;
-}
-
-.workspace__lower {
-  display: flex;
-  flex: none;
   min-height: 0;
 }
 
@@ -321,6 +334,19 @@
   transition: background 120ms ease;
 }
 
+/* The seam between the rig and the board, sat on the boundary rather than cut out of either. */
+.workspace > .splitter--vertical {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--rig-w, 40%);
+  z-index: 3;
+  width: 7px;
+  margin-left: -3px;
+  background: transparent;
+  cursor: col-resize;
+}
+
 .splitter--vertical {
   width: 5px;
   cursor: col-resize;
@@ -340,10 +366,12 @@
 /* --------------------------------------------------------------- viewport */
 
 .viewport {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  background: radial-gradient(120% 90% at 50% 0%, #0e141c 0%, var(--bg-void) 70%);
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: var(--rig-w, 40%);
+  background: var(--bg-void);
 }
 
 .viewport__canvas {
@@ -352,34 +380,45 @@
   height: 100%;
 }
 
+/*
+ * A margin note, in the corner the seed badge takes over once there is a trace to stamp.
+ *
+ * It used to be a centred block, which was the right shape for an empty board and is the wrong
+ * one for a drawn board: the level is on screen from the moment the work order opens, and the
+ * middle of it is the last place to put a paragraph saying nothing has run yet.
+ */
 .viewport__empty {
   position: absolute;
-  inset: 0;
+  bottom: var(--space-3);
+  left: var(--space-3);
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  align-items: center;
-  justify-content: center;
+  gap: 2px;
+  max-width: 32ch;
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid var(--border-strong);
+  background: color-mix(in srgb, var(--bg-panel) 88%, transparent);
   color: var(--ink-dim);
-  text-align: center;
   pointer-events: none;
 }
 
 .viewport__empty-title {
+  color: var(--ink);
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 11px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
 }
 
 .viewport__empty-note {
-  max-width: 34ch;
-  font-size: 12px;
+  font-size: 11px;
+  line-height: 1.4;
 }
 
+/* Stacked over the working-on line: seed and tick belong with what the run is doing, not apart. */
 .viewport__badge {
   position: absolute;
-  top: var(--space-3);
+  bottom: 44px;
   left: var(--space-3);
   display: flex;
   gap: var(--space-2);
@@ -397,15 +436,30 @@
 
 /* --------------------------------------------------------------- timeline */
 
+/*
+ * The transport, as a control rather than as a bar.
+ *
+ * It sits at the foot of the rig instead of spanning the workspace: the board is behind it either
+ * way, and a full-width rule under the picture is the single most website-shaped thing the old
+ * layout had. The track gets its own row because a 300-tick trace scrubbed through what is left
+ * beside five buttons and a speed menu is not a control.
+ */
 .timeline {
   display: flex;
   flex: none;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-height: var(--timeline-h);
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+}
+
+.timeline__row {
+  display: flex;
   gap: var(--space-3);
   align-items: center;
-  height: var(--timeline-h);
-  padding: 0 var(--space-3);
-  border-top: 1px solid var(--border);
-  background: var(--bg-panel);
 }
 
 .timeline__transport {
@@ -422,10 +476,10 @@
  */
 .viewport__now {
   position: absolute;
-  right: var(--space-3);
   bottom: var(--space-3);
   left: var(--space-3);
   display: flex;
+  max-width: 46ch;
   gap: var(--space-2);
   align-items: baseline;
   padding: 3px var(--space-2);
@@ -466,8 +520,7 @@
  */
 .timeline__track {
   position: relative;
-  flex: 1;
-  min-width: 80px;
+  width: 100%;
   height: 20px;
 }
 
@@ -752,10 +805,9 @@
 
 /* -------------------------------------------------------------- objective */
 
-.rail {
-  flex: none;
-  width: 268px;
-  overflow-y: auto;
+/* Sizing lives on `.hud-card`; what is left here is the rail's own rhythm. */
+.rail__section:first-of-type {
+  padding-top: var(--space-2);
 }
 
 .rail__section {
@@ -1374,6 +1426,206 @@
   letter-spacing: 0.08em;
 }
 
+/* --------------------------------------------------------------- the HUD
+ *
+ * Everything in this block floats over the board. Two rules run through all of it.
+ *
+ * One: backing before beauty. A read-out over terrain — and on one art direction the terrain is a
+ * pale paper sheet — is legible because it is opaque, not because it is tinted. Nothing here goes
+ * below 88%, and the sheet, which carries prose and code samples, is solid.
+ *
+ * Two: nothing sits in the middle. `useWorkspaceLayout` reserves a gutter on each side of the
+ * board wide enough for these, so the objective read-out and the chips are over background rather
+ * than over grid at every size the reservation survives.
+ */
+
+.hud-card {
+  position: absolute;
+  top: var(--space-3);
+  left: calc(var(--rig-w, 40%) + var(--space-3));
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  width: 232px;
+  max-height: calc(100% - var(--space-6) - 44px);
+  overflow-y: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--bg-panel) 94%, transparent);
+}
+
+.hud-card__head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-raised);
+}
+
+.hud-card__label {
+  color: var(--ink-dim);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* The one number on the board worth reading from across the room. */
+.hud-card__count {
+  color: var(--ink);
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.hud-card__of {
+  color: var(--ink-dim);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/* ------------------------------------------------------------- HUD chips */
+
+.hud-tools {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-3);
+  z-index: 4;
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.hud-chips {
+  display: flex;
+  gap: var(--space-1);
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--bg-panel) 92%, transparent);
+}
+
+.hud-chip {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  height: 24px;
+  padding: 0 var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ink-dim);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.hud-chip:hover {
+  border-color: var(--border-strong);
+  color: var(--ink);
+}
+
+.hud-chip--on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.hud-chip__key {
+  color: var(--ink-dim);
+  font-size: 9px;
+  opacity: 0.75;
+}
+
+.hud-chip__count {
+  color: var(--ink);
+  font-size: 10px;
+}
+
+/* ----------------------------------------------------------------- sheet */
+
+/*
+ * The brief, the console and the reference, one at a time, slid over the board.
+ *
+ * Not a modal: the run keeps playing behind it and the player is meant to read the two against
+ * each other, so there is no scrim and no focus trap. It is solid rather than tinted for the same
+ * reason the rig is — it carries prose, signatures and code blocks.
+ */
+.sheet {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  width: min(560px, calc(100% - var(--rig-w, 40%) - var(--space-6)));
+  height: calc(100% - var(--space-3) - 52px);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  box-shadow: -18px 0 44px rgb(0 0 0 / 42%);
+  animation: sheet-in 140ms ease-out;
+}
+
+/*
+ * The work order is a card laid on the site, not a column beside it.
+ *
+ * It is the frame the game is most likely to be looked at in — first entry, nothing run yet — and
+ * the board has to be the thing in it. So the brief is the narrowest of the three and the only
+ * one that stops short of the bottom: board above it, below it, and all the way down the left.
+ */
+.sheet--brief {
+  width: min(468px, calc(100% - var(--rig-w, 40%) - var(--space-6)));
+  height: auto;
+  max-height: min(600px, calc(100% - var(--space-3) - 52px));
+}
+
+/* The reference is set to 78ch and reads as a manual; it gets the width to do it. */
+.sheet--docs {
+  width: min(628px, calc(100% - var(--rig-w, 40%) - var(--space-6)));
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateX(12px);
+    opacity: 0;
+  }
+}
+
+.sheet__head {
+  display: flex;
+  flex: none;
+  gap: var(--space-3);
+  align-items: center;
+  height: 34px;
+  padding: 0 var(--space-2) 0 var(--space-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-raised);
+}
+
+.sheet__title {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.sheet__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
 /* -------------------------------------------------------------- utilities */
 
 .screen {
@@ -1441,24 +1693,6 @@
     border-right-color: currentcolor;
     opacity: 0.5;
   }
-}
-
-/*
- * `.rail` is excluded on purpose. It carries `.panel` too, so it was being handed `flex: 1` here
- * and taking half the lower panel — a 268px list of short rows sitting in a 400px column, with
- * the brief paying for it. Its own `width: 268px` up in the objective block is the intent.
- */
-.workspace__column > .panel,
-.workspace__lower > .panel:not(.rail) {
-  flex: 1;
-  min-height: 0;
-}
-
-.panel__body--flush {
-  display: flex;
-  flex-direction: column;
-  padding: 0;
-  overflow: hidden;
 }
 
 .console {
@@ -1553,49 +1787,23 @@
   letter-spacing: 0.12em;
 }
 
-/* ------------------------------------------------------------- status bar */
+/* --------------------------------------------------- the Repository's line
+ *
+ * There is no status bar along the bottom of the app any more — the workspace is the board, edge
+ * to edge. The Repository's toggle is a chip like the other three and its line reads beside them.
+ */
 
-.statusbar {
-  display: flex;
-  flex: none;
-  gap: var(--space-3);
-  align-items: center;
-  height: 24px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--border);
-  border-top: none;
-  background: var(--bg-panel);
+.statusbar__status {
+  overflow: hidden;
+  max-width: 26ch;
+  padding: 0 var(--space-2);
   color: var(--ink-dim);
   font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.08em;
-}
-
-.statusbar__toggle {
-  appearance: none;
-  height: 16px;
-  padding: 0 var(--space-2);
-  border: 1px solid var(--border);
-  background: var(--bg-raised);
-  color: var(--ink-dim);
-  font: inherit;
-  cursor: pointer;
-}
-
-.statusbar__toggle:hover {
-  border-color: var(--border-strong);
-  color: var(--ink);
-}
-
-.statusbar__toggle[aria-pressed='true'] {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.statusbar__status {
-  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-shadow: 0 1px 3px var(--bg-void);
 }
 
 .statusbar__status--busy {
@@ -1610,7 +1818,6 @@
   position: absolute;
   inset: 0;
   z-index: 5;
-  min-width: 440px;
   border-right: 1px solid var(--border-strong);
   box-shadow: 12px 0 32px rgb(0 0 0 / 45%);
 }

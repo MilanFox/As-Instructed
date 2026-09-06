@@ -16,7 +16,7 @@ import { LEVELS } from '../../levels/index.ts';
 import { runLevel } from '../../levels/harness.ts';
 import { TraceTimeline } from '../timeline.ts';
 import { TRAIL_MAX_VISITS, TRAIL_MIN_VISITS, VisitTrail, trailFill } from '../trail.ts';
-import { mix, palette } from '../theme.ts';
+import { ART_IDS, DIRECTIONS, luminance, mix, palette } from '../theme.ts';
 
 function trailFor(trace: Trace): VisitTrail {
   return new VisitTrail(new TraceTimeline(trace));
@@ -188,6 +188,81 @@ describe('trail ramp', () => {
   it('is a darkening at the cold end, not a grey tint the cave floor swallows', () => {
     expect(trailFill(TRAIL_MIN_VISITS).startsWith('rgba(10, 14, 20')).toBe(true);
   });
+});
+
+/**
+ * The same guard, held against every art direction rather than against one background colour.
+ *
+ * FIX-TRAIL §7 is the reason this file exists: the first ramp ran from `inkDim`, which is within a
+ * few points of the World 4 cave floor, so the cold end drew nothing at all on the one level the
+ * trail is for. §7 wrote the fix down as "the cold end is a darkening", and the test above pins
+ * the literal that produced.
+ *
+ * That is the right lesson stated one direction too narrowly. A darkening is correct against a
+ * mid-value floor and wrong against a near-black one, where it fails for exactly the reason
+ * `inkDim` did. What actually has to hold is what §7 argues in prose — luminance first, hue
+ * second — so it is checked here as a contrast requirement against the floor each direction
+ * paints, in whichever direction that direction needs.
+ */
+describe('the cold end survives the floor it is painted on, in every direction', () => {
+  /*
+   * Below about 0.05 separation in relative luminance the step is not reliably visible on a
+   * middling laptop panel, which is the machine the original bug was found and missed on.
+   */
+  const MIN_SEPARATION = 0.05;
+
+  for (const id of ART_IDS) {
+    const direction = DIRECTIONS[id];
+
+    it(`${id}: cold end contrasts with its own floor`, () => {
+      const separation = Math.abs(
+        luminance(direction.trail.cold) - luminance(direction.referenceFloor),
+      );
+      expect(separation).toBeGreaterThan(MIN_SEPARATION);
+    });
+
+    it(`${id}: hot end survives the floor too`, () => {
+      const separation = Math.abs(
+        luminance(direction.trail.hot) - luminance(direction.referenceFloor),
+      );
+      expect(separation).toBeGreaterThan(MIN_SEPARATION);
+    });
+
+    /*
+     * Both ends being visible is not enough — they also have to be visible *as different things*,
+     * or a hot tile and a cold one read as the same wash and the whole overlay says only "been
+     * here" again. Luminance alone is the wrong measure for that: on paper the cold end is
+     * further from the floor than the hot end is, because there the hue carries the heat and the
+     * luminance carries the depth. Channel distance catches both cases.
+     */
+    it(`${id}: the two ends are told apart by more than depth`, () => {
+      const cold = Number.parseInt(direction.trail.cold.slice(1), 16);
+      const hot = Number.parseInt(direction.trail.hot.slice(1), 16);
+      const distance =
+        Math.abs(((cold >> 16) & 255) - ((hot >> 16) & 255)) +
+        Math.abs(((cold >> 8) & 255) - ((hot >> 8) & 255)) +
+        Math.abs((cold & 255) - (hot & 255));
+      expect(distance).toBeGreaterThan(120);
+    });
+
+    it(`${id}: the ramp deepens rather than saturating early`, () => {
+      expect(direction.trail.maxAlpha).toBeGreaterThan(direction.trail.minAlpha);
+      expect(direction.trail.minAlpha).toBeGreaterThan(0);
+      expect(direction.trail.maxAlpha).toBeLessThanOrEqual(1);
+    });
+
+    /*
+     * `accent2` is `overlay.goal`. A mid-heat floor the colour of the objective brackets is the
+     * one confusion `w4-02` cannot afford, so no direction is allowed to route its ramp through it.
+     */
+    it(`${id}: the ramp does not pass through the goal colour`, () => {
+      for (let t = 0; t <= 10; t++) {
+        expect(mix(direction.trail.cold, direction.trail.hot, t / 10)).not.toBe(
+          direction.overlay.goal,
+        );
+      }
+    });
+  }
 });
 
 /**

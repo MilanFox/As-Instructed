@@ -2,8 +2,16 @@ import { useMemo, useRef } from 'react';
 import { currentLevel, useGame } from '../game/store.ts';
 import { useLibrary } from '../meta/index.ts';
 import { LibraryPanel, libraryStatusLine } from '../meta/ui/index.ts';
+import { HudSheet } from './components/HudSheet.tsx';
 import { PanelBoundary } from './components/PanelBoundary.tsx';
 import { Splitter } from './components/Splitter.tsx';
+import {
+  type OverlayId,
+  closeOverlay,
+  openOverlay,
+  useOverlay,
+  useOverlayRequests,
+} from './hooks/useOverlay.ts';
 import { useWorkspaceLayout } from './hooks/useWorkspaceLayout.ts';
 import { BriefPanel } from './panels/BriefPanel.tsx';
 import { ConsolePanel } from './panels/ConsolePanel.tsx';
@@ -13,148 +21,164 @@ import { ObjectiveRail } from './panels/ObjectiveRail.tsx';
 import { TimelineBar } from './panels/TimelineBar.tsx';
 import { ViewportPanel } from './panels/ViewportPanel.tsx';
 
-const TABS = [
-  { id: 'brief', label: 'brief' },
-  { id: 'console', label: 'console' },
-  { id: 'docs', label: 'reference' },
-] as const;
+const SHEETS: Record<OverlayId, string> = {
+  brief: 'Work order',
+  console: 'Console',
+  docs: 'Reference',
+};
 
-/** Editor left, site view right, brief/console/reference below it, objectives pinned beside them. */
+const SHEET_ID = 'workspace-sheet';
+
+/**
+ * The site is the screen. The board is the whole workspace and everything else floats over it:
+ * the program on its own rig down the left, the objectives and the transport as read-outs, and
+ * the brief, the console and the reference summoned one at a time as a sheet.
+ */
 export function Workspace(): React.JSX.Element {
   const saved = useGame((state) => state.save.settings.layout);
   const setLayout = useGame((state) => state.setLayout);
-  const panel = useGame((state) => state.brief);
-  const setPanel = useGame((state) => state.setPanel);
   const libraryOpen = useLibrary((state) => state.panelOpen && state.save.unlocked);
   const level = useGame(currentLevel);
   const trace = useGame((state) => state.trace);
+  const overlay = useOverlay();
 
   const workspaceRef = useRef<HTMLDivElement | null>(null);
-  const rightRef = useRef<HTMLDivElement | null>(null);
 
-  // The split follows the shape of what the site view is drawing, so `w1-03`'s 30x3 corridor and
-  // `w4-05`'s 40x40 maze do not get handed the same box.
-  const gridAspect = useMemo(() => {
-    const world = trace?.initialWorld ?? (level ? level.build(level.seeds[0] as number) : null);
-    return world && world.h > 0 ? world.w / world.h : 1;
-  }, [level, trace]);
+  /*
+   * The board as it stands before a run: the renderer draws it as a preview, and the split
+   * follows its shape so `w1-03`'s 30x3 corridor and `w4-05`'s 40x40 maze do not get handed the
+   * same box. It is memoised because `setPreview` guards on identity — a world rebuilt per render
+   * re-fits the camera every frame and cancels any lean with it.
+   */
+  const world = useMemo(
+    () => trace?.initialWorld ?? (level ? level.build(level.seeds[0] as number) : null),
+    [level, trace],
+  );
+  const gridAspect = world && world.h > 0 ? world.w / world.h : 1;
   const layout = useWorkspaceLayout(workspaceRef, saved, gridAspect);
 
+  useOverlayRequests(level?.id ?? null);
+
   return (
-    <>
-      <div className="workspace" ref={workspaceRef}>
-        <div
-          className="workspace__column workspace__editor"
-          style={{ width: `${layout.editorFraction * 100}%` }}
-        >
-          <EditorPanel />
-          {libraryOpen ? (
-            <div className="workspace__library">
-              <PanelBoundary label="The Repository">
-                <LibraryPanel />
-              </PanelBoundary>
-            </div>
-          ) : null}
-        </div>
+    <div
+      className="workspace"
+      ref={workspaceRef}
+      style={{ ['--rig-w' as string]: `${layout.editorFraction * 100}%` }}
+    >
+      <ViewportPanel world={world} />
 
-        <Splitter
-          orientation="vertical"
-          value={layout.editorFraction}
-          min={0.24}
-          max={0.68}
-          onChange={(editorFraction) => setLayout({ editorFraction })}
-          containerRef={workspaceRef}
-          label="Program width"
-        />
-
-        <div className="workspace__column workspace__right" ref={rightRef}>
-          <ViewportPanel />
-          <TimelineBar />
-
-          <Splitter
-            orientation="horizontal"
-            value={layout.viewportFraction}
-            min={0.25}
-            max={0.8}
-            onChange={(viewportFraction) => setLayout({ viewportFraction })}
-            containerRef={rightRef}
-            label="Site view height"
-          />
-
-          <div
-            className="workspace__lower"
-            style={{ height: `${(1 - layout.viewportFraction) * 100}%` }}
-          >
-            <section className="panel" aria-label="Work order detail">
-              <header className="panel__head">
-                <div className="tabs" role="tablist" aria-label="Detail panels">
-                  {TABS.map((tab) => (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      role="tab"
-                      id={`tab-${tab.id}`}
-                      className="tab"
-                      aria-selected={panel === tab.id}
-                      aria-controls="detail-panel"
-                      onClick={() => setPanel(tab.id)}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-              </header>
-              <div
-                className="panel__body panel__body--flush"
-                id="detail-panel"
-                role="tabpanel"
-                aria-labelledby={`tab-${panel}`}
-              >
-                {panel === 'brief' ? <BriefPanel /> : null}
-                {panel === 'console' ? <ConsolePanel /> : null}
-                {panel === 'docs' ? <DocsPanel /> : null}
-              </div>
-            </section>
-
-            <ObjectiveRail />
+      <div className="rig">
+        <EditorPanel />
+        <TimelineBar />
+        {libraryOpen ? (
+          <div className="workspace__library">
+            <PanelBoundary label="The Repository">
+              <LibraryPanel />
+            </PanelBoundary>
           </div>
-        </div>
+        ) : null}
       </div>
 
-      <StatusBar />
-    </>
+      <Splitter
+        orientation="vertical"
+        value={layout.editorFraction}
+        min={layout.min}
+        max={layout.max}
+        onChange={(editorFraction) => setLayout({ editorFraction })}
+        containerRef={workspaceRef}
+        label="Program width"
+      />
+
+      <ObjectiveRail />
+
+      {overlay.open ? (
+        <HudSheet
+          id={SHEET_ID}
+          kind={overlay.open}
+          title={SHEETS[overlay.open]}
+          focusKey={overlay.requested ? overlay.open : null}
+          onClose={closeOverlay}
+        >
+          {overlay.open === 'brief' ? <BriefPanel /> : null}
+          {overlay.open === 'console' ? <ConsolePanel /> : null}
+          {overlay.open === 'docs' ? <DocsPanel /> : null}
+        </HudSheet>
+      ) : null}
+
+      <HudTools open={overlay.open} />
+    </div>
   );
 }
 
 /**
- * One line along the bottom of the workspace.
+ * The corner of the board the player summons things from.
  *
- * The Repository owns the text (`libraryStatusLine`) and the toggle; before the unlock there is
- * nothing here at all, which is what keeps the first three worlds a one-file game.
+ * The Repository owns its own line here (`libraryStatusLine`) and before the unlock there is
+ * nothing of it at all, which is what keeps the first three worlds a one-file game.
  */
-function StatusBar(): React.JSX.Element | null {
+function HudTools({ open }: { open: OverlayId | null }): React.JSX.Element {
   const unlocked = useLibrary((state) => state.save.unlocked);
-  const open = useLibrary((state) => state.panelOpen);
+  const libraryOpen = useLibrary((state) => state.panelOpen);
   const setPanelOpen = useLibrary((state) => state.setPanelOpen);
   const status = useLibrary(libraryStatusLine);
   const busy = useLibrary((state) => state.busy);
-
-  if (!unlocked) return null;
+  const lines = useGame((state) => state.console.length);
 
   return (
-    <div className="statusbar">
-      <button
-        type="button"
-        className="statusbar__toggle"
-        aria-pressed={open}
-        aria-label="Shared Subroutines Repository"
-        onClick={() => setPanelOpen(!open)}
-      >
-        repository
-      </button>
-      <span className={busy ? 'statusbar__status statusbar__status--busy' : 'statusbar__status'}>
-        {status}
-      </span>
+    <div className="hud-tools">
+      {unlocked ? (
+        <span className={busy ? 'statusbar__status statusbar__status--busy' : 'statusbar__status'}>
+          {status}
+        </span>
+      ) : null}
+      <div className="hud-chips" role="group" aria-label="Panels">
+        <SheetChip id="brief" label="work order" hint="B" open={open} />
+        <SheetChip id="console" label="console" hint="C" open={open} count={lines} />
+        <SheetChip id="docs" label="reference" hint="F1" open={open} />
+        {unlocked ? (
+          <button
+            type="button"
+            className={libraryOpen ? 'hud-chip hud-chip--on' : 'hud-chip'}
+            aria-pressed={libraryOpen}
+            aria-label="Shared Subroutines Repository"
+            onClick={() => setPanelOpen(!libraryOpen)}
+          >
+            repository
+          </button>
+        ) : null}
+      </div>
     </div>
+  );
+}
+
+function SheetChip({
+  id,
+  label,
+  hint,
+  open,
+  count,
+}: {
+  id: OverlayId;
+  label: string;
+  hint: string;
+  open: OverlayId | null;
+  count?: number;
+}): React.JSX.Element {
+  const on = open === id;
+  return (
+    <button
+      type="button"
+      className={on ? 'hud-chip hud-chip--on' : 'hud-chip'}
+      aria-expanded={on}
+      {...(on ? { 'aria-controls': SHEET_ID } : {})}
+      title={`${label} (${hint})`}
+      onClick={() => (on ? closeOverlay() : openOverlay(id))}
+    >
+      {label}
+      {count ? <span className="hud-chip__count numeric">{count}</span> : null}
+      <span className="hud-chip__key" aria-hidden="true">
+        {hint}
+      </span>
+    </button>
   );
 }

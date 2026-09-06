@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useGame } from '../../game/store.ts';
 import { useLibrary } from '../../meta/index.ts';
+import { closeOverlay, overlayState, toggleOverlay } from './useOverlay.ts';
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -30,9 +31,11 @@ export function useKeyboard(): void {
 
       if (event.key === 'Escape') {
         // Innermost thing first. The publish offer is a modal, and Escape on a modal closes the
-        // modal — it does not walk out of the work order underneath it.
+        // modal — it does not walk out of the work order underneath it. A sheet over the board is
+        // the same rule one level further in: it is dismissed before the work order is.
         if (useLibrary.getState().offer) useLibrary.getState().skipPublish(false);
         else if (state.showResults) state.dismissResults();
+        else if (state.screen === 'workspace' && overlayState().open !== null) closeOverlay();
         else if (state.screen !== 'levels') state.goto('levels');
         event.preventDefault();
         return;
@@ -61,9 +64,15 @@ export function useKeyboard(): void {
           state.pause();
           state.seek(state.endTick);
           break;
+        case 'b':
+          toggleOverlay('brief');
+          break;
+        case 'c':
+          toggleOverlay('console');
+          break;
         case '?':
         case 'F1':
-          state.setPanel('docs');
+          toggleOverlay('docs');
           break;
         default:
           return;

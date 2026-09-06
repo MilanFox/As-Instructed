@@ -20,7 +20,7 @@
  * No trace field, no engine change.
  */
 
-import { alpha, mix, palette } from './theme.ts';
+import { alpha, artVersion, mix, trailRamp } from './theme.ts';
 import type { TraceTimeline } from './timeline.ts';
 import type { ViewRange } from './camera.ts';
 
@@ -40,38 +40,54 @@ export const TRAIL_MAX_VISITS = 10;
 const TRAIL_HOT_VISITS = 6;
 
 /**
- * Cold-to-hot fill for each visit count.
+ * Cold-to-hot fill for each visit count, for the current art direction.
  *
- * `bgVoid` to `danger`, both already in the palette. The cold end is a *darkening* rather than a
- * tint, which is what makes the first step legible: the first draft ran the ramp from `inkDim`,
- * and `#6a7a8c` turned out to be within a few points of the cave floor's own grey, so two visits
- * rendered as nothing at all on the one level this exists for. Luminance first, hue second, works
- * on every biome. `danger` is what the renderer already means by "this did not work"
- * (`drawBlockedTell`), so the hot end needed no new accent.
+ * The cold end must be legible against the floor it is painted on. That is the whole lesson of
+ * FIX-TRAIL §7: the first draft ran the ramp from `inkDim`, and `#6a7a8c` turned out to be within
+ * a few points of the cave floor's own grey, so two visits rendered as nothing at all on the one
+ * level this exists for. Luminance first, hue second.
+ *
+ * §7 wrote that down as "the cold end is a darkening", which was the correct fix for a board with
+ * a mid-value floor and is still what `standard`, `survey` and `deepsite` do. It is not the
+ * general rule: `signal` paints a near-black phosphor floor, where a darkening fails for exactly
+ * the reason `inkDim` did, and has to brighten instead. So each direction declares its own cold
+ * and hot ends and the *contrast* against `referenceFloor` is what the test enforces.
  *
  * The ramp deliberately does not pass through `accent2`, which would read as a smoother heat
  * gradient but is also `overlay.goal`; a mid-heat floor the colour of the objective brackets is
  * the one confusion `w4-02` cannot afford.
  *
- * Hue and alpha are on separate curves on purpose. Red arrives by `TRAIL_HOT_VISITS`, so the
- * second lap of a loop reads as trouble while the player is still watching; alpha goes on
+ * Hue and alpha are on separate curves on purpose. The hot hue arrives by `TRAIL_HOT_VISITS`, so
+ * the second lap of a loop reads as trouble while the player is still watching; alpha goes on
  * deepening to `TRAIL_MAX_VISITS`, so a run that is well past trouble keeps saying so.
  *
- * Built once. `alpha()` memoises per hue, so this is nine small tables and no per-frame strings.
+ * Rebuilt only when the direction changes — a single integer compare in `draw()`, not per cell.
+ * `alpha()` memoises per hue, so each rebuild is nine short strings and no per-frame allocation.
  */
-const RAMP: readonly string[] = (() => {
+let RAMP: string[] = [];
+let rampVersion = -1;
+
+export function rebuildTrailRamp(): void {
   const table = new Array<string>(TRAIL_MAX_VISITS + 1).fill('');
   const span = TRAIL_MAX_VISITS - TRAIL_MIN_VISITS;
   const hotSpan = TRAIL_HOT_VISITS - TRAIL_MIN_VISITS;
+  const ramp = trailRamp;
+  const range = ramp.maxAlpha - ramp.minAlpha;
   for (let v = TRAIL_MIN_VISITS; v <= TRAIL_MAX_VISITS; v++) {
     const hue = Math.min(1, (v - TRAIL_MIN_VISITS) / hotSpan);
     const depth = (v - TRAIL_MIN_VISITS) / span;
-    table[v] = alpha(mix(palette.bgVoid, palette.danger, hue), 0.16 + depth * 0.2);
+    table[v] = alpha(mix(ramp.cold, ramp.hot, hue), ramp.minAlpha + depth * range);
   }
-  return table;
-})();
+  RAMP = table;
+  rampVersion = artVersion();
+}
+
+function syncRamp(): void {
+  if (rampVersion !== artVersion()) rebuildTrailRamp();
+}
 
 export function trailFill(visits: number): string {
+  syncRamp();
   if (visits < TRAIL_MIN_VISITS) return '';
   return RAMP[Math.min(visits, TRAIL_MAX_VISITS)] as string;
 }
@@ -164,6 +180,7 @@ export class VisitTrail {
    */
   draw(ctx: CanvasRenderingContext2D, tilePx: number, range: ViewRange): void {
     if (this.hot.length === 0) return;
+    syncRamp();
     let style = '';
     for (let i = 0; i < this.hot.length; i++) {
       const cell = this.hot[i] as number;

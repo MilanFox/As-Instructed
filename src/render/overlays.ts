@@ -12,7 +12,7 @@
 
 import { Terrain, maturity, terrainProps, tileAt } from '../engine/index.ts';
 import type { ItemKind, Machine, Vec, World } from '../engine/index.ts';
-import { alpha, overlay, palette } from './theme.ts';
+import { alpha, artDirection, luminance, metrics, overlay, palette } from './theme.ts';
 import type { ViewRange } from './camera.ts';
 import { roundRect } from './sprites.ts';
 
@@ -36,14 +36,14 @@ export function drawGrid(
   dpr = 1,
 ): void {
   const tile = tilePx;
-  if (tile < 10 * dpr) return;
+  if (tile < metrics.gridMinTilePx * dpr) return;
   const x0 = range.x0;
   const y0 = range.y0;
   const x1 = range.x1 + 1;
   const y1 = range.y1 + 1;
 
   ctx.save();
-  ctx.lineWidth = 1;
+  ctx.lineWidth = metrics.gridWidth * dpr;
   ctx.strokeStyle = overlay.grid;
   ctx.beginPath();
   for (let x = x0; x <= x1; x++) {
@@ -60,6 +60,7 @@ export function drawGrid(
   }
   ctx.stroke();
 
+  ctx.lineWidth = metrics.gridMajorWidth * dpr;
   ctx.strokeStyle = overlay.gridMajor;
   ctx.beginPath();
   for (let x = x0; x <= x1; x++) {
@@ -275,7 +276,7 @@ export function drawOutOfBounds(
   const h = rows * tilePx;
   ctx.save();
   ctx.strokeStyle = alpha(palette.inkDim, 0.35);
-  ctx.lineWidth = Math.max(dpr, tilePx * 0.03);
+  ctx.lineWidth = Math.max(metrics.outlineWidth * dpr, tilePx * 0.03);
   ctx.strokeRect(-0.5, -0.5, w + 1, h + 1);
   ctx.restore();
 }
@@ -283,8 +284,17 @@ export function drawOutOfBounds(
 let vignetteKey = '';
 let vignette: CanvasGradient | null = null;
 
-/** Subtle corner falloff. DESIGN.md §8: no bloom, no curvature — this is the only screen effect. */
+/**
+ * Subtle corner falloff. DESIGN.md §8: no bloom, no curvature — this is the only screen effect.
+ *
+ * A vignette is a lens artefact, and not every direction has a lens: on a board that is a printed
+ * sheet it is a grey smudge over the paper corners, which is precisely the effect that direction
+ * exists to avoid. Gated on the luminance of the floor the direction actually paints rather than
+ * on a list of ids, so it stays a property of the look and a new direction gets the right answer
+ * without editing this file.
+ */
 export function drawVignette(ctx: CanvasRenderingContext2D, width: number, height: number): void {
+  if (luminance(artDirection().referenceFloor) > 0.4) return;
   const key = `${Math.round(width)}x${Math.round(height)}`;
   if (key !== vignetteKey || !vignette) {
     const cx = width / 2;

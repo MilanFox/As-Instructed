@@ -15,7 +15,8 @@
 import { Terrain, tileAt } from '../engine/index.ts';
 import type { Tile, World } from '../engine/index.ts';
 import { snapTilePx } from './camera.ts';
-import { alpha, palette } from './theme.ts';
+import { alpha, artDirection, palette } from './theme.ts';
+import type { ArtId } from './art/types.ts';
 import type { Biome, TileSet } from './tiles.ts';
 import { TILE_PX, biomeArt, terrainArt } from './tiles.ts';
 
@@ -28,6 +29,14 @@ export interface TerrainKey {
   biome: Biome;
   revision: number;
   cacheTilePx: number;
+  /**
+   * The art direction the cache was painted with.
+   *
+   * Without this a direction change leaves the previous look baked into the offscreen canvas
+   * until something else happens to invalidate it — a tile change or a zoom step — which on a
+   * static board is never. Keying on it makes the switch self-healing.
+   */
+  art: ArtId;
 }
 
 export function cacheTilePxFor(deviceTilePx: number, cols: number, rows: number): number {
@@ -43,7 +52,8 @@ export function keysEqual(a: TerrainKey | null, b: TerrainKey): boolean {
     a.rows === b.rows &&
     a.biome === b.biome &&
     a.revision === b.revision &&
-    a.cacheTilePx === b.cacheTilePx
+    a.cacheTilePx === b.cacheTilePx &&
+    a.art === b.art
   );
 }
 
@@ -80,7 +90,14 @@ export class TerrainLayer {
     deviceTilePx: number,
   ): boolean {
     const cacheTilePx = cacheTilePxFor(deviceTilePx, world.w, world.h);
-    const next: TerrainKey = { cols: world.w, rows: world.h, biome, revision, cacheTilePx };
+    const next: TerrainKey = {
+      cols: world.w,
+      rows: world.h,
+      biome,
+      revision,
+      cacheTilePx,
+      art: artDirection().id,
+    };
     if (keysEqual(this.key, next)) return false;
     this.key = next;
     this.rebuilds++;
@@ -100,6 +117,18 @@ export class TerrainLayer {
     ctx.clearRect(0, 0, width, height);
     ctx.imageSmoothingEnabled = tilePx < TILE_PX;
     ctx.imageSmoothingQuality = 'high';
+
+    /*
+     * A direction that paints its own terrain takes the whole layer and none of what follows —
+     * the atlas blit, the solid tint, the pit holes, the wall shadows and the biome dim are the
+     * *standard* direction's material language, not a shared substrate. Anything that wants a lit
+     * bevel or a hatched fill has to own the compositing to get it.
+     */
+    const art = artDirection();
+    if (art.paintTerrain) {
+      art.paintTerrain({ ctx, world, tilePx, biome, tiles, width, height });
+      return;
+    }
 
     for (let y = 0; y < world.h; y++) {
       for (let x = 0; x < world.w; x++) {

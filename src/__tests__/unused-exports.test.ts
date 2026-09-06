@@ -38,10 +38,16 @@
  * **Known limits of a name-based scan.** A name reached only through a string literal, a computed
  * property or `export * as Namespace` looks dead here and is not; a comment is not a reader, so
  * block comments and whole-line `//` are stripped before the identifiers are collected, which is
- * what catches `shade` and `toFragment` — mentioned nowhere in this repo but in the prose above
- * their own declarations. An aliased import is resolved back to the name it was imported under,
- * because `useLog as machineUseLog` in `src/levels/world-8/w8-05.ts` is a genuine read of `useLog`
- * and was the only false positive the first draft produced.
+ * what catches `toFragment` — mentioned nowhere in this repo but in the prose above its own
+ * declaration. An aliased import is resolved back to the name it was imported under, because
+ * `useLog as machineUseLog` in `src/levels/world-8/w8-05.ts` is a genuine read of `useLog` and was
+ * the only false positive the first draft produced.
+ *
+ * A string literal cuts the other way and is the one known false *negative*. `--rig-w`, the CSS
+ * custom property `src/ui/Workspace.tsx` sets inline, tokenises as `rig` and `w`, and `rig` is the
+ * name of a fixture in `src/engine/__tests__/helpers.ts` — so a shipping file appears to read it
+ * and it drops out of the test-only count below. Stripping string bodies would take real reads with
+ * it, because a template literal's `${}` holds them, so the scan wears this instead.
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
@@ -68,7 +74,7 @@ const IDENTIFIER = /[A-Za-z_$][\w$]*/g;
  * immediately *and* deleting one of these fails until its line here goes with it. A list that can
  * only grow is how `docs/ENGINE.md` came to advertise a constant nobody had called in months.
  *
- * Two names appear twice. `hasTerrain`, `toFragment`, `ProgressFacts` and `shade` are dead at the
+ * Three names appear twice. `hasTerrain`, `toFragment` and `ProgressFacts` are dead at the
  * declaration and dead again at the barrel that re-exports them, and both entries are worth having:
  * the barrel line is the one a reader greps into, and it is the line `docs/ENGINE.md:132` pointed
  * at for `BONUS_STAR_WEIGHT`.
@@ -116,10 +122,17 @@ const KNOWN_DEAD: readonly string[] = [
   'src/render/theme.ts PaletteKey',
   'src/runtime/modules.ts MODULE_PREAMBLE_LINES',
   'src/runtime/modules.ts SOURCE_URLS',
-  'src/ui/components/Icons.tsx IconClose',
   'src/ui/components/Icons.tsx IconTarget',
   'src/ui/copy.ts failureLine',
   'src/ui/copy.ts seedFailureLine',
+
+  // --- The write half of a read/write pair over one `localStorage` key. `storedArt()` is read at
+  // module load; `chooseArt()` is what a direction picker would call and no picker has been built,
+  // so which direction ships is decided by editing `DEFAULT_ART`. Listed rather than deleted
+  // because it is not the `BONUS_STAR_WEIGHT` shape: there is no live twin doing the job instead,
+  // so no edit to it can silently no-op, and deleting half the pair leaves a key that can be read
+  // and never written. It comes off this list the day something calls it. ---
+  'src/ui/art.ts chooseArt',
 
   // --- Dead behind a barrel: the declaration and the re-export that carries it out of the module.
   // `docs/LIBRARY.md:129,166` documents `toFragment` as part of the library's public surface. ---
@@ -127,12 +140,10 @@ const KNOWN_DEAD: readonly string[] = [
   'src/meta/index.ts toFragment',
   'src/meta/save.ts toFragment',
   'src/meta/types.ts ProgressFacts',
-  'src/render/index.ts shade',
-  'src/render/theme.ts shade',
 ];
 
 /** Exports whose only readers are tests, split as `[every file, files outside `__tests__`]`. */
-const KNOWN_TEST_ONLY: readonly [number, number] = [68, 32];
+const KNOWN_TEST_ONLY: readonly [number, number] = [67, 32];
 
 /** A floor under the scan itself: a regex that quietly stops matching passes every set test. */
 const SCANNED_EXPORTS_AT_LEAST = 1500;
@@ -281,7 +292,7 @@ test('every export in src/ is read somewhere, or is on the list of ones that are
  *
  * A per-entry allowlist was the wrong instrument here. Two thirds of these are `offline.ts`,
  * `helpers.ts`, `naive.ts` and `fake-monaco.ts` — fixtures whose readers are tests by construction,
- * and listing sixty-eight lines of mostly-fine would bury the thirty-two that live in shipping
+ * and listing sixty-seven lines of mostly-fine would bury the thirty-two that live in shipping
  * modules. So the pair is pinned instead: total first, then the count declared outside `__tests__`,
  * which is the half worth reading. It fails in both directions like the allowlist does, and the
  * failure prints the whole list rather than a bare number so the diff is one grep away.
