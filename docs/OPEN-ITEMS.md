@@ -1980,3 +1980,56 @@ sampled history rather than the final figure — **the reasoning holds, the cita
 
 `docs/AUDIT-UI.md`'s held styling findings still need re-triage against the winning art direction.
 `DEFAULT_ART` is `survey` pending that call.
+
+---
+
+## 2026-09-06 — the coverage found the bug the hand-testing missed
+
+**Merged.** Main green at **1895 tests / 88 files**. 62 new tests, six files, **no source file
+changed** — and one real bug found, which is exactly why the pass was commissioned.
+
+### The bug: the objective rail ignores a declared meter
+
+`ObjectiveRail` throws away an objective's declared `meter`/`unit` and re-derives them from the
+label. `ObjectiveRow` has no `meter` field, so `budgetFor` sees `undefined` and falls back to parsing
+prose. **On the rail, every objective in the campaign is treated as undeclared** — A13's *"prefer a
+declaration over the label"* is not in force there at all. Three objectives already disagree between
+rail and report, and **`w5-02` is reachable today**: on a failed run the report draws a gauge and the
+rail draws a plain counter for the same objective, contradicting `ReportObjective`'s own docstring.
+
+The larger cost is the trap. A13 exists so a new objective can declare its meter **and therefore let
+its label say whatever reads best**. Take that freedom and the rail silently loses the gauge, the
+unit, and the `LIMIT` tag — the very distinction that shipped hours ago so a player can tell which
+tick number ends their run.
+
+**It flagged rather than patched, and did not write the agreement test, because "the honest version
+is red today."** Both were the right calls. Spawned to fix the rail and then write that test — proved
+red against the unfixed rail first, and asserted across the **whole campaign**, since the three known
+cases are symptoms and the invariant is that the rail and the report describe the same objective the
+same way.
+
+### The tests that pass both ways, recorded rather than hidden
+
+`ModalBoundary`'s seven containment tests pass against the pre-fix code because `PanelBoundary`
+already provided containment (AUDIT-UI F21). That is disclosed, and the file's **first test
+reproduces the unprotected case synthetically on every run**: with no boundary in the tree, the
+throw comes out of the root render. **That test is the fidelity floor** — a driver that swallowed
+errors would pass everything else while proving nothing. The rest that pass both ways are negatives
+(*the report says nothing and pays nothing for library use*), which could not have failed before the
+feature existed and are its regression guards.
+
+### Two constraints it hit, both routed rather than worked around
+
+**`monaco-editor` ships `module` and no `main`**, so vite cannot resolve it under node and *no test
+file in this repo can even `vi.mock('monaco-editor')`* — a file whose whole body is that call fails
+to collect. It covered the ordering guarantee through `RuntimeRunner.ready()` instead, where every
+caller lives, and handed over the `vitest.config.ts` diff unapplied. Now assigned, with the
+condition that **it does not get to destabilise the build**: full suite green and `npm run build`
+clean, or revert it.
+
+**The hooks driver is duplicated four times** — precisely the duplicated-constant class the two
+ratchet guards exist to catch, sitting inside the test suite. It could not extract it because
+`KNOWN_TEST_ONLY` is pinned exactly and `src/__tests__/` was reserved. Now assigned, with that one
+constant unreserved and this instruction: **a correct duplicate beats a shared lie.** If a shared
+driver cannot preserve errors propagating out of the root render, keep the duplication and explain
+why.
