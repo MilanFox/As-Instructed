@@ -40,7 +40,9 @@ export function useKeyboard(): void {
          * The way out, innermost thing first — and it destroys nothing on the way.
          *
          * A sheet held up to the lamp goes back on the desk. The publish offer is a real modal and
-         * closes as one. Then the open book. Then the work order itself.
+         * closes as one. Then the open book. Then `~/lib.ts`, which is the terminal's other file
+         * rather than an overlay, so leaving it puts the work order back on the screen. Then the
+         * work order itself.
          *
          * It deliberately does not dismiss the run report. On the desk the report is paper and it
          * lies there until it is filed (docs/AUDIT-UI.md §6.2, §6.6): a key that made a player's
@@ -52,6 +54,7 @@ export function useKeyboard(): void {
           if (papers.lifted) papers.putDown();
           else if (useLibrary.getState().offer) useLibrary.getState().skipPublish(false);
           else if (overlayState().open === 'docs') closeOverlay();
+          else if (useLibrary.getState().panelOpen) useLibrary.getState().setPanelOpen(false);
           else if (state.screen !== 'levels') state.goto('levels');
         },
 

@@ -142,10 +142,6 @@ const KNOWN_DEAD: readonly string[] = [
   'src/meta/index.ts ProgressFacts',
   'src/meta/index.ts toFragment',
   'src/meta/save.ts toFragment',
-  'src/meta/ui/LibraryPanel.tsx LibraryPanel',
-  'src/meta/ui/LibraryPanel.tsx libraryStatusLine',
-  'src/meta/ui/index.ts LibraryPanel',
-  'src/meta/ui/index.ts libraryStatusLine',
   'src/meta/types.ts ProgressFacts',
 ];
 

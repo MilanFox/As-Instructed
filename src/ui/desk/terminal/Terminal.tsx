@@ -13,9 +13,11 @@
  */
 import { useState } from 'react';
 
-import { currentLevel, useGame } from '../../../game/store.ts';
+import { useGame } from '../../../game/store.ts';
+import { useLibrary } from '../../../meta/store.ts';
 import { AudioSettings } from '../../screens/AudioSettings.tsx';
 import { BezelFoot } from './BezelFoot.tsx';
+import { FileRail } from './FileRail.tsx';
 import { OutputLog } from './OutputLog.tsx';
 import { Program } from './Program.tsx';
 import { Rail } from './Rail.tsx';
@@ -35,24 +37,34 @@ function stateWord(running: boolean, watching: boolean, passed: boolean | undefi
 }
 
 export function Terminal(): React.JSX.Element {
-  const level = useGame(currentLevel);
   const runState = useGame((state) => state.runState);
   const trace = useGame((state) => state.trace);
   const verdict = useGame((state) => state.verdict);
   const resetCode = useGame((state) => state.resetCode);
   const [problems, setProblems] = useState(0);
   const [sound, setSound] = useState(false);
+  /*
+   * `~/lib.ts` is drawn on this glass, so while it is the loaded file everything under it — the
+   * program, the objectives rail, the log and this bar's own copy of the file rail — is covered.
+   * Covered is not hidden: without `inert` a screen reader still walks all of it, and the file rail
+   * in particular reads out twice.
+   */
+  const libLoaded = useLibrary((state) => state.save.unlocked && state.panelOpen);
 
   const state = stateWord(runState === 'running', trace !== null, verdict?.passed);
 
   return (
     <section className="display display--term">
       <div className="bezel">
-        <div className="screen">
+        <div className="screen" inert={libLoaded}>
           <div className="term-bar">
             <span className="tb-host">station-4471</span>
             <span className="tb-sep">:</span>
-            <span className="tb-path">~/orders/{level?.id ?? 'none'}</span>
+            {/*
+              Which file the station has loaded. One path until the Repository is provisioned, and
+              a rail of two once it is — see `FileRail.tsx`.
+            */}
+            <FileRail />
             <span className="tb-spacer" />
             {/*
               The starter program, back. It was the editor panel's only header control and the
