@@ -5,11 +5,14 @@ import { FakeRunner } from '../ports.ts';
 import { campaignOrder } from '../../levels/index.ts';
 import type { SaveFile } from '../save.ts';
 import { emptyProgress, emptySave } from '../save.ts';
+import type { GameState } from '../store.ts';
 import { isLevelUnlocked, useGame } from '../store.ts';
 
 /** A runner the test drives by hand, so every branch of the state machine is reachable. */
 class ScriptedRunner implements RunnerPort {
   settle: ((response: RunResponse) => void) | null = null;
+  /** The host itself breaking, which is the only thing `RunnerPort.run` is allowed to reject with. */
+  fail: ((error: unknown) => void) | null = null;
   cancelled = 0;
   requests: RunSubmission[] = [];
 
@@ -17,8 +20,9 @@ class ScriptedRunner implements RunnerPort {
 
   run(request: RunSubmission): Promise<RunResponse> {
     this.requests.push(request);
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       this.settle = resolve;
+      this.fail = reject;
     });
   }
   cancel(): void {
@@ -453,5 +457,162 @@ describe('the unlock gate', () => {
 
   it('knows nothing about a work order the campaign never issued', () => {
     expect(isLevelUnlocked(emptySave(), 'w2-03')).toBe(false);
+  });
+});
+
+/**
+ * A work order that has not been dispatched in this session wears no verdict.
+ *
+ * The desk reads this store and nothing else — the terminal's `EDIT / SENT / RETURNED / CLOSED`
+ * word, the site feed's `NO TRACE ON FILE`, the objectives rail, the transport and the `OUTPUT`
+ * log are one subscription each. So a run left behind after the order that produced it has gone is
+ * not a rendering fault on one surface; it is every surface at once, agreeing about something that
+ * is not true.
+ *
+ * "Clean" is not a list restated here. It is the store's own resting shape, read before anything
+ * has run, so a field added to the run later is covered without this file being edited.
+ */
+const RUN_SHAPED = [
+  'runState',
+  'trace',
+  'verdict',
+  'seedResults',
+  'traceSeed',
+  'failedSeed',
+  'failure',
+  'showResults',
+  'freshCommendations',
+  'personalBest',
+  'tick',
+  'endTick',
+  'console',
+  'suppressed',
+] as const;
+
+function runShape(state: GameState): Record<string, unknown> {
+  return Object.fromEntries(RUN_SHAPED.map((field) => [field, state[field]]));
+}
+
+const AT_REST = runShape(useGame.getState());
+
+/**
+ * Everything a settled promise still owes.
+ *
+ * `runState` is already `idle` the moment the order changes, so waiting on it would answer before
+ * the abandoned run's own handler has run at all and pass against a store that is about to be
+ * written. A turn of the macrotask queue drains every microtask behind it.
+ */
+function afterTheHostAnswers(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+describe('a freshly opened work order carries no run', () => {
+  /* Every route into an order lands on `openLevel`: the site map's nodes, the Repository's "open
+     the order" button through its host, and the campaign advance. Each one is driven here. */
+  async function aRunOn(levelId: string): Promise<void> {
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+    useGame.getState().openLevel(levelId);
+    await runOnce('move(Dir.South);');
+    expect(useGame.getState().trace).not.toBeNull();
+    expect(useGame.getState().verdict?.passed).toBe(false);
+  }
+
+  it('when the order is picked off the site map', async () => {
+    reset();
+    await aRunOn('w1-01');
+    useGame.getState().openLevel('w1-03');
+    expect(useGame.getState().currentLevelId).toBe('w1-03');
+    expect(runShape(useGame.getState())).toEqual(AT_REST);
+  });
+
+  it('when the campaign hands over the next one', async () => {
+    reset();
+    await aRunOn('w1-01');
+    useGame.getState().advanceToNextLevel();
+    expect(useGame.getState().currentLevelId).toBe('w1-03');
+    expect(runShape(useGame.getState())).toEqual(AT_REST);
+  });
+
+  /*
+   * The other half of the same rule, and the one a fix must not break: leaving to the site map is
+   * not leaving the order. `back to the station` returns a player to the run they were watching,
+   * so the trace has to survive the round trip. It stops being theirs when a different order is
+   * opened, not when the map is.
+   */
+  it('but the site plan and back is the same order, and keeps it', async () => {
+    reset();
+    await aRunOn('w1-01');
+    const watching = useGame.getState().trace;
+    useGame.getState().goto('levels');
+    useGame.getState().goto('workspace');
+    expect(useGame.getState().trace).toBe(watching);
+    useGame.getState().openLevel('w1-03');
+    expect(runShape(useGame.getState())).toEqual(AT_REST);
+  });
+
+  it('when the page is reloaded onto a save that remembers the program', async () => {
+    reset();
+    const stored = new Map<string, string>();
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key: string) => stored.get(key) ?? null,
+        setItem: (key: string, value: string) => void stored.set(key, value),
+      },
+    });
+    try {
+      await aRunOn('w1-01');
+      expect(stored.size).toBeGreaterThan(0);
+
+      vi.resetModules();
+      const reloaded = (await import('../store.ts')).useGame;
+      expect(reloaded.getState().code).toBe('move(Dir.South);');
+      expect(runShape(reloaded.getState())).toEqual(AT_REST);
+    } finally {
+      Reflect.deleteProperty(globalThis, 'localStorage');
+    }
+  });
+
+  /*
+   * The one that was broken. A run the player walked out on is dropped by token everywhere it is
+   * read back — except in the rejection arm, where the halt line and the run counters were written
+   * before anything asked whose run it was. `RunnerPort.run` rejects only when the host broke, and
+   * the host is Monaco's chunk, the library compile and the transpile, so a flaky network is
+   * enough: the next order opens with someone else's halt in its `OUTPUT` log and a failure
+   * charged to the record for a run nobody watched.
+   */
+  it('and a run walked out on cannot file its halt against the next one', async () => {
+    reset();
+    const runner = new ScriptedRunner();
+    useGame.getState().attachRunner(runner);
+    useGame.getState().openLevel('w1-01');
+    useGame.getState().run();
+
+    useGame.getState().openLevel('w1-03');
+    runner.fail?.(new Error('the simulator could not be started'));
+    await afterTheHostAnswers();
+
+    expect(runShape(useGame.getState())).toEqual(AT_REST);
+    expect(useGame.getState().save.stats).toEqual({ runs: 0, passes: 0, fails: 0 });
+  });
+
+  it('and neither can one that answers after the order has gone', async () => {
+    reset();
+    const runner = new ScriptedRunner();
+    useGame.getState().attachRunner(runner);
+    useGame.getState().openLevel('w1-01');
+    useGame.getState().run();
+
+    useGame.getState().openLevel('w1-03');
+    const answer = await new FakeRunner({ latencyMs: 0 }).run({
+      code: 'move(Dir.South);',
+      levelId: 'w1-01',
+      seeds: [1],
+    });
+    runner.settle?.(answer);
+    await afterTheHostAnswers();
+
+    expect(runShape(useGame.getState())).toEqual(AT_REST);
+    expect(useGame.getState().save.stats).toEqual({ runs: 0, passes: 0, fails: 0 });
   });
 });
