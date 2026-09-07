@@ -137,6 +137,12 @@ export interface DeskDoc {
    * it is filed; it is just not lying across the work.
    */
   stowed: boolean;
+  /**
+   * Whether the player has ever held this sheet up to the lamp. A sheet at rest does not have to
+   * be legible (ruling 1 above), so lifting it is the only moment the desk learns a document has
+   * been read — and what has not been read is what eviction may not take.
+   */
+  read: boolean;
   /** Set by the stamp block or the pen. What filing a sheet actually looks like. */
   mark: string | null;
   payload: DocPayload;
@@ -180,11 +186,49 @@ export const DOC_HOME: Record<DocKind, { x: number; y: number; rot: number }> = 
 export const DOC_ARRIVAL = { x: 170, y: 236, rot: -1.4 } as const;
 
 /**
- * How many loose sheets the desk holds before the oldest is filed for you. The desk is tidy on
- * purpose (`docs/DESK-CONCEPT.md` §10) and an unbounded pile is the cramped Papers, Please desk
- * that was tried and cut.
+ * How much unfiled paper the desk holds before the oldest sheet you have already read is filed for
+ * you. The desk is tidy on purpose (`docs/DESK-CONCEPT.md` §10) and an unbounded pile is the
+ * cramped Papers, Please desk that was tried and cut.
  */
 export const DESK_CAPACITY = 6;
+
+/**
+ * The work order for the level that is open. Nothing but the player takes that one off the desk.
+ */
+function briefId(): string | null {
+  const open = useGame.getState().currentLevelId;
+  return open ? `order:${open}` : null;
+}
+
+/**
+ * What the desk may file for you when it runs out of room: paper the player has read, waiting in
+ * the tray, that is neither the standing sheet nor the brief for the level that is open.
+ *
+ * Eviction used to take the oldest unfiled sheet whatever it was, and `issueOnce` in
+ * `usePaperwork.ts` will not re-issue an id it has already handed out. So a Performance Review
+ * that arrived and was pushed under by five HALT NOTICEs went to the Repository unread — and
+ * nothing on this desk draws filed paper, so for the player it was destroyed. It is the last
+ * thing the game says to somebody who has closed all 33 work orders, and the only way back to it
+ * was clearing `bootstrap.desk` by hand, which a player cannot do. An unread document is not the
+ * oldest thing on the desk in any sense the player cares about.
+ */
+function evictable(doc: DeskDoc, brief: string | null): boolean {
+  return doc.read && doc.stowed && doc.kind !== 'standing' && doc.id !== brief;
+}
+
+/**
+ * A HALT NOTICE is about the run you just did, and the one before it is worthless the moment a
+ * new one exists. So a halt notice replaces its predecessor on the same work order rather than
+ * stacking beside it: five failed dispatches on `w8-01` left five sheets in the tray, and the
+ * fifth said everything the first four did. The replaced sheet is filed, not deleted.
+ */
+function supersedes(next: DeskDoc, doc: DeskDoc): boolean {
+  return (
+    next.payload.kind === 'halt' &&
+    doc.payload.kind === 'halt' &&
+    next.payload.report.levelId === doc.payload.report.levelId
+  );
+}
 
 /** What may go on the copy stand. The specification, never the memo. */
 export const PINNABLE: ReadonlySet<DocKind> = new Set<DocKind>(['order', 'requisition']);
@@ -218,7 +262,9 @@ interface PaperState {
   pinnedPage: PinnedPage | null;
   top: number;
 
-  issue(doc: Omit<DeskDoc, 'z' | 'filed' | 'stowed' | 'mark' | 'moved'> & Partial<DeskDoc>): void;
+  issue(
+    doc: Omit<DeskDoc, 'z' | 'filed' | 'stowed' | 'read' | 'mark' | 'moved'> & Partial<DeskDoc>,
+  ): void;
   lift(id: string): void;
   putDown(): void;
   pin(id: string): void;
@@ -294,23 +340,39 @@ export const usePapers = create<PaperState>((set, get) => ({
       moved: null,
       filed: false,
       stowed: false,
+      read: false,
       mark: null,
       ...doc,
       z,
     };
+    const brief = briefId();
     const without = state.docs.filter((d) => d.id !== next.id);
     const loose = without.filter((d) => !d.filed);
-    const overflow = Math.max(0, loose.length + 1 - DESK_CAPACITY);
-    const retired = new Set(loose.slice(0, overflow).map((d) => d.id));
+    const stale = new Set(loose.filter((d) => supersedes(next, d)).map((d) => d.id));
+    const held = loose.filter((d) => !stale.has(d.id));
+    const overflow = Math.max(0, held.length + 1 - DESK_CAPACITY);
+    const retired = new Set(
+      held
+        .filter((d) => evictable(d, brief))
+        .slice(0, overflow)
+        .map((d) => d.id),
+    );
     const docs = without
-      .map((d) => (retired.has(d.id) ? { ...d, filed: true } : d))
+      .map((d) => (stale.has(d.id) || retired.has(d.id) ? { ...d, filed: true } : d))
       .concat(next);
     set({ docs, top: z });
     persist(get());
   },
 
   lift(id) {
-    set((state) => ({ lifted: state.lifted === id ? null : id }));
+    set((state) => {
+      const unread = state.docs.some((d) => d.id === id && !d.read);
+      return {
+        lifted: state.lifted === id ? null : id,
+        docs: unread ? state.docs.map((d) => (d.id === id ? { ...d, read: true } : d)) : state.docs,
+      };
+    });
+    persist(get());
   },
 
   putDown() {
@@ -395,8 +457,7 @@ export const usePapers = create<PaperState>((set, get) => ({
   },
 
   clearLevelPaper() {
-    const open = useGame.getState().currentLevelId;
-    const keep = open ? `order:${open}` : null;
+    const keep = briefId();
     set((state) => {
       const docs = state.docs.filter((d) => d.kind !== 'order' || d.filed || d.id === keep);
       /*

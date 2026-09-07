@@ -1,0 +1,206 @@
+/**
+ * The ending must not be lose-able by ordinary play.
+ *
+ * A playtester who closed all 33 work orders never read the Performance Review. `DESK_CAPACITY`
+ * files the oldest unfiled sheet when a new one arrives, five failed dispatches on `w8-01` put
+ * five HALT NOTICEs in the tray, and the memo went under. Eviction does not delete the document —
+ * it sets `filed` — but no surface on this desk draws filed paper: `looseDocs` and `trayDocs` both
+ * exclude it and the Repository binder reads filed *certificates* only, for one `ENTERED` flag. So
+ * the memo was on the record and unreachable, and `issueOnce` in `usePaperwork.ts` never hands out
+ * an id it has already issued, so it could not come back. The only route to it was clearing
+ * `bootstrap.desk` by hand.
+ *
+ * Reachable, here, means exactly what the player can get at: out on the desk, or in the in-tray
+ * where `Tray` lists it and `takeOut` puts it back on the desk. Everything the company issues once
+ * is in the same class as the memo — the certificate, the requisition, the Repository note, the
+ * standing sheet and the brief for the level that is open — so the guard covers the class.
+ */
+import { beforeEach, describe, expect, it } from 'vitest';
+
+import { useGame } from '../../../../game/store.ts';
+import type { DocPayload, ReportSnapshot } from '../papers.ts';
+import { DESK_CAPACITY, DOC_HOME, filedDocs, looseDocs, trayDocs, usePapers } from '../papers.ts';
+
+function reset(): void {
+  useGame.setState({ currentLevelId: null });
+  usePapers.setState({ docs: [], lifted: null, pinned: null, pinnedPage: null, top: 20 });
+}
+
+function report(levelId: string): ReportSnapshot {
+  return {
+    levelId,
+    title: 'THE LAST ONE',
+    passed: false,
+    graded: true,
+    medal: 'none',
+    headline: 'HALTED',
+    ticks: null,
+    par: null,
+    limit: null,
+    bestTicks: null,
+    seeds: [],
+    seedLines: [],
+    objectives: [],
+    causes: [],
+    cause: null,
+    failure: 'stalled',
+    failureCode: 'STALL',
+    failureSeed: null,
+    failureLine: null,
+    passedSeed: null,
+    commendations: [],
+    personalBest: null,
+    points: null,
+    stars: 0,
+    onRecord: null,
+    libraryLine: null,
+    at: 0,
+  };
+}
+
+/** Issued the way the company issues it: into the in-tray, unread. */
+function issue(id: string, payload: DocPayload): void {
+  usePapers.getState().issue({
+    id,
+    kind: payload.kind,
+    home: DOC_HOME[payload.kind],
+    stowed: true,
+    payload,
+  });
+}
+
+/** The player takes a sheet out, holds it up to the lamp, and puts it away again. */
+function readIt(id: string): void {
+  usePapers.getState().takeOut(id);
+  usePapers.getState().lift(id);
+  usePapers.getState().putDown();
+  usePapers.getState().stow(id);
+}
+
+/** Enough read paper to push anything else past capacity several times over. */
+function fillTheDesk(count: number): void {
+  for (let n = 0; n < count; n += 1) {
+    const id = `filler:${String(n)}`;
+    issue(id, { kind: 'order', levelId: `filler-${String(n)}` });
+    readIt(id);
+  }
+}
+
+function reachable(): string[] {
+  const state = usePapers.getState();
+  return [...looseDocs(state), ...trayDocs(state)].map((doc) => doc.id);
+}
+
+const ISSUED_ONCE: readonly { what: string; id: string; payload: DocPayload }[] = [
+  { what: 'the Performance Review', id: 'memo:4', payload: { kind: 'memo', rank: 4 } },
+  { what: 'the Repository note', id: 'issue:repository', payload: { kind: 'issue' } },
+  {
+    what: 'the hardware requisition',
+    id: 'requisition:w5-01',
+    payload: { kind: 'requisition', levelId: 'w5-01', hardware: ['drill'] },
+  },
+  {
+    what: 'a certificate of closure',
+    id: 'certificate:w8-01:1',
+    payload: { kind: 'certificate', report: { ...report('w8-01'), passed: true } },
+  },
+  { what: 'the standing sheet', id: 'standing', payload: { kind: 'standing' } },
+];
+
+describe('paper the player has not read is never filed for them', () => {
+  beforeEach(reset);
+
+  /*
+   * The tester blamed the five failed dispatches, and five of anything cannot on its own reach a
+   * sheet that is newer than five other sheets — the memo is lost because it arrives at a rank
+   * tier partway through the campaign and then everything else in the campaign arrives on top of
+   * it. This is that, at the size it actually happens: a memo in the tray, and an ordinary evening
+   * of work landing on it.
+   */
+  it('keeps the Performance Review while the campaign goes on around it', () => {
+    issue('memo:4', { kind: 'memo', rank: 4 });
+    issue('standing', { kind: 'standing' });
+    issue('issue:repository', { kind: 'issue' });
+    issue('requisition:w7-01', {
+      kind: 'requisition',
+      levelId: 'w7-01',
+      hardware: ['survey drone'],
+    });
+    issue('certificate:w7-05:1', {
+      kind: 'certificate',
+      report: { ...report('w7-05'), passed: true },
+    });
+    issue('order:w8-01', { kind: 'order', levelId: 'w8-01' });
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
+      issue(`halt:w8-01:${String(attempt)}`, { kind: 'halt', report: report('w8-01') });
+    }
+
+    expect(reachable()).toContain('memo:4');
+    const doc = trayDocs(usePapers.getState()).find((each) => each.id === 'memo:4');
+    expect(doc?.payload).toEqual({ kind: 'memo', rank: 4 });
+  });
+
+  for (const { what, id, payload } of ISSUED_ONCE) {
+    it(`keeps ${what} however much paper arrives after it`, () => {
+      issue(id, payload);
+      fillTheDesk(DESK_CAPACITY * 3);
+
+      expect(reachable()).toContain(id);
+      expect(filedDocs(usePapers.getState()).map((doc) => doc.id)).not.toContain(id);
+    });
+  }
+
+  it('keeps the brief for the level that is open, read or not', () => {
+    useGame.setState({ currentLevelId: 'w8-01' });
+    issue('order:w8-01', { kind: 'order', levelId: 'w8-01' });
+    readIt('order:w8-01');
+    fillTheDesk(DESK_CAPACITY * 3);
+
+    expect(reachable()).toContain('order:w8-01');
+  });
+
+  it('still files the oldest sheet the player has read', () => {
+    fillTheDesk(DESK_CAPACITY);
+    expect(reachable()).toHaveLength(DESK_CAPACITY);
+
+    issue('memo:4', { kind: 'memo', rank: 4 });
+
+    expect(filedDocs(usePapers.getState()).map((doc) => doc.id)).toEqual(['filler:0']);
+    expect(reachable()).toHaveLength(DESK_CAPACITY);
+  });
+});
+
+describe('a halt notice replaces its predecessor', () => {
+  beforeEach(reset);
+
+  it('leaves one sheet for one work order, and files the rest', () => {
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
+      issue(`halt:w8-01:${String(attempt)}`, { kind: 'halt', report: report('w8-01') });
+    }
+
+    expect(reachable()).toEqual(['halt:w8-01:5']);
+    expect(filedDocs(usePapers.getState()).map((doc) => doc.id)).toEqual([
+      'halt:w8-01:4',
+      'halt:w8-01:3',
+      'halt:w8-01:2',
+      'halt:w8-01:1',
+    ]);
+  });
+
+  it('does not touch the halt notice for a different work order', () => {
+    issue('halt:w7-03:1', { kind: 'halt', report: report('w7-03') });
+    issue('halt:w8-01:1', { kind: 'halt', report: report('w8-01') });
+
+    expect(reachable()).toContain('halt:w7-03:1');
+  });
+
+  it('does not touch a certificate for the same work order', () => {
+    issue('certificate:w8-01:1', {
+      kind: 'certificate',
+      report: { ...report('w8-01'), passed: true },
+    });
+    issue('halt:w8-01:2', { kind: 'halt', report: report('w8-01') });
+
+    expect(reachable()).toContain('certificate:w8-01:1');
+  });
+});
