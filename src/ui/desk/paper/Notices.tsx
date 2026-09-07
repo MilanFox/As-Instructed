@@ -226,7 +226,7 @@ export function StandingSheet(): React.JSX.Element {
           <b>points</b>
           <span className="numeric">
             {report.points} of {report.maxPoints}
-            <span className="quiet"> over {report.closed} closed work orders</span>
+            <span className="quiet"> over {report.closed} graded work orders</span>
           </span>
         </div>
         <div>

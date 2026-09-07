@@ -2224,3 +2224,69 @@ you can solve in pieces, which is the whole complaint. And **only if that lands*
 `name-the-hold` currently reads the one thread that already integrates best, so coupling the airlock
 creates the first genuinely new question the level can ask. Bonuses are otherwise settled; this one
 is reopened deliberately, because job 1 changes what the level asks.
+
+## Fourteen bonus stars nothing proves can be earned
+
+**Assumed earnable. Not verified.** An audit of every bonus objective in the game found **34 stars
+across 31 levels**, of which **fourteen had no test that any program takes them**. World 6's four
+have since been proved and are struck off (see below); **the remaining ten are still assumed, and
+that assumption is the open item.** An argument that a star looks possible is not a proof, and this
+list exists because three of them are argued at length in `docs/FIX-BONUSES-3-5.md` and none of
+those arguments was ever run.
+
+### Only-refused — a test proves the star can be *missed*, nothing proves it can be *taken*
+
+`w2-02/no-wasted-fieldwork` · `w4-04/best-order` · `w5-01/one-pass` · `w5-03/tight-order` ·
+`w5-04/largest-idle` · `w6-02/name-the-fault` · `w6-03/shorter-encoding` · `w6-04/straggler` ·
+`w6-05/repair-blocks` · `w7-05/workers-busy`
+
+### Untested — the id appears in no test at all
+
+`w5-02/eight-probes` · `w5-03/within-20-probe` · `w8-01/within-10-look` · `w8-03/within-26-probe`
+
+### Why this is not a chore
+
+**All four of World 6 were on the list, and World 6 was the only world with no `bonus.test.ts`.**
+That is not a coincidence — an absent suite is how a whole world drifts unchecked — and it is now
+fixed: `src/levels/world-6/__tests__/bonus.test.ts` exists and proves all four earnable by the
+shipped reference on every declared seed, inside par (`w6-02` 25/37/18/29 of par 37, `w6-03`
+38×4 of 38, `w6-04` 9/12/10/14 of 14, `w6-05` 60×5 of 60). Those four are **verified** and struck
+from the list; the other ten are not.
+
+**`name-the-fault` is the bar `docs/FIX-BONUSES-3-5.md` measures every other bonus in the game
+against** — *"The bar is `w6-02`'s `name-the-fault` — report which byte was altered"* — and until
+this pass nothing proved it could be met. If the standard-setter is unearnable the standard is
+fiction, so it was proved first. It is earnable, and the arithmetic that makes it solvable is that
+the corrupting delta is drawn odd (`rng.int(0, 127) * 2 + 1`), hence invertible mod 256, so the
+weighted difference names the altered position uniquely. Nothing player-facing states this.
+
+One live defect found while proving it, pinned rather than fixed: **seed 2 is the deliberately
+clean band** (`rate = 0`), so `faultReports` is empty and `name-the-fault` is **vacuously true for
+any program, including one that does nothing**. That is the do-nothing hole that same document
+catalogues, sitting in its own exemplar. Harmless in play — `src/game/store.ts:552` banks no star
+on a failed run — and the new suite asserts the seed map `{1: false, 2: true, 3: false, 4: false}`
+so it cannot be rediscovered as a surprise.
+
+**The four untested ones share a mechanism, not four separate oversights.** They are all
+`Objectives.withinSenses` budgets, and three of the four (`within-20-probe`, `within-10-look`,
+`within-26-probe`) carry **engine-minted ids**. The per-world bonus suites look objectives up by
+**hand-written id string**, so a minted id is walked past in silence rather than failing. Anyone
+closing this should consider making that lookup fail loudly on an id it does not recognise — that
+closes the class instead of the four instances. Note also that `w5-03` and `w8-01` each carry a
+*second*, hand-written bonus that **is** covered, so a reader of those test files would reasonably
+conclude the level was done.
+
+### What let it happen
+
+`src/levels/__tests__/levels.test.ts:380` is the only campaign-wide check on bonuses, and it
+asserts `typeof objective.met === 'boolean'` plus an aggregate `earned.size >= ceil(levels * 0.6)`
+— "at least 60% of *levels* have at least one bonus some reference run earns". It pins no
+individual id, so fourteen of thirty-four sat unproven under a green suite.
+`src/runtime/__tests__/reference-solutions.test.ts` looks like it would cover them and does not:
+`buildVerdict` is handed `level.objectives` only, and stars are graded in a separate second pass
+into `result.bonus`.
+
+**The invariant worth landing** is *every bonus in the game has a test proving it is earnable*. A
+hand-maintained list that a new bonus must be added to is an acceptable shape for it, as long as
+forgetting to add one goes red rather than silently passing — which is precisely what the 60% rule
+does not do.
