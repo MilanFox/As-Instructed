@@ -147,6 +147,21 @@
 .desk .station, .desk .slot, .desk .tray, .desk .dispatch, .desk .binder, .desk .stampblock, .desk .pen, .desk .mug, .desk .keyboard, .desk .copystand,
 .desk .paper-layer, .desk .binder-open { position: fixed; z-index: 5; }
 
+/* What a desk object leaves behind when it throws (`components/PanelBoundary.tsx`). The desk is
+   the only thing that mounts one, so the rules live here rather than in app.css, where they were
+   the last selector the old panel workspace still reached across the boundary with. */
+.desk .panel-boundary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  justify-content: center;
+  height: 100%;
+  padding: var(--space-5);
+  background: var(--bg-panel);
+  color: var(--ink-dim);
+  font-size: 12px;
+}
+
 /* ============================== MOTION ============================ */
 
 @media (prefers-reduced-motion: reduce) {

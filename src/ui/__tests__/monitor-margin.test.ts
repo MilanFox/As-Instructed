@@ -3,9 +3,13 @@
  *
  * `docs/FIX-HUD-OVERLAP.md` landed a guard that keeps the objective read-out off the drawn grid,
  * and `docs/AUDIT-UI.md` §6.5 records that it protects exactly one rectangle — the chip row and
- * the empty-state note were left over the board on purpose. That guard lives in
- * `useWorkspaceLayout.ts` and reads `--hud-gutter` out of `app.css`, and **the desk uses none of
- * it**: there is no HUD strip, no card, and no `Workspace`.
+ * the empty-state note were left over the board on purpose. That guard lived in
+ * `useWorkspaceLayout.ts` and read `--hud-gutter` out of `app.css`, and **none of that machinery
+ * survives**: there is no HUD strip, no card, no `Workspace` and no hook. The header here used to
+ * shorten that to "the desk uses none of it", which was read as "the desk uses none of `app.css`".
+ * That is false and was false when it was written — the desk reads fifty class names out of that
+ * sheet, and three shipped defects came in through them. The last block below states what is
+ * actually true and holds it mechanically.
  *
  * The desk's answer is stronger and cheaper. Nothing is placed over the board at all. The canvas
  * is inset by `FEED_INSET` and every readout on the feed lives in the strip that inset created, so
@@ -18,7 +22,7 @@
  *     campaign, draws entirely inside it.
  *
  * The third block is the cost, stated the way `FIX-HUD-OVERLAP.md` §8 states the objectives
- * strip's: which levels lose legibility and by how much.
+ * strip's: which levels lose legibility and by how much. The fourth is the `app.css` boundary.
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
@@ -257,5 +261,133 @@ describe('the legibility floor', () => {
       if (camera.deviceTilePx < 24) under.push(level.id);
     }
     expect(under).toEqual([...CANNOT_SHOW_WHOLE_BOARD_FULL_BLEED]);
+  });
+});
+
+/*
+ * The `app.css` boundary, stated as what it is rather than as what would be nicer.
+ *
+ * `app.css` is the old panel workspace's sheet. The workspace was deleted when the desk replaced
+ * it and the rules were not, so the file filled up with selectors that described nothing — until
+ * one of them happened to name a class the desk *does* render, at which point it silently painted
+ * a surface nobody intended. That is not hypothetical: `docs/PLAYTEST.md` has three of them from
+ * one playthrough. An orphaned `.crate` block put a dark background behind paper ink and blanked
+ * all eight verb names on the hardware requisition — the sheet whose entire job is naming the new
+ * commands. `.desk .crate .nm` needed `flex-wrap` or the `reference` button printed over the spec.
+ * An orphaned `.seed-row__outstanding { white-space: nowrap; overflow: hidden }` clipped every
+ * per-seed failure reason on the halt notice mid-word. All three names are in `paper.css` too,
+ * which is the whole mechanism and the whole guard: two sheets, one name, nobody's decision.
+ *
+ * A hard boundary — `app.css` reaches nothing under `.desk` — is not available at this price. The
+ * desk genuinely reads this sheet: the terminal rail takes `.objective__mark`'s box and border and
+ * `.objective__label`'s `flex` from here, the halt notice takes `.cause__diff-value`, `.seed-chip`
+ * and `.tag`, and `.sr-only` is declared nowhere else. Cutting them off restyles the desk, which
+ * is the one thing this may not do — measured rather than guessed: every element of the desk at
+ * rest, of the hardware requisition and of the halt notice, on fifty computed properties each.
+ *
+ * So the guard holds the *class*, not the instances. Every name the two sheets share is listed,
+ * and a new one fails this test. It cannot tell a deliberate share from an orphan — that is the
+ * author's job — but it makes the author say which they meant, which is exactly what did not
+ * happen three times. The list is a ratchet: it may only get shorter.
+ */
+const SHARED_WITH_THE_DESK = [
+  // the objective rail and the report's copy of it, drawn from one set of rules
+  'objective',
+  'objective--active',
+  'objective--met',
+  'objective--over',
+  'objective__gate',
+  'objective__label',
+  'objective__mark',
+  'objective__progress',
+  'objective__progress--over',
+  'seed-chip',
+  'seed-row',
+  // the budget gauge, the fuel gauge and par, on the rail and on the report
+  'budget-bar',
+  'budget-bar__fill',
+  'budget-bar__limit',
+  'fuel',
+  'fuel__track',
+  'fuel__value',
+  'par-note',
+  'par-row__value--good',
+  'par-row__value--over',
+  // why the run failed, on the halt notice
+  'cause',
+  'cause__detail',
+  'cause__diff',
+  'cause__diff-tag',
+  'cause__diff-where',
+  'cause__head',
+  'cause__label',
+  'cause__readout',
+  'failure-box',
+  'failure-box__code',
+  'failure-box__message',
+  'failure-box__note',
+  'record',
+  'record__line',
+  'record__numbers',
+  'record__tag',
+  'record__was',
+  'tag',
+  // the two components the site map and the desk both mount
+  'commend',
+  'commend--in',
+  'commend--out',
+  'commend__note',
+  'commend__seal',
+  'commend__title',
+  'medal',
+  'medal--lg',
+  // and the four names both sheets simply use
+  'modal',
+  'overlay',
+  'screen',
+  'sr-only',
+] as const;
+
+describe('app.css and the desk share only the names they mean to', () => {
+  /** Every class named in a selector of a sheet, comments and declarations stripped. */
+  function classesIn(css: string): Set<string> {
+    const found = new Set<string>();
+    const bare = css.replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const match of bare.matchAll(/(?:^|[};])([^{};]*)\{/g)) {
+      const selector = match[1];
+      if (!selector || selector.trim().startsWith('@')) continue;
+      for (const name of selector.matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)) {
+        if (name[1]) found.add(name[1]);
+      }
+    }
+    return found;
+  }
+
+  const shell = classesIn(read('src/ui/styles/app.css'));
+  const desk = new Set(
+    ['desk', 'terminal', 'monitor', 'paper', 'furniture', 'director'].flatMap((name) => [
+      ...classesIn(read(`src/ui/styles/desk/${name}.css`)),
+    ]),
+  );
+
+  test('no name is in both sheets without being on the list', () => {
+    const shared = [...shell].filter((name) => desk.has(name)).sort();
+    expect(shared).toEqual([...SHARED_WITH_THE_DESK].sort());
+  });
+
+  test('the list carries no name that has stopped being shared', () => {
+    const stale = [...SHARED_WITH_THE_DESK].filter((name) => !shell.has(name) || !desk.has(name));
+    expect(stale).toEqual([]);
+  });
+
+  /*
+   * The names the three defects came through. None is in the shell sheet any more, and naming them
+   * here is the point: both leaks would have been caught by the rule above rather than by a
+   * playtester, because `paper.css` names all three as well.
+   */
+  test('the classes the three defects came through are gone from the shell sheet', () => {
+    for (const name of ['crate', 'crate__head', 'seed-row__outstanding', 'hud-card', 'splitter']) {
+      expect([name, shell.has(name)]).toEqual([name, false]);
+    }
   });
 });
