@@ -65,10 +65,19 @@ export const w2_04: LevelDef = {
     'The hopper leaves the depot full of seed. It does not open at the other end; Legal have',
     'confirmed this is a feature and have declined to say of what.',
     '',
-    'Clear the north plot and leave every tile of it planted.',
+    'Two things get checked at the end of shift: every tile that started with a crop must have',
+    'been harvested at some point, and every tile in the plot must be planted when you clock out.',
+    'These are not the same tile list — a tile can satisfy the second without ever having grown',
+    'anything for the first.',
   ].join('\n'),
   facts: [
     { label: 'The plot', value: 'Six tiles. Three across, two deep.' },
+    {
+      label: 'The bare patch',
+      value:
+        'One or two tiles came up empty this shift. Maintenance blames the night crew, the night ' +
+        'crew blames the schedule, the schedule blames Legal.',
+    },
     {
       label: 'The hopper',
       value: 'Starts the shift full. A full hopper takes nothing and the arm swings anyway.',
@@ -125,6 +134,8 @@ export const w2_04: LevelDef = {
   hints: [
     'The hopper starts full, so the first inventory reading is also its size.',
     'A swing at a full hopper costs the same two ticks as one that works.',
+    'The plot always has one or two bare tiles. Plant those first — that is the only room the',
+    'hopper has to empty into before anything can be harvested.',
     'One pass cannot finish the plot. The crops do not all come ready at the same time.',
     'Growth climbs by one per tick, so a tile says exactly how long it needs. The clock runs whether the bot drives or stands still.',
     'Waiting on a tile until it comes ready costs no spoilage. Driving laps costs the same ticks and arrives late.',
