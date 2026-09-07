@@ -592,6 +592,8 @@
  * lazily and cannot be relied on to come first.
  */
 [data-art='deepsite'] .sitemap {
+  --num-size: clamp(28px, 3vw, 46px);
+
   background: var(--bg-void);
 }
 
@@ -622,10 +624,7 @@
 }
 
 [data-art='deepsite'] .sitemap .world__num {
-  font-family: var(--font-mono);
-  font-size: clamp(28px, 3vw, 46px);
   font-weight: 800;
-  letter-spacing: 0.02em;
   line-height: 0.9;
 }
 
