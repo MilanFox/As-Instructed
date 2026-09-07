@@ -20,6 +20,25 @@
   --content-inset: max(var(--screen-gutter), calc((100% - var(--content-max)) / 2));
   --world-accent: var(--accent);
 
+  /*
+   * The world numeral's plate, measured from the type it holds instead of guessed at. Two digits
+   * of a monospace face advance 0.6em each and carry 0.02em of tracking, so the glyph is exactly
+   * 1.24 times the type size wide; the plate is that, even padding either side, and its own
+   * border. It was a flat 42px while the deepsite direction set the numeral at 46px, so `08` ran
+   * 16px out through the right-hand border and touched THE KESSLER CONTRACT beside it. A
+   * direction that wants a bigger numeral now moves `--num-size` and the plate follows.
+   *
+   * 42px stays as the floor rather than the answer: at the base direction's 13px the plate is a
+   * marker whose size is a decision, not a consequence of the type. Everything that has to line
+   * up with the plate — the meta column's indent, the route spine that runs through its centre —
+   * reads `--num-box` rather than restating it.
+   */
+  --num-size: 13px;
+  --num-glyph: calc(1.24 * var(--num-size));
+  --num-pad: calc(0.14 * var(--num-size));
+  --num-box: max(42px, calc(var(--num-glyph) + 2 * var(--num-pad) + 2px));
+  --num-gap: 14px;
+
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -134,13 +153,27 @@
   gap: var(--space-6);
 }
 
+/*
+ * The eight worlds, and only them. The spine hangs off this rather than off `.sitemap__route`
+ * because the commendation shelf is a child of the route too, and a rule spanning the route's
+ * full height ran on past the last world and down the side of a panel that is not a stop on it.
+ * Giving the worlds a container of their own is what makes `top`/`bottom` mean "the run of
+ * track"; a `bottom:` tuned to clear the shelf would only hold until the shelf changed height.
+ */
+.sitemap__worlds {
+  display: flex;
+  position: relative;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
 /* The spine that makes eight sections read as one route. */
-.sitemap__route::before {
+.sitemap__worlds::before {
   content: '';
   position: absolute;
   top: 12px;
   bottom: 12px;
-  left: 21px;
+  left: calc(var(--num-box) / 2);
   width: 1px;
   background: linear-gradient(
     to bottom,
@@ -162,7 +195,7 @@
 
 .world__meta {
   min-width: 0;
-  padding-left: 56px;
+  padding-left: calc(var(--num-box) + var(--num-gap));
 }
 
 .world__head {
@@ -174,12 +207,14 @@
 .world__num {
   position: absolute;
   left: 0;
-  width: 42px;
+  width: var(--num-box);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
   background: var(--bg-void);
   color: var(--world-accent);
-  font-size: 13px;
+  font-family: var(--font-mono);
+  font-size: var(--num-size);
+  letter-spacing: 0.02em;
   line-height: 26px;
   text-align: center;
 }
@@ -525,7 +560,7 @@
   }
 
   .world__meta {
-    padding-left: 56px;
+    padding-left: calc(var(--num-box) + var(--num-gap));
   }
 
   .world__rail {

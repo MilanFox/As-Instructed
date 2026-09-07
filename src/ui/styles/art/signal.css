@@ -593,11 +593,14 @@
   font-family: var(--font-mono);
 }
 
+[data-art='signal'] .sitemap {
+  --num-size: var(--t-body);
+}
+
 [data-art='signal'] .world__num {
   border-radius: 0;
   border-color: var(--world-accent);
   color: var(--world-accent);
-  font-size: var(--t-body);
   text-shadow: var(--glow);
 }
 
@@ -698,7 +701,7 @@
   text-transform: uppercase;
 }
 
-[data-art='signal'] .sitemap__route::before {
+[data-art='signal'] .sitemap__worlds::before {
   background: var(--border);
 }
 

@@ -378,131 +378,135 @@ export function LevelSelect(): JSX.Element {
 
       <div className="sitemap__scroll">
         <div className="sitemap__route" onKeyDown={onKeyDown}>
-          {rows.map((row) => {
-            const fill = row.issued > 0 ? (row.closed / row.issued) * 100 : 0;
-            /*
-             * The world's colour comes from the art direction, not from the level definition.
-             *
-             * `WORLDS` carries eight literal accents, three of which are not in the palette at
-             * all and two of which *are* reserved semantic tokens — World 7 is `--danger` and
-             * World 8 is `--gold`, so on `w8-05` the world's colour and the medal being chased
-             * are the same colour. Eight decorative hues on top of a six-colour semantic palette
-             * is how a palette stops meaning anything (AUDIT-UI F1). Indirecting through
-             * `--world-N` leaves the level data untouched and hands the decision to whichever
-             * direction is loaded.
-             */
-            const style: StyleVars = {
-              '--world-accent': `var(--world-${row.world.id})`,
-              '--rail-fill': `${fill}%`,
-            };
+          <div className="sitemap__worlds">
+            {rows.map((row) => {
+              const fill = row.issued > 0 ? (row.closed / row.issued) * 100 : 0;
+              /*
+               * The world's colour comes from the art direction, not from the level definition.
+               *
+               * `WORLDS` carries eight literal accents, three of which are not in the palette at
+               * all and two of which *are* reserved semantic tokens — World 7 is `--danger` and
+               * World 8 is `--gold`, so on `w8-05` the world's colour and the medal being chased
+               * are the same colour. Eight decorative hues on top of a six-colour semantic palette
+               * is how a palette stops meaning anything (AUDIT-UI F1). Indirecting through
+               * `--world-N` leaves the level data untouched and hands the decision to whichever
+               * direction is loaded.
+               */
+              const style: StyleVars = {
+                '--world-accent': `var(--world-${row.world.id})`,
+                '--rail-fill': `${fill}%`,
+              };
 
-            return (
-              <section
-                key={row.world.id}
-                className={row.complete ? 'world world--complete' : 'world'}
-                style={style}
-                aria-label={`World ${row.world.id}, ${row.world.name}`}
-              >
-                <div className="world__meta">
-                  <div className="world__head">
-                    <span className="world__num numeric">
-                      {String(row.world.id).padStart(2, '0')}
-                    </span>
-                    <div>
-                      <h2 className="world__name">{row.world.name}</h2>
-                      <p className="world__subtitle">{row.world.subtitle}</p>
+              return (
+                <section
+                  key={row.world.id}
+                  className={row.complete ? 'world world--complete' : 'world'}
+                  style={style}
+                  aria-label={`World ${row.world.id}, ${row.world.name}`}
+                >
+                  <div className="world__meta">
+                    <div className="world__head">
+                      <span className="world__num numeric">
+                        {String(row.world.id).padStart(2, '0')}
+                      </span>
+                      <div>
+                        <h2 className="world__name">{row.world.name}</h2>
+                        <p className="world__subtitle">{row.world.subtitle}</p>
+                      </div>
                     </div>
-                  </div>
-                  <p className="world__blurb">{row.world.blurb}</p>
-                  <p className="world__tally numeric">
-                    {row.maxPoints > 0 ? `${row.points}/${row.maxPoints} pts` : '—/— pts'}
-                    <span className="world__issued">
-                      {' · '}
-                      {row.closed}/{row.issued} closed
-                    </span>
-                  </p>
-                  {row.complete ? (
-                    <p className={row.perfect ? 'world__stamp world__stamp--gold' : 'world__stamp'}>
-                      {row.perfect ? 'ALL AT PAR' : 'SECTOR NOMINAL'}
+                    <p className="world__blurb">{row.world.blurb}</p>
+                    <p className="world__tally numeric">
+                      {row.maxPoints > 0 ? `${row.points}/${row.maxPoints} pts` : '—/— pts'}
+                      <span className="world__issued">
+                        {' · '}
+                        {row.closed}/{row.issued} closed
+                      </span>
                     </p>
-                  ) : null}
-                </div>
-
-                <div className="world__track">
-                  <div className="world__rail" aria-hidden="true">
-                    <span className="world__rail-fill" />
+                    {row.complete ? (
+                      <p
+                        className={row.perfect ? 'world__stamp world__stamp--gold' : 'world__stamp'}
+                      >
+                        {row.perfect ? 'ALL AT PAR' : 'SECTOR NOMINAL'}
+                      </p>
+                    ) : null}
                   </div>
-                  <ul className="world__nodes">
-                    {row.nodes.map((node) => (
-                      <li className="node-slot" key={node.id}>
-                        <button
-                          type="button"
-                          ref={(element) => registerNode(node.id, element)}
-                          className={[
-                            'node',
-                            `node--${node.progress.medal}`,
-                            node.playable ? 'node--live' : 'node--locked',
-                            node.isNext ? 'node--next' : '',
-                          ]
-                            .filter(Boolean)
-                            .join(' ')}
-                          disabled={!node.playable}
-                          aria-disabled={!node.playable}
-                          aria-label={nodeLabel(node)}
-                          tabIndex={node.id === roving ? 0 : -1}
-                          onFocus={() => setRoving(node.id)}
-                          onClick={() => openLevel(node.id)}
-                        >
-                          <span className="node__disc">
-                            {node.playable ? (
-                              <span className="node__index numeric">
-                                {String(node.index).padStart(2, '0')}
-                              </span>
-                            ) : (
-                              <LockGlyph />
+
+                  <div className="world__track">
+                    <div className="world__rail" aria-hidden="true">
+                      <span className="world__rail-fill" />
+                    </div>
+                    <ul className="world__nodes">
+                      {row.nodes.map((node) => (
+                        <li className="node-slot" key={node.id}>
+                          <button
+                            type="button"
+                            ref={(element) => registerNode(node.id, element)}
+                            className={[
+                              'node',
+                              `node--${node.progress.medal}`,
+                              node.playable ? 'node--live' : 'node--locked',
+                              node.isNext ? 'node--next' : '',
+                            ]
+                              .filter(Boolean)
+                              .join(' ')}
+                            disabled={!node.playable}
+                            aria-disabled={!node.playable}
+                            aria-label={nodeLabel(node)}
+                            tabIndex={node.id === roving ? 0 : -1}
+                            onFocus={() => setRoving(node.id)}
+                            onClick={() => openLevel(node.id)}
+                          >
+                            <span className="node__disc">
+                              {node.playable ? (
+                                <span className="node__index numeric">
+                                  {String(node.index).padStart(2, '0')}
+                                </span>
+                              ) : (
+                                <LockGlyph />
+                              )}
+                            </span>
+                          </button>
+
+                          <span className="node__pips" aria-hidden="true">
+                            {Array.from(
+                              { length: starsFor(node.level.bonus, node.progress.stars) },
+                              (_, pip) => (
+                                <span className="node__pip" key={pip} />
+                              ),
                             )}
                           </span>
-                        </button>
 
-                        <span className="node__pips" aria-hidden="true">
-                          {Array.from(
-                            { length: starsFor(node.level.bonus, node.progress.stars) },
-                            (_, pip) => (
-                              <span className="node__pip" key={pip} />
-                            ),
-                          )}
-                        </span>
-
-                        <span className="node__id numeric">{node.id}</span>
-                        <span className="node__title">
-                          {node.playable ? node.level.title : ' '}
-                        </span>
-                        <span
-                          className={`node__status status--${node.status.replace(' ', '-').toLowerCase()}`}
-                        >
-                          {/*
-                            The grade in a glyph, beside the word. Colour was the sole channel
-                            across 33 discs at 44px (AUDIT-UI F1), and a legend does not help you
-                            tell two warm rings apart. `MedalBadge` prints `I / II / III / ✓`,
-                            which survives greyscale and survives Signal. `✓` is the ungraded
-                            close — the mark of finished work, not a fourth medal (DESIGN.md §11
-                            A7). The button above already announces the grade, so this is for the
-                            eye only.
-                          */}
-                          {node.progress.completed ? (
-                            <span className="node__medal" aria-hidden="true">
-                              <MedalBadge medal={medalOf(node.level, node.progress)} />
-                            </span>
-                          ) : null}
-                          {node.status}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </section>
-            );
-          })}
+                          <span className="node__id numeric">{node.id}</span>
+                          <span className="node__title">
+                            {node.playable ? node.level.title : ' '}
+                          </span>
+                          <span
+                            className={`node__status status--${node.status.replace(' ', '-').toLowerCase()}`}
+                          >
+                            {/*
+                              The grade in a glyph, beside the word. Colour was the sole channel
+                              across 33 discs at 44px (AUDIT-UI F1), and a legend does not help you
+                              tell two warm rings apart. `MedalBadge` prints `I / II / III / ✓`,
+                              which survives greyscale and survives Signal. `✓` is the ungraded
+                              close — the mark of finished work, not a fourth medal (DESIGN.md §11
+                              A7). The button above already announces the grade, so this is for the
+                              eye only.
+                            */}
+                            {node.progress.completed ? (
+                              <span className="node__medal" aria-hidden="true">
+                                <MedalBadge medal={medalOf(node.level, node.progress)} />
+                              </span>
+                            ) : null}
+                            {node.status}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </section>
+              );
+            })}
+          </div>
 
           <CommendationShelf achievements={save.achievements} />
         </div>
