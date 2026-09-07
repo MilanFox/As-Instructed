@@ -9,9 +9,9 @@ export interface Vec {
 /**
  * Cardinal direction. North is y-1 because y grows South.
  *
- * DESIGN.md §4.1 writes this as `const enum`. We use a frozen object plus a union type because
- * the value has to survive into the player's transpiled program at runtime, and `const enum`
- * members are erased by the bundler (and are illegal under `isolatedModules`).
+ * DESIGN.md §4.1 requires a frozen object plus a union type here, never a TypeScript enum: the
+ * value has to survive into the player's transpiled program at runtime, and `const enum` members
+ * are erased by the bundler (and are illegal under `isolatedModules`).
  */
 export const Dir = {
   North: 0,

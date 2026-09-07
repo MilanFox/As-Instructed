@@ -37,6 +37,8 @@ House sentence: two beats — a flat statement, then a flatter qualifier that ma
 - Never punch at the player — copy targets the situation, never their competence. The company
   never admits fault, and never quite denies it. It reclassifies.
 - British-adjacent bureaucratese: "actioned", "as per", "deprioritised", "raised as a concern".
+- Atmosphere without a joke is fog. Name a mechanic in `CURRICULUM.md`, never in a brief — there
+  are no levels here, only work orders.
 
 ### 1.3 Length budgets (hard limits — the UI depends on these)
 
@@ -52,37 +54,15 @@ House sentence: two beats — a flat statement, then a flatter qualifier that ma
 
 Failure/success lines repeat hundreds of times: no punchline structure, no one-shot gag.
 
-### 1.4 Five good lines
+### 1.4 Vocabulary
 
-| Line | Note |
-|---|---|
-| The hangar has been swept. Not recently. But it has been swept. | two beats |
-| Your predecessor left the bot in the corner facing a wall. We have chosen to read this as parked. | reclassifies |
-| Kessler & Daughters does not recognise the term "unsafe". The approved term is "outside of tolerance". | bureaucratese |
-| Yield is up eleven percent. Yield is measured by a machine that we also maintain. | specific number |
-| You will not be going to the surface. That is what the surface is for. | flat, then worse |
-
-### 1.5 Mistakes not to repeat
-
-| Bad example | Verdict |
-|---|---|
-| "LOL the last guy totally exploded 💀" | Outside-fiction register; burns #4470's fate for a laugh. |
-| "Neither do I \[care if you die\]." | K&D is indifferent, not hostile. |
-| "SOMEBODY needs more coffee! ☕" | Reaches at the player's real life; nothing in-world knows Mondays. |
-| "This will teach you breadth-first search." | No levels here, only work orders. Name mechanics in `CURRICULUM.md`, never the brief. |
-| "the cold cathedral of the void…" | Purple, not funny — atmosphere without a joke is fog. |
-
-### 1.6 Words that are banned
-
-`epic`, `insane`, `crushed it`, `oops`, `whoops`, `uh-oh`, `yikes`, `nice try`, `better luck`,
-`skill issue`, `bruh`, any emoji, any meme, any second-person insult, `AI` used as a boast,
-`hero`, `destiny`, `chosen`, `grim`, `bleak`, `soulless`. Never call the player "user" —
+Banned: `epic`, `insane`, `crushed it`, `oops`, `whoops`, `uh-oh`, `yikes`, `nice try`,
+`better luck`, `skill issue`, `bruh`, any emoji, any meme, any second-person insult, `AI` used as
+a boast, `hero`, `destiny`, `chosen`, `grim`, `bleak`, `soulless`. Never call the player "user" —
 Contractor #4471, "you", or (ONBOARD only) "NEW HIRE".
 
-### 1.7 Words that are load-bearing
-
-`actioned`, `as per`, `at this time`, `deprioritised`, `raised as a concern`, `outside of
-tolerance`, `pending review`, `for information only`, `historically`, `nominal`,
+Load-bearing: `actioned`, `as per`, `at this time`, `deprioritised`, `raised as a concern`,
+`outside of tolerance`, `pending review`, `for information only`, `historically`, `nominal`,
 `statistically interesting`, `the engagement`, `legacy`, `retained`, `unrecoverable`,
 `per the Charter`, `see Appendix C`.
 
@@ -105,11 +85,6 @@ got stuck the same way: their termination sits unsigned, so their contract auto-
 payroll error has filed #4471 (the player) into an heir slot, making #4471's signature valid —
 the contract, and #4470's fate, become the player's decision by World 8.
 
-### 3.1 Beat per world
-
-World names live in `src/levels/index.ts`; each world's beat is the shipped copy in
-`src/levels/world-N/*.ts`. §3.2 covers what they plant and pay off.
-
 ### 3.2 Planting and payoff
 
 Required plants — deepen these, do not add new mysteries.
@@ -123,9 +98,6 @@ Required plants — deepen these, do not add new mysteries.
 | #4470's locker | w1-01 | w8-04 — an unsigned termination form inside |
 | #4470's status ping | w6-01, as noise | w6-05, as a message |
 
-The 9-tick airlock Dot names in the finale brief (w8-05) has no plant anywhere in Worlds 1–7:
-an open gap, not a style choice. Plant it earlier, or drop the payoff.
-
 ### 3.3 The ending (World 8, level 5)
 
 One screen, two buttons, no timer: form `KD-0001-T — TERMINATION OF ENGAGEMENT (CHARTER)`,
@@ -137,36 +109,29 @@ Vance.
 
 ## 4. Per-World Framing
 
-World copy — one intro card, one complete card, two mid-world memos (dismissible, never
-blocking Run) — lives in `src/levels/world-N/*.ts`. Placeholders in `[brackets]` fill from real
-save data. Write new copy in this voice; do not duplicate any of it here.
+Each world has one intro card, one complete card, and two mid-world memos that are dismissible
+and never block Run. Placeholders in `[brackets]` fill from real save data.
 
 ## 5. Failure Flavour
 
-Canonical lines live in `src/ui/copy.ts` (`BRONZE`, `SILVER`, `GOLD`, `CLOSED`, `HALT`,
-`UNMET`, `BY_CODE`). Add new lines there, in cadence, inside the §1.3 budgets.
+Canonical lines live in `src/ui/copy.ts`. Generalization failure — pass on one seed, fail on
+another — is the most important category: multi-seed levels test that a solution generalizes, not
+that it memorized one layout.
 
-Generalization failure — pass on one seed, fail on another — is the most important category:
-multi-seed levels test that a solution generalizes, not that it memorized one layout.
+A blocked move is not a failure (DESIGN.md §4.4). Do not write failure copy for it.
 
-A blocked move is not a failure: it returns `false` and costs the tick it always cost
-(DESIGN.md §4.4). Do not write failure copy for it.
+`HALT NOTICE`'s per-tile `want`/`got` plus "Nothing was billed" is the model for a failure
+message: say which tile disagreed and what the player was not charged for.
 
 ## 6. Success and Medal Flavour
 
-Canonical lines live in `src/ui/copy.ts` (`BRONZE`, `SILVER`, `GOLD`, `CLOSED`, `UNDER_PAR`,
-`BONUS_MET`, `personalBestLine`). Warm, never a trophy pop.
-
-Medals are ticks-only (DESIGN.md §7). Nothing may score, rank, or remark on program length.
+Canonical lines live in `src/ui/copy.ts`. Warm, never a trophy pop. Certificate copy varies by
+how a medal was earned; keep varying it for new medal states.
 
 ## 6a. Commendations
 
-Ids, rules, and requirements live in `src/game/achievements.ts` (self-documented). One more,
-voice-only: never congratulate the player directly — the company notices a number moved,
-nothing else.
-
-Hardware requisition card format and the `spec`/`opens` split are documented on `HardwareNote`
-in `src/ui/copy.ts`.
+Ids, rules, and requirements live in `src/game/achievements.ts`. One more, voice-only: never
+congratulate the player directly — the company notices a number moved, nothing else.
 
 ## 7. The Performance Review Memo
 
@@ -174,11 +139,8 @@ Delivered once, ever, per tier, on the site map. Tier is medal points earned as 
 medal points available, closed work orders only — gold 3, silver 2, bronze 1, bonus star +1, not
 in the denominator (DESIGN.md §7).
 
-Four tiers, numbered 2–5 not 1–4: `reviewedRanks` in the save records which memos a contractor
-has already read, so the surviving four keep their original numbers. Deleted-Tier-1 rationale:
-`REVIEW_TIERS` in `src/game/score.ts`, checked against this section by
-`src/__tests__/confessed-invariants.test.ts`. Escalation runs upward — each tier renders a grade
-line, a Vance body, a Dot aside, and (tiers 3–5) a Legal footnote.
+Four tiers, numbered 2–5 not 1–4 (DESIGN.md §7). Escalation runs upward — each tier renders a
+grade line, a Vance body, a Dot aside, and (tiers 3–5) a Legal footnote.
 
 ---
 
@@ -295,11 +257,10 @@ Canon spellings and definitions. Do not invent synonyms.
 
 [The actual ask, in plain unfunny language. What must be true when the
 program finishes. No jokes in this part.]
-
-[Optional: a #4470 comment appears in `starter`, not here.]
 ```
 
-A hidden requirement in the flavour is a content bug, not a difficulty setting.
+A hidden requirement in the flavour is a content bug, not a difficulty setting. A #4470 comment
+goes in `starter`, not in the brief.
 
 ### 9.2 #4470 comment placement
 

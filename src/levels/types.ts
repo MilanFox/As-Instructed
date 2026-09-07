@@ -52,7 +52,7 @@ export interface LevelDef {
   docs?: string[];
   /** Optional challenges worth an extra star. */
   bonus?: Objective[];
-  /** Per-level overrides of the DESIGN.md §4.4 cost table. */
+  /** Per-level overrides of the `src/engine/costs.ts` defaults. DESIGN.md §4.4. */
   costs?: CostOverrides;
   /** Per-level budget. Defaults come from `Sim`. */
   budget?: { maxTicks?: number; maxOps?: number };

@@ -1,63 +1,44 @@
 # DESIGN — the binding contract
 
 > Every rule here is currently true and stated once. Nothing may contradict it. If a rule looks
-> wrong, report it rather than deviating silently.
+> wrong, report it rather than deviating silently. Sections are cited from source comments by
+> number (`DESIGN.md §7`), so renumber one only by repointing every citation to it.
 
 ## 1. The Game
 
-**BOOTSTRAP** — *or: How I Learned to Stop Worrying and Automate the Regolith.*
-
-The player is Contractor #4471 at **Kessler & Daughters Terraforming Ltd.** They never go to the
-planets; they write the code the planets' robots run. Puzzle-programming: grid worlds, real
-TypeScript, deterministic simulation, replayable traces, optimization scoring.
+**BOOTSTRAP.** The player is Contractor #4471 at **Kessler & Daughters Terraforming Ltd.** They
+never go to the planets; they write the code the planets' robots run. Puzzle-programming: grid
+worlds, real TypeScript, deterministic simulation, replayable traces, optimization scoring.
 
 Tone is dry, corporate-dystopian, affectionate, never mean-spirited. **Jokes live in mission
 briefs, management e-mail and failure messages. API docs stay clean and factual.** Voice is
 specified in `docs/NARRATIVE.md`.
 
-## 2. Hard Technical Decisions (settled — do not re-litigate)
+## 2. Settled Technical Decisions (do not re-litigate)
 
-| Thing | Decision |
-|---|---|
-| Build | Vite 6 + TypeScript 5 (strict) |
-| UI | React 19 + zustand. **No Tailwind.** Plain CSS with design tokens in `src/ui/styles/tokens.css` |
-| Editor | `monaco-editor` + `@monaco-editor/react` |
-| Player language | Real TypeScript, transpiled in-browser by Monaco's TS worker |
-| Rendering | Canvas2D, no WebGL, no Pixi |
-| Audio | WebAudio, synthesized in code. No audio asset files |
-| Tiles | Kenney.nl CC0 sprite packs, committed under `public/assets/` |
-| Units/FX | Drawn in code (Canvas2D paths), not sprites |
-| Sim | Deterministic, seeded, integer-tick. Runs **inside the Web Worker** |
-| Persistence | `localStorage`, plus JSON export/import |
-| Tests | Vitest for engine + level solvability |
-| Package manager | npm |
-| i18n | Out of scope, permanently. English only, strings inline |
+Versions live in `package.json`. What is not discoverable there is the prohibitions:
+
+- **No Tailwind and no CSS framework.** Plain CSS, design tokens in `src/ui/styles/tokens.css`.
+- **Canvas2D only** — no WebGL, no Pixi. Units and FX are drawn in code, not sprites; tiles are
+  Kenney.nl CC0 packs committed under `public/assets/`.
+- **No audio asset files.** WebAudio, synthesized in code.
+- **The player writes real TypeScript**, transpiled in-browser by Monaco's TS worker.
+- **The sim runs inside the Web Worker.** Deterministic, seeded, integer-tick.
+- **i18n is out of scope permanently.** English only, strings inline.
+- Persistence is `localStorage` plus JSON export/import.
 
 ## 3. Execution Model
 
 **Trace-based replay.** Everything else depends on it.
 
-```
-main thread                          worker
------------                          ------
- user hits Run
- monaco TS worker -> emit JS  ---->  new Function(js) with API bound
-                                     runs to completion, SYNCHRONOUSLY
-                                     every API call mutates the Sim and
-                                     appends timestamped events to a Trace
-   <---- { trace, verdict, stats }
- replay/scrub/step the trace
-```
-
 - **The player's API is synchronous.** `move(Dir.North)` — no `await`, ever. Deliberate
   accessibility decision.
-- The program runs to completion *before* a frame is drawn. The renderer never talks to the sim;
-  it consumes a `Trace`.
+- The program runs to completion in the worker *before* a frame is drawn. The renderer never talks
+  to the sim; it consumes a `Trace`.
 - **Scrubbing, rewind, step, and speed control are required features** and are free.
-- Runaway code is stopped three ways: the `maxTicks` budget (every API call checks it and throws
-  `HaltError`), the `maxOps` budget for loops that call the API without advancing ticks, and a
-  main-thread watchdog that terminates the worker after `WORKER_TIMEOUT_MS` (default 5000). A
-  tight `while(true){}` with no API call is only catchable by the third.
+- A main-thread watchdog terminates the worker after `WORKER_TIMEOUT_MS`. It is the only guard that
+  catches a tight `while(true){}` with no API call in it; the budgets that catch the rest are in
+  `docs/ENGINE.md` §7.
 - Runtime errors map back to the **user's** line and column: the transpiled JS is wrapped, so
   subtract the wrapper offset before displaying, and show the failing line inline in Monaco.
 
@@ -68,17 +49,17 @@ browser-specific.** It runs in Node under Vitest unchanged.
 
 ### 4.1 Primitives
 
-`Vec` is `{ x, y }`. Grid: `x` grows East, `y` grows **South** (screen coordinates); North is
-`y - 1`. `Dir`, `Terrain`, `ItemKind`, `MachineKind`, `FailureCode` and `Medal` are **frozen objects
-plus a union type, never TypeScript enums** — a `const enum` erases at build time and the player's
+Grid: `x` grows East, `y` grows **South** (screen coordinates); North is `y - 1`. Tiles are
+row-major, indexed `y * w + x`.
+
+`Dir`, `Terrain`, `ItemKind`, `MachineKind`, `FailureCode` and `Medal` are **frozen objects plus a
+union type, never TypeScript enums** — a `const enum` erases at build time and the player's
 transpiled program needs `Dir` as a real runtime value.
 
 ### 4.2 World
 
-`World` (`src/engine/types.ts`) is the whole simulated site: dimensions, a row-major `tiles` array
-indexed `y * w + x`, `bots`, loose `items`, `machines`, an integer `tick`, a seeded `rng`, and a
-`vars` scratch record for level-specific state. `Tile` carries `terrain`, optional `growth`, optional
-`occupant`. **Everything is data** — no methods, no classes with behaviour. `Sim` operates on it.
+`World` is the whole simulated site and **everything in it is data** — no methods, no classes with
+behaviour. `Sim` operates on it. `World.vars` is a scratch record for level-specific state.
 
 ### 4.3 Bots and virtual clocks
 
@@ -90,55 +71,40 @@ Multi-bot worlds (World 7+):
 - Bots act independently; `b1.move()` then `b2.move()` means both move in parallel.
 - `sync()` advances every bot's clock to `max(clock)`.
 - If bot A would enter a tile occupied by bot B over an overlapping interval, A's move **fails and
-  returns false**, costing `BLOCKED_COST` ticks. Resolution order is ascending `(clock, botId)`.
+  returns false**, costing `BLOCKED_COST` ticks. Contention resolves by issue order
+  (`docs/ENGINE.md` §3).
 - The level's tick score is `max(bot.clock)` (makespan), which is what makes World 7 about
   parallelism.
 
 ### 4.4 Commands and cost model
 
-Sensing is **free** (0 ticks). Acting costs ticks. Defaults, overridable per level:
-
-| Action | Ticks |
-|---|---|
-| `move` (success) | 1 |
-| `move` (blocked) | 1 |
-| `harvest` / `mine` / `plant` | 2 |
-| `pickup` / `drop` | 1 |
-| `use` | 2 |
-| `wait(n)` | n |
-| `send` | 1 |
-| any sensing (`scan`, `pos`, `canMove`, `look`, `inventory`, `carrying`) | 0 |
+Sensing is **free** (0 ticks) and acting costs ticks. The default table is `src/engine/costs.ts`,
+overridable per level via `LevelDef.costs`.
 
 **A blocked move is priced once, in ticks, and nothing may charge for it again.** `move` returning
-`false` is a sensing channel the game teaches deliberately — `w1-01`'s own hint sells
-bump-and-turn as a real, slightly expensive strategy — and the tick cost is the whole price. A
+`false` is a sensing channel the game teaches deliberately, and the tick cost is the whole price. A
 reward for the *non-occurrence* of an error signal is jointly satisfiable with an information
 budget only by already knowing the layout, which is hardcoding, which is what multi-seed levels
 exist to prevent.
 
-**Fuel is a real mechanic.** Every bot has `fuel: number`, default `Infinity`, so most levels are
-unaffected. Acting consumes fuel equal to the action's tick cost; sensing is free. At zero fuel an
-action throws `OutOfFuelError` (`FailureCode.OUT_OF_FUEL`). `refuel()` on a fuel-depot tile
-restores to max and burns nothing. Levels opt in via `World.bots[i].fuel` / `fuelMax`. The UI shows
-a fuel gauge only where a level uses it. Used by `w4-05` and `w8-05`.
+**Fuel is a real mechanic**, opt-in per bot and defaulting to `Infinity` so most levels are
+unaffected. Acting consumes fuel equal to the action's tick cost; sensing is free. `refuel()`
+restores to max, burns nothing, and only succeeds on a fuel-depot tile. The UI shows a fuel gauge
+only where a level uses it. Mechanics in `docs/ENGINE.md` §3a.
 
 ### 4.5 Trace
 
-`Trace` and `TraceEvent` are declared in `src/engine/trace.ts`. A trace is `initialWorld` (a deep
-snapshot), `events` sorted by `t` with a stable sort, `keyframes` every ~500 ticks, and `endTick`.
+A trace is `initialWorld` (a deep snapshot), `events` sorted by `t` with a stable sort, `keyframes`
+every ~500 ticks, and `endTick`.
 
 **Replay must be reconstructible purely from `initialWorld` + `events`. The renderer never guesses,
 and keyframes are an optimisation only.**
 
 ### 4.6 Verdict
 
-`Verdict` (`src/engine/verdict.ts`) reports `passed`, the `objectives` with their labels and
-optional `[done, total]` progress, an optional `failure` carrying a `FailureCode` and a message, and
-`stats`.
-
 **`stats.spend` is generic resource accounting** — cable used, and anything a later level meters the
 same way. Commands and levels populate it via `Sim.spend`; it is merged worst-case per resource
-across seeds. Required by `w5-05`.
+across seeds.
 
 **`FailureCode.BLOCKED_LIVELOCK` exists and must be used.** When every bot in a multi-bot level has
 its move blocked for N consecutive resolution rounds, fail with that code and a message naming
@@ -148,34 +114,23 @@ Failure codes are spelled in `SCREAMING_CASE`.
 
 ## 5. Level Contract
 
-`LevelDef` is declared in `src/levels/types.ts`. The fields that carry rules rather than data: `id`
-(`'w1-03'`, stable forever, the save key), `build(seed)` (pure and deterministic), `objectives`,
-`seeds` (**all** must pass; more than one means generalization is required), `par: { ticks }` (the
-medal axis and the only par a level has, §7), `graded` (default `true`, §7), `hardware` (the API
-names this order unlocks, cumulative), `hints` (progressive, never a full solution), and `bonus`.
-
+`LevelDef` is declared in `src/levels/types.ts`. `id` is stable forever — it is the save key.
 Rules for level authors:
 
-- `seeds.length >= 3` from World 2 onward. Randomized worlds kill hardcoded solutions.
+- `seeds.length >= 3` from World 2 onward, and **all** of them must pass. Randomized worlds kill
+  hardcoded solutions.
 - Every level ships a reference solution in `src/levels/**/__solutions__/<id>.ts`. These are test
   fixtures only, excluded from the production bundle by `vite.config.ts` and unreachable from the
-  UI. Vitest asserts every level is solvable on every seed and that the reference's tick count is
-  `<= par.ticks`.
-- `par.ticks` is *achievable but tight*: reference solution ticks minus roughly 10%.
-- `hints` are nudges ("What happens if the field is empty when you arrive?"), never code.
-- `brief` is two or three sentences of roleplay and then the ask, capped at 110 words and tested.
-  **Every number, unit, budget, reach, dimension and wire format belongs in `facts`, in an
-  objective label, or on the requisition card** — somewhere it stays on screen while the player
-  writes code. Players are frequently reading in a second language; prose is read once, a row can
-  be re-read.
-- **A new objective whose progress counts anything must declare its meter.** `Objective.meter` and
-  `Objective.unit` are declared in `src/engine/objectives.ts`; `BudgetMeter` is declared there once
-  and aliased by `src/game/budgets.ts`; `meterFor` / `budgetFor` prefer a declaration over the
-  label. `Objectives.custom` can declare one too, via `CustomReport.meter` / `.unit`. Parsing the
-  unit back out of the label survives only as a fallback so that an objective which forgot to
-  declare reads out approximately right instead of silently not scoring; nothing that ships may
-  depend on it, and `src/game/__tests__/budget-declarations.test.ts` pins the set that still infers
-  at empty.
+  UI.
+- `hints` are progressive nudges ("What happens if the field is empty when you arrive?"), never
+  code, never a full solution.
+- `brief` is two or three sentences of roleplay and then the ask. **Every number, unit, budget,
+  reach, dimension and wire format belongs in `facts`, in an objective label, or on the requisition
+  card** — somewhere it stays on screen while the player writes code. Players are frequently
+  reading in a second language; prose is read once, a row can be re-read.
+- **A new objective whose progress counts anything must declare its `meter`.** Parsing the unit back
+  out of the label survives only as a fallback so that an objective which forgot to declare reads
+  out approximately right instead of silently not scoring; nothing that ships may depend on it.
 - **Omit `progress()` rather than ship a bar pointed at the wrong meter.** Where the honest quantity
   is not a run-wide total — `w7-02`'s heaviest single bot's share, for instance — a bar the readout
   attributes to a run-wide meter is worse than no bar.
@@ -188,21 +143,12 @@ rendered and never behind a filter.
 ## 6. Progression — 8 Worlds
 
 Progression is driven by **hardware unlocks**: the player does not have `scan()` until the level
-that installs the sensor. Each world's finale is a bigger multi-objective level.
-
-| # | World | Theme | Teaches | Unlocks |
-|---|---|---|---|---|
-| 1 | **Boot Sector** | A dusty test hangar | loops, conditionals, coordinates | `move` `pos` `canMove` `print` `wait` |
-| 2 | **Regolith Fields** | Agriculture on a hostile rock | state machines, resource cycles | `scan` `harvest` `plant` `inventory` |
-| 3 | **The Sorting Yards** | Logistics depot | data structures, filtering, maps | `pickup` `drop` `carrying` |
-| 4 | **Cave Systems** | Unmapped tunnels | search, BFS/DFS, memory of unknown maps | `look` `mark` `readMark` |
-| 5 | **The Grid** | Power infrastructure | constraint solving, ordering, graphs | `probe` `use` `power` `link` |
-| 6 | **Deep Signal** | A listening post | string/number crunching, parsing, checksums | `receive` `transmit` `decode` |
-| 7 | **Swarm** | A hundred cheap robots | parallelism, scheduling, makespan | `bots` `spawn` `sync` `send`/`recv` |
-| 8 | **The Kessler Contract** | The finale | everything, under budget | — (capstone levels) |
+that installs the sensor. World names, themes and accents are `WORLDS` in `src/levels/index.ts`;
+what each world teaches and unlocks is `docs/CURRICULUM.md` §3–§10.
 
 The campaign is 33 work orders. A world is not five levels and `index` is ascending rather than
-contiguous. World 8 is four large orders plus one monster.
+contiguous. World 8 is four large orders plus one monster. Each world's finale is a bigger
+multi-objective level.
 
 **Closing a work order opens the next two, and closing a world opens the whole of the next world.**
 `isLevelUnlocked` in `src/game/store.ts` is the one place that decides it. **Not yet succeeding must
@@ -242,15 +188,16 @@ level.** On `w2-04` ticks cannot tell lapping from waiting, and it still grades 
 ask. It is not satisfiable by a program that does nothing. Where a level has no second axis at all —
 every correct program costs identical ticks — its predicate must also require the level's own
 required objective, or an idle program takes the star for free. Prefer a bonus that requires
-evidence of a thing done over one that requires the absence of a thing done.
+evidence of a thing done over one that requires the absence of a thing done. A bonus with an exact
+acceptance string (`weak <id> <n>`, `bad <packet> <byte>`) is reliably earned; one phrased as a
+comparison ("best order", "fewest trips") is reliably missed and gives the player no feedback.
 
 **The vacuously-true predicate is the defect class to watch for.** A predicate that measures a
 maximum, an absence or an exclusion is true of a program that never attempts the level, unless it
 also checks the level's required objective. A predicate that measures a produced artefact — a
 report, a trail, an ordering — cannot be. **Test a candidate by running `print('.')` and nothing
 else against it.** `w6-02`'s `name-the-fault` is vacuously true on seed 2 by design, because `build`
-sets the corruption rate to zero there; it is harmless because a failed run banks no star, and the
-suite asserts the whole seed map so it cannot resurface as a surprise.
+sets the corruption rate to zero there; it is harmless because a failed run banks no star.
 
 **Character count does not exist**, and nothing may measure, score, rank, store or display the
 length of a player's program — not as a target, not as a personal best, not as a neutral readout.
@@ -267,9 +214,8 @@ resets on a failed run. **Nothing in this game may reward a player for not press
 
 - **Nothing is gated behind a commendation**, ever. No level, hint, doc page, or hardware.
 - **Nothing may be lost by playing badly, and nothing may be earned by refusing to play.** No
-  first-try commendation, no flawless one, no streak, and nothing a player can permanently spoil
-  for themselves by experimenting. A reward for never being wrong teaches a player to hesitate
-  before dispatching, and dispatching is the entire activity.
+  first-try commendation, no flawless one, no streak — a reward for never being wrong teaches a
+  player to hesitate before dispatching, and dispatching is the entire activity.
 - **The bar for a commendation is whether a real person, reading the line at the moment it
   appeared, would smile or feel seen.** Merely being accurate does not clear it. Attendance is
   allowed and so is completion in small quantities — no more than about a fifth of the list may be
@@ -279,9 +225,9 @@ resets on a failed run. **Nothing in this game may reward a player for not press
   stay hidden until it fires.** Something a player could aim at and miss must be public.
   `Achievement.hidden` marks the second kind, `CommendationShelf` keeps them off the shelf until
   they fire, and they are where the jokes live.
-- **`RunFacts` carries `ticks`, `ops` and `parTicks: number | null`, and no medal.** A medal is
-  already on the screen. `parTicks` is nullable because an ungraded order has no ladder; the
-  entries that read it decline on `null` rather than dividing by it.
+- **`RunFacts` carries no medal.** A medal is already on the screen. Its `parTicks` is nullable
+  because an ungraded order has no ladder; the entries that read it decline on `null` rather than
+  dividing by it.
 - **Retired commendation ids are never reissued.** `rescueAchievements` in `save.ts` drops them on
   read, so a reissued id would be awarded on the run and dropped on the next load. An id this build
   does not recognise is *kept*: it belongs to a newer build, and a downgrade must not eat a
@@ -290,8 +236,8 @@ resets on a failed run. **Nothing in this game may reward a player for not press
   commendation taken back. A failed run increments a counter that exists only to reward
   persistence. A program that did not compile was never dispatched and does not even do that.
 - **Hardware unlocks are a ceremony.** `Requisition` shows each new command once, ever.
-- **Everything that plays on completion is skippable**: `prefers-reduced-motion` collapses it,
-  `settings.celebrations` turns it off permanently, and a click finishes it immediately.
+- **Everything that plays on completion is skippable**, by reduced-motion, by a permanent setting,
+  and by a click.
 
 **The Performance Review is a memo, not a screen.** It is delivered on the site map, once per
 grade, through the same ceremony as `Requisition` and `RepositoryIssue`. Delivery is keyed to the
@@ -301,10 +247,9 @@ may rebuild it as a screen.
 
 **The review is four grades, numbered 2 to 5, and renumbering them 1-4 is a bug.**
 `save.reviewedRanks` persists which memos have been sent, so renumbering re-points every existing
-save at the wrong memo and withholds one the player has never read. `rescueRanks` accepts any
-integer >= 1, so no migration is needed. There is no tier 1 because there cannot be: `reportFor`
-divides by three points per graded work order and the cheapest close is a bronze at one of three,
-so **33.3% is the exact floor** of any graded record.
+save at the wrong memo and withholds one the player has never read. There is no tier 1 because
+there cannot be: `reportFor` divides by three points per graded work order and the cheapest close
+is a bronze at one of three, so **33.3% is the exact floor** of any graded record.
 
 **An optional new save field needs no `SAVE_VERSION` bump** — every earlier save already satisfies
 the shape, so there is nothing for a migration step to do. A bump is for *required* fields.
@@ -367,19 +312,6 @@ Three things RENDER must draw, because a level's lesson is unreadable otherwise:
 ## 9. Directory Ownership
 
 Agents own directories exclusively. Do not write outside your assigned paths.
-
-```
-src/engine/      sim, world, trace, rng, cost model            [FOUNDATION]
-src/levels/      level defs, objectives, solutions, worlds      [CONTENT]
-src/runtime/     worker, api surface, transpile, protocol       [RUNTIME]
-src/render/      canvas renderer, sprites, camera, fx, tiles    [RENDER]
-src/ui/          react app, panels, monaco, styles              [UI]
-src/audio/       webaudio synth + sfx bus                       [POLISH]
-src/game/        save, progress, scoring, glue store            [UI]
-public/assets/   kenney tilesets                                [RENDER]
-public/fonts/    self-hosted fonts                              [UI]
-docs/            this file, plus notes                          [ORCHESTRATOR]
-```
 
 ## 10. Non-Negotiables
 

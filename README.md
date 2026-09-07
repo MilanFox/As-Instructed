@@ -66,8 +66,15 @@ the editor arrives with the workspace.
 
 ## Documentation
 
-[`docs/README.md`](docs/README.md) routes you to the right file. `docs/DESIGN.md` is the binding
-contract and everything else defers to it; [`TODO.md`](TODO.md) at the root is the live backlog.
+[`docs/DESIGN.md`](docs/DESIGN.md) is the binding contract — execution model, engine and level
+contracts, progression, scoring, visual language — and everything else defers to it. Sections are
+cited from source comments by number (`DESIGN.md §7`), so renumber one only by repointing every
+citation to it.
+
+- [`docs/ENGINE.md`](docs/ENGINE.md) — how to call the engine, and its traps.
+- [`docs/CURRICULUM.md`](docs/CURRICULUM.md) — what each work order teaches, and how to author a new one.
+- [`docs/NARRATIVE.md`](docs/NARRATIVE.md) — register, cadence, length budgets, cast, story spine.
+- [`TODO.md`](TODO.md) — the live backlog.
 
 ## Licences
 

@@ -105,9 +105,8 @@ const KNOWN_DEAD: readonly string[] = [
   'src/levels/world-7/__solutions__/fleet.ts holdUntil',
   'src/levels/world-7/__solutions__/fleet.ts runDir',
 
-  // --- Objective builders `docs/ENGINE.md` §5 lists as available to level authors, that no
-  // level ever built. The closest thing in this repo to the `BONUS_STAR_WEIGHT` shape: documented,
-  // reachable, never called. ---
+  // --- Objective builders offered to level authors that no level ever built. The closest thing
+  // in this repo to the `BONUS_STAR_WEIGHT` shape: reachable, never called. ---
   'src/engine/index.ts hasTerrain',
   'src/engine/objectives.ts allTilesAre',
   'src/engine/objectives.ts hasTerrain',

@@ -4,8 +4,8 @@
  * DESIGN.md §8 makes RENDER responsible for the visuals a level's *failure* is argued
  * through. `w4-02` is the case that named this one: the cave loops, the w4-01 rule rides the
  * loop until the tick budget halts it, and until now the replay drew a bot moving around with
- * nothing to say it had been there twenty-five times already. CURRICULUM.md's `naive-fails` line
- * for that level asks for exactly this — "the replay should show the bot going round and round".
+ * nothing to say it had been there twenty-five times already. CURRICULUM.md §6 asks for exactly
+ * this — the replay must show the bot going round and round.
  *
  * Two decisions are load-bearing and both come from measuring real traces:
  *

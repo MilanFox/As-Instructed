@@ -7,7 +7,7 @@
  * selector left behind here was a landmine: `.crate` painted a dark background behind the
  * requisition's ink and hid all eight verb names, `.seed-row__outstanding` clipped every failure
  * reason on the halt notice mid-word, and neither was written for the surface it hit. The orphans
- * are gone now (`docs/PLAYTEST.md`), but the mechanism is not: this file is loaded globally, its
+ * are gone now, but the mechanism is not: this file is loaded globally, its
  * rules are unscoped, and the desk renders `.objective*`, `.cause*`, `.seed-chip`, `.tag`,
  * `.medal*`, `.commend*`, `.screen` and `.sr-only` too. It reads several of them on purpose.
  *
