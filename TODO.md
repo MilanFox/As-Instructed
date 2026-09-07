@@ -4,7 +4,7 @@ One current list. Everything here is known and not done. `docs/OPEN-ITEMS.md` is
 journal beside it — history, not backlog; read it backwards when something looks arbitrary.
 
 **State as of the last merge:** green. `tsc --noEmit` clean, `npm run build` clean,
-`npm test` at 2094 tests / 99 files. `npx eslint src` reports exactly one error, a known false
+`npm test` at 2140 tests / 100 files. `npx eslint src` reports exactly one error, a known false
 positive at `src/levels/world-5/__solutions__/w5-01.ts:32` (`react-hooks/rules-of-hooks` firing on
 a function named `run` that calls `use`). Leave it.
 
@@ -77,6 +77,13 @@ which is why it is here and not done.
 - **`docs/DESK-CONCEPT.md` §7 derives its board-legibility numbers off the wrong axis** (width, but
   a square grid in a 656×438 screen is fitted by height). The document's central defence of the
   smaller board does not hold as written, and will be cited later as if it were measured.
+- **The two art-direction sheets still carry the old workspace's orphans.**
+  `src/ui/styles/art/signal.css` and `art/deepsite.css` are loaded globally and hold the same dead
+  selectors `app.css` was just swept of (`.console__row`, `.timeline__mark`, `.viewport__now`,
+  `.rail__label`, `.filter-group`, `.btn--next`, `.par-row__label`) — so they carry the same
+  collision risk that produced three shipped bugs. Same sweep, but double the blast radius: these
+  sheets also style desk classes *deliberately*, and unscoped, so a rule that looks orphaned may be
+  an art direction doing its job.
 - **Signal restyles the board but not the desk chrome.** `src/ui/styles/art/*.css` target old-UI
   class names and `.desk` redefines `--ink`/`--accent`/`--scr` locally. Legible and usable, not
   beautiful.
