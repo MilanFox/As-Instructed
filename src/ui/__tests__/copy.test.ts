@@ -3,7 +3,7 @@ import { Medal } from '../../engine/index.ts';
 import { BONUS_MET, UNDER_PAR, successLine } from '../copy.ts';
 
 /**
- * DESIGN.md §11 A7. Six levels admit one route, so par is not a budget there and a medal ladder
+ * DESIGN.md §7. Six levels admit one route, so par is not a budget there and a medal ladder
  * would teach the player the grade is noise. `medalForLevel` hands those a `null` instead of a
  * `Medal`, and the close ceremony still fires — what it must not do is grade.
  */

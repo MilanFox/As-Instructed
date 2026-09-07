@@ -384,7 +384,7 @@
 .desk .repsw:hover .rsw-legend { color: #b9c2cb; }
 
 /* ---- SOUND. A key on the plate, moulded so it reads as pressable in
-   a still (docs/AUDIT-UI.md F11). */
+   a still. */
 
 .desk .footkey {
   cursor: pointer; border: 0;
@@ -450,8 +450,8 @@
 /* ---- THE FILE RAIL, and the second file itself.
 
    Two files, two moulded keys, each carrying its whole path and a
-   legend saying what the file is. `docs/AUDIT-UI.md` F12 is why they
-   are keys and not a corner control: a door weighs what is behind it,
+   legend saying what the file is. They are keys and not a corner
+   control because a door weighs what is behind it,
    and behind this one is every routine the player has written. The
    rail is not drawn at all until the Repository is provisioned, which
    is what keeps Worlds 1 and 2 a one-file game. */

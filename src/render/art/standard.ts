@@ -61,7 +61,7 @@ export const standard: ArtDirection = {
   /*
    * `gridWidth: 0.5` is not a preference, it is the old `ctx.lineWidth = 1` written in the new
    * unit. That 1 was in *device* pixels, so on the 2x display this is developed on it has always
-   * been half a CSS pixel — which is AUDIT-UI F6, and which the other directions do not inherit.
+   * been half a CSS pixel, and the other directions do not inherit it.
    */
   metrics: {
     gridWidth: 0.5,
@@ -72,7 +72,7 @@ export const standard: ArtDirection = {
   },
 
   /*
-   * The FIX-TRAIL §7 ramp, unchanged: a darkening at the cold end, red by the sixth visit, alpha
+   * The trail ramp, unchanged: a darkening at the cold end, red by the sixth visit, alpha
    * still deepening to the tenth. `referenceFloor` is the World 4 cave floor as it actually
    * renders — `floor.rock` #89a2a3 under the cave biome's 0.7 dim — which is the surface that
    * caught the original calibration out.

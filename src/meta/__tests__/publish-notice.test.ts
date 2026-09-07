@@ -6,9 +6,9 @@ import { useLibrary } from '../store.ts';
 /**
  * The Repository's answer to a work order it can take nothing from.
  *
- * `docs/AUDIT-INCENTIVES.md` finding 2: the publish offer was gated on the player already having
- * the habit the Repository exists to teach, so the player who needed it got silence. These pin the
- * refusal — the player must learn that something was wanted and what shape it has.
+ * The publish offer was once gated on the player already having the habit the Repository exists to
+ * teach, so the player who needed it got silence. These pin the refusal — the player must learn
+ * that something was wanted and what shape it has.
  */
 
 const STRAIGHT_LINE = 'move();\nmove();\nturn();\n';

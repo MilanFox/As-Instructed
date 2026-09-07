@@ -589,7 +589,7 @@
   color: var(--ink);
 }
 
-/* The Memory page. DESIGN.md §11 A3 — always rendered, never behind a filter. */
+/* The Memory page. DESIGN.md §5 — always rendered, never behind a filter. */
 .docs-card--guide {
   padding: var(--space-4);
   margin-bottom: var(--space-4);

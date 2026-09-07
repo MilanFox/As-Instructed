@@ -1,8 +1,8 @@
 /**
  * The stamp block, and what filing actually is.
  *
- * `docs/AUDIT-UI.md` §6.2 and §6.6: five ceremonies took the screen, said something once and were
- * then unreachable, and the run report was one stray click from gone with no way back. The desk's
+ * Five ceremonies used to take the screen, say something once and then become unreachable, and the
+ * run report was one stray click from gone with no way back. The desk's
  * answer is that **paper persists until it is filed** — so filing has to be an act the player
  * performs, not a timeout and not a backdrop click. You pick up the closure die and press it into
  * the box on the certificate. That call is `usePapers.file(id, mark)`, and the sheet moves to the
@@ -12,8 +12,8 @@
  * company's dies and cannot be picked up: being assessed by somebody else is the whole pressure of
  * this game, and handing the player their own medal die contradicts it. They are indicators — one
  * is live for the work order on the desk, the rest are inert. `CLOSED` is the contractor's, and
- * pressing it is how a sheet leaves the desk. Six work orders carry no medal at all (DESIGN.md §11
- * A7), and under this split that stops being an awkward fourth medal: it is simply the normal act
+ * pressing it is how a sheet leaves the desk. Six work orders carry no medal at all (DESIGN.md §7),
+ * and under this split that stops being an awkward fourth medal: it is simply the normal act
  * with no grade lit beside it.
  *
  * The block does not know what a certificate is. It listens for a press on anything carrying

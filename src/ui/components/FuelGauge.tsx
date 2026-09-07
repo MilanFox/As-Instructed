@@ -1,4 +1,4 @@
-/** Shown only on levels that use the fuel mechanic. DESIGN.md §11 A1. */
+/** Shown only on levels that use the fuel mechanic. DESIGN.md §4.4. */
 export function FuelGauge({ fuel, max }: { fuel: number; max: number }): React.JSX.Element {
   const ratio = max > 0 && Number.isFinite(max) ? Math.max(0, Math.min(1, fuel / max)) : 1;
   const low = ratio <= 0.2;

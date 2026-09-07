@@ -107,14 +107,13 @@ export const w4_01: LevelDef = {
     /*
      * `single-pass` — reach the pad without entering a tile twice — was measured free. The tunnel
      * does not fork, so any program that arrives has already walked it once and nothing else; the
-     * reference took the star on all three seeds and so does every correct program in
-     * `docs/FIX-PAR-3-8.md` §6.1, which records this board as the one level in Worlds 3–8 where
-     * the route is forced and par cannot rank anything.
+     * reference took the star on all three seeds and so does every correct program — this is the
+     * one level in Worlds 3–8 where the route is forced and par cannot rank anything.
      *
      * That is what makes an information budget the only honest star here. Ticks are identical for
      * every correct program; rays are not. The id is minted in the engine's `within-<n>-<meter>`
      * shape on purpose, so the readout takes the meter from the id and never from the label
-     * (DESIGN.md §11 A13) — this level counts the whole of the `look` meter, so the bar is honest.
+     * (DESIGN.md §5) — this level counts the whole of the `look` meter, so the bar is honest.
      *
      * The arrival conjunct is not decoration. A budget alone is satisfied by a program that never
      * runs: nought rays is inside any allowance. A star has to be earned by playing.

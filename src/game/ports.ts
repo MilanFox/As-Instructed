@@ -82,7 +82,7 @@ export interface RendererPort {
    * The end-of-run flourish, and the per-row beat a staged report needs.
    *
    * `<Results/>` owns the timing of both, because the sounds and the rings have to land on the
-   * same instants — `MEDAL_BEAT` is the number the two sides agree on (docs/AUDIO.md §8).
+   * same instants — `MEDAL_BEAT` is the number the two sides agree on.
    */
   celebrate(kind: CelebrationKind): void;
   pulse(kind?: 'objective' | 'commend'): void;

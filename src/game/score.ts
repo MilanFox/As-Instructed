@@ -1,5 +1,5 @@
 /**
- * Scoring, as the player sees it. DESIGN.md §7 and §11 A4.
+ * Scoring, as the player sees it. DESIGN.md §7 and §7.
  *
  * `Verdict.stats` is the engine's, and it wins wherever the two overlap; this module is what the
  * shell uses for the live readouts, the medal wall and the Performance Review, and it must agree
@@ -9,7 +9,7 @@ import { MEDAL_WEIGHT, Medal, SILVER_FACTOR, medalFor } from '../engine/index.ts
 
 export { Medal, medalFor, MEDAL_WEIGHT };
 
-/** DESIGN.md §11 A4. */
+/** DESIGN.md §7. */
 export const BONUS_STAR_POINTS = 1;
 
 /** Re-exported, not redeclared: `src/engine/verdict.ts` holds the only copy. */
@@ -56,9 +56,9 @@ export interface LevelScore {
 }
 
 /**
- * Medal points for one level result. DESIGN.md §11 A4: gold 3, silver 2, bronze 1, star +1.
+ * Medal points for one level result. DESIGN.md §7: gold 3, silver 2, bronze 1, star +1.
  *
- * `null` is an ungraded work order (§11 A7) and weighs a gold's three. The player loses nothing by
+ * `null` is an ungraded work order (§7) and weighs a gold's three. The player loses nothing by
  * a level having no ladder, which is the whole reason ungrading one is safe.
  */
 export function levelPoints(medal: Medal | null, stars = 0): number {
@@ -84,7 +84,7 @@ export function isGraded(level: { graded?: boolean }): boolean {
   return level.graded !== false;
 }
 
-/** The medal a finished run earns, or `null` where the level carries no ladder (§11 A7). */
+/** The medal a finished run earns, or `null` where the level carries no ladder (§7). */
 export function medalForLevel(
   level: { graded?: boolean; par: { ticks: number } },
   passed: boolean,
@@ -93,7 +93,7 @@ export function medalForLevel(
   return isGraded(level) ? medalFor(passed, ticks, level.par.ticks) : null;
 }
 
-/** The medal on record for a level, or `null` where the level carries no ladder (§11 A7). */
+/** The medal on record for a level, or `null` where the level carries no ladder (§7). */
 export function medalOf(level: { graded?: boolean }, progress: { medal: Medal }): Medal | null {
   return isGraded(level) ? progress.medal : null;
 }

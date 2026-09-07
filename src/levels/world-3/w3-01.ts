@@ -183,7 +183,7 @@ export const w3_01: LevelDef = {
     /*
      * The budget this replaced was `endTick <= PAR_TICKS && failedPickups === 0` — par restated,
      * with a no-error conjunct bolted on. Gold already asks the first half, and the exhaustive
-     * pairing measurement in `docs/FIX-BONUSES.md` shows the only slack left on this board is the
+     * pairing measurement shows the only slack left on this board is the
      * survey sweep, so no tighter number was available that was not a tax on walking.
      *
      * The shift's flat trips are the one fact about the yard nothing else grades. Loading the pads

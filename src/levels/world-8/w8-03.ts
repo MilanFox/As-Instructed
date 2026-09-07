@@ -64,8 +64,8 @@ interface Layout {
  * `precedence-held` is *vacuously true* on a grid with no edges, so the seed did not exercise the
  * objective the level is about; and `deadlineFor` is a function of the chain, so the seed with no
  * chain got the tightest shift in the set — 98 ticks, under the silver cut of a flat par. The
- * level graded hardest on the one layout that had removed its own idea. `docs/FIX-PAR-REPAIRS.md`
- * §2. Three bands keeps the anti-hardcode axis (a program that assumes a chain still breaks here)
+ * level graded hardest on the one layout that had removed its own idea. Three bands keeps the
+ * anti-hardcode axis (a program that assumes a chain still breaks here)
  * and gives the objective something to hold.
  */
 const LAYOUTS: Record<number, Layout> = {

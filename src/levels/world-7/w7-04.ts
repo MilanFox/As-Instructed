@@ -79,7 +79,7 @@ export interface Job {
 /**
  * The work is packed into one block rather than sprinkled across the yard, so walking is a real
  * cost and never the deciding one. This level is about *when* a bot starts a job, and a layout
- * where routing dominates would be teaching w3-05 again (CURRICULUM.md §12).
+ * where routing dominates would just re-teach w3-02's lookup-table idea instead of scheduling.
  */
 export function jobsFor(seed: number): Job[] {
   const { jobs, shape } = requisitionFor(seed);

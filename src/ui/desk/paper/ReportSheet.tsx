@@ -7,9 +7,9 @@
  * business lying on your desk. A HALT notice arrives already filed by site systems, because
  * nothing was asked of you.
  *
- * **It is a snapshot and never a live read.** `docs/AUDIT-UI.md` §6.6: the most information-dense
- * card in the game was one stray click from gone. `ReportSnapshot` freezes it at the moment the
- * run finished, so running again issues a second sheet rather than rewriting the first.
+ * **It is a snapshot and never a live read.** The most information-dense card in the game used to
+ * be one stray click from gone. `ReportSnapshot` freezes it at the moment the run finished, so
+ * running again issues a second sheet rather than rewriting the first.
  *
  * The objective rows are rendered from the same four claims the rail makes — gauge, over, limit,
  * readout — because a budget that read as a gauge while the run played and as a tick-box on the
@@ -134,7 +134,7 @@ export function ReportSheet({
         </span>
         <div className="report__verdict">
           <h2>{report.passed ? VERDICT_PASS : VERDICT_FAIL}</h2>
-          {/* Grade is text before it is colour (`docs/DESK-CONCEPT.md` §6): the word survives
+          {/* Grade is text before it is colour: the word survives
               hue removal and it survives the Signal direction. */}
           {report.passed ? <span className="report__die">{stampWordFor(report.medal)}</span> : null}
           <p className="quiet">{report.headline}</p>
@@ -293,7 +293,7 @@ export function ReportSheet({
       ) : null}
 
       {/*
-       * The code and the seed, once. `docs/AUDIT-UI.md` F5b: the objective's name was printed in
+       * The code and the seed, once. The objective's name used to be printed in
        * the cause row, again in the objectives list and again here. The causes above already say
        * which objective and by how much, so the engine's own sentence is only printed where there
        * is no cause to have said it.
@@ -363,8 +363,8 @@ export function ReportSheet({
 /**
  * The per-seed breakdown, costing space in proportion to what it reveals.
  *
- * `docs/AUDIT-UI.md` F10: five rows, character-for-character identical, and it is the *common*
- * case. Identical outcomes collapse to one line; disagreement expands to the list, which is
+ * Five rows, character-for-character identical, is the *common* case. Identical outcomes
+ * collapse to one line; disagreement expands to the list, which is
  * exactly the case the list exists to reveal.
  */
 function SeedSummary({ report }: { report: ReportSnapshot }): React.JSX.Element {

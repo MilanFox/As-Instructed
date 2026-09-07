@@ -1,15 +1,16 @@
 /**
  * Every objective in the campaign can say *where* a run went wrong.
  *
- * `docs/AUDIT-INCENTIVES.md` finding 1: 71 of the 82 objective calls were `Objectives.custom`
+ * 71 of the 82 objective calls were `Objectives.custom`
  * with no divergence, so 31 of 34 work orders could only ever report the string `not met`. The
  * core loop is run → fail → read → revise, and with nothing to read it degrades to guessing.
  * `src/levels/__tests__/divergence.test.ts` is the same idea applied to four specific levels; this
  * file is the one that makes the silence impossible to reintroduce anywhere.
  *
  * The rule is one line: **an objective either reports a divergence or declares itself binary.**
- * A progress tuple is not a third option — `0 of 5 — 5 short` is the exact readout the beginner
- * playtest lost fifty-five minutes to (`docs/PLAYTEST-BEGINNER.md` §3).
+ * A progress tuple is not a third option — `0 of 5 — 5 short` is the exact readout that cost a
+ * beginner playtester fifty-five minutes: four plausible answers and an empty program all
+ * produced it.
  *
  * The type system now asks the same question at every call site: `Objectives.custom` takes a
  * `CustomReport` whose `divergence` is required. This file is what catches the two things a type

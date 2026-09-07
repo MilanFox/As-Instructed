@@ -186,7 +186,7 @@ function apart(a: number, b: number): number {
 
 const MEDALS = ['gold', 'silver', 'bronze'] as const;
 
-/** Every mark the board can draw. `closed` is an ungraded work order (DESIGN.md §11 A7). */
+/** Every mark the board can draw. `closed` is an ungraded work order (DESIGN.md §7). */
 const MARKS = [...MEDALS, 'closed'] as const;
 
 /** Boot Sector's first work order, which the site does not grade. */
@@ -271,7 +271,7 @@ describe('the key is drawn in the marks the board is drawn in', () => {
 });
 
 /**
- * The fourth mark. The first two work orders on the site are ungraded (DESIGN.md §11 A7), so `✓`
+ * The fourth mark. The first two work orders on the site are ungraded (DESIGN.md §7), so `✓`
  * is the first mark a new contractor ever sees on the board and gold, silver and bronze all read
  * zero underneath it. A key to three of the four is how that reads as three failures.
  */

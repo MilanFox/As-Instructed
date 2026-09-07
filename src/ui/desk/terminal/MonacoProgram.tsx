@@ -1,7 +1,7 @@
 /**
  * Monaco, and nothing else.
  *
- * This module exists to be the whole of the lazy chunk (`docs/AUDIT-UI.md` F23). Everything that
+ * This module exists to be the whole of the lazy chunk. Everything that
  * statically reaches `monaco-editor` — `@monaco-editor/react`, `../../monaco-setup.ts` and the
  * marker plumbing — lives here and is reached only through the dynamic import in `Program.tsx`,
  * so the desk, the site, the rail and the log all paint before the editor's chunk lands.

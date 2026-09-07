@@ -193,16 +193,15 @@ describe('trail ramp', () => {
 /**
  * The same guard, held against every art direction rather than against one background colour.
  *
- * FIX-TRAIL §7 is the reason this file exists: the first ramp ran from `inkDim`, which is within a
- * few points of the World 4 cave floor, so the cold end drew nothing at all on the one level the
- * trail is for. §7 wrote the fix down as "the cold end is a darkening", and the test above pins
- * the literal that produced.
+ * The first ramp ran from `inkDim`, which is within a few points of the World 4 cave floor, so
+ * the cold end drew nothing at all on the one level the trail is for. The fix was "the cold end
+ * is a darkening", and the test above pins the literal that produced.
  *
  * That is the right lesson stated one direction too narrowly. A darkening is correct against a
  * mid-value floor and wrong against a near-black one, where it fails for exactly the reason
- * `inkDim` did. What actually has to hold is what §7 argues in prose — luminance first, hue
- * second — so it is checked here as a contrast requirement against the floor each direction
- * paints, in whichever direction that direction needs.
+ * `inkDim` did. What actually has to hold is luminance first, hue second — so it is checked here
+ * as a contrast requirement against the floor each direction paints, in whichever direction that
+ * direction needs.
  */
 describe('the cold end survives the floor it is painted on, in every direction', () => {
   /*

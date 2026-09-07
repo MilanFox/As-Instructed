@@ -20,8 +20,8 @@ import { serpentineHarvest } from '../../__tests__/naive.ts';
  * seed, and the obvious correct answer missing it. A bonus only one of those is true of is either
  * confetti or impossible, and both have shipped before.
  *
- * That obvious answer used to be the level's own reference solution. Since docs/FIX-PAR.md it is
- * not: on w2-05 par moved onto the route that uses the level's hardware, so the reference had to
+ * That obvious answer used to be the level's own reference solution. Not anymore:
+ * on w2-05 par moved onto the route that uses the level's hardware, so the reference had to
  * move with it, and the lazier route lives in `src/levels/__tests__/naive.ts` as
  * `serpentineHarvest`. It is still correct, still passes every seed, and now takes silver rather
  * than gold.
@@ -381,7 +381,7 @@ describe('w2-05 bonus — footprint', () => {
   });
 
   /**
-   * `docs/FIX-FINALE-INTEGRATE.md` §3. The sweep used to come home on all five seeds and lose only
+   * The sweep used to come home on all five seeds and lose only
    * the star; the shift is 62 now, so on three of them it is powered down mid-row with the hopper
    * still open. Where it does come home it still walks too much ground to have the star, which is
    * the half of the old assertion worth keeping: the footprint budget is not the deadline wearing

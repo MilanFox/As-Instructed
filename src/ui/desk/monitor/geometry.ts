@@ -1,11 +1,11 @@
 /**
  * What the feed's chrome takes, and what is therefore left for the grid.
  *
- * `docs/DESK-CONCEPT.md` §9 item 1 is the hard part of this concept: the prototype draws its
+ * The hard part of this concept is that the prototype draws its
  * graticule *inside* the canvas, in a margin it leaves itself. The real renderer has a camera that
  * fits the whole canvas, so a margin that is not reserved by the element is a margin the camera
- * fills with tiles and the numerals then sit on top of — which re-opens the exact defect
- * `docs/FIX-HUD-OVERLAP.md` closed and the user reported personally.
+ * fills with tiles and the numerals then sit on top of — which re-opens the same overlap defect
+ * that was already closed once.
  *
  * So the margin is reserved by insetting the canvas element, and every piece of the feed's chrome
  * lives in the strip that inset created. Nothing is positioned over the canvas at all. These are
@@ -45,14 +45,14 @@ export const RULER_LABEL_MIN_TILE_PX = 7;
 /**
  * The smallest tile, in device pixels, a work order is allowed to *open* at.
  *
- * `docs/DESK-CONCEPT.md` §7 sets this floor, and the desk's 656 x 438 picture cannot fit eight of
+ * This floor means the desk's 656 x 438 picture cannot fit eight of
  * the campaign's thirty-three grids above it — five of them could not on a full-bleed screen
  * either, so it is a property of the approved composition and not of the graticule.
  *
  * The answer is not to open small. A first-time player handed an illegible board does not know the
  * board could be bigger; they conclude the game is like that. So the feed opens at the largest rung
  * that clears this floor even when that crops the grid, and `FIT` on the transport is the way back
- * to the whole board. `docs/AUDIT-UI.md` §7: readability is the ruling that outranks the desk
- * brief, and it outranks completeness with it.
+ * to the whole board. Readability is the ruling that outranks the desk brief, and it outranks
+ * completeness with it.
  */
 export const LEGIBLE_DEVICE_TILE_PX = 24;

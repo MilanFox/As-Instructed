@@ -180,7 +180,7 @@ describe('the sandbox', () => {
     expect(prints.map((event) => event.text)).toEqual(['hello 1']);
   });
 
-  test('ordinary JavaScript state persists for the whole run (DESIGN.md §11 A3)', () => {
+  test('ordinary JavaScript state persists for the whole run (DESIGN.md §5)', () => {
     const source = [
       'const log = new Map<number, string>();',
       'for (let i = 0; i < 3; i++) {',
@@ -199,8 +199,8 @@ describe('the sandbox', () => {
 });
 
 /**
- * docs/OPEN-ITEMS.md defect 1. `power()` on a hand-operated machine used to charge the tick,
- * return false and say nothing, so the two levels built to teach *"this one has no grid
+ * `power()` on a hand-operated machine used to charge the tick, return false and say nothing, so
+ * the two levels built to teach *"this one has no grid
  * connection"* could not teach it by failure. These assert the whole path a player actually
  * reads: the sentence, the machine, its tile, and the line of their own code.
  */

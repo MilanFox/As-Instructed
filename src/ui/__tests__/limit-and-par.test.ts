@@ -3,8 +3,8 @@
  *
  * `w8-01` asks the run to close inside 215 ticks and pars at 165. Both were printed as "ticks"
  * with nothing to say which one ends the work order and which one moves the medal, and a player
- * who reads the wrong one either rewrites a passing program or watches a good one fail
- * (`docs/FIX-INCENTIVES.md` §H). The fix gave each its own word.
+ * who reads the wrong one either rewrites a passing program or watches a good one fail.
+ * The fix gave each its own word.
  *
  * Nothing here hardcodes 215 or 165. The numbers are read off the level, so a par repair moves the
  * expectation with it; what is pinned is that the two numbers are different, that each is printed
@@ -15,7 +15,7 @@
  * kind of thing.
  *
  * The renderer is `src/ui/__tests__/react-driver.ts`, one hand-cranked React shared by every UI
- * test (`docs/FIX-RAIL-METER.md` §4).
+ * test.
  */
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type * as ReactModule from 'react';
@@ -57,7 +57,7 @@ type Objective = LevelDef['objectives'][number];
 
 /**
  * The run report as the desk draws it: a snapshot, on a certificate of closure or a HALT notice.
- * `Results` was a modal that destroyed itself (`docs/AUDIT-UI.md` §6.6); the sheet is the same
+ * `Results` was a modal that destroyed itself; the sheet is the same
  * report on paper, and it is read off `snapshotReport` exactly as `usePaperwork` reads it.
  */
 function Results(): unknown {

@@ -54,7 +54,7 @@ export interface WorldOptions {
   capacity?: number;
   fill?: Terrain;
   inventory?: ItemStack[];
-  /** Opts every bot into the fuel mechanic. Omit for the `Infinity` default. DESIGN.md §11 A1. */
+  /** Opts every bot into the fuel mechanic. Omit for the `Infinity` default. DESIGN.md §4.4. */
   fuel?: number;
 }
 

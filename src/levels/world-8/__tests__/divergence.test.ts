@@ -2,7 +2,7 @@
  * What World 8's objectives say when they are missed.
  *
  * Every test here drives a program that is wrong in one nameable way and asserts the point that
- * comes back. `docs/AUDIT-INCENTIVES.md` finding 1 singled out the finale's work orders because
+ * comes back. The finale's work orders are singled out because
  * they are the longest runs in the campaign: a shift that takes a thousand ticks to answer
  * `not met` is the most expensive guess a player can be asked to make.
  *
@@ -248,7 +248,7 @@ describe('w8-03 pins an overrun on the bot that was still going', () => {
 });
 
 /**
- * `docs/FIX-PAR-REPAIRS.md` §2. `within-shift` and the medal ladder read the same clock, and this
+ * `within-shift` and the medal ladder read the same clock, and this
  * level is the only one in the campaign where one of them varies by seed and the other does not.
  * When they disagree the grade is a lie in one direction or the other: par used to be 128 while
  * seed 3's shift ended at 98, so the ladder promised gold up to 128 in a band the verdict had

@@ -32,7 +32,7 @@ const GOLD = [
 ];
 
 /**
- * Closing an ungraded level (DESIGN.md §11 A7). Not a fourth rung — these levels admit one route,
+ * Closing an ungraded level (DESIGN.md §7). Not a fourth rung — these levels admit one route,
  * so there is no budget to have met and nothing to compare against. The level is worth the same
  * three points a gold is, so none of these may read as a consolation, and none of them mentions
  * par, a time, or a grade.

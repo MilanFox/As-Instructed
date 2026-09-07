@@ -4,7 +4,7 @@
  * `src/meta` talks to the game through one interface (`MetaHost`) and knows nothing else about it.
  * This file is the whole of that seam on the campaign's side: it reads `useGame`, it writes to
  * `useGame` on exactly the two paths the metagame is allowed to write on, and it decides when the
- * three "after a work order closes" hooks fire (docs/LIBRARY.md §6).
+ * three "after a work order closes" hooks fire.
  */
 import type { Medal } from '../engine/index.ts';
 import type {
@@ -182,7 +182,7 @@ export function mountLibrary(runner: RuntimeRunner): () => void {
      * `src/meta`. It is recognised here rather than there, because the metagame does not know the
      * campaign exists and should not start now.
      *
-     * A clean regression pass used to be recognised beside it and no longer is (DESIGN.md §11 A9):
+     * A clean regression pass used to be recognised beside it and no longer is (DESIGN.md §7.1):
      * refactoring is supposed to break things so you find out, and paying for the run that broke
      * nothing prices the wrong half of it.
      */

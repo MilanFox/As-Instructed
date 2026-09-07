@@ -203,7 +203,7 @@ function orderTaken(ctx: ObjectiveContext): Divergence | undefined {
 }
 
 /**
- * The difficulty cliff of the first half of the game (CURRICULUM.md §1.3, §11). Everything here
+ * The difficulty cliff of the first half of the game (CURRICULUM.md §6, §11). Everything here
  * that can be scaffolded, is: the starter ships the representation, hint 1 splits the task in two,
  * the bonus is six permutations rather than a second hard problem, and `budget.maxTicks` is set
  * well above a full survey plus a clean circuit — a player who wanders while mapping and then

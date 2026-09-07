@@ -2,7 +2,7 @@
  * Every machine kind, every crop maturity and every item kind draws a different mark, in every
  * art direction, down to the tile size the biggest board is played at.
  *
- * This is the guard on the thing `docs/FIX-SPRITES.md` was opened to fix. Terrain became
+ * This is the guard against the thing that used to break: terrain became
  * per-direction and machines, crops and items did not, so a board was half atlas and half
  * authored. Closing that gap means four independent sets of sprites, and four sets is exactly the
  * shape where "the furnace and the press ended up as the same shape" ships without anyone noticing
@@ -593,9 +593,9 @@ describe.each(ART_IDS)('%s', (id) => {
  * Two things grow on the same soil and only one of them is the harvest.
  *
  * `w2-05` is entirely this reading — a field of crop mixed with ice-scrub, a sensor that tells
- * them apart for free, an arm that does not, and a shift too short to visit everything. Until
- * `docs/FIX-SPRITES.md` §16 the kind never reached a painter at all: `CropPaint` did not carry it,
- * so the two were one plant drawn twice and the level could not be solved by looking at it.
+ * them apart for free, an arm that does not, and a shift too short to visit everything. The kind
+ * used to never reach a painter at all: `CropPaint` did not carry it, so the two were one plant
+ * drawn twice and the level could not be solved by looking at it.
  *
  * Asserted as a collision check over the **union of the two ladders** rather than kind against
  * kind at the same rung. A scrub tile that draws what a crop three rungs down the ladder draws is
@@ -678,7 +678,7 @@ it('every direction either authors all three live layers or none of them', () =>
 // ---------------------------------------------------------------------------
 
 /**
- * `docs/LIGHT.md` §7, made mechanical: **a smaller board must be cheaper to draw.**
+ * The draw-cost rule, made mechanical: **a smaller board must be cheaper to draw.**
  *
  * The defect this guards is a construct whose draw-call count is *decoupled from the device-pixel
  * area it covers* — a dither whose cell floors at one device pixel while its extent scales with
@@ -689,7 +689,7 @@ it('every direction either authors all three live layers or none of them', () =>
  * The recording context the distinctness properties already use is counted rather than compared,
  * so there is one stand-in for the canvas in this file and not two.
  *
- * Both halves of §7 run, and they answer different questions:
+ * Both halves of the rule run, and they answer different questions:
  *
  * - **per element** — does one mark get cheaper as the tile shrinks;
  * - **per frame, whole board** — does the *frame* get cheaper, given that zooming out also pulls
@@ -701,7 +701,7 @@ it('every direction either authors all three live layers or none of them', () =>
  * the same apparent size on every panel; `overlays.ts` states the argument. The consequence is
  * that on a 1x panel the rungs sit at half the device-pixel budget they do on a 2x one, so a
  * measurement taken only at `dpr: 2` says nothing about the machines most likely to need the
- * headroom. `docs/FIX-SPRITES.md` §14 has the measured spread.
+ * headroom.
  */
 const DRAW_OPS =
   /^(?:fillRect|strokeRect|fill|stroke|fillText|strokeText|drawImage|putImageData|drawFrame)\(/;
@@ -725,8 +725,8 @@ const DPRS: readonly number[] = [1, 2];
  *
  * One entry, kept as an entry rather than as a loosened bound, so the next reader sees the shape
  * instead of inheriting a tolerance. `signal` builds every glyph out of a fixed eight rows of at
- * most two spans, so its cost is bounded by a *part count* and not by a tile fraction — the thing
- * §7 calls safe by shape. Its far form is one `fillRect` per span, which is the cheapest a span
+ * most two spans, so its cost is bounded by a *part count* and not by a tile fraction — safe by
+ * shape. Its far form is one `fillRect` per span, which is the cheapest a span
  * can be drawn; the near form perforates that span against a cell grid, and where the cell happens
  * to swallow a short span whole it emits fewer rectangles than the solid one did. Measured across
  * the ladder at `dpr: 2` the count runs 15, 15, 10, 9, 13 — wobble around a bound of sixteen,
@@ -738,7 +738,7 @@ describe('cost', () => {
   /**
    * No mark may cost more at the floor than it costs at the rung the board is played at.
    *
-   * Stated per kind as "not more" rather than "strictly less" on purpose. §7's healthy ratio of
+   * Stated per kind as "not more" rather than "strictly less" on purpose. A healthy ratio of
    * far ÷ near ≈ 0.5 was measured over a whole layer and is asserted over a whole layer below.
    * Per *kind* the honest bar is that nothing gets more expensive as it gets smaller: a mark built
    * from a fixed number of parts is flat by shape and cannot be tuned into a fall without changing
@@ -794,7 +794,7 @@ describe('cost', () => {
   /**
    * A whole layer must not get dearer as it gets smaller.
    *
-   * This is the assertion §9's `far ÷ near` number belongs to, and the one that catches a mark
+   * This is the assertion the `far ÷ near` ratio belongs to, and the one that catches a mark
    * made cheap in one kind and paid for in the next. The bot is held to it with the rest: there
    * is one of it, but it is redrawn on every frame of every replay.
    */
@@ -845,7 +845,8 @@ describe('cost', () => {
 // ---------------------------------------------------------------------------
 
 /**
- * The second half of §7: **a per-element count can fall while the per-frame total does not.**
+ * The other half of the draw-cost rule: **a per-element count can fall while the per-frame
+ * total does not.**
  *
  * Zooming out shrinks every mark and pulls more of the board into view at the same time, and the
  * two move against each other. So the number that decides a player's frame rate is not a ratio —

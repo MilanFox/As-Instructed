@@ -17,13 +17,13 @@ export const FailureCode = {
   BotLost: 'bot-lost',
   /** The submitted source failed to transpile. */
   Compile: 'compile',
-  /** A bot ran dry. DESIGN.md §11 A1. */
+  /** A bot ran dry. DESIGN.md §4.4. */
   OutOfFuel: 'out-of-fuel',
-  /** Every bot in a multi-bot level blocked every other, indefinitely. DESIGN.md §11 A6. */
+  /** Every bot in a multi-bot level blocked every other, indefinitely. DESIGN.md §4.6. */
   BlockedLivelock: 'blocked-livelock',
 
   /**
-   * DESIGN.md §11 spells these two in SCREAMING_CASE. Aliases so either name compiles; the
+   * DESIGN.md §4.6 spells these two in SCREAMING_CASE. Aliases so either name compiles; the
    * PascalCase keys above are canonical and both spellings share one value.
    */
   OUT_OF_FUEL: 'out-of-fuel',

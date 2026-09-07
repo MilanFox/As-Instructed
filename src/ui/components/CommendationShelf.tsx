@@ -1,7 +1,7 @@
 import type { JSX } from 'react';
 import { ACHIEVEMENTS } from '../../game/achievements.ts';
 
-/** The anchor the header's count points at (docs/AUDIT-UI.md F14). */
+/** The anchor the header's count points at. */
 export const SHELF_ID = 'commendations';
 
 const MONTHS = [
@@ -43,7 +43,7 @@ export function earnedOn(at: number): string {
  * into a chore. Once earned it joins the shelf like any other and never leaves it.
  *
  * No fraction. The head used to read `2/5`, and a denominator that moves is a completion bar the
- * player cannot act on (DESIGN.md §11 A9). With a hidden half the denominator is not even
+ * player cannot act on (DESIGN.md §7.1). With a hidden half the denominator is not even
  * knowable, which settles the question rather than reopening it: the rows are the readout.
  */
 export function CommendationShelf({

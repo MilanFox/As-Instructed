@@ -1,8 +1,7 @@
 /**
  * Public surface of the metagame — the Shared Subroutines Repository.
  *
- * The host imports from here and nothing deeper. See `docs/LIBRARY.md` for what is built, what is
- * specified but not yet built, and where each component is meant to mount.
+ * The host imports from here and nothing deeper.
  */
 
 export type {

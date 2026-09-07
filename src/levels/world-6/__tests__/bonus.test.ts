@@ -5,11 +5,11 @@
  * of bonuses nothing proved could be taken: `divergence.test.ts` pins what each one says when it
  * is *missed*, and nothing anywhere asserted that any program takes one. All four turn out to be
  * earned by the shipped reference on every declared seed, inside par — the gap was in the suite,
- * not in the levels. `docs/OPEN-ITEMS.md` "Fourteen bonus stars nothing proves can be earned"
- * carries the write-up and the ten that are still only assumed.
+ * not in the levels. `TODO.md`'s "Assumed working, never verified" list carries the write-up and
+ * the ten that are still only assumed.
  *
- * `name-the-fault` is first because `docs/FIX-BONUSES-3-5.md` holds every other bonus in the game
- * against it. A standard-setter nothing proves is reachable is not a standard.
+ * `name-the-fault` is first because every other bonus in the game is held to its standard.
+ * A standard-setter nothing proves is reachable is not a standard.
  */
 import { describe, expect, test } from 'vitest';
 import type { Sim } from '../../../engine/index.ts';
@@ -64,8 +64,8 @@ describe('w6-02 name-the-fault', () => {
    *
    * Seed 2 is the exception and it is deliberate: `build` sets the corruption rate to zero there,
    * so the band is clean, there is nothing to report, and the predicate is vacuously true. That
-   * is the do-nothing hole `docs/FIX-BONUSES-3-5.md` catalogues, sitting in the bonus that
-   * document holds every other bonus against. It is harmless in play — a run that files nothing
+   * is a do-nothing hole, sitting in the one bonus every other bonus in the game is held
+   * against. It is harmless in play — a run that files nothing
    * still has to relay all thirty-seven packets to pass, and a failed run banks no star — and it
    * is pinned here rather than left to be rediscovered.
    */

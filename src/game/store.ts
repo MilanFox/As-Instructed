@@ -947,7 +947,7 @@ export function progressFor(state: GameState, levelId: string): LevelProgress {
   return state.save.levels[levelId] ?? emptyProgress();
 }
 
-/** Closing one work order opens the next two. DESIGN.md §11 A11. */
+/** Closing one work order opens the next two. DESIGN.md §6. */
 export const LEVELS_OPENED_BY_A_CLOSE = 2;
 
 /**

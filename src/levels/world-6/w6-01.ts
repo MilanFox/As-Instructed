@@ -31,13 +31,13 @@ const expected = (ctx: ObjectiveContext): Objective =>
   Objectives.printedSequence(queued(ctx.initialWorld));
 
 /**
- * CURRICULUM.md §1.1 calls this the rest beat: the biggest deliberate difficulty drop in the
+ * CURRICULUM.md §8 calls this the rest beat: the biggest deliberate difficulty drop in the
  * game, straight after w5-05's spanning tree. It is a `while` loop over a queue and nothing else.
  * No traversal, no bonus, one objective.
  *
  * Par: every verb the level unlocks is free, so the reference finishes in 0 ticks. `par.ticks` is
  * 1 because the registry test requires a positive par — which is exactly why the level is
- * ungraded (DESIGN.md §11 A7). A ladder built on a number that exists to satisfy a test would
+ * ungraded (DESIGN.md §7). A ladder built on a number that exists to satisfy a test would
  * teach the player the grade is noise, one world before the grade starts carrying information.
  */
 export const w6_01: LevelDef = {

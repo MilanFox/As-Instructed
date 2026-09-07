@@ -61,8 +61,8 @@ export interface MetaHost {
  * Write-once for its whole life: `offerPublish` mints it, `confirmPublish` and `skipPublish`
  * clear it, and nothing in between ever replaces it. What the player has ticked is *not* part of
  * it — that is a draft the dialog owns and hands over once, at the press of the button. Keeping
- * the draft here cost the game a black screen (docs/FIX-PUBLISH-CRASH.md): a component that
- * derives from an object and writes the derivation back into that object never settles.
+ * the draft here once cost the game a black screen: a component that derives from an object and
+ * writes the derivation back into that object never settles.
  */
 export interface PublishOffer {
   levelId: string;

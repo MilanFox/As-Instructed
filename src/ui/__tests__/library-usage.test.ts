@@ -1,8 +1,8 @@
 /**
  * `LibraryUsage`, spent at last — and paying nothing.
  *
- * The measurement rode on every run that linked `lib.ts` and was thrown away unread
- * (`docs/FIX-INCENTIVES.md` §I). It now surfaces twice: a line on the run report saying how many
+ * The measurement rode on every run that linked `lib.ts` and was thrown away unread.
+ * It now surfaces twice: a line on the run report saying how many
  * Repository routines the run called and how many ticks were spent inside them, and a `Work orders`
  * column on the Structure tab saying how many work orders import each published routine.
  *
@@ -13,7 +13,7 @@
  *
  * Both halves live here rather than in two files because they are one feature and they read one
  * render. The renderer itself is `src/ui/__tests__/react-driver.ts`, shared with every other UI
- * test (`docs/FIX-RAIL-METER.md` §4).
+ * test.
  */
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type * as ReactModule from 'react';
@@ -56,7 +56,7 @@ const { reportFor } = await import('../screens/review.ts');
 
 /**
  * The run report as the desk draws it: a snapshot, on a certificate of closure or a HALT notice.
- * `Results` was a modal that destroyed itself (`docs/AUDIT-UI.md` §6.6); the sheet is the same
+ * `Results` was a modal that destroyed itself; the sheet is the same
  * report on paper, and it is read off `snapshotReport` exactly as `usePaperwork` reads it.
  */
 function Results(): unknown {

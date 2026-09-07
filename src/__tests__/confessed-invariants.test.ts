@@ -3,9 +3,9 @@
  *
  * This codebase has an unusually good habit: where one value is written down twice, the second
  * copy usually says so — "mirrors `src/game/store.ts`", "verbatim from NARRATIVE.md §7", "the one
- * authoritative copy". `docs/AUDIT-CONSTANTS.md` found that grepping for those three words returns
- * a free, accurate index of exactly where the two-sources-of-truth bug class lives in this repo,
- * and that nobody had ever read it. Five of that audit's nine findings are in the index.
+ * authoritative copy". Grepping for those three words returns a free, accurate index of exactly
+ * where the two-sources-of-truth bug class lives in this repo, and nobody had ever read it. Five
+ * of a later audit's nine findings are in the index.
  *
  * So the index is the guard. Every hit has to be registered below, and every registration has to
  * name the test that holds it. Three dispositions are allowed and no fourth:
@@ -23,8 +23,8 @@
  * deleted one fails until it is unregistered, so the list cannot rot into a list of things that
  * used to be true.
  *
- * **What this does not cover.** Only the duplicates that confess. `docs/AUDIT-CONSTANTS.md` §3 —
- * the silver rule, wrong in three places at once on a shipping build — was never confessed by any
+ * **What this does not cover.** Only the duplicates that confess. The silver rule — wrong in three
+ * places at once on a shipping build — was never confessed by any
  * comment, and `silverRule` below had to be written against the rule's two halves rather than
  * against the index. A duplicate that says nothing is still invisible to this file.
  */
@@ -312,7 +312,7 @@ test('a constant declared in two files has one value', () => {
 /**
  * The rule the whole game is scored on, in the four places it is written out in prose.
  *
- * `docs/FIX-PAR.md` §7 widened the silver band to `max(par + 1, par * 1.25)` so a par below four
+ * An amendment widened the silver band to `max(par + 1, par * 1.25)` so a par below four
  * still has a reachable rung. The amendment landed in `medalFor` and in nothing else, so DESIGN.md
  * §7, the function's own docstring and the docs panel the player reads in-game all went on stating
  * the bare multiplier — on a build shipping two levels with a par under four, which meant the game
@@ -347,8 +347,8 @@ test('every prose copy of the silver rule states both halves of it', () => {
      * The fourth copy, and the one this guard was written to catch: `medalThresholds` is what the
      * Refactor screen projects a "silver to gold" rung from, so a copy of the rule that drops the
      * floor offers the player a rung the engine does not award. It was live on `w6-01` (par 1) and
-     * `w5-02` (par 2) and was carried here as a `KNOWN_OPEN` breach; `docs/FIX-DISCREPANCY.md` §5
-     * fixed it, and it is now held to the same standard as the other three.
+     * `w5-02` (par 2) and was carried here as a `KNOWN_OPEN` breach until it was fixed, and it is
+     * now held to the same standard as the other three.
      */
     [
       'src/meta/profile.ts medalThresholds()',
@@ -447,7 +447,7 @@ test('CelebrationKind is spelled the same on both sides of the port', () => {
  * This guard used to compare `HUD_GUTTER` against `.hud-card`'s width in `app.css` and say, in so
  * many words, that widening the card alone would put the read-out back over the grid. Both numbers
  * were 232, the guard was green, and the read-out was over the grid on `w1-01` — the game's first
- * work order — at the default split on a 1920px window. `docs/FIX-HUD-OVERLAP.md` has the numbers.
+ * work order — at the default split on a 1920px window.
  *
  * The equality was never the mechanism. What put the card on the grid was the *reservation being a
  * preference*: it was discarded whenever `RIG_MIN` bound or the player dragged the splitter, and it

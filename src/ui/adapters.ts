@@ -36,7 +36,7 @@ export class RuntimeRunner implements RunnerPort {
   private levelId: string | null = null;
   private configuredFor: string | null = null;
 
-  /** The unwrapped runner, for the metagame's regression suite (docs/LIBRARY.md §6). */
+  /** The unwrapped runner, for the metagame's regression suite. */
   get simulation(): Runner {
     return this.runner;
   }
@@ -96,7 +96,7 @@ export class RuntimeRunner implements RunnerPort {
   }
 
   /**
-   * The Repository, compiled and ready to link (docs/LIBRARY.md §6, step 2).
+   * The Repository, compiled and ready to link.
    *
    * Before the unlock there is no `lib.ts` to build, so this costs nothing at all for the first
    * three worlds. Afterwards it runs on every Run — that is also what installs `declare module
@@ -228,9 +228,8 @@ export class CanvasRenderer implements RendererPort {
    * monitor narrows structurally at its own call site instead, which keeps the headless path from
    * growing five methods that mean nothing to it.
    *
-   * They are here because the renderer has shipped all of them since before the desk and none of
-   * them reached the UI — `docs/AUDIT-UI.md` F6: "the numbers are still being computed and thrown
-   * away, exactly as the audit said, one layer further along".
+   * They are here because the renderer has shipped all of them since before the desk;
+   * `Monitor.tsx` is what finally consumes them, through the hover readout below.
    */
 
   /**
@@ -300,7 +299,7 @@ export class CanvasRenderer implements RendererPort {
    * Where the grid is on the canvas right now, written into `out`.
    *
    * Written into a caller-supplied record rather than returned fresh because the graticule reads
-   * it once a frame, and a fresh object per frame is the steady small allocation `LIGHT.md` §7
+   * it once a frame, and a fresh object per frame is the steady small allocation the draw-cost rule
    * and the renderer's own `frameInfo` both refuse to make.
    */
   readView(out: BoardView): BoardView {

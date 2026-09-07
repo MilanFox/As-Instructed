@@ -36,10 +36,10 @@ function runOnce(level: (typeof LEVELS)[number], seed: number) {
 }
 
 /**
- * Seven work orders were withdrawn (docs/FIX-COMPRESSION.md, docs/FIX-CONTENT.md) and the
- * survivors kept their ids, so the campaign is no longer five per world and `index` is no longer
- * contiguous inside one. It is still strictly ascending, which is all `campaignOrder` and the
- * site map need.
+ * Seven work orders were withdrawn (`w1-02`, `w1-04`, `w2-01`, `w2-03`, `w3-03`, `w3-05`, `w4-03`)
+ * and the survivors kept their ids, so the campaign is no longer five per world and `index` is no
+ * longer contiguous inside one. It is still strictly ascending, which is all `campaignOrder` and
+ * the site map need.
  */
 const EXPECTED_INDICES: Readonly<Record<number, number[]>> = {
   1: [1, 3, 5],
@@ -182,7 +182,7 @@ describe('reference solutions', () => {
 });
 
 /**
- * CURRICULUM.md §14: every level names the randomization that kills a memorized answer. These
+ * CURRICULUM.md §2 rule 2: every level names the randomization that kills a memorized answer. These
  * are the cases where the claim is checkable — a solution written for one seed, run on the rest.
  *
  * A wrong answer is allowed to fail loudly: walking into a pit throws rather than returning a
@@ -252,7 +252,7 @@ describe('randomization defeats hardcoding', () => {
 });
 
 /**
- * docs/FIX-PAR.md. Par is a medal threshold, so the thing to assert about one is a medal — a test
+ * Par is a medal threshold, so the thing to assert about one is a medal — a test
  * that repeats `expect(level.par.ticks).toBe(16)` proves only that a constant was copied twice.
  *
  * Every case here drives a *second* correct program through the level and states what its medal is
@@ -281,7 +281,7 @@ describe('par calibration', () => {
   });
 
   /**
-   * `docs/FIX-FINALE-INTEGRATE.md` §3. The shift was 84 and the serpentine cost 58–68, so the
+   * The shift was 84 and the serpentine cost 58–68, so the
    * level's own promise — *you cannot visit everything, so choose* — decided nothing but the
    * medal. The shift is 62 now, and this is the assertion that says so from the losing side: the
    * sweep is still a correct program and it still runs out of shift, on three seeds of five.
@@ -303,7 +303,7 @@ describe('par calibration', () => {
   });
 
   /**
-   * `docs/FIX-PAR-REPAIRS.md` §1. This par used to be free: the workings held short cuts between
+   * This par used to be free: the workings held short cuts between
    * the legs of the filed route, so the answer that never decoded a packet walked to the locker in
    * a fifth of the ticks the plan costs and golded on every seed by 106 ticks. The repair is the
    * map, not the number — no two corridors run side by side any more, so the filed route is the
@@ -329,7 +329,7 @@ describe('par calibration', () => {
    * `floor(3 * 1.25)` is 3. Two levels are there — `w6-01`, whose own comment says its par is 1
    * only because the registry test requires a positive one, and `w5-02`, whose par is the single
    * `power` call the level is about. Neither is a design figure, so the band was widened to
-   * `max(par + 1, par * 1.25)` rather than the pars moved: `docs/FIX-PAR.md` §7.
+   * `max(par + 1, par * 1.25)` rather than the pars moved.
    *
    * The list stays because the arithmetic that made the widening necessary is still worth naming,
    * and a third level arriving in it is worth knowing about. What it no longer implies is an
@@ -356,7 +356,7 @@ describe('par calibration', () => {
   /**
    * The criterion for "a tick budget cannot grade this level", measured rather than inferred from
    * how small the par is: the reference costs the *same* number of ticks on every seed, so the
-   * clock is reporting the work rather than the route. `docs/FIX-PAR.md` §6 argues this is the set
+   * clock is reporting the work rather than the route. This is the set
    * an `ungraded` flag should be scoped by, and it is not the set par magnitude picks out.
    */
   const CLOCK_CANNOT_VARY = ['w1-01', 'w5-02', 'w6-01', 'w6-03', 'w6-05'];

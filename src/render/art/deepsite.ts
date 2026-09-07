@@ -1561,7 +1561,7 @@ const BOT_LAMP = '#ffe6b8';
  * The contact shadow: the hard bar directly under the soles, where no ambient light gets in.
  *
  * The *cast* goes through `castBlock` with everything else that stands on the plate. This is the
- * other half of the same lamp, and `LIGHT.md` §3 holds it at 0.34 against terrain's `UMBRA` at
+ * other half of the same lamp, and `docs/DESIGN.md` §8 holds it at 0.34 against terrain's `UMBRA` at
  * 0.32 on purpose — two shadow densities on one screen read as two lamps.
  */
 const SHADE = alpha('#000000', 0.34);
@@ -1604,7 +1604,7 @@ const BOT_POOL: readonly string[] = [
  * lamp instead of a face. That is not a rendering trick — it is the perspective being honest about
  * a figure that leans in the direction it travels — but it is the reading the character wants.
  *
- * Everything is axis-aligned rects under the one north-west lamp of `docs/LIGHT.md` §2: base on
+ * Everything is axis-aligned rects under the one north-west lamp of `docs/DESIGN.md` §8: base on
  * the cell's south edge, top pushing north, lit north and west, deep south, shadow south-east.
  * `volume()` and `castBlock()` do all of it, so the bot is lit by the same lamp as the walls.
  */
@@ -1644,7 +1644,7 @@ const BOT_COWL_H = 0.19;
  * pixel at 16 and the head goes back to being centred.
  */
 const BOT_LEAN = 0.12;
-/** The arris width `LIGHT.md` §1 fixes for a lit top edge. */
+/** The arris width for a lit top edge. */
 const BOT_BEVEL = 0.07;
 
 /**
@@ -2017,7 +2017,7 @@ function drawBot(c: Ctx, pose: BotPose, tilePx: number, options: BotDrawOptions)
 }
 
 /**
- * DESIGN.md §11 A5: a blocked move must look obviously different from a successful one.
+ * DESIGN.md §8: a blocked move must look obviously different from a successful one.
  *
  * The machine has hit something, so the tell is drawn where it hit — a stepped double chevron
  * crumpled against the face that took the impact, plus a hard frame round the footprint. Both are
@@ -3005,7 +3005,7 @@ function cropBrackets(c: Ctx, ox: number, oy: number, T: number): void {
  * on the row, it turns no ground, and it never wears the brackets however ripe the tile says it
  * is — a bracket means "worth the two ticks" and this never is.
  *
- * The tell is the one `docs/LIGHT.md` §2 already spends on the three obstacle classes: **height,
+ * The tell is the one `docs/DESIGN.md` §8 already spends on the three obstacle classes: **height,
  * and the light that comes with it.** A crop is a volume — lit west shoulder, dark east flank, a
  * shadow cast south-east. Scrub lies flat on the plate, so it has no shoulder, no flank and
  * nothing to cast: one value, no faces, no shadow. A field of it reads as scribble on the floor
@@ -3042,7 +3042,7 @@ const SCRUB_REACH: readonly number[] = [0.13, 0.19, 0.25, 0.31, 0.36, 0.42];
 /**
  * One arm, stepped along its own direction.
  *
- * `w` never drops below two device pixels, which is the bound `docs/LIGHT.md` §7 puts on a stepped
+ * `w` never drops below two device pixels, which is the bound on a stepped
  * line: the step count is `reach / w`, so it falls with the tile instead of holding at a hairline.
  */
 function scrubArm(

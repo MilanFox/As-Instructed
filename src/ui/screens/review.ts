@@ -15,10 +15,10 @@
  *
  * Nothing here filters by unlock state any more. It used to, to decide which rows the medal wall
  * drew; the wall is gone, and an unreached work order carries no medal, so it contributes nothing
- * to either side of the fraction whether it is listed or not. An ungraded level (DESIGN.md §11 A7)
+ * to either side of the fraction whether it is listed or not. An ungraded level (DESIGN.md §7)
  * falls out the same way for the same reason.
  *
- * DESIGN.md §11 A4 fixes what a medal is worth. This module changes what is counted, not that.
+ * DESIGN.md §7 fixes what a medal is worth. This module changes what is counted, not that.
  */
 import type { SaveFile } from '../../game/save.ts';
 import {
@@ -43,7 +43,7 @@ export interface ReviewReport {
   /** Work orders carrying a medal. The grade's denominator, in work orders. */
   closed: number;
   /**
-   * Work orders closed that the site never graded (DESIGN.md §11 A7). Not in `closed`, because
+   * Work orders closed that the site never graded (DESIGN.md §7). Not in `closed`, because
    * they are not in the fraction; counted at all because a record holding two of them and no
    * medals is a record with work behind it, and the standing sheet was telling that player to go
    * and close a work order.

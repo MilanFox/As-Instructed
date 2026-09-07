@@ -1,7 +1,7 @@
 /**
  * DISPATCH — the commitment act, as an object.
  *
- * `docs/DESK-CONCEPT.md` §4: *you throw it*. Running a program is the one irreversible thing the
+ * *You throw it.* Running a program is the one irreversible thing the
  * player does in a session, and a toolbar button with a triangle on it says nothing about that. A
  * guarded key on the desk with three lamps says the program leaves the room, travels forty
  * light-minutes and comes back as a trace, which is what actually happens.

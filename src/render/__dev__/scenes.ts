@@ -49,7 +49,7 @@ export function sceneW101(): Scene {
     const botId = sim.world.bots[0]?.id ?? 0;
     w1_01_solution.run(sim, botId);
     // A deliberate wall bump after the solution, so the harness always shows the blocked-move
-    // treatment required by DESIGN.md §11 A5.
+    // treatment required by DESIGN.md §8.
     sim.move(botId, Dir.East);
     sim.move(botId, Dir.East);
     sim.move(botId, Dir.North);
@@ -383,7 +383,7 @@ export function sceneMaze(): Scene {
 /**
  * The identity case: every machine kind, the whole maturity ladder and every item kind at once.
  *
- * `docs/FIX-SPRITES.md` claims three things and this is the grid all three are checked on. Two of
+ * This is the grid built to catch three failure modes. Two of
  * them only fail in company — a furnace and a press are each fine on their own board and converge
  * the moment they are side by side, and ripe reads perfectly against bare soil and stops reading
  * against a crop one bucket short of it. So the ten kinds sit in one row and the crops alternate

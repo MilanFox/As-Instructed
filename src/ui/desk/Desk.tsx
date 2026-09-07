@@ -4,7 +4,7 @@
  * The player is a remote contract programmer at Kessler & Daughters and the screen is their
  * workstation. Nothing here is chrome: there is a terminal, a site monitor, a dispatch key, a
  * stamp block, a copy stand, a bound Repository, a wire-bound reference, an in-tray, a keyboard
- * and loose paper. `docs/DESK-CONCEPT.md` is the design; this is the wiring.
+ * and loose paper. This is the wiring for that arrangement.
  *
  * **The screen is the work; the paper is the company.** The program, the site view, the run and
  * the numbers are digital and live on two screens. The work order, the requisition, the memo and
@@ -59,7 +59,7 @@ export type DeskMode = 'write' | 'run' | 'watch';
  *
  * These are lists rather than markup on purpose. A `<Binder>` that threw once took the *whole desk*
  * black — the site view, the paperwork and the program the player was in the middle of writing —
- * which is `docs/AUDIT-UI.md` F21 returning in furniture rather than in a modal. One boundary per
+ * the same class of failure surfacing in furniture instead of in a modal. One boundary per
  * object fixes it, but a boundary applied by hand is a convention, and the next object added
  * re-opens the hole silently. Rendering from a list means there is exactly one place a boundary
  * can be omitted, and `src/ui/__tests__/desk-boundaries.test.ts` fails if an object is missing
@@ -85,8 +85,7 @@ export const DESKWARE: readonly DeskObject[] = [
   /*
    * The way back to the campaign, and it is an object because it has to be findable. A player
    * opened a work order and could not return to the site map — they said so — and a game you
-   * cannot get out of a level in is broken. The same complaint as `docs/AUDIT-UI.md` F12: the
-   * doors were 10px chips, and a door nobody can see is a door that is not there.
+   * cannot get out of a level in is broken. A door nobody can see is a door that is not there.
    */
   ['The site plan', SitePlan],
   ['The Repository', Binder],

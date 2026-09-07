@@ -2,7 +2,7 @@
  * What World 6's objectives say when they are missed.
  *
  * The listening post grades streams — packets in, packets out, lines printed — and a stream is
- * exactly the shape `docs/PLAYTEST-BEGINNER.md` §3 measured the damage on: `4 of 31` says a run
+ * exactly the shape a beginner playtest measured the damage on: `4 of 31` says a run
  * went wrong somewhere in thirty-one packets and nothing else. Every test here drives a program
  * that is wrong in one specific way and asserts the report names that way.
  *

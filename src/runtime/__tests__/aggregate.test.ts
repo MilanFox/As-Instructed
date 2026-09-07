@@ -125,7 +125,7 @@ describe('aggregate', () => {
     expect(response.verdict.failure?.message).toContain('Seed 1 of 2 (seed 5) failed.');
   });
 
-  test('spend is merged worst-case per resource (DESIGN.md §11 A5)', () => {
+  test('spend is merged worst-case per resource (DESIGN.md §4.6)', () => {
     const response = aggregate([
       seedRun({ seed: 1, passed: true, spend: { cable: 12, cell: 1 } }),
       seedRun({ seed: 2, passed: true, spend: { cable: 20 } }),

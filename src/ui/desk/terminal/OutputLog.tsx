@@ -1,7 +1,7 @@
 /**
  * `OUTPUT` — the terminal's own log, under the code.
  *
- * `docs/AUDIT-UI.md` §6.1: `visibleConsole(all, filter, tick)` already filters print output to the
+ * `visibleConsole(all, filter, tick)` already filters print output to the
  * playhead, so a printed line and the frame it belongs to line up. The old UI then drew the console
  * in a sheet *over* the board, which made the loop it exists for — watch the number, watch the bot,
  * correlate — impossible to run. The tick alignment was never the defect; the geometry was. On the

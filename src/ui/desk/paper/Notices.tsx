@@ -101,7 +101,7 @@ export function RepositoryNote({ docId }: { docId: string }): React.JSX.Element 
 /**
  * The Performance Review — a memo from Deputy Site Coordinator M. Vance.
  *
- * DESIGN.md §11 A8: it is a memo, not a screen. It used to be a screen behind a top-bar icon with
+ * DESIGN.md §7.1: it is a memo, not a screen. It used to be a screen behind a top-bar icon with
  * a medal wall that restated the site map, and neither playtester opened it once; then it was a
  * modal on the site map that fired once per tier and was deleted on acknowledgement. It arrives at
  * the desk now, which is where a memo arrives, and it lies there until it is acknowledged.
@@ -190,14 +190,14 @@ export function PerformanceMemo({
 /**
  * The standing sheet. Never filed, never dismissed, always on the desk.
  *
- * `docs/AUDIT-UI.md` F18: the grade was shown once, ever, and then it was unreachable — *a grade
- * delivered once and then deleted is not a grade, it is an event*. `reportFor` already computed it
- * on the site map, for the memo's delivery check, and nothing displayed it.
+ * The grade used to be shown once, ever, and then it was unreachable — *a grade delivered once
+ * and then deleted is not a grade, it is an event*. `reportFor` already computed it on the site
+ * map, for the memo's delivery check, and nothing displayed it.
  *
  * **The header follows `reportFor`.** Points, the maximum they were scored against and the
  * percentage are one fraction read three ways; a second denominator beside points would be the
  * disagreeing-tick-counter bug in miniature. And this is a persistent readout, not permission to
- * rebuild the Performance Review screen (DESIGN.md §11 A8).
+ * rebuild the Performance Review screen (DESIGN.md §7.1).
  */
 export function StandingSheet(): React.JSX.Element {
   const save = useGame((state) => state.save);
@@ -251,7 +251,7 @@ export function StandingSheet(): React.JSX.Element {
       <p className="quiet">
         {/* The middle state the sheet used to skip: work closed, none of it graded. Telling a
             contractor who has closed two work orders to go and close a work order reads the
-            three zeros above as a failure rather than as A7 (DESIGN.md §11 A7). */}
+            three zeros above as a failure rather than as A7 (DESIGN.md §7). */}
         {report.graded
           ? 'A quality average over what is closed, not a progress bar. It moves both ways.'
           : report.ungraded > 0

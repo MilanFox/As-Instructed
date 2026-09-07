@@ -6,8 +6,7 @@
  * — and stubs this function to do it. The polling loop, the warm-up model and the give-up were
  * uncovered, and it was a module-resolution problem rather than a design one: `monaco-editor`
  * declares `module` and no `main`, so nothing in this repo could so much as name it under node.
- * `vitest.config.ts` now sets `ssr.resolve.mainFields`, which is what opens this file up
- * (`docs/FIX-RAIL-METER.md` §3).
+ * `vitest.config.ts` now sets `ssr.resolve.mainFields`, which is what opens this file up.
  *
  * The fake below rejects `getTypeScriptWorker()` with the **bare string** `'TypeScript not
  * registered!'`, exactly as Monaco does — the value with no `message` on it that reached the

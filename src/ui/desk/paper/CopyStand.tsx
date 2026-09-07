@@ -4,8 +4,8 @@
  * Pinning is not zoom and it is not pick-up. Pick-up is for reading *now*; pinning is for keeping
  * a specification legible **while you write**, hands on the keyboard, across runs.
  *
- * `docs/DESK-CONCEPT.md` §9 item 3 is a hard constraint: **the pinned form is a second authored
- * view of the same content, not a CSS scale of the sheet.** What goes on the stand is the ask and
+ * **The pinned form is a second authored view of the same content, not a CSS scale of the
+ * sheet.** What goes on the stand is the ask and
  * the site data, set larger than the sheet itself carries. The flavour paragraph, the addressing
  * block, the field notes and the footnotes stay on the paper. What you pin is the specification,
  * never the memo.

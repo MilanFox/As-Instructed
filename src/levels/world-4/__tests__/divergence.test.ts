@@ -1,8 +1,8 @@
 /**
  * What World 4's objectives say when they are missed.
  *
- * `docs/AUDIT-INCENTIVES.md` finding 1 used `w4-04`'s bonus as its worked example: the level knows
- * the order the run took and knows the best order, and reported neither. These are the assertions
+ * `w4-04`'s bonus is the worked example: the level knows
+ * the order the run took and knows the best order, and used to report neither. These are the assertions
  * that it now reports the first, and prices it against the second without handing it over.
  */
 import { describe, expect, test } from 'vitest';

@@ -3,8 +3,8 @@
  *
  * Progression in BOOTSTRAP is hardware, not experience points (DESIGN.md §6) — you do not have
  * `scan()` until the crate arrives. That is the single biggest beat in the game and it used to be
- * a chip in a brief panel, then a modal that fired once and could never be reopened
- * (`docs/AUDIT-UI.md` §6.2). It is a sheet on the desk now, and it stays there until it is signed.
+ * a chip in a brief panel, then a modal that fired once and could never be reopened. It is a
+ * sheet on the desk now, and it stays there until it is signed.
  *
  * The signature line is the pen's business: the furniture lane drags ink along `.rule` and files
  * the sheet. What is here is the box the ink lands in.

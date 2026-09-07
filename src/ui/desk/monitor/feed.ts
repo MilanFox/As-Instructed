@@ -29,9 +29,9 @@ export interface FeedRenderer {
 /**
  * The coordinate, and the one other fact about the tile that is worth the width.
  *
- * `docs/AUDIT-UI.md` F6 asks for the ability to *name* a tile, so the numbers lead. Crop maturity
- * follows where there is a crop, because `docs/DESK-CONCEPT.md` §7 makes ripeness a shape at small
- * tile sizes and a shape is exactly the thing a player wants a second opinion on.
+ * The ability to *name* a tile matters most, so the numbers lead. Crop maturity follows where
+ * there is a crop, because ripeness is a shape at small tile sizes and a shape is exactly the
+ * thing a player wants a second opinion on.
  */
 export function readoutLine(readout: TileReadout | null): string {
   if (!readout) return '';

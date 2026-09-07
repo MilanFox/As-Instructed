@@ -1,7 +1,7 @@
 /**
  * World 4's bonus stars, from both sides: a run that earns one and a run that does not.
  *
- * `docs/FIX-BONUSES-3-5.md` is the specification. Each star is pinned by a pair — the shipped
+ * Each star is pinned by a pair — the shipped
  * reference earns it on every declared seed, and a *correct, gold-taking* program that did not
  * have the second idea is refused. `w4-02` gets a third assertion, because the star it replaced
  * was earned by a program that never touched the level's own hardware.
@@ -27,7 +27,7 @@ import { w4_05 } from '../w4-05.ts';
  *
  * This is the run the old `mark-budget` was calibrated against, and it is a correct, gold-taking
  * answer. What its trail cannot do is lead anybody home: a tile that says only "somebody was here"
- * is a visited flag written on the floor, and `docs/FIX-BONUSES.md` records that an ordinary `Set`
+ * is a visited flag written on the floor, and an ordinary `Set`
  * does the same job for nothing.
  */
 function markedVisited(sim: Sim, botId: number): void {
@@ -52,7 +52,7 @@ function markedVisited(sim: Sim, botId: number): void {
 /**
  * `w4-02` with no marks at all: the visited set held in program memory.
  *
- * `PLAYTEST-VETERAN.md` §122 — *"gold 236/391 + star, 1st run… I placed zero marks"*. Under the
+ * *"gold 236/391 + star, 1st run… I placed zero marks"* — under the
  * old budget this took the star for leaving the issued hardware in the crate.
  */
 function rememberedVisited(sim: Sim, botId: number): void {
@@ -181,7 +181,7 @@ describe('w4-02 breadcrumb-trail', () => {
   });
 
   /**
-   * `PLAYTEST-VETERAN.md` §122 — *"gold 236/391 + star, 1st run… I placed zero marks."* The old
+   * *"gold 236/391 + star, 1st run… I placed zero marks."* The old
    * budget paid a star for leaving the issued hardware in the crate. This is that run, and the
    * new star refuses it on every seed while the level still passes and still takes gold.
    */

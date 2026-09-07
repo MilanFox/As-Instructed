@@ -495,8 +495,8 @@
 }
 
 /*
- * What the failed report opens with. Q1 of `docs/DESIGN-REVIEW-RUBRIC.md`: the player must be able
- * to say what they will change next, and they cannot say it from a red row with no number on it.
+ * What the failed report opens with. The player must be able to say what they will change next,
+ * and they cannot say it from a red row with no number on it.
  */
 .cause {
   margin-bottom: var(--space-4);
@@ -596,7 +596,7 @@
   color: var(--danger);
 }
 
-/* Seven words, drawn once, only where both numbers are on the screen (docs/FIX-INCENTIVES.md H). */
+/* Seven words, drawn once, only where both numbers are on the screen. */
 .par-note {
   margin: var(--space-2) 0 var(--space-1);
   color: var(--ink-dim);
@@ -686,7 +686,7 @@
   color: var(--ink-dim);
 }
 
-/* An ungraded work order is closed, not un-medalled: the stamp reads as done (DESIGN.md §11 A7). */
+/* An ungraded work order is closed, not un-medalled: the stamp reads as done (DESIGN.md §7). */
 .medal--closed {
   border-color: var(--ok);
   background: color-mix(in srgb, var(--ok) 16%, transparent);
@@ -714,7 +714,7 @@
 }
 
 /*
- * The head and the foot are pinned; the body is the part that scrolls (docs/AUDIT-UI.md F9).
+ * The head and the foot are pinned; the body is the part that scrolls.
  *
  * The dialog used to scroll as one block, which on an 800px window drew its own footer over its
  * last paragraph — the run report's `NOTHING WAS BILLED` line and the delivery note's last crate
@@ -942,7 +942,7 @@
 
 /*
  * The layer is a hook for the modals, not a box around them: each one draws its own `.overlay`
- * fixed to the viewport, and a failed one draws a dialog in the same shape (docs/AUDIT-UI.md F21).
+ * fixed to the viewport, and a failed one draws a dialog in the same shape.
  */
 .modal-layer {
   flex: none;

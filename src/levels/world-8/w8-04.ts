@@ -541,7 +541,6 @@ function died(ctx: ObjectiveContext): Divergence {
  * the shortest walk to the locker there is, so a program that throws the plan away cannot walk
  * less than one that keeps it — it can only walk the same ground plus whichever dead ends it
  * tried first. Measured, the two best off-plan programs cost 261–290 and 121–358 against par 116.
- * docs/FIX-PAR-REPAIRS.md §1.
  */
 export const w8_04: LevelDef = {
   id: 'w8-04',
@@ -631,7 +630,7 @@ export const w8_04: LevelDef = {
   bonus: [
     /* No `progress()`. Neither figure is a running total of anything the trace counts, so
        `budgetFor` would have had to guess a meter for the bar and would have drawn the wrong
-       one. `docs/FIX-BONUSES-7-8.md` states the rule. */
+       one. A star with no honest meter to show gets no bar rather than a dishonest one. */
     Objectives.custom(
       'read-the-plan',
       'Report the shift the plan was filed under, and how many legs it describes',

@@ -128,7 +128,7 @@
    the key turned grey the moment it was thrown. A positioned face paints above it. */
 .desk .dsp-face { position: absolute; inset: 0; border-radius: 50%; background: inherit; }
 /* Thrown. The umbra shortens 9u -> 3u because the key is nearer the desk, and it stays at 135deg
-   with equal offsets on both axes, because the lamp did not move (docs/LIGHT.md §3, §6). */
+   with equal offsets on both axes, because the lamp does not move (docs/DESIGN.md §8). */
 .desk .dsp-key.down { transform: translateY(calc(5 * var(--u))); box-shadow: 0 calc(1 * var(--u)) 0 #4a1310, calc(3 * var(--u)) calc(3 * var(--u)) calc(2 * var(--u)) rgb(var(--ink-sh) / .32), inset calc(2 * var(--u)) calc(2 * var(--u)) calc(2 * var(--u)) rgb(var(--ink-sh) / .32); }
 .desk .dsp-collar {
   position: absolute; inset: calc(-8 * var(--u)); border-radius: 50%;

@@ -7,7 +7,7 @@
   --ts: 1;     /* SIZE: the character-size knob on the terminal bezel.
                   It scales type and line boxes, not the station geometry —
                   the station is already fitted to the viewport, and scaling
-                  it up would only crop the desk. See DESK-CONCEPT.md §6. */
+                  it up would only crop the desk. */
 
   --room:      #05070a;
   --desk:      #23261f;
@@ -47,7 +47,7 @@
   --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   --prose: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
 
-  /* docs/LIGHT.md — one lamp, due north-west, and the desk obeys it too */
+  /* docs/DESIGN.md §8 — one lamp, due north-west, and the desk obeys it too */
   --key:    219 232 240;   /* #dbe8f0 */
   --ink-sh:   4   9  15;   /* #04090f */
   --arris-n: inset 0 calc(2 * var(--u)) 0 rgb(var(--key) / .46);

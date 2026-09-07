@@ -2,7 +2,7 @@
  * The safety net, jumped into.
  *
  * `ModalBoundary` exists for one defect: a throw inside a dialog took the whole application with
- * it and left the player looking at the background (`docs/AUDIT-UI.md` F21). Nothing asserted that
+ * it and left the player looking at the background. Nothing asserted that
  * it caught anything, which is a net nobody has landed in.
  *
  * Vitest runs in node and this repo carries no DOM, so the driver below is a hand-cranked React in

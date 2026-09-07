@@ -4,13 +4,13 @@
  * `DESK_FRAME` is the denominator of `--u`, so a frame smaller than the composition crops it at
  * every viewport where that axis binds. That is not hypothetical: the prototype's 1560 x 1000 was
  * four units short vertically against a terminal whose top edge is at `50% - 502 * u`, and the
- * terminal's lit north arris — the one hard rule `docs/LIGHT.md` §1 spends on the top edge — was
+ * terminal's lit north arris — the one hard rule the lamp spends on the top edge — was
  * clipped by about 1.5px on every laptop.
  *
  * The extents are **recomputed from the stylesheets**, never restated here. A test that carried
  * its own copy of the numbers would pass forever while someone nudged the in-tray outward, which
- * is precisely how the objectives overlay shipped past a guard that asserted the wrong thing
- * (`docs/FIX-HUD-OVERLAP.md`). The only literals below are the *policy*: which objects have to be
+ * is precisely how the objectives overlay shipped past a guard that asserted the wrong thing.
+ * The only literals below are the *policy*: which objects have to be
  * wholly on screen and which are cropped on purpose.
  */
 import { readFileSync, readdirSync } from 'node:fs';
@@ -23,7 +23,7 @@ const STYLE_DIR = join(process.cwd(), 'src/ui/styles/desk');
 
 /**
  * Wholly on screen at every supported viewport. Each of these is either a machine the player
- * reads or a door they have to be able to find — `docs/AUDIT-UI.md` F12 is the finding that a
+ * reads or a door they have to be able to find — a
  * door the player cannot see is a door that does not exist.
  */
 const MUST_CONTAIN: Record<string, string> = {
@@ -47,7 +47,7 @@ const MAY_OVERFLOW: Record<string, string> = {
   tray: 'sits behind the copy stand at the desk edge',
   pen: 'lies on the desk and may run off it',
   slot: 'display: none — deliveries arrive from off frame',
-  mug: 'cut. DESK-CONCEPT.md §10 — subtraction beat placement',
+  mug: 'cut — subtraction beat placement',
   station: 'a bare wrapper. its two displays are measured instead',
   'paper-layer': 'a full-bleed layer. the sheets inside it are draggable anywhere',
   'binder-open': 'a full-bleed spread when the Repository is open',
@@ -182,7 +182,7 @@ describe('the desk frame contains the desk', () => {
   /**
    * The routines file is the terminal showing something else, not a layer laid over it.
    *
-   * `docs/DESK-CONCEPT.md` §6 is absolute that nothing is drawn over either machine, and a
+   * The rule is absolute that nothing is drawn over either machine, and a
    * full-bleed panel is how that rule gets broken by accident. So the box is asserted to be the
    * terminal's glass exactly — recomputed here from the bezel's padding and the terminal screen's
    * own height, never restated — which makes it impossible for it to reach the desk, the paper or

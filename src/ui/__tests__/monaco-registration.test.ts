@@ -23,7 +23,7 @@
  * *Not covered, and it is a resolution problem rather than a design one:* the polling and warm-up
  * model inside `typescriptRegistered` itself. `monaco-editor`'s package.json declares `module` and
  * no `main`, so vite cannot resolve it under node and no test file can even mock it. The exact
- * config change that would open it up is in `docs/FIX-UI-COVERAGE.md` §2; it is not applied here.
+ * config change that would open it up exists but is not applied here.
  */
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 

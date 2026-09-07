@@ -411,11 +411,11 @@ describe('w3-01 — one clamp', () => {
   });
 
   /*
-   * PLAYTEST-BEGINNER.md §10 item 3: the old label said "pickup", which is a trace event kind, so
+   * The old label said "pickup", which is a trace event kind, so
    * the readout counted every pickup in the run against a limit taken from a 0-or-1 flag and
    * rendered `6 / 1 pickups`. The star that replaced it counts nothing at all — it is one line,
    * right or wrong — so the honest shape is no progress bar and a label that names no meter,
-   * which is what DESIGN.md §11 A13 asks for while `Objectives.custom` still cannot declare one.
+   * which is what DESIGN.md §5 asks for while `Objectives.custom` still cannot declare one.
    */
   test('the star names no meter and offers no bar to point at the wrong one', () => {
     const star = (w3_01.bonus ?? [])[0] as Objective;

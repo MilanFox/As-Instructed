@@ -1,10 +1,10 @@
 /**
  * The failure's two cells, recovered from the report so the board can keep them.
  *
- * `docs/AUDIT-UI.md` F5: the one thing the game computes about *where* a run went wrong lived for
- * the length of one modal and was then deleted. On the desk the report is paper and stays on the
- * desk, so the sentence survives — but the requirement is that the *place* survives too, marked on
- * the site view where the two coordinates are.
+ * The one thing the game computes about *where* a run went wrong must outlive the report that
+ * names it. On the desk the report is paper and stays on the desk, so the sentence survives — but
+ * the requirement is that the *place* survives too, marked on the site view where the two
+ * coordinates are.
  *
  * **Bound by: feedback is a diff and never an oracle.** Marking the two cells the engine already
  * computed is a diff. Drawing the route between them that the player should have taken is an

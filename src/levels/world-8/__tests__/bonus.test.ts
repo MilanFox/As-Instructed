@@ -1,7 +1,7 @@
 /**
  * World 8's bonus stars, from both sides: a run that earns one and a run that does not.
  *
- * `docs/FIX-BONUSES-7-8.md` is the specification. Three questions decide whether a star is worth
+ * Three questions decide whether a star is worth
  * having, and all three are asserted here: does it ask something the required objectives do not,
  * is it refused to a correct program that did not have the idea, and — the one that caught
  * `w8-05`'s two budget stars — is it refused to a program that does nothing at all.
@@ -249,7 +249,7 @@ describe('w8-05 name-the-hold', () => {
 // ---------------------------------------------------------------------------
 
 /**
- * The second star, opened deliberately after `docs/FIX-FINALE-INTEGRATE.md` §1 coupled the airlock
+ * The second star, opened deliberately after the airlock was coupled
  * to the grid.
  *
  * `name-the-hold` reads the use log and nothing else, which makes it a report on the one thread of

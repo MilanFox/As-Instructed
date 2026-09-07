@@ -5,7 +5,7 @@
  * set the precedent — real hook semantics, real `Object.is` dependency comparison, the real
  * component called as a function — and four files then carried a trimmed copy of it each. Four
  * copies of one driver is the duplicated-constant class the two ratchets in `src/__tests__` exist
- * to catch, sitting inside the test suite; `docs/FIX-RAIL-METER.md` §4 is the extraction.
+ * to catch, sitting inside the test suite; this file is the extraction.
  *
  * Nothing was weakened to make it shareable. The version here is the widest of the four — the
  * `useState` setter takes an updater function as well as a value, which only

@@ -155,7 +155,7 @@ export interface LevelFacts {
   parTicks: number;
   seeds: number[];
   /**
-   * Whether this work order carries a medal. Defaults to `true`. DESIGN.md §11 A7.
+   * Whether this work order carries a medal. Defaults to `true`. DESIGN.md §7.
    *
    * `false` makes `parTicks` a price rather than a budget, so the Refactor screen must not offer
    * "save two ticks and this goes silver to gold" against it — there is no silver and no gold, and

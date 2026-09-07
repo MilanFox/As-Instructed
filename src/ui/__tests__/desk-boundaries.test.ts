@@ -2,14 +2,14 @@
  * Nothing on the desk may take the desk down with it.
  *
  * A `<Binder>` that threw once blanked the whole screen — the site view, the paperwork and the
- * program the player was in the middle of writing. That is `docs/AUDIT-UI.md` F21 returning in
+ * program the player was in the middle of writing. That is the same defect returning in
  * furniture rather than in a modal, and it is data loss rather than a styling complaint, the same
  * class as the run report being destroyed by a stray backdrop click.
  *
  * `Desk.tsx` renders every object through `PanelBoundary` from two lists. This asserts the lists
  * are complete, because a boundary applied by hand is a convention and a convention survives
  * exactly until someone adds an object. That is how the objectives overlay shipped past a guard
- * that asserted the wrong thing (`docs/FIX-HUD-OVERLAP.md`).
+ * that asserted the wrong thing.
  */
 import { describe, expect, it } from 'vitest';
 

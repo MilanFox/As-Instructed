@@ -66,12 +66,8 @@ the editor arrives with the workspace.
 
 ## Documentation
 
-`docs/` is the source of truth, in this order:
-
-- `DESIGN.md` — the binding contract. Read §3 (execution model) and §11 (amendments) first.
-- `NARRATIVE.md` — voice, cast, and every stock player-facing line.
-- `CURRICULUM.md` — all forty work orders, what each teaches, and why par is where it is.
-- `ENGINE.md`, `AUDIO.md`, `LIBRARY.md`, `ASSETS.md` — one per subsystem, written by whoever built it.
+[`docs/README.md`](docs/README.md) routes you to the right file. `docs/DESIGN.md` is the binding
+contract and everything else defers to it; [`TODO.md`](TODO.md) at the root is the live backlog.
 
 ## Licences
 

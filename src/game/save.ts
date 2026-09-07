@@ -196,7 +196,7 @@ function reconstructStats(levels: Record<string, LevelProgress>): CampaignStats 
  * Pulls every recoverable level record out of an unknown blob. Never throws.
  *
  * Medals are whitelisted against the level list on the way in, which is how a save written before
- * DESIGN.md §11 A7 keeps loading: a build that graded `w1-01` recorded a gold there, the level no
+ * DESIGN.md §7 keeps loading: a build that graded `w1-01` recorded a gold there, the level no
  * longer carries a medal, and the stored string is dropped exactly as the retired char-count field
  * is. Everything beside it — the code, the close, the best ticks, the stars, the banked objectives
  * — survives untouched, so the work orders stay closed and the ticks stay on the board. Dropping
