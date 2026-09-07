@@ -8,6 +8,16 @@
 
 .sitemap {
   --screen-gutter: clamp(20px, 3.2vw, 56px);
+  /*
+   * The content column, defined once for the whole screen. The gutter holds it off the window
+   * edges until the column reaches its cap; past that the surplus is split evenly. Both the header
+   * band and the scrolling body take this inset, which is the whole point: the header used to take
+   * `--screen-gutter` alone while the rows were additionally capped and centred, so on a window
+   * wider than the cap plus two gutters the header's right-hand group drifted 37px past the rows
+   * it sits above. Percentages here resolve against `.sitemap`, so both users measure the same box.
+   */
+  --content-max: 1680px;
+  --content-inset: max(var(--screen-gutter), calc((100% - var(--content-max)) / 2));
   --world-accent: var(--accent);
 
   display: flex;
@@ -90,7 +100,7 @@
   flex: none;
   align-items: center;
   gap: var(--space-5);
-  padding: var(--space-4) var(--screen-gutter);
+  padding: var(--space-4) var(--content-inset);
   border-bottom: 1px solid var(--border);
   background: var(--bg-panel);
 }
@@ -114,7 +124,7 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding: var(--space-6) var(--screen-gutter) 96px;
+  padding: var(--space-6) var(--content-inset) 96px;
 }
 
 .sitemap__route {
@@ -122,8 +132,6 @@
   position: relative;
   flex-direction: column;
   gap: var(--space-6);
-  max-width: 1680px;
-  margin-inline: auto;
 }
 
 /* The spine that makes eight sections read as one route. */

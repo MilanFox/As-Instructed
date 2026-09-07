@@ -5,6 +5,7 @@
  * defects `docs/FIX-UNGRADED.md` measured live: the points reduce paid nothing for a close, the
  * at-par reckoning could never count one, and the accessible name announced it as unfinished.
  */
+import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { Medal, isGraded } from '../../../game/score.ts';
 import { emptySave } from '../../../game/save.ts';
@@ -141,5 +142,56 @@ describe('the accessible name does not announce finished work as unfinished', ()
   test('a medal is still named where the level carries one', () => {
     const save = close(bootSectorInProgress(), GRADED, Medal.Gold);
     expect(nodeLabel(nodeFor(save, GRADED))).toContain('Closed. gold medal.');
+  });
+});
+
+/*
+ * The header band and the work orders under it are one column, and the stylesheet may only say so
+ * once.
+ *
+ * A player on a 1855px window photographed the split: the header took `--screen-gutter` alone
+ * while the route was additionally capped at 1680px and centred, so above the cap plus two gutters
+ * the header's right-hand group — the campaign bar and its caption — drifted 37px past the rows it
+ * describes and ran at the window edge. The fix is not a matching padding on the header; it is one
+ * inset both of them read, because a second hand-tuned number is the same bug again. These cases
+ * hold the single source rather than the pixels: measured boxes belong in a browser, but "the
+ * header does not carry a gutter of its own" is a property of the file.
+ */
+describe('the site map header stays in the content column', () => {
+  const CSS = readFileSync(new URL('../../styles/screens.css', import.meta.url), 'utf8');
+
+  const rule = (selector: string): string => {
+    const found = new RegExp(`\\${selector}\\s*\\{[^}]*\\}`).exec(CSS)?.[0];
+    if (!found) throw new Error(`no ${selector} rule in screens.css`);
+    return found;
+  };
+
+  test('the column is defined once, on the screen root', () => {
+    const root = rule('.sitemap');
+    expect(['--content-max', /--content-max:\s*\d+px/.test(root)]).toEqual(['--content-max', true]);
+    expect([
+      '--content-inset',
+      /--content-inset:\s*max\(var\(--screen-gutter\),\s*calc\(\(100% - var\(--content-max\)\) \/ 2\)\)/.test(
+        root,
+      ),
+    ]).toEqual(['--content-inset', true]);
+  });
+
+  test('the header and the scrolling body take the same inset', () => {
+    for (const selector of ['.sitemap__header', '.sitemap__scroll']) {
+      expect([selector, /padding:[^;]*var\(--content-inset\)/.test(rule(selector))]).toEqual([
+        selector,
+        true,
+      ]);
+      expect([`${selector} has no gutter of its own`, rule(selector).includes('--screen-gutter')]).toEqual(
+        [`${selector} has no gutter of its own`, false],
+      );
+    }
+  });
+
+  test('the route no longer sets a width the header cannot see', () => {
+    const route = rule('.sitemap__route');
+    expect(['max-width', /max-width/.test(route)]).toEqual(['max-width', false]);
+    expect(['margin-inline', /margin-inline/.test(route)]).toEqual(['margin-inline', false]);
   });
 });
