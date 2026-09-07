@@ -7,3 +7,7 @@ coverage
 .vite
 *.tsbuildinfo
 .eslintcache
+
+.claude
+.idea/workspace.xml
+.idea/shelf
