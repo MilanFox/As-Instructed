@@ -281,6 +281,14 @@
 }
 .desk .tb-revert:hover { color: var(--ink); background: #1c2a36; }
 
+/* A passive confirmation, not a button — no border, no hover, nothing to press. It only has to
+   sit near `.tb-revert` and read quieter than it. */
+.desk .tb-saved {
+  padding: 0 calc(7 * var(--u));
+  font-family: var(--mono); font-size: calc(9 * var(--u) * var(--ts));
+  letter-spacing: .1em; color: #4b5b68;
+}
+
 /* ---- the rail. The objective marks are the report's marks, so the
    classes are shared; only where the readout sits is different. */
 

@@ -71,6 +71,10 @@ export interface GameState {
   runState: RunState;
   /** Incremented on every run and on every cancel. Stale responses compare unequal and are dropped. */
   runToken: number;
+  /** What the currently loaded `trace`/`verdict` came from — a real dispatch or a one-seed preview. */
+  runMode: 'dispatch' | 'preview' | null;
+  /** `preview()`'s own in-flight flag, apart from `runState` so a preview never lights up DISPATCH. */
+  previewState: RunState;
   trace: Trace | null;
   verdict: Verdict | null;
   seedResults: PerSeedResult[];
@@ -138,6 +142,10 @@ export interface GameState {
 
   run(): void;
   cancel(): void;
+  /** Runs the program against the work order's first seed only, and autoplays it. No save side effects. */
+  preview(): void;
+  /** Clears whatever `run()` or `preview()` loaded, back to blank. Leaves `code` and `save` untouched. */
+  resetPreview(): void;
   dismissResults(): void;
   advanceToNextLevel(): void;
   signRequisition(): void;
@@ -353,6 +361,25 @@ export const useGame = create<GameState>((set, get) => {
     set({ runState: 'idle', ...patch });
   }
 
+  /** `finishRun`'s twin for `preview()` — the same token discipline, but idles `previewState` only. */
+  function finishPreview(token: number, patch: Partial<GameState>): void {
+    if (get().runToken !== token) return;
+    clearWatchdog();
+    set({ previewState: 'idle', ...patch });
+  }
+
+  /** Bumps past whatever `preview()` has in flight. Shared by `preview()`'s own toggle and `resetPreview()`. */
+  function cancelPreview(): void {
+    const state = get();
+    clearWatchdog();
+    set({ runToken: state.runToken + 1, previewState: 'idle' });
+    try {
+      state.runner().cancel();
+    } catch {
+      // A host that cannot even be cancelled is still not allowed to hold the shell.
+    }
+  }
+
   /**
    * The state a report raised by a run that never produced a verdict carries.
    *
@@ -382,6 +409,8 @@ export const useGame = create<GameState>((set, get) => {
 
     runState: 'idle',
     runToken: 0,
+    runMode: null,
+    previewState: 'idle',
     trace: null,
     verdict: null,
     seedResults: [],
@@ -463,6 +492,8 @@ export const useGame = create<GameState>((set, get) => {
         code: stored?.code ?? level.starter,
         runState: 'idle',
         runToken: get().runToken + 1,
+        runMode: null,
+        previewState: 'idle',
         trace: null,
         verdict: null,
         seedResults: [],
@@ -540,6 +571,7 @@ export const useGame = create<GameState>((set, get) => {
       set({
         runToken: token,
         runState: 'running',
+        runMode: 'dispatch',
         failure: null,
         verdict: null,
         seedResults: [],
@@ -815,6 +847,137 @@ export const useGame = create<GameState>((set, get) => {
       pushLines([{ t: 0, kind: 'system', text: 'run cancelled' }]);
     },
 
+    /**
+     * "Try it" — the one-seed roundtrip the playtest asked for, kept apart from `run()` so trying
+     * something never touches the record. Only the level's first seed runs, never the audit
+     * layouts (`AuditSeeds` is a dispatch-only concept), and success never calls `recordResult` or
+     * `failedReport`: no medal, no attempt, no stat, no achievement is at stake here, on purpose.
+     */
+    preview() {
+      const state = get();
+      if (state.runState === 'running') return;
+      if (state.previewState === 'running') {
+        cancelPreview();
+        pushLines([{ t: 0, kind: 'system', text: 'preview cancelled' }]);
+        return;
+      }
+      const level = state.currentLevelId ? getLevel(state.currentLevelId) : undefined;
+      if (!level) return;
+
+      const seeds = [level.seeds[0] as number];
+      const token = state.runToken + 1;
+      state.pause();
+      set({
+        runToken: token,
+        previewState: 'running',
+        runMode: 'preview',
+        failure: null,
+        verdict: null,
+        seedResults: [],
+        traceSeed: null,
+        failedSeed: null,
+        showResults: false,
+      });
+      pushLines([{ t: 0, kind: 'system', text: `preview ${level.id} — seed ${seeds[0]}` }]);
+
+      clearWatchdog();
+      watchdog = setTimeout(() => {
+        finishPreview(token, {
+          failure: {
+            kind: 'timeout',
+            message:
+              'Your program did not halt. We stopped it. We would like this noted on the record.',
+          },
+        });
+        pushLines([
+          { t: 0, kind: 'error', text: 'HALT notice filed. The host did not answer in time.' },
+        ]);
+      }, UI_WATCHDOG_MS);
+
+      state
+        .runner()
+        .run({ code: state.code, levelId: level.id, seeds })
+        .then((response) => {
+          if (get().runToken !== token) return;
+          if (!response.ok) {
+            // A cancelled preview is not a failure; the player already knows they stopped it.
+            if (response.error.kind === 'cancelled') {
+              finishPreview(token, {});
+              return;
+            }
+            finishPreview(token, { failure: response.error });
+            pushLines([{ t: 0, kind: 'error', text: response.error.message }]);
+            return;
+          }
+
+          const { trace, verdict, results, traceSeed, failedSeed } = response;
+          const cap = get().save.settings.consoleCap;
+          const prints = trace.events.filter(
+            (event): event is PrintEvent => event.kind === 'print',
+          );
+          const shown = prints.slice(0, cap);
+          pushLines(
+            shown.map((event) => ({
+              t: event.t,
+              kind: 'print' as const,
+              text: event.text,
+              ...(event.line !== undefined ? { line: event.line } : {}),
+            })),
+          );
+          pushLines([
+            {
+              t: trace.endTick,
+              kind: verdict.passed ? 'success' : 'error',
+              text: `preview complete — ${verdict.stats.ticks} ticks`,
+            },
+          ]);
+
+          // Unlike a dispatch, which lands on the end so the objective rail reads the finished
+          // state, a preview loads at the start and plays — the point is watching it happen.
+          get().renderer().setTrace(trace);
+          get().renderer().seek(0);
+          set({
+            trace,
+            verdict,
+            seedResults: results,
+            traceSeed,
+            failedSeed: failedSeed ?? null,
+            suppressed: Math.max(0, prints.length - shown.length),
+            tick: 0,
+            endTick: trace.endTick,
+            showResults: false,
+          });
+          finishPreview(token, {});
+          get().play();
+        })
+        .catch((error: unknown) => {
+          if (get().runToken !== token) return;
+          const message = error instanceof Error ? error.message : String(error);
+          finishPreview(token, { failure: { kind: 'runtime', message } });
+          pushLines([{ t: 0, kind: 'error', text: message }]);
+        });
+    },
+
+    resetPreview() {
+      const state = get();
+      if (state.previewState === 'running') cancelPreview();
+      else if (state.runState === 'running') state.cancel();
+
+      get().pause();
+      get().renderer().setTrace(null);
+      set({
+        trace: null,
+        verdict: null,
+        seedResults: [],
+        traceSeed: null,
+        failedSeed: null,
+        tick: 0,
+        endTick: 0,
+        runMode: null,
+        showResults: false,
+      });
+    },
+
     dismissResults() {
       set({ showResults: false });
     },
@@ -889,6 +1052,10 @@ export const useGame = create<GameState>((set, get) => {
     },
 
     togglePlay() {
+      if (get().trace === null) {
+        get().preview();
+        return;
+      }
       if (get().playing) get().pause();
       else get().play();
     },

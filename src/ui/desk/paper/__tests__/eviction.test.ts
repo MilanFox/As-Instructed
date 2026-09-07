@@ -203,4 +203,50 @@ describe('a halt notice replaces its predecessor', () => {
 
     expect(reachable()).toContain('certificate:w8-01:1');
   });
+
+  it('is filed by a certificate that closes the same work order', () => {
+    issue('halt:w8-01:1', { kind: 'halt', report: report('w8-01') });
+    issue('certificate:w8-01:2', {
+      kind: 'certificate',
+      report: { ...report('w8-01'), passed: true },
+    });
+
+    expect(reachable()).toContain('certificate:w8-01:2');
+    expect(filedDocs(usePapers.getState()).map((doc) => doc.id)).toContain('halt:w8-01:1');
+  });
+});
+
+describe('a halt notice is filed once its level is no longer open', () => {
+  beforeEach(reset);
+
+  it('files a halt notice for a level the player has left', () => {
+    issue('halt:w8-01:1', { kind: 'halt', report: report('w8-01') });
+    useGame.setState({ currentLevelId: 'w8-02' });
+
+    usePapers.getState().clearLevelPaper();
+
+    expect(reachable()).not.toContain('halt:w8-01:1');
+    expect(filedDocs(usePapers.getState()).map((doc) => doc.id)).toContain('halt:w8-01:1');
+  });
+
+  it('leaves the halt notice alone while its level is still open', () => {
+    useGame.setState({ currentLevelId: 'w8-01' });
+    issue('halt:w8-01:1', { kind: 'halt', report: report('w8-01') });
+
+    usePapers.getState().clearLevelPaper();
+
+    expect(reachable()).toContain('halt:w8-01:1');
+  });
+
+  it('does not touch a certificate for a level the player has left', () => {
+    issue('certificate:w8-01:1', {
+      kind: 'certificate',
+      report: { ...report('w8-01'), passed: true },
+    });
+    useGame.setState({ currentLevelId: 'w8-02' });
+
+    usePapers.getState().clearLevelPaper();
+
+    expect(reachable()).toContain('certificate:w8-01:1');
+  });
 });

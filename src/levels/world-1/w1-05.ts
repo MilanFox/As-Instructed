@@ -76,6 +76,7 @@ export const w1_05: LevelDef = {
     'The doorway sits at the South end of the partition. A sweep that reaches the bottom row going East drives through it without being told to.',
     'Once the bot is in the east half, the same sweep works again. Only the direction it climbs has changed.',
     'A sweep that ends at the wrong wall has to drive back over a row it already did. Which way you snake decides which wall you end at.',
+    'Count the columns in the west half before committing to a direction. An even count and a row-by-row snake reaches the door on its own. An odd count needs the snake run column by column instead.',
   ],
   docs: ['canMove', 'move'],
 };

@@ -5,12 +5,16 @@ import { usePapers } from '../desk/paper/papers.ts';
 import { KEY_LIST, type KeyId } from '../desk/terminal/keys.ts';
 import { closeOverlay, overlayState, toggleOverlay } from './useOverlay.ts';
 
+function isEditorTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement && target.closest('.monaco-editor') !== null;
+}
+
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   if (target.isContentEditable) return true;
   const tag = target.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
-  return target.closest('.monaco-editor') !== null;
+  return isEditorTarget(target);
 }
 
 /**
@@ -55,7 +59,7 @@ export function useKeyboard(): void {
           else if (useLibrary.getState().offer) useLibrary.getState().skipPublish(false);
           else if (overlayState().open === 'docs') closeOverlay();
           else if (useLibrary.getState().panelOpen) useLibrary.getState().setPanelOpen(false);
-          else if (state.screen !== 'levels') state.goto('levels');
+          else if (state.screen !== 'levels' && !isEditorTarget(event.target)) state.goto('levels');
         },
 
         play: () => {

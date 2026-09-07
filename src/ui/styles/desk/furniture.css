@@ -308,36 +308,15 @@
   font-family: var(--mono); font-size: calc(9.5 * var(--u) * var(--ts)); letter-spacing: .16em;
   color: #cfcabb;
 }
-.desk .stamp.gold .sb { color: #f0cf7f; }
-.desk .stamp.silver .sb { color: #d3dae2; }
-.desk .stamp.bronze .sb { color: #dda577; }
-
-/*
- * The three the company owns. They are indicators, not dies you can lift: the player does not
- * grade themselves. They sit lower in the block, they do not rise to the cursor, and the one the
- * work order was awarded is the only one lit.
- */
-.desk .stamp--grade {
-  display: block; cursor: default; transform: translateY(calc(9 * var(--u)));
-  filter: saturate(.25) brightness(.7);
-}
-.desk .stamp--grade:hover { transform: translateY(calc(9 * var(--u))); }
-.desk .stamp--grade .sh { opacity: .55; }
-.desk .stamp--grade .sb { box-shadow: inset 0 1px 0 rgba(255,255,255,.12); }
-.desk .stamp--grade.is-live {
-  transform: none; filter: none;
-}
-.desk .stamp--grade.is-live .sb {
-  box-shadow: calc(6 * var(--u)) calc(6 * var(--u)) calc(2 * var(--u)) rgb(var(--ink-sh) / .32),
-              inset 0 1px 0 rgba(255,255,255,.24), 0 0 calc(10 * var(--u)) rgba(255,176,32,.5);
-}
 
 /*
  * Yours, and the only die that leaves the block.
  *
  * It reacts only when a certificate is lying on the desk unstamped, and sits dead in the rack
  * otherwise. That is the instruction: a control that is inert until the moment it is needed
- * teaches itself, and this game gets no tutorial and no tooltip.
+ * teaches itself, and this game gets no tutorial and no tooltip. A glow across the room is easy to
+ * miss on a desk this busy, so the moment it goes live it also calls to itself: three short rises,
+ * the same vocabulary `desk-arrive` already uses to say "look here", not a label bolted on.
  */
 .desk .stamp.closed { position: relative; transform: translateY(calc(9 * var(--u))); filter: saturate(.25) brightness(.7); cursor: default; }
 .desk .stamp .sc {
@@ -349,6 +328,7 @@
 .desk .stamp.closed .sh { opacity: .55; }
 .desk .stamp.closed.is-ready {
   transform: translateY(calc(-3 * var(--u))); filter: none; cursor: pointer;
+  animation: desk-stamp-call 1.1s ease-in-out 3;
 }
 .desk .stamp.closed.is-ready .sh { opacity: 1; }
 .desk .stamp.closed.is-ready .sb {
@@ -357,6 +337,10 @@
               inset 0 1px 0 rgba(255,255,255,.4), 0 0 calc(10 * var(--u)) rgba(255,255,255,.22);
 }
 .desk .stamp.closed.is-ready:hover { transform: translateY(calc(-9 * var(--u))); }
+@keyframes desk-stamp-call {
+  0%, 100% { transform: translateY(calc(-3 * var(--u))) scale(1); }
+  50% { transform: translateY(calc(-9 * var(--u))) scale(1.08); }
+}
 .desk .stamp.closed:focus-visible { outline: calc(2 * var(--u)) solid var(--accent); outline-offset: calc(3 * var(--u)); }
 .desk .stamp--held { opacity: .35; }
 

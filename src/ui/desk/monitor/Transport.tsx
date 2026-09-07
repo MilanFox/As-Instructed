@@ -43,6 +43,7 @@ export function Transport({ onZoom }: TransportProps): React.ReactElement {
   const togglePlay = useGame((state) => state.togglePlay);
   const setSpeed = useGame((state) => state.setSpeed);
   const trace = useGame((state) => state.trace);
+  const resetPreview = useGame((state) => state.resetPreview);
   const level = useGame(currentLevel);
 
   const idle = endTick <= 0;
@@ -51,7 +52,8 @@ export function Transport({ onZoom }: TransportProps): React.ReactElement {
   const acts = useMemo(() => segments(playback), [playback]);
   const marks = useMemo(() => landmarks(playback), [playback]);
   const steps = useMemo(() => progressMarks(playback), [playback]);
-  const percent = (value: number): string => `${String(endTick > 0 ? (value / endTick) * 100 : 0)}%`;
+  const percent = (value: number): string =>
+    `${String(endTick > 0 ? (value / endTick) * 100 : 0)}%`;
 
   return (
     <div className="feed-controls">
@@ -70,9 +72,11 @@ export function Transport({ onZoom }: TransportProps): React.ReactElement {
           type="button"
           className="fk fk-wide"
           onClick={togglePlay}
-          disabled={idle}
-          title={playing ? 'Pause (space)' : 'Play (space)'}
-          aria-label={playing ? 'Pause' : 'Play'}
+          disabled={!level}
+          title={playing ? 'Pause (space)' : trace === null ? 'Try it (space)' : 'Play (space)'}
+          aria-label={
+            playing ? 'Pause' : trace === null ? 'Try this solution against one seed' : 'Play'
+          }
         >
           {playing ? '❚❚' : '▶'}
         </button>
@@ -85,6 +89,16 @@ export function Transport({ onZoom }: TransportProps): React.ReactElement {
           aria-label="Step forward one tick"
         >
           ▶
+        </button>
+        <button
+          type="button"
+          className="fk"
+          onClick={resetPreview}
+          disabled={idle}
+          title="Reset this run — clear the trace so you can try again"
+          aria-label="Reset the run"
+        >
+          ↺
         </button>
       </div>
 

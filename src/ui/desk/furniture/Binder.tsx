@@ -18,6 +18,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 
 import { Medal, medalOf, starsFor } from '../../../game/score.ts';
 import { useGame } from '../../../game/store.ts';
+import { useLibrary } from '../../../meta/store.ts';
 import { CommendationShelf } from '../../components/CommendationShelf.tsx';
 import { buildRows, campaignTally } from '../../screens/LevelSelect.tsx';
 import { filedDocs, usePapers } from '../paper/papers.ts';
@@ -26,6 +27,7 @@ import { filedDocs, usePapers } from '../paper/papers.ts';
 const TABS = [0, 1, 2, 3, 4, 5, 6, 7];
 
 export function Binder(): React.ReactElement {
+  const unlocked = useLibrary((state) => state.save.unlocked);
   const save = useGame((state) => state.save);
   /*
    * The pile itself, not `filedDocs`. That helper builds a new array on every call, and a zustand
@@ -51,6 +53,8 @@ export function Binder(): React.ReactElement {
 
   const rows = useMemo(() => buildRows(save), [save]);
   const tally = useMemo(() => campaignTally(rows), [rows]);
+
+  if (!unlocked) return <></>;
 
   /** The mark the player stamped on this order's certificate, where one has been filed. */
   const stamped = new Map<string, string>();

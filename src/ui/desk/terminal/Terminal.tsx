@@ -28,9 +28,19 @@ import { RUN_HINT } from './keys.ts';
  *
  * `EDIT` is yours, `SENT` is in flight, `RETURNED` is a run you can watch, `CLOSED` is one the
  * site accepted. It is the same four states the DISPATCH key's lamps carry, said in a word.
+ *
+ * `CLOSED` and `RETURNED` both hinge on `mode === 'dispatch'`: a preview leaves `trace`/`verdict`
+ * set too, but it never went to site, so it must never claim either word — it falls through to
+ * `EDIT`, same as a work order nothing has run yet.
  */
-function stateWord(running: boolean, watching: boolean, passed: boolean | undefined): string {
+function stateWord(
+  running: boolean,
+  watching: boolean,
+  passed: boolean | undefined,
+  mode: 'dispatch' | 'preview' | null,
+): string {
   if (running) return 'SENT';
+  if (mode !== 'dispatch') return 'EDIT';
   if (passed) return 'CLOSED';
   if (watching) return 'RETURNED';
   return 'EDIT';
@@ -40,6 +50,7 @@ export function Terminal(): React.JSX.Element {
   const runState = useGame((state) => state.runState);
   const trace = useGame((state) => state.trace);
   const verdict = useGame((state) => state.verdict);
+  const runMode = useGame((state) => state.runMode);
   const resetCode = useGame((state) => state.resetCode);
   const [problems, setProblems] = useState(0);
   const [sound, setSound] = useState(false);
@@ -51,7 +62,7 @@ export function Terminal(): React.JSX.Element {
    */
   const libLoaded = useLibrary((state) => state.save.unlocked && state.panelOpen);
 
-  const state = stateWord(runState === 'running', trace !== null, verdict?.passed);
+  const state = stateWord(runState === 'running', trace !== null, verdict?.passed, runMode);
 
   return (
     <section className="display display--term">
@@ -79,6 +90,12 @@ export function Terminal(): React.JSX.Element {
             >
               revert
             </button>
+            <span
+              className="tb-saved"
+              title="Every keystroke is written to your save automatically."
+            >
+              autosaves
+            </span>
             <span className="tb-state">{state}</span>
           </div>
 

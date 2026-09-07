@@ -8,9 +8,10 @@
  * again. **That is a data-loss bug, not a styling complaint.**
  *
  * So nothing here opens anything. It *issues* paper, and paper stays on the desk until it is
- * filed — stamped, signed or acknowledged — and filed paper goes to the Repository rather than to
- * nowhere. The one document that is never filed is the standing sheet, because a grade delivered
- * once and then deleted is not a grade, it is an event (F18).
+ * filed — stamped or acknowledged — and filed paper goes to the Repository rather than to nowhere.
+ * The standing sheet is never filed, because a grade delivered once and then deleted is not a
+ * grade, it is an event (F18). Signing a requisition is not filing either — it stows the sheet
+ * rather than sending it to the Repository, so the delivery note it signed for stays reachable.
  *
  * `deliverPaperwork` is the whole of it and it is a plain function: every issue is idempotent by
  * id, so running it too often is free and running it once too few times is the only failure mode
@@ -64,9 +65,10 @@ export function deliverPaperwork(): void {
       { kind: 'order', levelId },
       game.save.levels[levelId] ? DOC_HOME.order : DOC_ARRIVAL,
       /*
-       * The one sheet that lies out. Everything else goes to the in-tray, because five documents
+       * The order always lies out. Everything else goes to the in-tray, because five documents
        * arriving at once buried both screens and the program is the largest thing on this desk
-       * while it is being written.
+       * while it is being written. The requisition below is the one exception, and only at the
+       * moment it is granted.
        */
       false,
     );
@@ -94,11 +96,23 @@ export function deliverPaperwork(): void {
   }
 
   if (game.requisition) {
-    issueOnce(`requisition:${game.requisition.levelId}`, 'requisition', {
-      kind: 'requisition',
-      levelId: game.requisition.levelId,
-      hardware: [...game.requisition.hardware],
-    });
+    issueOnce(
+      `requisition:${game.requisition.levelId}`,
+      'requisition',
+      {
+        kind: 'requisition',
+        levelId: game.requisition.levelId,
+        hardware: [...game.requisition.hardware],
+      },
+      DOC_HOME.requisition,
+      /*
+       * Opens on the level that grants it, same as the order — a delivery note nobody sees land is
+       * a delivery note nobody signs. `issueOnce` never re-issues an id it has already handed out,
+       * so this is the only moment it surfaces; the signature is a quiet way back to the tray, not
+       * the only way to notice the sheet.
+       */
+      false,
+    );
   }
 
   if (isDeliveryNoteOwed(useLibrary.getState().save)) {

@@ -39,7 +39,7 @@ export interface KeyBinding {
  * `useKeyboard` accepts Meta as well as Control so a Mac keyboard's Command works, but a hint that
  * names both names neither — the audit's finding was two hints disagreeing, not one being narrow.
  */
-export const RUN_HINT = 'ctrl+enter dispatches';
+export const RUN_HINT = 'ctrl+enter dispatches every seed';
 
 export const KEY_LIST: readonly KeyBinding[] = [
   {

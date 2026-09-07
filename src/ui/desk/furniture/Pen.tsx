@@ -1,9 +1,10 @@
 /**
  * The pen, and signing for hardware.
  *
- * The same act as the stamp block for a different sheet: a requisition is closed by dragging along
- * its signature line, and ink follows the pointer. Filing is a thing the player does with their
- * hand, and a requisition that signs itself on a button press is a modal in a nicer costume.
+ * The same act as the stamp block for a different sheet: a requisition is signed for by dragging
+ * along its signature line, and ink follows the pointer. Putting it away is a thing the player does
+ * with their hand, and a requisition that signs itself on a button press is a modal in a nicer
+ * costume.
  *
  * Like the stamp block this does not know what a requisition is. It listens for a drag on anything
  * carrying `data-signline` and reads the sheet's id off the nearest `data-doc-id`.
@@ -59,7 +60,11 @@ export function Pen(): React.ReactElement {
       const sheet = line.closest<HTMLElement>('[data-doc-id]');
       const id = sheet?.dataset['docId'] ?? line.dataset['signline'];
       useGame.getState().signRequisition();
-      if (id) usePapers.getState().file(id, 'signed');
+      /*
+       * Not `file()` — the requisition already did its job by being seen. Signing is a quiet way
+       * back to the tray, not a trip to the Repository, so it stays reachable for reference.
+       */
+      if (id) usePapers.getState().stow(id, 'signed');
       stop();
     };
 

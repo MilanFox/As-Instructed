@@ -319,3 +319,53 @@ describe('the desk holds one sheet at a time', () => {
     expect(loose().length, 'nothing was lost putting one away').toBe(before);
   });
 });
+
+/**
+ * Playtest, 2026-09-07: "the Sheet spawns silently in the tray and there is nothing obviously
+ * showing you that." A requisition now opens on the level that grants it, the one time it is
+ * granted — and signing it away is a route back to the tray, not off the desk for good.
+ */
+describe('a requisition surfaces once, on the level that grants it', () => {
+  test('it lies out rather than landing silently in the tray', () => {
+    useGame.setState({
+      screen: 'workspace',
+      currentLevelId: 'w1-05',
+      requisition: { levelId: 'w1-05', hardware: ['scan'] },
+    });
+    deliver();
+
+    expect(ofKind('requisition')).toHaveLength(1);
+    expect(looseDocs(usePapers.getState()).some((doc) => doc.kind === 'requisition')).toBe(true);
+  });
+
+  test('it does not re-surface once handled, even if the level is granted again', () => {
+    useGame.setState({
+      screen: 'workspace',
+      currentLevelId: 'w1-05',
+      requisition: { levelId: 'w1-05', hardware: ['scan'] },
+    });
+    deliver();
+    const id = ofKind('requisition')[0]?.id as string;
+    usePapers.getState().stow(id, 'signed');
+
+    useGame.setState({ requisition: { levelId: 'w1-05', hardware: ['scan'] } });
+    deliver();
+
+    expect(usePapers.getState().docs.find((doc) => doc.id === id)?.stowed).toBe(true);
+  });
+
+  test('signing it stows it for reference rather than filing it to the Repository', () => {
+    useGame.setState({
+      screen: 'workspace',
+      currentLevelId: 'w1-05',
+      requisition: { levelId: 'w1-05', hardware: ['scan'] },
+    });
+    deliver();
+    const id = ofKind('requisition')[0]?.id as string;
+
+    usePapers.getState().stow(id, 'signed');
+
+    expect(filedDocs(usePapers.getState()).some((doc) => doc.id === id)).toBe(false);
+    expect(trayDocs(usePapers.getState()).some((doc) => doc.id === id)).toBe(true);
+  });
+});

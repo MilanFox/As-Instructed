@@ -20,7 +20,7 @@ type Lamp = 'ready' | 'flight' | 'returned';
 
 /** What the company says the run is doing. Its own voice, not the engine's. */
 const LEGEND: Record<Lamp, string> = {
-  ready: 'program not yet sent',
+  ready: 'send this solution against every seed',
   flight: 'in flight · 41 min',
   returned: 'trace returned',
 };
@@ -28,6 +28,7 @@ const LEGEND: Record<Lamp, string> = {
 export function Dispatch(): React.ReactElement {
   const runState = useGame((state) => state.runState);
   const trace = useGame((state) => state.trace);
+  const runMode = useGame((state) => state.runMode);
   const run = useGame((state) => state.run);
   const cancel = useGame((state) => state.cancel);
   const [down, setDown] = useState(false);
@@ -35,7 +36,9 @@ export function Dispatch(): React.ReactElement {
   const settle = useRef(0);
 
   const running = runState === 'running';
-  const lamp: Lamp = running ? 'flight' : trace ? 'returned' : 'ready';
+  // A preview leaves `trace` set too, but it never went through this key — the lamp only reads
+  // "returned" for the trip it actually sent.
+  const lamp: Lamp = running ? 'flight' : runMode === 'dispatch' && trace ? 'returned' : 'ready';
 
   /*
    * The key throws whoever threw it. `ctrl+enter` calls `run()` straight off the window, so
@@ -62,7 +65,9 @@ export function Dispatch(): React.ReactElement {
       <button
         type="button"
         className={down ? 'dsp-key down' : 'dsp-key'}
-        aria-label={running ? 'Recall the program' : 'Dispatch program to site'}
+        aria-label={
+          running ? 'Recall the program' : 'Dispatch — run this solution against every seed'
+        }
         onClick={() => {
           if (running) cancel();
           else run();

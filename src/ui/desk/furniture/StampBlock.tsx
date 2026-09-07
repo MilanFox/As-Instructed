@@ -8,13 +8,11 @@
  * the box on the certificate. That call is `usePapers.file(id, mark)`, and the sheet moves to the
  * Repository rather than being destroyed.
  *
- * **The block is split, and the split is the fiction.** `GOLD`, `SILVER` and `BRONZE` are the
- * company's dies and cannot be picked up: being assessed by somebody else is the whole pressure of
- * this game, and handing the player their own medal die contradicts it. They are indicators — one
- * is live for the work order on the desk, the rest are inert. `CLOSED` is the contractor's, and
- * pressing it is how a sheet leaves the desk. Six work orders carry no medal at all (DESIGN.md §7),
- * and under this split that stops being an awkward fourth medal: it is simply the normal act
- * with no grade lit beside it.
+ * `CLOSED` is the contractor's die, and pressing it is how a sheet leaves the desk. The grade a
+ * work order earned is read off the certificate and the medal badge, not stamped here — a rack of
+ * dies that never reacted was mistaken for a broken control, so it is gone. Six work orders carry
+ * no medal at all (DESIGN.md §7), and `CLOSED` presses the same for those: the normal act with no
+ * grade attached.
  *
  * The block does not know what a certificate is. It listens for a press on anything carrying
  * `data-stampbox` and reads the sheet's id off the nearest `data-doc-id`, so the paper lane owns
@@ -31,13 +29,6 @@ interface Die {
   /** The rule the die stands for, printed under the ink. */
   sub: string;
 }
-
-/** The company's three. Read-only: which one is live is the company's answer, not yours. */
-const GRADES: readonly Die[] = [
-  { mark: 'gold', die: 'GOLD', sub: 'AT PAR OR UNDER' },
-  { mark: 'silver', die: 'SILVER', sub: 'UP TO A QUARTER OVER' },
-  { mark: 'bronze', die: 'BRONZE', sub: 'A PASS' },
-];
 
 /** Yours. */
 const CLOSURE: Die = { mark: 'closed', die: 'CLOSED', sub: 'NO NOTES' };
@@ -57,7 +48,7 @@ export function StampBlock(): React.ReactElement {
    *
    * The die reacting *only* when there is something to stamp is the whole instruction: a control
    * that is plainly inert until the moment it is needed teaches itself, and this game does not get
-   * a tutorial or a tooltip. The grade dies never react, because the player never operates them.
+   * a tutorial or a tooltip.
    *
    * A certificate is *issued to the in-tray*, because one sheet lies out and that sheet is the
    * work order. So the die was live with nothing on the desk carrying a stamp box: a player closed
@@ -71,8 +62,6 @@ export function StampBlock(): React.ReactElement {
     (doc) => !doc.filed && doc.payload.kind === 'certificate' && doc.mark === null,
   );
   const ready = waiting !== undefined;
-  /** Which grade the company awarded the sheet on the desk. Its lamp, not the player's control. */
-  const live = waiting?.payload.kind === 'certificate' ? waiting.payload.report.medal : null;
 
   useEffect(() => {
     if (!held) return undefined;
@@ -135,21 +124,6 @@ export function StampBlock(): React.ReactElement {
           <span>K&amp;D</span>
         </div>
         <div className="rack">
-          {GRADES.map((grade) => (
-            <span
-              key={grade.mark}
-              className={`stamp stamp--grade ${grade.mark}${live === grade.mark ? ' is-live' : ''}`}
-              role="img"
-              aria-label={
-                live === grade.mark
-                  ? `${grade.die}: the grade awarded for this work order`
-                  : `${grade.die}: not awarded`
-              }
-            >
-              <span className="sh" />
-              <span className="sb">{grade.die}</span>
-            </span>
-          ))}
           <button
             type="button"
             className={`stamp ${CLOSURE.mark}${ready ? ' is-ready' : ''}${held ? ' stamp--held' : ''}`}
@@ -177,11 +151,6 @@ export function StampBlock(): React.ReactElement {
           >
             <span className="sh" />
             <span className="sb">{CLOSURE.die}</span>
-            {/*
-              Screen-printed on the block under the live die. The row reads GOLD SILVER BRONZE
-              CLOSED, which a player read as a legend rather than as a control; the three grade
-              dies stay a legend, and this says which one of the four is a key.
-            */}
             {ready ? <span className="sc">{held ? 'CLICK THE BOX' : 'PRESS TO FILE'}</span> : null}
           </button>
         </div>

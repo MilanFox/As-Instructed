@@ -45,6 +45,7 @@ export function Monitor(): React.ReactElement {
   const trace = useGame((state) => state.trace);
   const tick = useGame((state) => state.tick);
   const runState = useGame((state) => state.runState);
+  const previewState = useGame((state) => state.previewState);
   const playing = useGame((state) => state.playing);
   const endTick = useGame((state) => state.endTick);
   const docs = usePapers((state) => state.docs);
@@ -279,7 +280,9 @@ export function Monitor(): React.ReactElement {
             <span className="feed-tick">{String(flooredTick).padStart(4, '0')}</span>
           ) : (
             <span className="feed-stamp">
-              {runState === 'running' ? 'AWAITING TELEMETRY' : 'LAST KNOWN STATE · NO TRACE ON FILE'}
+              {runState === 'running' || previewState === 'running'
+                ? 'AWAITING TELEMETRY'
+                : 'LAST KNOWN STATE · NO TRACE ON FILE'}
             </span>
           )}
           {marking ? (

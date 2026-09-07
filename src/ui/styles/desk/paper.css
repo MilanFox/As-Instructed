@@ -18,7 +18,6 @@
   padding: calc(22 * var(--u)) calc(26 * var(--u));
   transform-origin: 50% 0;
   cursor: grab;
-  will-change: transform;
 }
 .desk .doc::before {
   /* paper stock: laid grain, plus the lamp falling across it from the NW */

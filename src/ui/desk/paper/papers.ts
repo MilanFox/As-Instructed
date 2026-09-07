@@ -218,14 +218,17 @@ function evictable(doc: DeskDoc, brief: string | null): boolean {
 
 /**
  * A HALT NOTICE is about the run you just did, and the one before it is worthless the moment a
- * new one exists. So a halt notice replaces its predecessor on the same work order rather than
- * stacking beside it: five failed dispatches on `w8-01` left five sheets in the tray, and the
- * fifth said everything the first four did. The replaced sheet is filed, not deleted.
+ * new one exists — including when that new one is a certificate. So a halt notice replaces its
+ * predecessor on the same work order rather than stacking beside it: five failed dispatches on
+ * `w8-01` left five sheets in the tray, and the fifth said everything the first four did; a sixth
+ * dispatch that finally closes the order retires the halt the same way, because a HALT NOTICE for
+ * a work order that is now closed is not information, it is clutter. The replaced sheet is filed,
+ * not deleted.
  */
 function supersedes(next: DeskDoc, doc: DeskDoc): boolean {
   return (
-    next.payload.kind === 'halt' &&
     doc.payload.kind === 'halt' &&
+    (next.payload.kind === 'halt' || next.payload.kind === 'certificate') &&
     next.payload.report.levelId === doc.payload.report.levelId
   );
 }
@@ -276,10 +279,13 @@ interface PaperState {
   /** File it. The sheet leaves the desk for the Repository; it is not destroyed. */
   file(id: string, mark?: string): void;
   /** Put it away. It goes to the in-tray and can be taken out again. */
-  stow(id: string): void;
+  stow(id: string, mark?: string): void;
   /** Take it out of the tray. Whatever was out goes back in — the desk holds one sheet. */
   takeOut(id: string): void;
-  /** Take away the *other* work orders. The one for the level that is open is never dropped. */
+  /**
+   * Take away the *other* work orders, and file the halt notices for levels that are no longer
+   * open. The order for the level that is open is never dropped.
+   */
   clearLevelPaper(): void;
 }
 
@@ -431,9 +437,11 @@ export const usePapers = create<PaperState>((set, get) => ({
    * sheet it had just been handed, roughly half the time, and left the desk with no work order
    * on it at all.
    */
-  stow(id) {
+  stow(id, mark) {
     set((state) => ({
-      docs: state.docs.map((d) => (d.id === id ? { ...d, stowed: true } : d)),
+      docs: state.docs.map((d) =>
+        d.id === id ? { ...d, stowed: true, mark: mark ?? d.mark } : d,
+      ),
       lifted: state.lifted === id ? null : state.lifted,
     }));
     persist(get());
@@ -458,15 +466,31 @@ export const usePapers = create<PaperState>((set, get) => ({
 
   clearLevelPaper() {
     const keep = briefId();
+    const open = useGame.getState().currentLevelId;
     set((state) => {
-      const docs = state.docs.filter((d) => d.kind !== 'order' || d.filed || d.id === keep);
+      /*
+       * A halt notice for a level that is no longer open has done its job — `supersedes` only
+       * retires one when a *newer* sheet for the same order arrives, and leaving the level
+       * without one is exactly the case that otherwise left old halts stranded in the tray
+       * forever, including ones from levels finished long ago.
+       */
+      const stale = new Set(
+        state.docs
+          .filter((d) => !d.filed && d.payload.kind === 'halt' && d.payload.report.levelId !== open)
+          .map((d) => d.id),
+      );
+      const docs = state.docs
+        .filter((d) => d.kind !== 'order' || d.filed || d.id === keep)
+        .map((d) => (stale.has(d.id) ? { ...d, filed: true } : d));
       /*
        * Only the sheet that actually left is put down. Clearing `lifted` unconditionally dropped
        * whatever the player was holding every time the paperwork was re-delivered — and it is
        * re-delivered on any store nudge, so asking for a hint took the work order out of your
        * hand while you were reading it.
        */
-      const gone = state.lifted !== null && !docs.some((d) => d.id === state.lifted);
+      const gone =
+        state.lifted !== null &&
+        (stale.has(state.lifted) || !docs.some((d) => d.id === state.lifted));
       return { docs, lifted: gone ? null : state.lifted };
     });
     persist(get());

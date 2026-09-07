@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { RunResponse } from '../../runtime/protocol.ts';
 import type { RunSubmission, RunnerPort } from '../ports.ts';
 import { FakeRunner } from '../ports.ts';
-import { campaignOrder } from '../../levels/index.ts';
+import { campaignOrder, getLevel } from '../../levels/index.ts';
 import type { SaveFile } from '../save.ts';
 import { emptyProgress, emptySave } from '../save.ts';
 import type { GameState } from '../store.ts';
@@ -48,6 +48,8 @@ function reset(): void {
     save: emptySave(),
     runState: 'idle',
     runToken: 0,
+    runMode: null,
+    previewState: 'idle',
     trace: null,
     verdict: null,
     seedResults: [],
@@ -211,6 +213,108 @@ describe('run state machine', () => {
     await Promise.resolve();
     expect(useGame.getState().verdict).toBe(verdict);
     expect(useGame.getState().failure).toBeNull();
+  });
+});
+
+/**
+ * "Try it" against "commit it" — the whole point of `preview()` is that it can never be mistaken
+ * for a dispatch: one seed, no save write, and the report never opens.
+ */
+describe('preview', () => {
+  // A level with more than one seed proves preview picks the first rather than the level's own
+  // full schedule; `w1-01`'s single seed could not tell the two apart.
+  const level = getLevel('w1-03');
+
+  async function previewOnce(code: string): Promise<void> {
+    useGame.getState().setCode(code);
+    useGame.getState().preview();
+    await vi.waitFor(() => expect(useGame.getState().previewState).toBe('idle'));
+  }
+
+  afterEach(() => {
+    // Restores the default level so the describes after this one keep seeing 'w1-01' unasked.
+    useGame.getState().openLevel('w1-01');
+  });
+
+  it("runs against the level's first seed only, not its full schedule", () => {
+    reset();
+    expect(level?.seeds.length ?? 0).toBeGreaterThan(1);
+    const runner = new ScriptedRunner();
+    useGame.getState().attachRunner(runner);
+    useGame.getState().openLevel('w1-03');
+
+    useGame.getState().preview();
+
+    expect(runner.requests[0]?.seeds).toEqual([level?.seeds[0]]);
+    // Clears the watchdog `ScriptedRunner` will otherwise leave ticking as a real timer.
+    useGame.getState().resetPreview();
+  });
+
+  it('populates trace and verdict but never opens the report or touches the save', async () => {
+    reset();
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+    useGame.getState().openLevel('w1-03');
+    const runsBefore = useGame.getState().save.stats.runs;
+
+    await previewOnce('move(Dir.South);');
+
+    const state = useGame.getState();
+    expect(state.trace).not.toBeNull();
+    expect(state.verdict).not.toBeNull();
+    expect(state.runMode).toBe('preview');
+    expect(state.runState).toBe('idle');
+    expect(state.showResults).toBe(false);
+    expect(state.save.stats.runs).toBe(runsBefore);
+    expect(state.save.levels['w1-03']?.attempts ?? 0).toBe(0);
+  });
+
+  it('resetPreview clears the loaded run without touching the code or the save', async () => {
+    reset();
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+    useGame.getState().openLevel('w1-03');
+    await previewOnce('move(Dir.South);');
+    const code = useGame.getState().code;
+    const save = useGame.getState().save;
+
+    useGame.getState().resetPreview();
+
+    const state = useGame.getState();
+    expect(state.trace).toBeNull();
+    expect(state.verdict).toBeNull();
+    expect(state.tick).toBe(0);
+    expect(state.endTick).toBe(0);
+    expect(state.runMode).toBeNull();
+    expect(state.code).toBe(code);
+    expect(state.save).toBe(save);
+  });
+
+  it('togglePlay with no trace loaded starts a preview rather than doing nothing', async () => {
+    reset();
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+    useGame.getState().openLevel('w1-03');
+    useGame.getState().setCode('move(Dir.South);');
+    expect(useGame.getState().trace).toBeNull();
+
+    useGame.getState().togglePlay();
+    expect(useGame.getState().previewState).toBe('running');
+
+    await vi.waitFor(() => expect(useGame.getState().previewState).toBe('idle'));
+    expect(useGame.getState().trace).not.toBeNull();
+  });
+
+  it('does not disturb a dispatch already recorded on the same work order', async () => {
+    reset();
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+    await runOnce(W1_01_SOLUTION);
+    const recorded = useGame.getState().save;
+    expect(recorded.levels['w1-01']?.completed).toBe(true);
+
+    // Previewing the same program that was just dispatched — no `setCode` in between, so the only
+    // way `save` could change here is `preview()` itself writing to it, which it must not.
+    useGame.getState().preview();
+    await vi.waitFor(() => expect(useGame.getState().previewState).toBe('idle'));
+
+    expect(useGame.getState().save).toBe(recorded);
   });
 });
 
@@ -563,6 +667,8 @@ describe('the unlock gate', () => {
  */
 const RUN_SHAPED = [
   'runState',
+  'runMode',
+  'previewState',
   'trace',
   'verdict',
   'seedResults',
