@@ -268,7 +268,7 @@ describe('playback', () => {
 });
 
 describe('rewards', () => {
-  /* Closing a work order is the game working, not an achievement. The list is five (§7.1). */
+  /* Closing a work order is the game working, not an achievement. Most closes pay nothing. */
   it('pays no commendation for an ordinary close', async () => {
     reset();
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
@@ -278,6 +278,95 @@ describe('rewards', () => {
     expect(state.verdict?.passed).toBe(true);
     expect(state.freshCommendations).toEqual([]);
     expect(state.save.achievements).toEqual({});
+  });
+
+  /*
+   * The facts below are the ones the store has to assemble itself — from the source, from the
+   * trace, and from the save — rather than read off a `Verdict`. `earnedBy` is tested on the
+   * snapshot; these prove the snapshot says what happened.
+   */
+  it('notices a comment the player wrote, and not the one the starter shipped', async () => {
+    reset();
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+
+    await runOnce(W1_01_SOLUTION);
+    expect(useGame.getState().save.achievements['left-a-comment']).toBeUndefined();
+
+    await runOnce(`// the long way round\n${W1_01_SOLUTION}`);
+    expect(useGame.getState().freshCommendations).toContain('left-a-comment');
+  });
+
+  it('notices the diagnostics left in a closing program', async () => {
+    reset();
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+    await runOnce(`print('here');\n${W1_01_SOLUTION}`);
+
+    expect(useGame.getState().verdict?.passed).toBe(true);
+    expect(useGame.getState().freshCommendations).toContain('diagnostics-retained');
+  });
+
+  it('notices a program with nothing in it, on a run that closed nothing', async () => {
+    reset();
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+    await runOnce('// TODO\n\n');
+
+    expect(useGame.getState().verdict?.passed).toBe(false);
+    expect(useGame.getState().freshCommendations).toContain('empty-dispatch');
+  });
+
+  it('notices the same program dispatched twice, and only on the second', async () => {
+    reset();
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+
+    await runOnce(W1_01_SOLUTION);
+    expect(useGame.getState().freshCommendations).not.toContain('resubmitted');
+
+    await runOnce(W1_01_SOLUTION);
+    expect(useGame.getState().freshCommendations).toContain('resubmitted');
+
+    await runOnce(W1_01_SLOWER);
+    expect(useGame.getState().save.achievements['resubmitted']).toBeGreaterThan(0);
+  });
+
+  /* One field, written once, and the only thing in the save that survives a session boundary. */
+  it('stamps the first run and never moves it', async () => {
+    reset();
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+
+    await runOnce(W1_01_SOLUTION);
+    const started = useGame.getState().save.firstRunAt;
+    expect(started).toBeGreaterThan(0);
+
+    await runOnce(W1_01_SLOWER);
+    expect(useGame.getState().save.firstRunAt).toBe(started);
+    expect(useGame.getState().save.achievements['came-back']).toBeUndefined();
+  });
+
+  it('nods at somebody who came back on a later day', async () => {
+    reset();
+    const yesterday = Date.now() - 36 * 60 * 60 * 1000;
+    useGame.setState({ save: { ...emptySave(), firstRunAt: yesterday } });
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+
+    await runOnce(W1_01_SOLUTION);
+    expect(useGame.getState().freshCommendations).toContain('came-back');
+    expect(useGame.getState().save.firstRunAt).toBe(yesterday);
+  });
+
+  /* A sector is closed when every order in it is, and world 1 is the only one small enough to
+     seed by hand without asserting the campaign's shape. */
+  it('files the sector award only once the last order in it is closed', async () => {
+    reset();
+    const world = campaignOrder().filter((level) => level.world === 1);
+    const closed = Object.fromEntries(
+      world.slice(1).map((level) => [level.id, { ...emptyProgress(), completed: true }]),
+    );
+    useGame.setState({ save: { ...emptySave(), levels: closed } });
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+
+    await runOnce(W1_01_SOLUTION);
+    expect(useGame.getState().freshCommendations).toContain('sector-closed');
+    expect(useGame.getState().freshCommendations).not.toContain('site-closed');
   });
 
   it('files a commendation once and never again', async () => {
