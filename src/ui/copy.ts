@@ -290,8 +290,9 @@ const HARDWARE: Record<string, HardwareNote> = {
     opens: 'Each bot keeps its own time. This is the whole difficulty and the whole opportunity.',
   },
   spawn: {
-    spec: 'Brings a new bot online on a neighbouring tile. Costs 5 ticks on the spawning bot.',
-    opens: 'Robots are cheap. This is the level at which the company means it.',
+    spec: 'Brings a new bot online on a neighbouring tile. Costs 5 ticks on the spawning bot. A bot holds the tile it stands on against its own clock: a second bot sent to that tile does not take a turn and does not wait, its move simply fails.',
+    opens:
+      'Robots are cheap, because they do not talk to each other. Split the ground, not the list.',
   },
   sync: {
     spec: 'Advances every clock to the latest one. Costs whatever the slowest bot still owed.',

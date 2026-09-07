@@ -141,3 +141,54 @@ describe('the requisition card agrees with the spec', () => {
     }
   });
 });
+
+/**
+ * A reference entry may name only the calls its own reader already has.
+ *
+ * `pickup` told the player to check a full bot with "`inventory()` against `capacity()`", and
+ * `capacity()` is not player hardware on any level — `Sim` has it, the API does not. A playtester
+ * on `w8-01` read the entry, wrote the call, and got `Cannot find name 'capacity'`. Three more
+ * entries named a command fitted a level or two after their own.
+ *
+ * The check is mechanical because the file already sorts: `functions` is stored in unlock order
+ * and level ids sort lexicographically in that same order, which is the comparison `apiUnlockedBy`
+ * itself makes. Prose is held to both halves — the call must exist and must be installed by then.
+ * An example is held only to the second: `if (`, `for (` and a program's own locals are not
+ * hardware, and a list of keywords to forgive is a list that rots.
+ */
+describe('the reference names only calls its reader has', () => {
+  const unlock = new Map(PLAYER_API.functions.map((fn) => [fn.name, fn.unlockedBy]));
+
+  function called(text: string): string[] {
+    return [...text.matchAll(/`([A-Za-z][A-Za-z0-9]*)\s*\(/g)].map((match) => match[1] ?? '');
+  }
+
+  test('every call the prose names is fitted by the time the entry is', () => {
+    for (const fn of PLAYER_API.functions) {
+      const prose = [fn.doc, ...fn.params.map((param) => param.doc)];
+      for (const name of prose.flatMap(called)) {
+        if (name === fn.name) continue;
+        const at = unlock.get(name);
+        expect(at, `${fn.name} names ${name}(), which no level installs`).toBeDefined();
+        expect(
+          (at ?? '') <= fn.unlockedBy,
+          `${fn.name} unlocks at ${fn.unlockedBy} and names ${name}(), fitted at ${at ?? '?'}`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  test('no example calls hardware the entry has not been fitted with yet', () => {
+    for (const fn of PLAYER_API.functions) {
+      for (const match of fn.example.matchAll(/\b([A-Za-z][A-Za-z0-9]*)\s*\(/g)) {
+        const name = match[1] ?? '';
+        const at = unlock.get(name);
+        if (at === undefined) continue;
+        expect(
+          at <= fn.unlockedBy,
+          `the ${fn.unlockedBy} example for ${fn.name} calls ${name}(), fitted at ${at}`,
+        ).toBe(true);
+      }
+    }
+  });
+});
