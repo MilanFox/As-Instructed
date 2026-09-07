@@ -17,6 +17,11 @@ function isTypingTarget(target: EventTarget | null): boolean {
   return isEditorTarget(target);
 }
 
+/** The browser's own "Save Page As" shortcut, on any platform, in any case the modifier leaves `key` in. */
+export function isNativeSaveShortcut(event: KeyboardEvent): boolean {
+  return (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's';
+}
+
 /**
  * Global shortcuts. DESIGN.md §10.5 — the game is playable without a mouse.
  *
@@ -33,6 +38,18 @@ function isTypingTarget(target: EventTarget | null): boolean {
 export function useKeyboard(): void {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
+      /*
+       * Ctrl+S/Cmd+S is muscle memory from every other editor, and left alone the browser answers
+       * it with its own "Save Page As" dialog. Every keystroke already writes to the save file, so
+       * there is nothing here for a native save to do — the key is only eaten before that dialog
+       * fires. Deliberately not a `KeyId`: `KEY_LIST` is what the REFERENCE manual prints, and this
+       * is not a feature to announce, just quiet around a browser shortcut that has no work to do.
+       */
+      if (isNativeSaveShortcut(event)) {
+        event.preventDefault();
+        return;
+      }
+
       const state = useGame.getState();
 
       const actions: Record<KeyId, () => void> = {

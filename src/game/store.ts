@@ -514,6 +514,14 @@ export const useGame = create<GameState>((set, get) => {
 
     setCode(code) {
       const id = get().currentLevelId;
+      /*
+       * A trace on the board is a recording of the code as it stood the moment `preview()` or
+       * `run()` last read it. The instant that code changes underneath it, the recording is of a
+       * program that no longer exists, and `togglePlay()` would resume it rather than trying the
+       * edit — so an edit quietly clears it, the same clearing the player's own Reset (↺) does on
+       * purpose, but fired automatically and without Reset's own visual say-so.
+       */
+      if (code !== get().code && get().trace !== null) get().resetPreview();
       set({ code });
       if (!id) return;
       const levels = { ...get().save.levels };

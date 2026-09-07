@@ -288,6 +288,35 @@ describe('preview', () => {
     expect(state.save).toBe(save);
   });
 
+  it('editing the code after a preview clears the stale trace, quietly', async () => {
+    reset();
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+    useGame.getState().openLevel('w1-03');
+    await previewOnce('move(Dir.South);');
+    expect(useGame.getState().trace).not.toBeNull();
+
+    useGame.getState().setCode('move(Dir.South);\nmove(Dir.East);');
+
+    const state = useGame.getState();
+    expect(state.trace).toBeNull();
+    expect(state.verdict).toBeNull();
+    expect(state.runMode).toBeNull();
+    // Not the player's own Reset — the edit itself did the clearing.
+    expect(state.code).toBe('move(Dir.South);\nmove(Dir.East);');
+  });
+
+  it('setCode leaves a loaded trace alone when the code has not actually changed', async () => {
+    reset();
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+    useGame.getState().openLevel('w1-03');
+    await previewOnce('move(Dir.South);');
+    const trace = useGame.getState().trace;
+
+    useGame.getState().setCode('move(Dir.South);');
+
+    expect(useGame.getState().trace).toBe(trace);
+  });
+
   it('togglePlay with no trace loaded starts a preview rather than doing nothing', async () => {
     reset();
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
