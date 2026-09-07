@@ -295,11 +295,10 @@ if (picked === null) {
       },
     ],
     returns: 'boolean',
-    doc: 'Plants one item of `kind` from the inventory into plantable ground under the bot. It refuses for exactly three reasons, and each one has a free check that tells it from the other two: the ground is not soil (`scan().terrain`), something is already growing there (`scan().crop`), or the bot carries none of that kind (`inventory(kind)`). A refusal costs the full price, so it is worth asking first.',
+    doc: 'Plants one item of `kind` from the inventory into plantable ground under the bot. It refuses for exactly three reasons: the ground is not soil (`scan().terrain`), something is already growing there (`scan().crop`), or the bot carries none of that kind. The first two have a free check that tells them apart, and the third is the one you find out by paying for it — a refusal costs the full price, so it is worth asking first.',
     example: `const here = scan();
 if (here.terrain !== 'soil') print('not soil');
 else if (here.crop !== null) print('already growing');
-else if (inventory('seed') === 0) print('out of seed');
 else plant();`,
     cost: 2,
     unlockedBy: 'w2-02',
@@ -345,7 +344,7 @@ print(\`crops held: \${inventory('crop')}\`);`,
       },
     ],
     returns: 'number',
-    doc: "Picks loose items up off the bot's own tile and returns how many were actually taken. The result is clamped by what is on the ground and by the remaining inventory capacity, so it can be smaller than `count`, or zero. A zero has three causes and each has a free check: nothing is lying there, or none of the kind you named is (`scan().items`), or the bot is already full (`inventory()` against `capacity()`). It costs the full price either way.",
+    doc: "Picks loose items up off the bot's own tile and returns how many were actually taken. The result is clamped by what is on the ground and by the remaining inventory capacity, so it can be smaller than `count`, or zero. A zero has three causes: nothing is lying there, or none of the kind you named is — `scan().items` tells those two apart for free — or the bot is already full, and nothing on the bot reports its own limit, so a return smaller than `count` is how that limit is found. It costs the full price either way.",
     example: `const taken = pickup('ore', 5);
 print(\`loaded \${taken} ore\`);`,
     cost: 1,
@@ -372,7 +371,7 @@ print(\`loaded \${taken} ore\`);`,
       },
     ],
     returns: 'number',
-    doc: "Drops items from the inventory onto the bot's own tile and returns how many actually left the inventory. A zero means the bot is carrying nothing at all, or none of the kind you named — `carrying()` lists the kinds and `inventory(kind)` counts one of them, both free — and it still costs a tick.",
+    doc: "Drops items from the inventory onto the bot's own tile and returns how many actually left the inventory. A zero means the bot is carrying nothing at all, or none of the kind you named — `inventory()` counts everything held and `inventory(kind)` counts one kind, both free — and it still costs a tick.",
     example: `while (inventory() > 0) {
   drop();
   move(Dir.East);
@@ -605,7 +604,7 @@ if (raw !== null) {
       {
         name: 'id',
         type: 'number',
-        doc: 'Which bot to command, as reported by `bots()` or returned by `spawn()`.',
+        doc: 'Which bot to command, as reported by `bots()`.',
       },
     ],
     returns: 'Bot',

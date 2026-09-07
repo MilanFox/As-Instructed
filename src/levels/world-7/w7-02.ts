@@ -165,7 +165,7 @@ export const w7_02: LevelDef = {
     },
     {
       label: '`spawn(dir)`',
-      value: `Puts a new bot on the next tile in \`dir\` and gives back its id. Costs ${String(SPAWN_COST)} ticks, charged to the parent. A bot can spawn a bot.`,
+      value: `Puts a new bot on the next tile in \`dir\` and gives back its id. Costs ${String(SPAWN_COST)} ticks, charged to the parent. A bot can spawn a bot. The fleet does not queue — see the delivery note.`,
     },
     {
       label: 'A new bot',
