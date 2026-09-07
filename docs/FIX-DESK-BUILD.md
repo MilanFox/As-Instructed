@@ -239,10 +239,14 @@ See §9. What follows is what is still open.
 
 **Other stated gaps.**
 
-- **Crop and ice-scrub are not visually separable at all**, found by the monitor lane:
-  `Renderer.drawCrops` never reads `tile.crop`, so no art direction can draw them differently.
-  `w2-05`'s entire ask is telling them apart. This is a `src/render/**` change, reported not fixed,
-  and it is a *solvability* issue rather than a legibility one. Maturity **is** separable, by shape.
+- ~~**Crop and ice-scrub are not visually separable at all**, found by the monitor lane:
+  `Renderer.drawCrops` never reads `tile.crop`.~~ **Closed.** `CropPaint` gained a `kind` field and
+  `drawCrops` sets it from `tile.crop ?? 'crop'`, so both directions can and do draw the weed as a
+  different thing rather than a different colour: in `deepsite` scrub lies flat on the plate with
+  five splayed arms, no shoulder, no flank and no cast shadow, standing next to a crop that is a lit
+  volume; in `signal` it draws no soil rule at all, because "sown but bare" and "a weed came up
+  here" are facts a player acts on differently. `w2-05` is solvable. Maturity was already separable,
+  by shape.
 
 - **The paper explosion is fixed, and the rule is guarded.** A player opening `w1-03` was handed
   five documents at once, stacked over the terminal. Now **one sheet lies out** — the work order —
@@ -277,9 +281,38 @@ See §9. What follows is what is still open.
   change this lane does not own.
 - The bezel foot clears the DISPATCH key by **5px at 1280×800**. Tight; check it if anything on
   that plate widens.
-- `src/game/store.ts` keeps `trace` / `verdict` across a level change in at least one path — a
-  freshly opened order can read `RETURNED`. The desk surfaces agree with each other; the store is
-  stale.
+- ~~`src/game/store.ts` keeps `trace` / `verdict` across a level change in at least one path — a
+  freshly opened order can read `RETURNED`.~~ **That is not what it was, and the bullet was wrong
+  the day it was written** — `store.ts` has not moved a byte since. `currentLevelId` has exactly two
+  writers: the store's own construction, and `openLevel`. Every door into an order lands on
+  `openLevel` — the site map's nodes, the Repository's `open the order` through its host, and
+  `advanceToNextLevel` — and it clears all fourteen fields that describe a run, `trace` and
+  `verdict` among them. A reload cannot carry one either: nothing in the save is a trace and the
+  store is built with `trace: null`. Driven rather than read: a failed run on `w1-01` followed by
+  each of those doors leaves the store at its resting shape every time. What *does* survive an order
+  change is the previous order's HALT notice, in the in-tray — but that is the paper rule working,
+  not the store leaking, and it is the one thing likely to be mistaken for this.
+
+  **What was actually there** is the same defect one arm further in. `run()` compares tokens at the
+  top of the resolve arm and does not compare them in the *reject* arm, and `failedReport()` is
+  evaluated as an argument, so it fires before `finishRun` ever gets to drop the response. A player
+  who dispatches, walks out of the order and is then answered by a broken host gets the abandoned
+  run's halt line in the **fresh order's `OUTPUT` log**, and a failure charged to `save.stats` for a
+  run nobody watched. `RunnerPort.run` rejects only when the host itself broke — and the host is
+  Monaco's chunk, the library compile and the transpile, so a flaky network is enough. The fix is
+  the one line the resolve arm already carried. `src/game/__tests__/store.test.ts` holds it, drives
+  all four doors, and takes its definition of *clean* from the store's own resting shape rather than
+  restating a field list that would rot. Mutation-tested: removing the line fails with the halt line
+  still sitting in `w1-03`'s log.
+
+  **Three things left standing, reported rather than absorbed.** `run()` clears `verdict` but keeps
+  `trace`, `tick` and `endTick`, so dispatching and then cancelling leaves the terminal reading
+  `RETURNED` off the *previous* run with no verdict behind it — same order, so the rule above still
+  holds, but it is the same shape and it is a design call rather than a defect. The two doors into
+  one order disagree: `back to the station` returns you to the run you were watching and picking the
+  same node off the site map throws it away. And `advanceToNextLevel` is reached from nothing in the
+  desk build — the certificate carries no next-order control — so the campaign advance is exercised
+  only by test.
 
 ---
 

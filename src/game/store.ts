@@ -460,6 +460,7 @@ export const useGame = create<GameState>((set, get) => {
           finishRun(token, {});
         })
         .catch((error: unknown) => {
+          if (get().runToken !== token) return;
           const message = error instanceof Error ? error.message : String(error);
           finishRun(token, { failure: { kind: 'runtime', message }, ...failedReport() });
           pushLines([{ t: 0, kind: 'error', text: message }]);
