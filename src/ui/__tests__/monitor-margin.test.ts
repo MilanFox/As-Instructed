@@ -268,8 +268,8 @@ describe('the legibility floor', () => {
  * `app.css` is the old panel workspace's sheet. The workspace was deleted when the desk replaced
  * it and the rules were not, so the file filled up with selectors that described nothing — until
  * one of them happened to name a class the desk *does* render, at which point it silently painted
- * a surface nobody intended. That is not hypothetical: `docs/PLAYTEST.md` has three of them from
- * one playthrough. An orphaned `.crate` block put a dark background behind paper ink and blanked
+ * a surface nobody intended. That is not hypothetical: one full playthrough turned up three of
+ * them. An orphaned `.crate` block put a dark background behind paper ink and blanked
  * all eight verb names on the hardware requisition — the sheet whose entire job is naming the new
  * commands. `.desk .crate .nm` needed `flex-wrap` or the `reference` button printed over the spec.
  * An orphaned `.seed-row__outstanding { white-space: nowrap; overflow: hidden }` clipped every

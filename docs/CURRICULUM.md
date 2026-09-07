@@ -1,9 +1,7 @@
 # BOOTSTRAP — Curriculum
 
-Companion to `docs/DESIGN.md` §5–§6 (DESIGN.md wins any conflict). No solutions or solution
-code — reference solutions live in `src/levels/**/__solutions__/` as test fixtures.
-Anti-hardcode rationale and exact per-level randomization live in each level's own source file,
-not here.
+Companion to `docs/DESIGN.md` §5–§6 (DESIGN.md wins any conflict). Anti-hardcode rationale, exact
+per-level randomization and the live bonus list belong in each level's own source file, not here.
 
 33 levels ship. Ids are non-contiguous within a world by design — `w1-02, w1-04, w2-01, w2-03,
 w3-03, w3-05, w4-03` do not exist; the gaps are normal, not missing content.
@@ -29,6 +27,8 @@ w3-03, w3-05, w4-03` do not exist; the gaps are normal, not missing content.
     the player.
 11. A hint budget that spends most of its hints restating one idea is a smaller hint budget than
     it looks — spread hints across distinct blockers, not repetitions of one.
+12. The field-note glossary (`THE PARTITION`, `A SWING`, …) is the only teaching mechanism in the
+    game and replaces a tutorial. Do not add a tutorial.
 
 **Information budget** (`Objectives.withinSenses`, DESIGN.md §7): use only where sensing itself
 is the puzzle (`w5-02`) or re-sensing substitutes for remembering (`w8-01`). Omit where the
@@ -41,11 +41,11 @@ level is on the Frustration Watch (§11), or rationing would punish the better a
 ## 3. World 1 — Boot Sector
 Unlocks `move` `pos` `canMove` `print` `wait`. `print` is scored only in `w6-01`.
 
-| id | teaches | seeds | diff | bonus |
-|---|---|---|---|---|
-| w1-01 | Issuing an action; coordinates (x East, y South, North = y−1); counted `for` loop | 1 — declared hardcode exception (§2 rule 2) | 1 | none |
-| w1-03 | Conditional repetition on `canMove` | 3 | 2 | zero blocked moves |
-| w1-05 | Nested iteration over an area of unknown row/column count | `[21,1,2,6,8]` | 4 | ≤1 move per floor tile |
+| id | teaches | seeds | diff |
+|---|---|---|---|
+| w1-01 | Issuing an action; coordinates (x East, y South, North = y−1); counted `for` loop | 1 — declared hardcode exception (§2 rule 2) | 1 |
+| w1-03 | Conditional repetition on `canMove` | 3 | 2 |
+| w1-05 | Nested iteration over an area of unknown row/column count | `[21,1,2,6,8]` | 4 |
 
 `w1-01`'s route is 78 tiles inside a 90-tick booking — tight enough that typing every `move()`
 longhand still passes; intentional.
@@ -53,13 +53,13 @@ longhand still passes; intentional.
 ---
 
 ## 4. World 2 — Regolith Fields
-Unlocks `scan` `harvest` `plant` `inventory`. `seeds.length >= 3` mandatory from here on.
+Unlocks `scan` `harvest` `plant` `inventory`.
 
-| id | teaches | seeds | diff | bonus |
-|---|---|---|---|---|
-| w2-02 | Two-phase per-cell cycle; the world goes stale the instant you act on it | 4 | 3 | waste no swing or seed |
-| w2-04 | Interrupt/resume a traversal against a resource read at runtime | 4 | 6 | zero failed harvests |
-| w2-05 | Prioritise under a deadline; the sensor reaches further than the wheels | 5 | 7 | fill hopper on ≤32 tiles walked |
+| id | teaches | seeds | diff |
+|---|---|---|---|
+| w2-02 | Two-phase per-cell cycle; the world goes stale the instant you act on it | 4 | 3 |
+| w2-04 | Interrupt/resume a traversal against a resource read at runtime | 4 | 6 |
+| w2-05 | Prioritise under a deadline; the sensor reaches further than the wheels | 5 | 7 |
 
 `w2-02` needs the renderer's growth-stage overlay or a correct program looks idle. `w2-05`'s
 shift is 62 ticks, par 60, on a 72-tile field — deliberately tight.
@@ -69,54 +69,55 @@ shift is 62 ticks, par 60, on a 72-tile field — deliberately tight.
 ## 5. World 3 — The Sorting Yards
 Unlocks `pickup` `drop` `carrying`.
 
-| id | teaches | seeds | diff | bonus |
-|---|---|---|---|---|
-| w3-01 | `pickup`/`drop`/`carrying` — one carry slot | 3 | 2 | par ticks, zero failed pickups |
-| w3-02 | A lookup table read from the world, never hardcoded | 4 | 4 | beat par by 10% |
-| w3-04 | Order-preserving processing — a FIFO queue, not nearest-first | 4 | 6 | zero rejected drops |
+| id | teaches | seeds | diff |
+|---|---|---|---|
+| w3-01 | `pickup`/`drop`/`carrying` — one carry slot | 3 | 2 |
+| w3-02 | A lookup table read from the world, never hardcoded | 4 | 4 |
+| w3-04 | Order-preserving processing — a FIFO queue, not nearest-first | 4 | 6 |
 
 ---
 
 ## 6. World 4 — Cave Systems
 Unlocks `look` `mark` `readMark`.
 
-| id | teaches | seeds | diff | bonus |
-|---|---|---|---|---|
-| w4-01 | Local sensing (`look`) vs. knowing the map | 3 | 3 | never re-enter a tile |
-| w4-02 | External memory: `mark`/`readMark` as a visited set | 4 | 5 | solve with fewer than *N* marks |
-| w4-04 | Separate exploration from execution: build a graph, then plan over it | 4 | 7 | visit 3 points in optimal order |
-| w4-05 | Online exploration under a shared fuel budget | 5 | 8 | return with ≥20% fuel unspent |
+| id | teaches | seeds | diff |
+|---|---|---|---|
+| w4-01 | Local sensing (`look`) vs. knowing the map | 3 | 3 |
+| w4-02 | External memory: `mark`/`readMark` as a visited set | 4 | 5 |
+| w4-04 | Separate exploration from execution: build a graph, then plan over it | 4 | 7 |
+| w4-05 | Online exploration under a shared fuel budget | 5 | 8 |
 
-`w4-02`'s replay must visibly show the bot looping when the `w4-01` rule fails to stop — the
-loop is the lesson. `w4-04` is on the Frustration Watch, §11.
+`w4-02`'s replay must visibly show the bot going round and round when the `w4-01` rule fails to
+stop — the loop is the lesson. `w4-04` is on the Frustration Watch, §11.
 
 ---
 
 ## 7. World 5 — The Grid
 Unlocks `probe` `use` `power` `link`.
 
-| id | teaches | seeds | diff | bonus |
-|---|---|---|---|---|
-| w5-01 | Preconditions: read the feed direction before driving it | 3 | 3 | zero failed `power()` |
-| w5-02 | Binary search over a probe budget | 5, incl. break at 0 and n−1 | 4 | ≤8 probes every seed |
-| w5-03 | Topological sort of a dependency graph | 4, incl. a deep chain, a wide-shallow graph, a 3-prerequisite node, 2 disconnected components | 6 | valid order + min travel + ≤20 probe reads (a retry-until-stable loop passes — already priced in ticks) |
-| w5-04 | Assignment under capacity; item order decides whether greedy works | 5 | 7 | leave the largest feeder unused |
-| w5-05 | Minimum-cost network construction (MST) | 5, incl. a clustered and a near-uniform point set | 8 | within 2% of true MST weight |
+| id | teaches | seeds | diff |
+|---|---|---|---|
+| w5-01 | Preconditions: read the feed direction before driving it | 3 | 3 |
+| w5-02 | Binary search over a probe budget | 5, incl. break at 0 and n−1 | 4 |
+| w5-03 | Topological sort of a dependency graph | 4, incl. a deep chain, a wide-shallow graph, a 3-prerequisite node, 2 disconnected components | 6 |
+| w5-04 | Assignment under capacity; item order decides whether greedy works | 5 | 7 |
+| w5-05 | Minimum-cost network construction (MST) | 5, incl. a clustered and a near-uniform point set | 8 |
 
-`w5-05` is on the Frustration Watch, §11.
+`w5-03`'s star tolerates a retry-until-stable loop — already priced in ticks. `w5-05` is on the
+Frustration Watch, §11.
 
 ---
 
 ## 8. World 6 — Deep Signal
 Unlocks `receive` `transmit` `decode`.
 
-| id | teaches | seeds | diff | bonus |
-|---|---|---|---|---|
-| w6-01 | Drain a queue; handle empty without crashing | 3, incl. an empty-queue seed | 2 | none |
-| w6-02 | Validation: checksum, compare, reject | 4, incl. a zero-corrupt and a first-packet-corrupt seed | 4 | report the wrong byte |
-| w6-03 | Decode a compressed (RLE) instruction stream | 4 | 5 | transmit a shorter RLE of your own route |
-| w6-04 | Brute-force key search against a checkable property | 4, incl. key = 0 | 7 | recover a key via frequency analysis |
-| w6-05 | Parse a nested (recursive) grammar | 5, incl. a depth-1 seed | 8 | repair one corrupt group via redundancy |
+| id | teaches | seeds | diff |
+|---|---|---|---|
+| w6-01 | Drain a queue; handle empty without crashing | 3, incl. an empty-queue seed | 2 |
+| w6-02 | Validation: checksum, compare, reject | 4, incl. a zero-corrupt and a first-packet-corrupt seed | 4 |
+| w6-03 | Decode a compressed (RLE) instruction stream | 4 | 5 |
+| w6-04 | Brute-force key search against a checkable property | 4, incl. key = 0 | 7 |
+| w6-05 | Parse a nested (recursive) grammar | 5, incl. a depth-1 seed | 8 |
 
 `w6-01` sits at difficulty 2 directly after `w5-05`'s 8 — the steepest drop in the game and
 deliberate; no bonus, no added complexity. `w6-04` is on the Frustration Watch, §11.
@@ -127,13 +128,13 @@ deliberate; no bonus, no added complexity. `w6-04` is on the Frustration Watch, 
 Unlocks `bots` `spawn` `sync` `send`/`recv`. Score is `max(bot.clock)` — makespan — on every
 level here.
 
-| id | teaches | seeds | diff | bonus |
-|---|---|---|---|---|
-| w7-01 | Parallel clocks: makespan, not the sum | 3 | 3 | gold via one shared loop body for both bots |
-| w7-02 | Static partition by work, not area, unknown worker count | 4 | 5 | makespan within 10% of `total_work / N` |
-| w7-03 | Mutual exclusion — "retry if blocked" is a livelock, not a delay | 4, incl. a 2-bot seed | 7 | zero blocked moves |
-| w7-04 | Dynamic scheduling: assign the next job to the earliest-free worker | 5, incl. a near-uniform and a heavily-skewed distribution | 8 | makespan within 4/3 of the load lower bound |
-| w7-05 | Message passing: a scout publishes findings, workers consume live | 5 | 9 | workers idle under 10% of makespan |
+| id | teaches | seeds | diff |
+|---|---|---|---|
+| w7-01 | Parallel clocks: makespan, not the sum | 3 | 3 |
+| w7-02 | Static partition by work, not area, unknown worker count | 4 | 5 |
+| w7-03 | Mutual exclusion — "retry if blocked" is a livelock, not a delay | 4, incl. a 2-bot seed | 7 |
+| w7-04 | Dynamic scheduling: assign the next job to the earliest-free worker | 5, incl. a near-uniform and a heavily-skewed distribution | 8 |
+| w7-05 | Message passing: a scout publishes findings, workers consume live | 5 | 9 |
 
 `w7-01`'s replay must render both bots moving concurrently, never serialised. `w7-03` is on the
 Frustration Watch, §11.
@@ -143,13 +144,13 @@ Frustration Watch, §11.
 ## 10. World 8 — The Kessler Contract
 No new hardware.
 
-| id | teaches | seeds | diff | bonus |
-|---|---|---|---|---|
-| w8-01 | Optimisation as its own skill: ticks and the information budget both gate | 4 | 5 | close in 136 ticks; survey on 10 beams |
-| w8-02 | Pipeline composition: explore/route/deliver without leaking the seams | 5 | 8 | deliver ≥half the crates before exploration ends |
-| w8-03 | A topological order is a *partial* order — independent branches run in parallel | 5 | 9 | match critical-path makespan; restart plan on ≤26 probe reads |
-| w8-04 | Reconcile a decoded plan against observed reality | 5, incl. a zero-drift and a heavy-drift (>⅓ stale) seed | 9 | complete without re-exploring any correctly-described section |
-| w8-05 | Integration exam: everything at once, on the same fleet and fuel | `[1,4,7]` | 10 | see below |
+| id | teaches | seeds | diff |
+|---|---|---|---|
+| w8-01 | Optimisation as its own skill: ticks and the information budget both gate | 4 | 5 |
+| w8-02 | Pipeline composition: explore/route/deliver without leaking the seams | 5 | 8 |
+| w8-03 | A topological order is a *partial* order — independent branches run in parallel | 5 | 9 |
+| w8-04 | Reconcile a decoded plan against observed reality | 5, incl. a zero-drift and a heavy-drift (>⅓ stale) seed | 9 |
+| w8-05 | Integration exam: everything at once, on the same fleet and fuel | `[1,4,7]` | 10 |
 
 `w8-01`'s shift is 215 ticks (par 165), survey budget 16 beams — a fully-correct full-field
 sweep spending zero beams still overruns the shift by 5–40 ticks; that tension is the level.
@@ -158,10 +159,8 @@ sweep spending zero beams still overruns the shift by 5–40 ticks; that tension
 substation is hand-operated (no desk `power()`). Manifest is plain. Must be beatable at bronze
 by a slow, honest program — only gold is meant to bite. Seeds `1`/`4`/`7` are three authored
 instances, not a draw: general case; a pure chain with no parallelism (spare fleet capacity goes
-to crates); the squeeze (fuel runs out before scheduling does). Bonus, two stars, both free in
-ticks, graded on the worst seed: `name-the-hold` (print `held <station> <n>` — longest gap
-between a station's last feeder going live and its own first `use()`) and `mind-the-gate` (print
-`gate <station> <n>` — how long the airlock stood powered before anyone used it).
+to crates); the squeeze (fuel runs out before scheduling does). Its two stars are both free in
+ticks and graded on the worst seed.
 
 ---
 
@@ -181,11 +180,10 @@ These constants and behaviours look like mistakes. They are deliberate — do no
 
 ## 15. Seed Policy
 
-1. `seeds.length >= 3` from World 2 on.
-2. Seed 1 is the friendliest instance — a player's first honest idea works or nearly works.
-3. Every seed list includes ≥1 degenerate case (see the per-level tables above).
-4. Seed 1 runs first in the UI; a run stops on first failure.
-5. A seed differing from another only in its numbers, not a decision, is padding — remove it.
+1. Seed 1 is the friendliest instance — a player's first honest idea works or nearly works.
+2. Seed 1 runs first in the UI; a run stops on first failure.
+3. Every seed list includes ≥1 degenerate case, named in the per-level tables above (§2 rule 3).
+4. A seed differing from another only in its numbers, not a decision, is padding — remove it.
 
 ---
 
