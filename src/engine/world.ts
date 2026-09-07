@@ -149,7 +149,7 @@ export interface CreateBotOptions {
   capacity?: number;
   inventory?: ItemStack[];
   vars?: Record<string, number>;
-  /** Defaults to `Infinity` — opt in per level. DESIGN.md §11 A1. */
+  /** Defaults to `Infinity` — opt in per level. DESIGN.md §4.4. */
   fuel?: number;
   /** Defaults to `fuel`. */
   fuelMax?: number;

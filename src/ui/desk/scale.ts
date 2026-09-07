@@ -8,7 +8,7 @@
  * fitted to the viewport by `deskUnit`, so multiplying `--u` pushes the terminal's left edge off
  * screen and crops the thing the player is reading. Measured at 1440x860: `--u` is 0.857 and the
  * terminal's left edge sits at `50% - 762u`; at 1.25x that lands at -97px, taking the program's
- * line-number gutter off screen. See `docs/DESK-CONCEPT.md` §5 and `docs/FIX-DESK-BUILD.md`.
+ * line-number gutter off screen.
  *
  * Stored in its own `localStorage` key rather than in the campaign save, following
  * `src/ui/art.ts`: no save migration, and a look cannot corrupt a player's progress.

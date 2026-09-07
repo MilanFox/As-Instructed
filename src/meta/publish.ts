@@ -609,7 +609,7 @@ function initialiserAt(body: string): number {
  *
  * The Repository is for subroutines. A tile map, a loop counter or a best-so-far accumulator is
  * real code the player wrote, and it is still not a thing another work order imports and uses — it
- * travels as part of a routine's closure or it does not travel at all. See docs/FIX-LIBRARY.md.
+ * travels as part of a routine's closure or it does not travel at all.
  */
 function isCallable(kind: Declaration['kind'], text: string): boolean {
   if (kind === 'function' || kind === 'class') return true;

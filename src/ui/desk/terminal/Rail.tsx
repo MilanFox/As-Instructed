@@ -6,10 +6,10 @@
  * width back; inside the terminal it has a permanent home and takes nothing from
  * anybody, so there is nothing to fold away from.
  *
- * Two things the old card could not do are done here. `docs/AUDIT-UI.md` F22 recorded the label
- * and its readout as siblings on one row in a card clamped between 168 and 232px, so a label wrapped
+ * Two things the old card could not do are done here. The label and its readout used to be
+ * siblings on one row in a card clamped between 168 and 232px, so a label wrapped
  * mid-phrase — the column is taller and narrower now, and the readout sits *under* the label rather
- * than beside it. And DESIGN.md §11 A7's rule that an ungraded work order never prints "par" is
+ * than beside it. And DESIGN.md §7's rule that an ungraded work order never prints "par" is
  * carried over word for word, because `src/ui/__tests__/limit-and-par.test.ts` is the record of
  * what those words have to be.
  */
@@ -33,7 +33,7 @@ interface ObjectiveRow {
   /** The one the run is working towards at this tick. Exactly one row has it, or none. */
   active: boolean;
   progress?: [number, number];
-  /** Declared by the objective (DESIGN.md §11 A13). Without it `budgetFor` parses the label. */
+  /** Declared by the objective (DESIGN.md §5). Without it `budgetFor` parses the label. */
   meter?: Meter;
   /** Declared by the objective. Without it the noun is taken from the label. */
   unit?: string;
@@ -132,7 +132,7 @@ export function Rail(): React.JSX.Element {
   );
   const hardStop = gradesTicks ? undefined : level.budget?.maxTicks;
   /*
-   * Two tick numbers, two words for them (docs/FIX-INCENTIVES.md §H).
+   * Two tick numbers, two words for them.
    *
    * `w8-01` asks for 215 and pars at 165, and until this line both were called ticks — so the one
    * that ends the work order and the one that moves the medal were indistinguishable. The
@@ -176,7 +176,7 @@ export function Rail(): React.JSX.Element {
       <div className="rail-block rail-block--targets">
         <h3>TARGETS</h3>
         {/*
-          On an ungraded work order (DESIGN.md §11 A7) par is not a target, so it is not drawn as
+          On an ungraded work order (DESIGN.md §7) par is not a target, so it is not drawn as
           one. The clock still shows — it is the number `personalBestLine` compares against, and
           both playtesters called that the best reward in the game — but there is no denominator
           to fall short of and no red for falling short of it. A `78 / 78` in green on the level
@@ -184,7 +184,7 @@ export function Rail(): React.JSX.Element {
           the lesson A7 exists to stop teaching.
 
           Both numbers here are what the last run *cost*. The playhead is the transport's number
-          and it is never printed twice (docs/AUDIT-UI.md F22).
+          and it is never printed twice.
         */}
         <dl className="targets">
           <dt>{graded ? 'par' : 'ticks'}</dt>
@@ -251,7 +251,7 @@ export function Rail(): React.JSX.Element {
  * `src/ui/__tests__/rail-report-agreement.test.ts` reads both surfaces through: a budget that read
  * as a gauge while the run played and as a tick-box in the report is two different claims about
  * the same number. What changed on the desk is only where the readout sits — under the label
- * rather than beside it (docs/AUDIT-UI.md F22) — which is layout, not a claim.
+ * rather than beside it — which is layout, not a claim.
  */
 function ObjectiveItem({ row }: { row: ObjectiveRow }): React.JSX.Element {
   const budget = row.budget;

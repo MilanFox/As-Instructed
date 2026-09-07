@@ -336,7 +336,8 @@ export const w8_01: LevelDef = {
   bonus: [
     /* No `progress()` on purpose. What this counts is one row's share of the field, which is not
        any run-wide total, so `budgetFor` would have had to guess a meter for the bar and would
-       have drawn the wrong one. `docs/FIX-BONUSES-7-8.md` states the rule. */
+       have drawn the wrong one. A star with no honest meter to show gets no bar rather than a
+       dishonest one. */
     Objectives.custom(
       'name-the-row',
       'Name the row that held the most ripe crop',

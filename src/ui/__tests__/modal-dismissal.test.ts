@@ -4,7 +4,7 @@
  * This file used to assert five `ModalBoundary`s in `App` and that each one's dismissal really
  * closed the modal underneath it. That was the right test for the interface it was written
  * against, and it is the wrong test now: four of those five modals do not exist. What it was
- * *protecting* still does, and it is bigger than a boundary — `docs/AUDIT-UI.md` §6.2 and §6.6:
+ * *protecting* still does, and it is bigger than a boundary:
  *
  * > `showResults` is set true by a run and by nothing else, so there is no reopen path. The most
  * > information-dense card in the game — the medal, the cause, the divergence, the objectives, the
@@ -257,7 +257,7 @@ describe('filing is the only way off the desk, and it is not deletion', () => {
     expect(filed?.mark).toBe('gold');
   });
 
-  test('an ungraded work order is stamped CLOSED and files the same way (DESIGN.md §11 A7)', () => {
+  test('an ungraded work order is stamped CLOSED and files the same way (DESIGN.md §7)', () => {
     runFinished('w1-01', true, 78);
     deliver();
     const certificate = ofKind('certificate')[0];

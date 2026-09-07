@@ -1,12 +1,11 @@
 /**
  * REFERENCE — `K&D FORM 12 · REV 9`, the wire-bound manual at the bottom-left of the desk.
  *
- * `docs/AUDIT-UI.md` F12 is the reason it is a book. The work order, the console, the reference and
- * the Repository were four 10px dim uppercase chips in the corner of the board, and the reference
- * is the one a player has to read *at length* — a control that summons a reading surface has to be
- * proportionate to the surface. So it is an object on the desk with a cover, a coil and a form
- * number, and it opens as a two-page spread with the command reference set at a size meant to be
- * read.
+ * It is a book because the work order, the console, the reference and the Repository were four
+ * 10px dim uppercase chips in the corner of the board, and the reference is the one a player has to
+ * read *at length* — a control that summons a reading surface has to be proportionate to the
+ * surface. So it is an object on the desk with a cover, a coil and a form number, and it opens as a
+ * two-page spread with the command reference set at a size meant to be read.
  *
  * What is on the pages is `src/ui/desk/furniture/reference.ts`, and what is *on this bot* is
  * `unlockedHardware(level.id)`: progression in BOOTSTRAP is hardware (DESIGN.md §6), so the manual

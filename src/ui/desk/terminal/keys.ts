@@ -1,7 +1,7 @@
 /**
  * Every key the game binds — the list, and the thing the listener is built from.
  *
- * `docs/AUDIT-UI.md` F17: ten keys were bound and three were announced, in tooltips. The fix is a
+ * Ten keys used to be bound and only three of them announced, in tooltips. The fix is a
  * key list the player can reach, in the REFERENCE manual. A list written out in the manual beside
  * a `switch` written out in `useKeyboard.ts` is two sources of truth for one fact — the confessed-
  * duplication class `src/__tests__/confessed-invariants.test.ts` exists to catch — so there is one
@@ -9,7 +9,7 @@
  * `Record<KeyId, …>`, which makes an unbound listed key and an unlisted bound key both compile
  * errors rather than a drift nobody notices.
  *
- * The other half of F17 was a contradiction on one screen: the old RUN button drew `⌘⏎` while the
+ * There was also a contradiction on one screen: the old RUN button drew `⌘⏎` while the
  * editor's status line drew `ctrl+enter to run`. `RUN_HINT` is the one statement of the one
  * modifier, printed once, on the terminal's status strip.
  */

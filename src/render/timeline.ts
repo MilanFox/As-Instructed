@@ -7,7 +7,7 @@
  * plus arithmetic. That is what makes `seek(3.5)` show a bot halfway through its move, and what
  * makes scrubbing backwards exactly as cheap as scrubbing forwards.
  *
- * DESIGN.md §11 A5 lives here too: every bot has its own clock, so every bot has its own segment
+ * DESIGN.md §8 lives here too: every bot has its own clock, so every bot has its own segment
  * list and two bots at different clocks are legitimately at different points in their animations
  * on the same wall-clock frame. And a blocked move produces a *different segment shape* from a
  * successful one — a bump curve rather than a translation — rather than merely a different tint.

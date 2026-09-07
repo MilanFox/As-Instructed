@@ -4,8 +4,7 @@
  * Not the library of routines. That is `src/meta`, it is a different feature with a different job,
  * and it keeps its name inside the terminal. This is the ring binder the company keeps: every work
  * order the site has issued, in the order Finance prefers them closed, with the grade that was
- * stamped on it. `docs/AUDIT-UI.md` F18 — a grade shown once and then deleted is not a grade, it
- * is an event.
+ * stamped on it. A grade shown once and then deleted is not a grade, it is an event.
  *
  * Two sources, deliberately. `save` is the campaign record and is what the game scores. `filedDocs`
  * is what the *player* has actually put in the binder with the stamp block, and where the two
@@ -154,7 +153,7 @@ export function Binder(): React.ReactElement {
                     /*
                      * The grade is the company's and comes from the campaign record. `medalOf` is
                      * `null` on an order that carries no ladder, and an ungraded close is finished
-                     * work rather than a missing medal (DESIGN.md §11 A7) — so it reads CLOSED,
+                     * work rather than a missing medal (DESIGN.md §7) — so it reads CLOSED,
                      * which is the die the contractor actually holds.
                      */
                     const medal = medalOf(node.level, node.progress);

@@ -1,5 +1,5 @@
 /**
- * DESIGN.md §11 A7 — a level may be ungraded.
+ * DESIGN.md §7 — a level may be ungraded.
  *
  * The whole amendment, held to from the level definition through to the two things that count
  * medals: the site map's arithmetic and the Performance Review's denominator. It lives in one file
@@ -18,7 +18,7 @@ import { isGraded, levelPoints, medalForLevel, medalOf, progressPoints } from '.
 import { emptyProgress, emptySave, migrate, parseSave } from '../save.ts';
 import type { LevelProgress, SaveFile } from '../save.ts';
 
-/** docs/FIX-PAR.md §1–§2: the levels on which no correct program can beat another on ticks. */
+/** The levels on which no correct program can beat another on ticks. */
 const UNGRADED = ['w1-01', 'w1-03', 'w5-02', 'w6-01', 'w6-03', 'w6-05'];
 
 const closed = (patch: Partial<LevelProgress> = {}): LevelProgress => ({

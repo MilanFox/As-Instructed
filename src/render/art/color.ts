@@ -69,9 +69,9 @@ export function shade(hex: string, factor: number): string {
 /**
  * Relative luminance, 0..1, for a `#rrggbb` string.
  *
- * The trail's cold end has to be a *darkening* of whatever floor it lands on, and "darker" is a
- * luminance claim rather than a hue one. FIX-TRAIL §7 is the whole reason this is here: the first
- * ramp was calibrated by eye against one biome and drew nothing at all against another.
+ * The trail's cold end has to contrast with whatever floor it lands on, and "contrast" is a
+ * luminance claim rather than a hue one. The first ramp was calibrated by eye against one biome
+ * and drew nothing at all against another.
  */
 export function luminance(hex: string): number {
   const n = Number.parseInt(hex.slice(1), 16);

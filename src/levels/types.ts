@@ -35,7 +35,7 @@ export interface LevelDef {
   seeds: number[];
   par: { ticks: number };
   /**
-   * Whether this work order carries a medal at all. Defaults to `true`. DESIGN.md §11 A7.
+   * Whether this work order carries a medal at all. Defaults to `true`. DESIGN.md §7.
    *
    * `false` where no correct program can cost fewer ticks than another correct program: par is
    * then not a budget, it is the price of the only solution the level admits, and a ladder built

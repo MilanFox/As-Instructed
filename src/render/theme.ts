@@ -91,7 +91,7 @@ export function setArtDirection(id: ArtId): void {
  *
  * The attribute is what lets each direction ship its own stylesheet without a build flag, and
  * writing the palette across means the chrome and the canvas cannot disagree about what `accent`
- * means — which is the defect AUDIT-UI describes as the canvas not joining the chrome. Called
+ * means, so the canvas reads as joined to the chrome rather than dropped on top of it. Called
  * once at startup and again on a change, never in a frame.
  */
 export function applyArtDirection(id: ArtId, root?: HTMLElement): void {

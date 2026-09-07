@@ -2,8 +2,8 @@
  * What is printed in `K&D FORM 12 · REV 9` — the wire-bound reference on the desk.
  *
  * The prose was `src/ui/panels/DocsPanel.tsx`, which was reachable only through a 10px dim
- * uppercase chip in the corner of the board (`docs/AUDIT-UI.md` F12). The manual is the same words
- * behind a door that weighs what is behind it. The content is separated from the book so the guard
+ * uppercase chip in the corner of the board. The manual is the same words behind a door that
+ * weighs what is behind it. The content is separated from the book so the guard
  * in `src/__tests__/confessed-invariants.test.ts` has one file to read for the silver rule.
  */
 import type { CostOverrides } from '../../../engine/index.ts';
@@ -34,7 +34,7 @@ export interface GuidePage {
 /**
  * Required reading, and the only page in the manual that is.
  *
- * DESIGN.md §11 A3: several World 4 work orders are unsolvable until the player believes that an
+ * DESIGN.md §5: several World 4 work orders are unsolvable until the player believes that an
  * ordinary `Set` survives the whole run and that only `mark` writes to the world. A player who
  * thinks their variables are wiped between ticks will reach for `mark` for everything and pay a
  * tick for each write, and the level will look impossible rather than unlearned.

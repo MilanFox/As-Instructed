@@ -1,5 +1,5 @@
 /**
- * The certificate of closure on an ungraded work order (DESIGN.md §11 A7).
+ * The certificate of closure on an ungraded work order (DESIGN.md §7).
  *
  * The one thing this must not get wrong: ungrading removes the grade, not the reward. A close on
  * `w1-01` is the same work as a gold on `w1-05` and is paid the same three points, so the

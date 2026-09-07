@@ -159,7 +159,7 @@ describe('earnedBy, on a closed work order', () => {
   });
 
   /*
-   * DESIGN.md §11 A7. A work order may carry no par at all, and the two entries that read one are
+   * DESIGN.md §7. A work order may carry no par at all, and the two entries that read one are
    * the only place that could break on it. They read `null` and decline rather than dividing by it.
    */
   it('reads no par at all on an ungraded work order', () => {

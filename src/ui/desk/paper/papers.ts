@@ -6,13 +6,13 @@
  * 1. **Pick it up to read it.** A sheet at rest does not have to be legible, because paper on a
  *    desk is a thing you pick up. `lift` is a transform on a persistent element, never a portal
  *    or an overlay — implementing it as a modal would reintroduce exactly the self-destroying
- *    ceremony the desk exists to remove (`docs/DESK-CONCEPT.md` §9 item 2).
+ *    ceremony the desk exists to remove.
  * 2. **Pin it to the side.** A different mechanism for a different reason: lifting is for reading
  *    now, pinning is for keeping a specification legible while your hands are on the keyboard.
  *    The pinned form is a second authored view of the same content, not a CSS scale of the sheet.
  * 3. **Paper persists until it is filed.** Nothing here self-destructs and nothing is dismissed
- *    by a backdrop click. `docs/AUDIT-UI.md` §6.6: the run report was one stray click from gone
- *    with no reopen path, and that is the single strongest argument the desk has for existing.
+ *    by a backdrop click. The run report used to be one stray click from gone with no reopen
+ *    path, and that is the single strongest argument the desk has for existing.
  *
  * Geometry is in design units offset from the centre of the desk frame, matching the prototype —
  * `left: calc(50% + x * var(--u))`. Positions persist because where a player left a sheet is
@@ -62,7 +62,7 @@ export interface Divergence {
   got: string;
 }
 
-/** Why the run failed, worst first. The presentation of `divergence` is `docs/AUDIT-UI.md` F5. */
+/** Why the run failed, worst first. */
 export interface ReportCause {
   id: string;
   label: string;
@@ -81,7 +81,7 @@ export interface ReportSnapshot {
   title: string;
   passed: boolean;
   graded: boolean;
-  /** `null` on an ungraded work order (DESIGN §11 A7) — it reads `CLOSED`, not a medal. */
+  /** `null` on an ungraded work order (DESIGN §7) — it reads `CLOSED`, not a medal. */
   medal: 'gold' | 'silver' | 'bronze' | 'none' | null;
   /** The flavour line, frozen: `failureCursor` moves on the next failure. */
   headline: string;
@@ -109,7 +109,7 @@ export interface ReportSnapshot {
   /** What the record already says, on a run that changed nothing. */
   onRecord: { word: string; note: string } | null;
   libraryLine: string | null;
-  /** Epoch ms. The record carries its date; `docs/AUDIT-UI.md` F14. */
+  /** Epoch ms. The record carries its date. */
   at: number;
 }
 
@@ -187,8 +187,8 @@ export const DOC_ARRIVAL = { x: 170, y: 236, rot: -1.4 } as const;
 
 /**
  * How much unfiled paper the desk holds before the oldest sheet you have already read is filed for
- * you. The desk is tidy on purpose (`docs/DESK-CONCEPT.md` §10) and an unbounded pile is the
- * cramped Papers, Please desk that was tried and cut.
+ * you. The desk is tidy on purpose, and an unbounded pile is the cramped Papers, Please desk
+ * that was tried and cut.
  */
 export const DESK_CAPACITY = 6;
 
@@ -235,8 +235,8 @@ export const PINNABLE: ReadonlySet<DocKind> = new Set<DocKind>(['order', 'requis
 
 /**
  * The pinned form of a document: a second authored view of the same content, not a CSS scale of
- * the sheet (`docs/DESK-CONCEPT.md` §9 item 3). The ask and the site data, set larger than the
- * sheet itself carries; the flavour paragraph stays on the paper.
+ * the sheet. The ask and the site data, set larger than the sheet itself carries; the flavour
+ * paragraph stays on the paper.
  *
  * `value` is inline markdown, the same dialect `src/ui/components/Markdown.tsx` reads, because the
  * levels already write their facts that way. Anything outside the paper lane that wants the copy

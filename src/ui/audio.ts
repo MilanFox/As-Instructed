@@ -1,7 +1,7 @@
 /**
  * The audio system, wired to the shell.
  *
- * `src/audio` is a cursor over the trace driven by the renderer's clock (docs/AUDIO.md §1), so the
+ * `src/audio` is a cursor over the trace driven by the renderer's clock, so the
  * only per-frame wire is `attach(renderer)`. Everything else is a reaction to a store transition,
  * which is why this lives here rather than inside `src/game/store.ts`: the store stays a pure
  * state machine that runs in Node under Vitest, and nothing in it has to know a speaker exists.

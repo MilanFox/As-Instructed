@@ -2,19 +2,19 @@
  * The transport, screwed to the monitor's case.
  *
  * Physical keys, a scrub track and a screen-printed readout, in the same 1988 language as the
- * housing they are on — `docs/DESK-CONCEPT.md` §4: every verb in this game is an object with a
- * reason to exist, and playback is the one verb the site feed owns.
+ * housing they are on — every verb in this game is an object with a reason to exist, and playback
+ * is the one verb the site feed owns.
  *
  * Two things here are requirements rather than decoration:
  *
  * **The zoom.** The board is a picture and the SIZE dial is a type scale, so the only honest
- * answer to "make the board bigger" is the camera's own `ZOOM_LADDER`. `docs/AUDIT-UI.md` F12 is
- * the reason it is a key on the case and not a chip in a corner or a documented shortcut: the
- * doors to everything in this game were 10px chips, and that is the chrome the desk exists to
- * abolish. The wheel still works over the canvas; it is not the only way in.
+ * answer to "make the board bigger" is the camera's own `ZOOM_LADDER`. That is why it is a key on
+ * the case and not a chip in a corner or a documented shortcut: the doors to everything in this
+ * game used to be 10px chips, and that is the chrome the desk exists to abolish. The wheel still
+ * works over the canvas; it is not the only way in.
  *
- * **The word `PLAYHEAD`.** `AUDIT-UI.md` F22 found three tick counters showing two current values
- * within 700px, all called ticks. This one is the position of the recording. The terminal's rail
+ * **The word `PLAYHEAD`.** Three tick counters used to show two current values within 700px, all
+ * called ticks. This one is the position of the recording. The terminal's rail
  * keeps `par`, `limit` and `shift ends at`; nothing on the desk calls two different numbers by the
  * same noun.
  */
@@ -165,9 +165,8 @@ export function Transport({ onZoom }: TransportProps): React.ReactElement {
       </div>
 
       {/*
-       * `AUDIT-UI.md` F22 measured this one and it is closed: the accessibility tree prints
-       * `combobox "1x"` because that is the control's *value*. It already has a name from the
-       * label below. An `aria-label` here would give it a second one.
+       * The accessibility tree prints `combobox "1x"` because that is the control's *value*.
+       * It already has a name from the label below. An `aria-label` here would give it a second one.
        */}
       <label className="sr-only" htmlFor="speed">
         Playback speed
@@ -186,9 +185,9 @@ export function Transport({ onZoom }: TransportProps): React.ReactElement {
       </select>
 
       {/*
-       * `AUDIT-UI.md` F12 again, and the ruling that every door is an object with weight rather
-       * than a corner chip. These were three unlabelled ~10px glyphs beside a 6px legend: a player
-       * who could not read the walls spent two minutes resizing the browser and found `FIT` by
+       * These keys follow the ruling that every door is an object with weight rather than a corner
+       * chip. They used to be three unlabelled ~10px glyphs beside a 6px legend: a player who
+       * could not read the walls spent two minutes resizing the browser and found `FIT` by
        * reading the accessibility tree, not by looking at the screen. It solved their problem the
        * moment they pressed it. Same place, same three rungs, drawn as keys with words on them.
        */}

@@ -138,7 +138,7 @@ export type UseEvent = BotAction & {
 export type MarkEvent = BotAction & { kind: 'mark'; at: Vec; text: string | null };
 /** `to` is the resulting fuel level, so replay never has to know `fuelMax`. */
 export type RefuelEvent = BotAction & { kind: 'refuel'; at: Vec; ok: boolean; to: number };
-/** Generic resource accounting. Feeds `Verdict.stats.spend`. DESIGN.md §11 A5. */
+/** Generic resource accounting. Feeds `Verdict.stats.spend`. DESIGN.md §4.6. */
 export type SpendEvent = AtTick & {
   kind: 'spend';
   resource: string;

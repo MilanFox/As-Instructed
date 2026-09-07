@@ -134,9 +134,10 @@ export const signal: ArtDirection = {
   ],
 
   /*
-   * The one direction where the cold end must *brighten*. A darkening against a #2a1d09 floor is
-   * the exact failure FIX-TRAIL §7 describes, with the sign flipped — which is why the invariant
-   * is expressed as contrast against `referenceFloor` rather than as a fixed literal.
+   * The one direction where the cold end must *brighten*. A darkening against a #2a1d09 floor
+   * would be as illegible as `inkDim` was against the World 4 cave floor, with the sign flipped —
+   * which is why the invariant is expressed as contrast against `referenceFloor` rather than as a
+   * fixed literal.
    */
   trail: { cold: '#6b4a12', hot: BURN, minAlpha: 0.3, maxAlpha: 0.62 },
   referenceFloor: FLOOR,
@@ -1211,7 +1212,7 @@ function drawBotBrackets(
 }
 
 /**
- * DESIGN.md §11 A5: a blocked move must look obviously different from a successful one.
+ * DESIGN.md §8: a blocked move must look obviously different from a successful one.
  *
  * `danger` is the one place the monochrome bends, so the bump is the only time the phosphor goes
  * red — which makes it the single most distinct event on the board and keeps it legible for the

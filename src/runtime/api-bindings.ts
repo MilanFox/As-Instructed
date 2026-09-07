@@ -177,7 +177,7 @@ function decodeText(text: string, key: number): string {
 /**
  * A connection is recorded on the source machine as `vars['link:<toId>'] = 1`, and the cable it
  * consumes is the Manhattan distance between the two, reported through `Verdict.stats.spend`
- * (DESIGN.md §11 A5).
+ * (DESIGN.md §4.6).
  *
  * An id that names no machine costs the full price and then stops the run. Nothing in the API
  * creates a machine, so the identical call can never succeed later (docs/ENGINE.md §2), and

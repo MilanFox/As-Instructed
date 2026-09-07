@@ -59,7 +59,7 @@ export interface RegressionTarget {
   parTicks: number;
   /** The medal on record. Never written by the suite. */
   medal: Medal;
-  /** Whether this work order carries a medal at all. Defaults to `true`. DESIGN.md §11 A7. */
+  /** Whether this work order carries a medal at all. Defaults to `true`. DESIGN.md §7. */
   graded?: boolean;
   /** The ticks on record, when there are any. */
   ticks?: number;

@@ -14,12 +14,12 @@ const FINALE = { w: 48, h: 40 };
  * suite can measure what the level does to it.
  *
  * None of these are the reference solution. Most are the *wrong* answers the level blocks say a
- * player will reach for first, and prove CURRICULUM.md §14's claim that the randomization kills
+ * player will reach for first, and prove CURRICULUM.md §2 rule 2's claim that the randomization kills
  * them: each is expected to fail on at least one shipped seed.
  *
  * The last two are a different instrument and are marked as such. They are *correct* — they pass
  * every seed — and they exist so the suite can prove what medal a level hands to a program that
- * solved it without using the hardware it was issued for. See `docs/FIX-PAR.md` §3.
+ * solved it without using the hardware it was issued for.
  */
 
 const HEADING: Record<string, Dir> = {
@@ -251,7 +251,7 @@ export const fieldSweep: ReferenceSolution = {
 };
 
 // ---------------------------------------------------------------------------
-// Correct, and issued the hardware anyway. docs/FIX-PAR.md §3.
+// Correct, and issued the hardware anyway.
 // ---------------------------------------------------------------------------
 
 /**
@@ -312,7 +312,7 @@ export const serpentineHarvest: ReferenceSolution = {
 /**
  * w8-04, the answer that never turns the radio on: walk the workings until the form is in view,
  * then go and lift it. Correct on every seed, and it is the program the level's par exists to
- * rank — `docs/FIX-PAR-REPAIRS.md` §1.
+ * rank.
  */
 export const frontierScavenger: ReferenceSolution = {
   levelId: 'w8-04',
@@ -400,7 +400,7 @@ export const lockerCanvasser: ReferenceSolution = {
  * This is the veteran's third specific written as a program. Their complaint was that the form leg
  * *"depends on nothing else"* — that deleting the grid from a solution changes no other line of it
  * — and the only honest way to answer that is to delete the grid from a solution and see whether
- * the form still gets filed. It did. `docs/FIX-FINALE-INTEGRATE.md` §1 runs this against the same
+ * the form still gets filed. It did. The suite runs this against the same
  * seeds with and without the door's `fed:` key, which is the one difference between the two
  * worlds, and the star it is here to earn is the one it now cannot: `file-form`.
  *

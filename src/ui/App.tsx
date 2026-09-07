@@ -57,15 +57,15 @@ export function App(): React.JSX.Element {
       {/*
         Four of the five ceremonies that used to live here are paper now. `Results`, the hardware
         requisition, the Repository note and the performance memo arrive on the desk and stay
-        there until they are filed — see `src/ui/desk/paper/usePaperwork.ts` and
-        `docs/AUDIT-UI.md` §6.2 and §6.6. A modal that destroys itself is the defect the desk
-        exists to remove, and re-adding one here would undo it.
+        there until they are filed — see `src/ui/desk/paper/usePaperwork.ts`. A modal that
+        destroys itself is the defect the desk exists to remove, and re-adding one here would
+        undo it.
 
         The publish offer is the exception and it is not ours: it belongs to `src/meta/ui`. It
         keeps its boundary for the reason the original comment gives — a throw in a dialog the
         player did not open used to unmount the site map, the editor and their unsaved program
-        with it (docs/AUDIT-UI.md F21) — and it keeps its own close, because a modal the store
-        still thinks is open is a modal the next run raises again.
+        with it — and it keeps its own close, because a modal the store still thinks is open is
+        a modal the next run raises again.
       */}
       <div className="modal-layer">
         <ModalBoundary
@@ -138,7 +138,7 @@ function TopBar(): React.JSX.Element {
       {screen === 'workspace' && level ? (
         <div className="topbar__stats">
           {/*
-            Par is not a target on an ungraded work order (DESIGN.md §11 A7), so the top bar
+            Par is not a target on an ungraded work order (DESIGN.md §7), so the top bar
             reports the clock and stops there — no denominator to fall short of, and no amber for
             falling short of it. The objective rail draws the same distinction for the same reason.
           */}

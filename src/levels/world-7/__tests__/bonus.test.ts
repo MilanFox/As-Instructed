@@ -1,7 +1,7 @@
 /**
  * World 7's bonus stars, from both sides: a run that earns one and a run that does not.
  *
- * `docs/FIX-BONUSES-7-8.md` is the specification. A bonus that every passing run collects is
+ * A bonus that every passing run collects is
  * confetti — both playtests said so in the same words — so each star here is pinned by a pair:
  * the shipped reference solution earns it on every declared seed, and a *correct* program that
  * did not have the second idea passes the level and is refused.

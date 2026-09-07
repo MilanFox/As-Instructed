@@ -348,9 +348,8 @@
 
 /*
  * The report was written against the dark UI's tokens. Remapping them once here is what lets the
- * cause block, the objective rows and the budget bars come across unchanged — `docs/AUDIT-UI.md`
- * F5 says the `cause__diff` block is the best in the game and should not be touched, and this is
- * how it is not touched.
+ * cause block, the objective rows and the budget bars come across unchanged, leaving the
+ * `cause__diff` block — the best rendering in the game — untouched.
  */
 .desk .doc {
   --ink: var(--p-ink);
@@ -477,7 +476,7 @@
   letter-spacing: .1em; color: var(--p-dim);
 }
 
-/* Field notes, at the top of the work order. docs/AUDIT-UI.md F4. */
+/* Field notes, at the top of the work order. */
 .desk .doc .notes {
   border: 1px dashed var(--p-rule); background: rgba(0,0,0,.028);
   padding: calc(9 * var(--u)) calc(11 * var(--u)); margin: calc(4 * var(--u)) 0 calc(14 * var(--u));
@@ -546,8 +545,8 @@
 
 /* ============================== READING IT ======================== */
 /*
- * `docs/AUDIT-UI.md` F15: no reading surface may be capped below its own content while the window
- * has room to spare. The lift is sized to the window, so at 2560x1440 the whole work order fits
+ * No reading surface may be capped below its own content while the window has room to spare. The
+ * lift is sized to the window, so at 2560x1440 the whole work order fits
  * and there is no scrollbar. Where it cannot — a long order at `--ts: 1.5` on a 13" laptop, which
  * is the case measured in the prototype at 803px of sheet in a 778px window — the sheet scrolls
  * rather than running off the bottom of the screen. That is the window being out of room, not a
@@ -656,9 +655,8 @@
 
 /*
  * The report was written against the dark UI's tokens. Remapping them once here is what lets the
- * cause block, the objective rows and the budget bars come across unchanged — `docs/AUDIT-UI.md`
- * F5 says the `cause__diff` block is the best in the game and should not be touched, and this is
- * how it is not touched.
+ * cause block, the objective rows and the budget bars come across unchanged, leaving the
+ * `cause__diff` block — the best rendering in the game — untouched.
  */
 .desk .doc {
   --ink: var(--p-ink);
@@ -785,7 +783,7 @@
   letter-spacing: .1em; color: var(--p-dim);
 }
 
-/* Field notes, at the top of the work order. docs/AUDIT-UI.md F4. */
+/* Field notes, at the top of the work order. */
 .desk .doc .notes {
   border: 1px dashed var(--p-rule); background: rgba(0,0,0,.028);
   padding: calc(9 * var(--u)) calc(11 * var(--u)); margin: calc(4 * var(--u)) 0 calc(14 * var(--u));
@@ -854,8 +852,8 @@
 
 /* ============================== READING IT ======================== */
 /*
- * `docs/AUDIT-UI.md` F15: no reading surface may be capped below its own content while the window
- * has room to spare. The lift is sized to the window, so at 2560x1440 the whole work order fits
+ * No reading surface may be capped below its own content while the window has room to spare. The
+ * lift is sized to the window, so at 2560x1440 the whole work order fits
  * and there is no scrollbar. Where it cannot — a long order at `--ts: 1.5` on a 13" laptop, which
  * is the case measured in the prototype at 803px of sheet in a 778px window — the sheet scrolls
  * rather than running off the bottom of the screen. That is the window being out of room, not a

@@ -20,7 +20,7 @@
 .desk .stand--feed { top: calc(600 * var(--u)); width: calc(136 * var(--u)); height: calc(50 * var(--u)); }
 
 /*
-   The reserved margin, and the whole of docs/DESK-CONCEPT.md §9 item 1.
+   The reserved margin — the hard part of this design to get right.
 
    The prototype drew its graticule inside the canvas, in a margin the canvas left itself. The real
    renderer's camera fits whatever box it is given, so a margin that is not taken away from the
@@ -126,11 +126,11 @@
 .desk .asset-tag b { color: #2f2e29; letter-spacing: .1em; }
 
 /* ---- the graticule. in the strip the canvas gave up, never on a tile. ----
-   AUDIT-UI.md F6: the player is handed coordinates and no coordinate system.
-   Every mark positions itself off three custom properties the camera writes
+   This is what gives the player a coordinate system for the coordinates the
+   game hands them. Every mark positions itself off three custom properties the camera writes
    once a frame — --gx0/--gy0 (the world origin, in CSS px from the canvas's
    corner) and --gt (CSS px per tile) — so a camera move costs three style
-   writes rather than one draw call per cell. docs/LIGHT.md §7. */
+   writes rather than one draw call per cell. */
 
 /* Above the canvas in paint order, and that is deliberate rather than a lapse. The strip the
    canvas gave up holds the ruler when the grid fills the picture; when the camera letterboxes a
@@ -213,7 +213,7 @@
 .desk .fc-mark--bonus { border-radius: 0; transform: translateX(-50%) rotate(45deg); }
 
 /* ---- speed, and the zoom ladder as a stepped control on the case ---
-   AUDIT-UI.md F12: the doors to everything in this game were 10px chips in a
+   The doors to everything in this game used to be 10px chips in a
    corner, and that is the chrome the desk exists to abolish. A board a player
    cannot enlarge is a board they cannot read, so the camera's own rungs are a
    key on the housing rather than a shortcut in a tooltip. */

@@ -17,7 +17,7 @@ export interface Verdict {
     seeds: number;
     /**
      * Level-defined resource totals, e.g. `{ cable: 34 }`. The engine never interprets the keys;
-     * commands and levels populate it via `Sim.spend`. DESIGN.md §11 A5.
+     * commands and levels populate it via `Sim.spend`. DESIGN.md §4.6.
      */
     spend: Record<string, number>;
     /**
@@ -86,7 +86,7 @@ function unmetMessage(labels: readonly string[]): string {
   return `Contract not fulfilled. Outstanding: ${labels.join('; ')}.`;
 }
 
-/** DESIGN.md §11 A4. The Performance Review tiers assume exactly these weights. */
+/** DESIGN.md §7. The Performance Review tiers assume exactly these weights. */
 export const MEDAL_WEIGHT: Readonly<Record<Medal, number>> = Object.freeze({
   gold: 3,
   silver: 2,
@@ -109,13 +109,13 @@ export const SILVER_FACTOR = 1.25;
  * DESIGN.md §7: `<= par` gold, `<= max(par + 1, par * SILVER_FACTOR)` silver, a pass is bronze.
  *
  * The `par + 1` floor is not in §7's formula; it is there because ticks are integers, so a par
- * under four would otherwise have an empty silver band. docs/FIX-PAR.md §7.
+ * under four would otherwise have an empty silver band.
  */
 export function medalFor(passed: boolean, ticks: number, parTicks: number): Medal {
   if (!passed) return Medal.None;
   if (ticks <= parTicks) return Medal.Gold;
   // Ticks are integers, so a par under four has an empty silver band: floor(3 * 1.25) is 3.
-  // One rung is always reachable. docs/FIX-PAR.md §7.
+  // One rung is always reachable.
   if (ticks <= Math.max(parTicks + 1, parTicks * SILVER_FACTOR)) return Medal.Silver;
   return Medal.Bronze;
 }

@@ -2,8 +2,8 @@
  * The loose paper on the desk.
  *
  * One layer, back to front by `z`. Nothing here is a modal, nothing has a backdrop, and nothing is
- * dismissed by a click on the desk — `docs/AUDIT-UI.md` §6.2 and §6.6 are the whole argument for
- * the desk existing, and re-adding a self-destroying ceremony anywhere in this file would undo it.
+ * dismissed by a click on the desk — that is the whole argument for the desk existing, and
+ * re-adding a self-destroying ceremony anywhere in this file would undo it.
  *
  * A sheet leaves only when it is *filed*, and filing is an act with an object behind it: the stamp
  * block for a certificate, the pen for a requisition, the acknowledgement on a notice. Filed paper

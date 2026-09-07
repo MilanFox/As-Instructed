@@ -5,8 +5,8 @@ import type { MetaHost } from '../store.ts';
 /**
  * The publish dialog has to settle.
  *
- * `docs/AUDIT-UI.md` finding 21: the dialog derived its selection from `offer` and handed the
- * result back to a store action that replaced `offer` with a new object, so every commit
+ * The dialog once derived its selection from `offer` and handed the result back to a store action
+ * that replaced `offer` with a new object, so every commit
  * invalidated the memo that caused it. React answered with `Maximum update depth exceeded` and,
  * with no boundary above the modal layer, unmounted the whole application to a black screen.
  *

@@ -18,7 +18,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
  *
  * The bindings themselves are `src/ui/desk/terminal/keys.ts`, which is also what the REFERENCE
  * manual prints: a key the manual announces and a key the listener binds cannot be two different
- * facts (docs/AUDIT-UI.md F17). This file owns only what each one *does*, and the
+ * facts. This file owns only what each one *does*, and the
  * `Record<KeyId, …>` below is what makes the two lists the same length — an unbound listed key and
  * an unlisted bound key are both compile errors.
  *
@@ -45,7 +45,7 @@ export function useKeyboard(): void {
          * work order itself.
          *
          * It deliberately does not dismiss the run report. On the desk the report is paper and it
-         * lies there until it is filed (docs/AUDIT-UI.md §6.2, §6.6): a key that made a player's
+         * lies there until it is filed: a key that made a player's
          * grade unreachable would be the same data loss the desk exists to remove, with a keyboard
          * instead of a stray click.
          */

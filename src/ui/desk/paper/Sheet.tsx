@@ -10,12 +10,12 @@
  * sheet. The first build overloaded the click — press to drag, click to enlarge — and an
  * overloaded gesture is a gesture nobody discovers: a player who pressed a sheet meaning to move
  * it got it flying across the desk at 1.23x instead, and once it was up, dragging did nothing at
- * all. It is the same defect `docs/AUDIT-UI.md` F12 names about the 10px chips, and the desk's
+ * all. It is the same defect as the 10px chips elsewhere in this game, and the desk's
  * whole thesis is that things are objects you can see.
  *
- * **Enlarging is a transform on this element and nothing else.** `docs/DESK-CONCEPT.md` §9 item 2
- * is a hard constraint: as a portal or an overlay it would reintroduce exactly the
- * self-destroying-ceremony problem the desk exists to remove. So the held sheet is the same node
+ * **Enlarging is a transform on this element and nothing else.** As a portal or an overlay it
+ * would reintroduce exactly the self-destroying-ceremony problem the desk exists to remove. So
+ * the held sheet is the same node
  * in the same layer with a different `transform`, and putting it down restores the position it was
  * already in.
  *
@@ -251,7 +251,7 @@ export function Sheet({
           without it there was no way at all to clear a sheet off the work.
 
           The standing sheet has no `put it away`, because a grade you can put down is an event
-          rather than a standing (`docs/AUDIT-UI.md` F18).
+          rather than a standing.
         */}
         {doc.kind === 'standing' ? null : (
           <button

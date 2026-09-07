@@ -1,10 +1,9 @@
 /**
  * World 3's bonus stars, from both sides: a run that earns one and a run that does not.
  *
- * `docs/FIX-BONUSES-3-5.md` is the specification. A bonus every passing run collects is confetti,
- * so each star reworked there is pinned by a pair — the shipped reference earns it on every
- * declared seed, and a *correct* program that did not have the second idea passes the level and
- * is refused.
+ * A bonus every passing run collects is confetti, so each star here is pinned by a pair — the
+ * shipped reference earns it on every declared seed, and a *correct* program that did not have
+ * the second idea passes the level and is refused.
  */
 import { describe, expect, test } from 'vitest';
 import type { ObjectiveContext, Sim, TileView, Vec } from '../../../engine/index.ts';

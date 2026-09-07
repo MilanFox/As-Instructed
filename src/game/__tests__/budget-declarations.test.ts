@@ -45,12 +45,12 @@ interface Inferred {
 /**
  * Every campaign objective whose meter comes from nowhere but its label. There are none.
  *
- * It was six, then two. Four went with the bonus rework (`docs/FIX-BONUSES.md`) — the list getting
- * shorter for the best possible reason, because the objectives stopped existing. The last two,
+ * It was six, then two. Four went with the bonus rework — the list getting shorter for the best
+ * possible reason, because the objectives stopped existing. The last two,
  * `w8-03 within-shift` and `w8-05 deadline`, were both `Objectives.custom` and were **blocked on
  * the engine**: `CustomReport` was `{ progress?, divergence }` and had no path for a meter to reach
  * the objective at all. It now carries `meter` and `unit` and `custom()` forwards them
- * (DESIGN.md §11 A13, `docs/FIX-PAR-REPAIRS.md` §4), so both declare and both dropped the
+ * (DESIGN.md §5), so both declare and both dropped the
  * `…, in ticks` tail they were only carrying to feed the parser.
  *
  * An empty list is the strongest form this guard has ever been in, and it is the form to keep it

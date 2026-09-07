@@ -10,9 +10,8 @@ import { trayDocs, usePapers } from '../paper/papers.ts';
  * desk because you are sitting here, and that crop is the only thing in the composition that
  * places the player's body.
  *
- * `docs/DESK-CONCEPT.md` §10 is the rule that keeps this file short. The coffee mug was cut and
- * subtraction beat placement — every unit of clutter is a unit stolen from the code, so nothing is
- * added here that is not already load-bearing for the fiction.
+ * Subtraction beats placement: the coffee mug was cut, and every unit of clutter is a unit stolen
+ * from the code, so nothing is added here that is not already load-bearing for the fiction.
  */
 
 /** Three paper edges resting in the tray, from the prototype's own offsets. */

@@ -218,8 +218,8 @@ export const w4_02: LevelDef = {
     /*
      * The budget this replaced counted breadcrumbs and asked for fewer, which paid a star for
      * leaving the issued hardware in the crate: a program that keeps its visited set in an
-     * ordinary `Set` — legitimate, and DESIGN.md §11 A3 says so in as many words — walks the
-     * identical route, places zero, and took the star for free (PLAYTEST-VETERAN.md §122).
+     * ordinary `Set` — legitimate, and DESIGN.md §5 says so in as many words — walks the
+     * identical route, places zero, and took the star for free.
      *
      * A trail is the half of the mechanic a `Set` cannot stand in for. A closure goes home with
      * the bot; a breadcrumb stays in the cave and can be read by something that did not write it.

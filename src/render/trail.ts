@@ -1,13 +1,13 @@
 /**
  * The visited-tile trail: how often the bots have stood on each cell, drawn on the floor.
  *
- * DESIGN.md §11 A5 makes RENDER responsible for the visuals a level's *failure* is argued
+ * DESIGN.md §8 makes RENDER responsible for the visuals a level's *failure* is argued
  * through. `w4-02` is the case that named this one: the cave loops, the w4-01 rule rides the
  * loop until the tick budget halts it, and until now the replay drew a bot moving around with
  * nothing to say it had been there twenty-five times already. CURRICULUM.md's `naive-fails` line
  * for that level asks for exactly this — "the replay should show the bot going round and round".
  *
- * Two decisions are load-bearing and both come from measuring real traces (docs/FIX-TRAIL.md §1):
+ * Two decisions are load-bearing and both come from measuring real traces:
  *
  * - **Heat is a count, not a flag.** `w4-02` solved correctly touches its worst tile 3 times;
  *   `w4-02` failed touches it 25 to 113 times. A trail that saturated on the first visit would
@@ -42,16 +42,15 @@ const TRAIL_HOT_VISITS = 6;
 /**
  * Cold-to-hot fill for each visit count, for the current art direction.
  *
- * The cold end must be legible against the floor it is painted on. That is the whole lesson of
- * FIX-TRAIL §7: the first draft ran the ramp from `inkDim`, and `#6a7a8c` turned out to be within
- * a few points of the cave floor's own grey, so two visits rendered as nothing at all on the one
- * level this exists for. Luminance first, hue second.
+ * The cold end must be legible against the floor it is painted on. A ramp starting at `inkDim`
+ * (`#6a7a8c`) is within a few points of the World 4 cave floor's own grey, so two visits rendered
+ * as nothing at all on the one level this exists for. Luminance first, hue second.
  *
- * §7 wrote that down as "the cold end is a darkening", which was the correct fix for a board with
- * a mid-value floor and is still what `standard` and `deepsite` do. It is not the
- * general rule: `signal` paints a near-black phosphor floor, where a darkening fails for exactly
- * the reason `inkDim` did, and has to brighten instead. So each direction declares its own cold
- * and hot ends and the *contrast* against `referenceFloor` is what the test enforces.
+ * "The cold end is a darkening" is the correct fix for a board with a mid-value floor and is
+ * still what `standard` and `deepsite` do. It is not the general rule: `signal` paints a
+ * near-black phosphor floor, where a darkening fails for exactly the reason `inkDim` did, and has
+ * to brighten instead. So each direction declares its own cold and hot ends and the *contrast*
+ * against `referenceFloor` is what the test enforces.
  *
  * The ramp deliberately does not pass through `accent2`, which would read as a smoother heat
  * gradient but is also `overlay.goal`; a mid-heat floor the colour of the objective brackets is

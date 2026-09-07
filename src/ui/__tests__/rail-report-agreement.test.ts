@@ -4,11 +4,11 @@
  * `ReportObjective`'s own docstring is the claim: *"a budget that read as a gauge while the run
  * played and as a tick-box in the report is two different claims about the same number."* It was
  * not true. `ObjectiveRail` built its rows without the objective's declared `meter` and `unit`, so
- * `budgetFor` saw `undefined`, fell back to parsing the label, and DESIGN.md §11 A13 — *prefer a
+ * `budgetFor` saw `undefined`, fell back to parsing the label, and DESIGN.md §5 — *prefer a
  * declaration over the label* — held in the report and nowhere else. `w5-02`'s `eight-probes` was
  * reachable: a failed run drew a probe gauge in the report and a plain counter on the rail.
  *
- * So the assertion is not the three objectives `docs/FIX-UI-COVERAGE.md` measured. Those were
+ * So the assertion is not the three objectives that were broken. Those were
  * symptoms of one missing pair of fields, and the next objective to declare a meter would have
  * joined them silently. The invariant is the whole campaign, and it is asserted twice over: once on
  * a run that did nothing, and once on the reference solution.
@@ -70,7 +70,7 @@ type LevelDef = ReturnType<typeof campaignOrder>[number];
 type RunResult = ReturnType<typeof runLevel>;
 /**
  * The run report as the desk draws it: a snapshot, on a certificate of closure or a HALT notice.
- * `Results` was a modal that destroyed itself (`docs/AUDIT-UI.md` §6.6); the sheet is the same
+ * `Results` was a modal that destroyed itself; the sheet is the same
  * report on paper, and it is read off `snapshotReport` exactly as `usePaperwork` reads it.
  */
 function Results(): unknown {
@@ -251,8 +251,8 @@ describe('one objective, two screens', () => {
   });
 
   /*
-   * The one case `docs/FIX-UI-COVERAGE.md` measured as reachable today, and the reference solution
-   * is what reaches it: it spends its eighth probe locating the break, so the bonus is met with its
+   * The one reachable case, and the reference solution is what reaches it: it spends its eighth
+   * probe locating the break, so the bonus is met with its
    * progress exactly full — neither underspent nor overrun, the two shapes `budgetFor` can read
    * without a declaration. Before the fix the report drew `8 / 8 probes` as a gauge and the rail
    * drew `8 / 8` as a tick-box, which is the two-claims-about-one-number defect stated in full.

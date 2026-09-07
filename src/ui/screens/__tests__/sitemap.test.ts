@@ -1,8 +1,7 @@
 /**
- * The site map's arithmetic on an ungraded work order (DESIGN.md §11 A7).
+ * The site map's arithmetic on an ungraded work order (DESIGN.md §7).
  *
- * Every case here failed against the running app before the fix, and each is one of the three
- * defects `docs/FIX-UNGRADED.md` measured live: the points reduce paid nothing for a close, the
+ * Every case here checks one of three defects: the points reduce paid nothing for a close, the
  * at-par reckoning could never count one, and the accessible name announced it as unfinished.
  */
 import { readFileSync } from 'node:fs';

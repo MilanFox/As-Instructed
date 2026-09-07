@@ -10,7 +10,7 @@ import type { ReferenceSolution } from '../../types.ts';
  * wait it out: the clock runs at the same rate whether the bot drives or not, and driving arrives
  * late.
  *
- * `done` and `seen` are ordinary JavaScript Sets. They survive the whole run (DESIGN.md §11 A3),
+ * `done` and `seen` are ordinary JavaScript Sets. They survive the whole run (DESIGN.md §5),
  * which is what makes "resume where you left off" possible at all.
  */
 export const solution: ReferenceSolution = {

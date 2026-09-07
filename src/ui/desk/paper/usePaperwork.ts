@@ -1,8 +1,8 @@
 /**
  * The company's side of the desk: what arrives on it, and when.
  *
- * Every ceremony in this game used to be a modal that destroyed itself (`docs/AUDIT-UI.md` §6.2),
- * and the run report was the worst of them (§6.6): `showResults` was set true by a run and by
+ * Every ceremony in this game used to be a modal that destroyed itself, and the run report was
+ * the worst of them: `showResults` was set true by a run and by
  * nothing else, so a stray click on the backdrop took the medal, the cause, the divergence, the
  * objectives, the record and the seeds with it and the only route back was to run the program
  * again. **That is a data-loss bug, not a styling complaint.**
@@ -53,8 +53,8 @@ export function deliverPaperwork(): void {
 
   /*
    * A work order the player has never opened lands in front of them; one they have run before
-   * lands where a read order lives, off to the side. That is the difference between the two
-   * approved compositions — `docs/shots/desk/01-station-at-rest` and `02-pinned-and-writing`.
+   * lands where a read order lives, off to the side. That is the difference between the desk at
+   * rest and the desk mid-run.
    */
   if (game.screen === 'workspace' && game.currentLevelId) {
     const levelId = game.currentLevelId;
@@ -108,7 +108,7 @@ export function deliverPaperwork(): void {
   /*
    * The memo used to be raised on the site map, on the grounds that it was the one screen with no
    * ceremony on it. The desk has no ceremonies to stack behind, so it arrives at the desk, which
-   * is where a memo arrives. DESIGN.md §11 A8 still binds: it is a memo, not a screen.
+   * is where a memo arrives. DESIGN.md §7.1 still binds: it is a memo, not a screen.
    */
   const tier = reviewOwed(game.save);
   if (tier) {

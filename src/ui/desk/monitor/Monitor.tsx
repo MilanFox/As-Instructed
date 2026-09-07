@@ -3,19 +3,18 @@
  *
  * It is its own physical screen, not a panel inside the terminal: pale grey-beige, thick housing,
  * transport keys screwed to the case, an inventory tag somebody stuck on and nobody removed. The
- * joke `docs/DESK-CONCEPT.md` §3 asks for is meant to be visible in the object — the firm bought
- * you a good machine to write on and a twenty-year-old monitor to look at the planet through.
+ * joke is meant to be visible in the object — the firm bought you a good machine to write on and a
+ * twenty-year-old monitor to look at the planet through.
  *
  * Two rules shape everything below, and both of them are older than the desk:
  *
- * 1. **Nothing is drawn over the board.** `docs/FIX-HUD-OVERLAP.md` landed a guard that protects
- *    exactly one rectangle, and `docs/AUDIT-UI.md` §6.5 says the rest of the furniture was left
- *    unreserved on purpose. Here the canvas is inset by `FEED_INSET` and every readout on this
- *    screen lives in the strip that inset created. There is no chrome over the picture, so there
- *    is nothing for a guard to have to protect — see `src/ui/__tests__/monitor-margin.test.ts`.
+ * 1. **Nothing is drawn over the board.** The canvas is inset by `FEED_INSET` and every readout on
+ *    this screen lives in the strip that inset created; the rest of the furniture is deliberately
+ *    left unreserved. There is no chrome over the picture, so there is nothing for a guard to have
+ *    to protect — see `src/ui/__tests__/monitor-margin.test.ts`.
  * 2. **The board is never non-rectilinear.** DESIGN §8's "no curvature" is a gameplay rule wearing
  *    an aesthetic hat and it applies to the chrome too, so the glass is a flat sheen and the mode
- *    change is a change of light, never of geometry (`DESK-CONCEPT.md` §10).
+ *    change is a change of light, never of geometry.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -34,7 +33,7 @@ import { FEED_INSET, LEGIBLE_DEVICE_TILE_PX, RULER_LABEL_MIN_TILE_PX } from './g
 import type { FeedRenderer } from './feed.ts';
 import { readoutLine } from './feed.ts';
 
-/** Reused, never rebuilt: the graticule reads it once a frame. `LIGHT.md` §7. */
+/** Reused, never rebuilt: the graticule reads it once a frame. */
 const VIEW: BoardView = { originX: 0, originY: 0, tilePx: 0, cols: 0, rows: 0 };
 
 export function Monitor(): React.ReactElement {
@@ -70,7 +69,7 @@ export function Monitor(): React.ReactElement {
   const highlights = useMemo(() => highlightsAt(playback, flooredTick), [playback, flooredTick]);
 
   /*
-   * Where the run went wrong, kept after the report is put down. `AUDIT-UI.md` F5.
+   * Where the run went wrong, kept after the report is put down.
    *
    * The certificate is paper and stays on the desk, so the sentence already outlives the ceremony;
    * this is the other half of the requirement — the two coordinates, on the site view, where they
@@ -162,7 +161,7 @@ export function Monitor(): React.ReactElement {
     [renderer],
   );
 
-  /* The tile under the pointer, named in the header strip. `AUDIT-UI.md` F6. */
+  /* The tile under the pointer, named in the header strip. */
   useEffect(() => {
     return (renderer() as FeedRenderer).onHover?.(setReadout);
   }, [renderer]);
@@ -272,9 +271,9 @@ export function Monitor(): React.ReactElement {
           />
 
           {/*
-           * The empty state and the playhead timecode both live in the strip below the picture.
-           * `AUDIT-UI.md` §6.5 is the reason: the collision the overlap fix closed was closed for
-           * one card, and anything else placed over the board re-opens it.
+           * The empty state and the playhead timecode both live in the strip below the picture,
+           * because anything placed over the board would reopen the overlap collision the guard
+           * exists to prevent.
            */}
           {trace ? (
             <span className="feed-tick">{String(flooredTick).padStart(4, '0')}</span>

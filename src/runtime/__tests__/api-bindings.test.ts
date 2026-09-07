@@ -177,7 +177,7 @@ describe('link', () => {
     return { sim: new Sim(world), world };
   }
 
-  test('records the connection and reports the cable spent (DESIGN.md §11 A5)', () => {
+  test('records the connection and reports the cable spent (DESIGN.md §4.6)', () => {
     const { sim, world } = grid();
     expect(api(sim, ['link']).link?.('node-1', 'node-2')).toBe(true);
     expect(world.machines[0]?.vars['link:node-2']).toBe(1);

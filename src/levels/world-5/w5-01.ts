@@ -158,7 +158,7 @@ const orderedCount = (ctx: ObjectiveContext): number => {
  *
  * It was 37, which is what the answer that never probes costs: walk to one end, find the reactor
  * is at the other, and walk back switching as it goes. Par sat exactly on that program, so the
- * level's own hardware bought nothing. 37 is now silver. `docs/FIX-PAR-3-8.md` §6.2 measured both.
+ * level's own hardware bought nothing. 37 is now silver.
  */
 export const w5_01: LevelDef = {
   id: 'w5-01',

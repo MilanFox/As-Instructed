@@ -1,7 +1,7 @@
 /**
  * Closing a work order, end to end, on a real passing run.
  *
- * This is the ceremony the desk exists for. `docs/AUDIT-UI.md` §6.6: the run report used to be a
+ * This is the ceremony the desk exists for. The run report used to be a
  * modal destroyed by a stray backdrop click with no reopen path, so the medal, the cause, the
  * objectives, the record and the seeds were one misclick from gone. On the desk it is a
  * **certificate of closure** that lies there until the player stamps it, and stamping files it

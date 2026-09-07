@@ -1,7 +1,7 @@
 /**
  * The program, and the only lazy boundary on the desk.
  *
- * `docs/AUDIT-UI.md` F23: one `Suspense` used to wrap the whole workspace, so the site view, the
+ * One `Suspense` used to wrap the whole workspace, so the site view, the
  * work order and the objectives all sat behind Monaco's download. The boundary is here now and it
  * is as small as it can be — `MonacoProgram.tsx` is the only module in the tree that statically
  * reaches `monaco-editor`, and the fallback is drawn *in the program's own pane*, inside a screen

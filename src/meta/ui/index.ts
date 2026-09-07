@@ -1,5 +1,5 @@
 /**
- * The Repository's React surface. Mount points are documented in `docs/LIBRARY.md`.
+ * The Repository's React surface.
  *
  * Four components and nothing else: a tabbed panel for the workspace, a modal for the publish
  * offer, the unlock memo, and a status line for the chrome. Everything else is internal.

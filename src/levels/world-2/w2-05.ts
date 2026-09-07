@@ -11,8 +11,8 @@ const MAX_GROWTH = 8;
  *
  * It was 84, and at 84 the level did not ask its own question. The serpentine that reads only the
  * tile under the wheels costs 58–68 across the five seeds, so it came home inside the shift on
- * every one of them and the choosing decided nothing but the medal. Measured, not guessed
- * (docs/FIX-FINALE-INTEGRATE.md §3): the two-lane route costs 47/52/52/55/48, so the whole usable
+ * every one of them and the choosing decided nothing but the medal. Measured, not guessed:
+ * the two-lane route costs 47/52/52/55/48, so the whole usable
  * window is 56 to 67, and 62 is the tightest number in it that still leaves a tick above par for a
  * run to land on. The serpentine now misses on three seeds of five and cannot close the level;
  * the lane route comes home with 7 ticks in hand on its worst seed and 15 on its best.

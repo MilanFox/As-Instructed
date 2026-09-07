@@ -254,7 +254,7 @@ export class ParticleSystem {
         break;
       }
       case 'blocked': {
-        // DESIGN.md §11 A5: a blocked move has to read as a *failure*, not a pause. Hard white
+        // DESIGN.md §8: a blocked move has to read as a *failure*, not a pause. Hard white
         // sparks against the bump direction plus an expanding red ring on the wall it hit.
         for (let i = 0; i < 10; i++) {
           const a = (rand() - 0.5) * 2.2 + Math.atan2(-dy, -dx);

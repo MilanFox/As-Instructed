@@ -433,7 +433,7 @@ describe('rewards', () => {
     expect(best?.now).toBeLessThan(best?.previous ?? 0);
 
     /*
-     * `w1-01` is ungraded (DESIGN.md §11 A7), and this is the test that proves ungrading removed
+     * `w1-01` is ungraded (DESIGN.md §7), and this is the test that proves ungrading removed
      * the ladder without removing the mirror: no medal is recorded, while the personal best — the
      * diff both playtesters named the best reward in the game — still fires. It is not a
      * commendation and never was, which is why the cut to five did not touch it.
@@ -500,7 +500,7 @@ describe('rewards', () => {
 });
 
 /**
- * DESIGN.md §11 A11. The property that matters is not the number two — it is that no single work
+ * DESIGN.md §6. The property that matters is not the number two — it is that no single work
  * order can be the end of a campaign. Being stuck must always leave somewhere else to go.
  */
 describe('the unlock gate', () => {

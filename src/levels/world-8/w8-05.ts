@@ -90,7 +90,6 @@ const STATION_PREFIX = 'sub-';
  *
  * The four seeds this table used to carry moved the same numbers without moving a decision, and
  * seven randomisations of a 48x40 map is seven times the failure surface for no extra idea.
- * docs/FIX-FINALE.md records which went and why.
  */
 interface Instance {
   bots: number;
@@ -1047,8 +1046,8 @@ export const w8_05: LevelDef = {
      stops the carrier spending the opening of the shift walking to a door it cannot move.
      Par is left where it was when there were seven seeds: the two most expensive instances went
      with the seed cull, and moving the gold line down to meet the new worst case would be
-     tightening the medal on a level nobody has closed yet. docs/FIX-FINALE.md flags it as a
-     decision for the orchestrator, not a silent one. */
+     tightening the medal on a level nobody has closed yet. Left as a decision for the
+     orchestrator, not a silent one. */
   par: { ticks: 1050 },
   costs: { use: 1 },
   budget: { maxTicks: 16000, maxOps: 8_000_000 },

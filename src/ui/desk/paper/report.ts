@@ -1,7 +1,7 @@
 /**
  * The run report, frozen into paper.
  *
- * `docs/AUDIT-UI.md` §6.6 is the reason this file exists: `showResults` was set true by a run and
+ * This file exists because `showResults` used to be set true by a run and
  * by nothing else, so one stray click on the backdrop destroyed the medal, the cause, the
  * divergence, the objectives, the record and the seeds, and the only route back was to run the
  * program again. On the desk the report is a certificate of closure or a HALT notice lying on the
@@ -28,7 +28,7 @@ const MEDAL_WORD: Record<Medal, string> = {
 };
 
 /**
- * What the report calls the result. `null` is an ungraded work order (DESIGN.md §11 A7): there was
+ * What the report calls the result. `null` is an ungraded work order (DESIGN.md §7): there was
  * never a medal to award, so the word for it is the state — closed — and never a medal's absence.
  */
 export function resultWord(medal: Medal | null): string {
@@ -59,7 +59,7 @@ export function celebrationFor(medal: Medal | null): 'gold' | 'silver' | 'bronze
   return medal === null || medal === 'none' ? 'pass' : medal;
 }
 
-/** The die the stamp block presses onto a certificate. Text before colour, `DESK-CONCEPT.md` §6. */
+/** The die the stamp block presses onto a certificate. Text before colour. */
 export function stampWordFor(medal: Medal | null): string {
   return medal === null ? 'CLOSED' : MEDAL_WORD[medal].toUpperCase();
 }

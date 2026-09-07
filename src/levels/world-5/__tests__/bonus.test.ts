@@ -1,8 +1,8 @@
 /**
  * World 5's bonus star, from both sides: a run that earns it and a run that does not.
  *
- * `docs/FIX-BONUSES-3-5.md` is the specification. `w5-05` is the only World 5 star this pass
- * reworked; the rest are argued there and left alone. A bonus every passing run collects is
+ * `w5-05` is the only World 5 star this pass
+ * reworked; the rest are left alone. A bonus every passing run collects is
  * confetti, so this one is pinned by a pair — the shipped reference earns it on every declared
  * seed, and a *correct, gold-taking* program that did not have the second idea is refused.
  */

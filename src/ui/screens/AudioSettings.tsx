@@ -5,12 +5,12 @@ import { audio } from '../audio.ts';
 /**
  * Sound settings.
  *
- * `src/audio` owns its own persistence (`localStorage['bootstrap.audio']`, docs/AUDIO.md §4), so
+ * `src/audio` owns its own persistence (`localStorage['bootstrap.audio']`), so
  * this dialog holds no state of its own beyond a mirror for rendering: every control calls
  * `update`, which applies, persists and reconfigures the live graph in one step.
  *
  * Ambience ships off and stays off. The toggle is here because a player should be able to find it,
- * not because anyone has decided the bed is good (docs/AUDIO.md §7).
+ * not because anyone has decided the bed is good.
  */
 
 const BUSES: { key: 'master' | 'sfx' | 'ui' | 'ambience'; label: string; note: string }[] = [
@@ -54,7 +54,7 @@ export function AudioSettings({ onClose }: { onClose: () => void }): React.JSX.E
         <div className="modal__body">
           <div className="settings">
             {/*
-              One control for one outcome (docs/AUDIT-UI.md F19). `enabled` and `muted` are two
+              One control for one outcome. `enabled` and `muted` are two
               fields for two implementations of silence — one tears the graph down, one holds it —
               and `masterGain` returns 0 for either, so nothing a player can hear ever told them
               apart, while the two could be left disagreeing. The switch owns both: on means built

@@ -70,8 +70,8 @@ export interface OverlayColors {
  * Line weights and cutoffs, all in *screen* pixels and multiplied by `dpr` at the call site.
  *
  * These were magic numbers spread across `overlays.ts`. They are here because grid weight is the
- * single biggest legibility lever in the renderer — `AUDIT-UI.md` F6 is entirely about the grid
- * being a 1-device-pixel hairline at 18% alpha, which on a 2x display is half a CSS pixel.
+ * single biggest legibility lever in the renderer: the grid is a 1-device-pixel hairline at 18%
+ * alpha, which on a 2x display is half a CSS pixel.
  */
 export interface Metrics {
   /** Minor grid line, screen px. */
@@ -89,16 +89,15 @@ export interface Metrics {
 /**
  * The visited-tile ramp, as a property of the direction rather than of one background colour.
  *
- * FIX-TRAIL §7 fixed a real bug — the first ramp ran `inkDim` to `danger`, and `inkDim` is within
- * a few points of the World 4 cave floor, so the cold end drew nothing at all. The fix was to make
- * the cold end a *darkening*, and the regression test pinned the literal `rgba(10, 14, 20` that a
- * darkening happened to produce.
+ * The first ramp ran `inkDim` to `danger`, and `inkDim` is within a few points of the World 4 cave
+ * floor, so the cold end drew nothing at all. The fix was to make the cold end a *darkening*, and
+ * the regression test pinned the literal `rgba(10, 14, 20` that a darkening happened to produce.
  *
  * That literal is the lesson written down one direction too narrowly. On a paper board a
  * darkening is still right; on a near-black phosphor board a darkening is invisible for exactly
- * the reason `inkDim` was. The invariant that actually holds in every case is the one the §7
- * write-up argues for in prose — *luminance first, hue second* — so it is expressed here as a
- * contrast requirement against the floor the direction paints, and the test checks that instead.
+ * the reason `inkDim` was. The invariant that actually holds in every case is *luminance first,
+ * hue second* — so it is expressed here as a contrast requirement against the floor the direction
+ * paints, and the test checks that instead.
  */
 export interface TrailRamp {
   /** Colour at `TRAIL_MIN_VISITS`. Must contrast with `referenceFloor` — either way. */
@@ -126,8 +125,8 @@ export interface TerrainPaint {
  * Terrain is cached and machines, crops and items are not — maturity is derived from the tick
  * (ENGINE.md §6.4) and a machine's state changes without a rebuild — so these cannot ride the
  * `paintTerrain` hook and need a contract of their own. Until they had one, a direction that
- * rewrote the ground still had 48 px atlas sprites standing on it, which is the half-committed
- * board `docs/FIX-SPRITES.md` was opened against.
+ * rewrote the ground still had 48 px atlas sprites standing on it, leaving the board
+ * half-committed.
  *
  * Each is passed as one object the renderer owns and rewrites in place per call. A painter reads
  * it and returns; retaining it captures the next machine's values. That is the same
@@ -166,14 +165,14 @@ export interface MachinePaint {
  * One crop tile.
  *
  * `stage` is bucketed by the renderer against `PLANT_STAGES` rather than by the direction: the
- * six-step ladder is the thing DESIGN.md §11 A5 requires to be visually distinct, and a direction
+ * six-step ladder is the thing DESIGN.md §8 requires to be visually distinct, and a direction
  * that re-derived it could quietly ship five steps. `ripe` is the bit w2-02 is played on and is
  * handed over separately, because `stage === stages - 1` is true for authored-grown tiles whose
  * `max` is zero as well, and both of those really are ready to harvest.
  *
  * `kind` is the bit w2-05 is played on. Two things grow on that soil — the crop, and ice-scrub
  * that likes the same ground and is worth nothing — and the level is entirely the reading that
- * tells them apart. It was missing from this bag until `docs/FIX-SPRITES.md` §16, so no direction
+ * tells them apart. It was missing from this bag, so no direction
  * could draw the difference however it wanted to, and the field was one plant painted twice.
  */
 export interface CropPaint {
@@ -256,8 +255,8 @@ export interface PostPaint extends BackdropPaint {
   /**
    * The world transform, so a screen-space pass can say where a tile is.
    *
-   * `AUDIT-UI` F6 is "no axis labels, no ruler, no coordinate readout", and a direction that
-   * answers it inside the cached terrain layer answers it only above the zoom where the numbers
+   * The board has no axis labels, no ruler and no coordinate readout, and a direction that
+   * answers that inside the cached terrain layer answers it only above the zoom where the numbers
    * still have a body — which is not the zoom the big boards are played at. These are the same
    * snapped device-pixel values the renderer sets on the context, so a mark placed with them
    * lands on the tile it names.

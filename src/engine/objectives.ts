@@ -22,8 +22,8 @@ export interface ObjectiveContext {
 /**
  * The first concrete point at which what an objective wanted and what the run did parted company.
  *
- * `docs/PLAYTEST-BEGINNER.md` §3: a manifest level that grades printed text answered four
- * plausible lines and an empty program with the identical `0 of 5 — 5 short`. A count says an
+ * A manifest level that grades printed text once answered four plausible lines and an empty
+ * program with the identical `0 of 5 — 5 short`. A count says an
  * objective was missed; it never says where, so the only move left is to guess, and the level's
  * lesson is lost to brute force. This is the number the count throws away.
  *
@@ -103,8 +103,8 @@ export interface Objective {
    *
    * Only `checkbox` sets it. It exists so that "this objective reports one bit" has to be written
    * down by the author and can be counted by a reviewer, rather than being what happens when
-   * nobody supplied a `divergence`. `docs/AUDIT-INCENTIVES.md` finding 1 is what silence by
-   * default cost: 31 of 34 work orders could only ever say `not met`.
+   * nobody supplied a `divergence`. Silence by default once cost real information: 31 of 34 work
+   * orders could only ever say `not met`.
    */
   binary?: true;
   /**
@@ -452,7 +452,7 @@ export function withinOps(n: number, options?: ObjectiveOptions): Objective {
 export interface CustomReport {
   progress?(ctx: ObjectiveContext): [number, number];
   divergence(ctx: ObjectiveContext): Divergence | undefined;
-  /** What `progress` counts, where it counts against a limit. DESIGN.md §11 A13. */
+  /** What `progress` counts, where it counts against a limit. DESIGN.md §5. */
   meter?: BudgetMeter;
   unit?: string;
 }

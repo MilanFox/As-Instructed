@@ -1,8 +1,8 @@
 /**
  * What a failing objective says about *where* it failed.
  *
- * `docs/PLAYTEST-BEGINNER.md` §3 is the specification for this file: fifty-five minutes lost
- * because four plausible answers and an empty program produced the identical `0 of 5 — 5 short`.
+ * A beginner playtester lost fifty-five minutes to this: four plausible answers and an empty
+ * program produced the identical `0 of 5 — 5 short`.
  * Every test here is a program that is wrong in a specific way, asserting that the report now
  * names that way. The printed-text shape the playtest hit lives in
  * `src/engine/__tests__/divergence.test.ts`; the work order it was found on has been withdrawn.

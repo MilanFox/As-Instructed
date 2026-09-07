@@ -1,9 +1,9 @@
 /**
  * The desk's replacement for the HUD-overlap guard, and the board's legibility floor.
  *
- * `docs/FIX-HUD-OVERLAP.md` landed a guard that keeps the objective read-out off the drawn grid,
- * and `docs/AUDIT-UI.md` §6.5 records that it protects exactly one rectangle — the chip row and
- * the empty-state note were left over the board on purpose. That guard lived in
+ * A guard used to keep the objective read-out off the drawn grid, protecting exactly one
+ * rectangle — the chip row and the empty-state note were left over the board on purpose.
+ * That guard lived in
  * `useWorkspaceLayout.ts` and read `--hud-gutter` out of `app.css`, and **none of that machinery
  * survives**: there is no HUD strip, no card, no `Workspace` and no hook. The header here used to
  * shorten that to "the desk uses none of it", which was read as "the desk uses none of `app.css`".
@@ -21,8 +21,8 @@
  *  2. the real `Camera`, fitted to that box at every supported viewport and every grid in the
  *     campaign, draws entirely inside it.
  *
- * The third block is the cost, stated the way `FIX-HUD-OVERLAP.md` §8 states the objectives
- * strip's: which levels lose legibility and by how much. The fourth is the `app.css` boundary.
+ * The third block is the cost: which levels lose legibility and by how much. The fourth is the
+ * `app.css` boundary.
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
@@ -66,7 +66,7 @@ const VIEWPORTS = [
   { label: '1440x860', w: 1440, h: 860 },
 ] as const;
 
-/** Retina. The floor in `docs/DESK-CONCEPT.md` §7 is stated in device pixels. */
+/** Retina. The floor is stated in device pixels. */
 const DPR = 2;
 
 interface Fit {
@@ -177,13 +177,11 @@ describe('the feed reserves its own margin', () => {
 });
 
 /*
- * The cost, stated rather than hidden — the register `docs/FIX-HUD-OVERLAP.md` §8 uses when it says
- * plainly that four of thirty-three levels lose one rung at 1280.
+ * The cost, stated rather than hidden: four of thirty-three levels lose one rung at 1280.
  *
- * `docs/DESK-CONCEPT.md` §7 sets the floor at 24 device pixels per tile, and its own derivation of
- * the tile sizes is width-bound on a screen that is height-bound: the picture is 656 x 438 design
- * units, so a square grid is fitted by its height and `w4-05` lands at 14 device px at 1280x800,
- * not the 28 the document claims.
+ * The floor is 24 device pixels per tile. The feed screen is 656 x 438 design units, so a square
+ * grid is fitted by its height, not its width — `w4-05` lands at 14 device px at 1280x800, half of
+ * what a naive width-based derivation would give.
  *
  * These are the levels the feed cannot show **whole** above the floor. It is not a list of levels
  * that open illegibly — none do, because the camera climbs to the floor on entry and crops instead
@@ -223,7 +221,7 @@ describe('the legibility floor', () => {
 
   /*
    * The ruling this file exists under: a work order never opens below the floor. `w2-02` is the one
-   * that matters most — DESIGN §11 A5 makes it unsolvable if a player cannot read crop maturity —
+   * that matters most — DESIGN §8 makes it unsolvable if a player cannot read crop maturity —
    * and it clears the floor on the fit alone, so it never crops.
    */
   test('no work order opens below the floor', () => {

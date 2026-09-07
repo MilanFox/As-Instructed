@@ -5,7 +5,7 @@
  * draws whatever tick it is told to, at a *fractional* tick so movement interpolates between the
  * integer ticks the engine actually produced.
  *
- * Before the first run there is no trace, and a black rectangle is not a level (AUDIT-UI.md F3).
+ * Before the first run there is no trace, and a black rectangle is not a level.
  * `setPreview` takes the level's starting `World` and draws it still — same terrain, same
  * features, bots at rest — so the board is readable before anything has been executed. A trace
  * outranks a preview: `setTrace` takes the picture over and clearing it hands the picture back.
@@ -84,7 +84,7 @@ export const DEFAULT_SPEED = 4;
 /**
  * What the end of a run felt like. `pass` and `fail` are the verdict on its own; the three medals
  * are the verdict plus a medal, and each is visually the same gesture at a different size — the
- * same escalation the audio stingers make (docs/AUDIO.md §8).
+ * same escalation the audio stingers make.
  */
 export type CelebrationKind = 'gold' | 'silver' | 'bronze' | 'pass' | 'fail';
 
@@ -164,7 +164,7 @@ export interface FrameInfo {
 }
 
 export interface RendererOptions {
-  /** World number, 1..8. Selects the biome palette (ASSETS.md §5). */
+  /** World number, 1..8. Selects the biome palette. */
   world?: number;
   /** Attach pointer handlers for drag-pan, wheel-zoom and hover. Default true. */
   interactive?: boolean;
@@ -1039,7 +1039,7 @@ export class Renderer {
             dwell,
           );
         } else {
-          // DESIGN.md §11 A5. The bump is drawn by the bot itself; this is the impact burst.
+          // DESIGN.md §8. The bump is drawn by the bot itself; this is the impact burst.
           const dirX = dirDeltaX(event.dir);
           const dirY = dirDeltaY(event.dir);
           this.burst(
@@ -1241,7 +1241,7 @@ export class Renderer {
     ctx.drawImage(cache, 0, 0, cache.width, cache.height, 0, 0, world.w * tilePx, world.h * tilePx);
 
     // The visited-tile trail sits between the floor and the grid: the grid lines stay legible on
-    // top of it, and every feature, mark, item and bot below draws over it (DESIGN.md §11 A5).
+    // top of it, and every feature, mark, item and bot below draws over it (DESIGN.md §8).
     if (this.trail) {
       this.trail.sync(tick);
       this.trail.draw(ctx, tilePx, this.range);
@@ -1489,7 +1489,7 @@ export class Renderer {
   }
 
   /**
-   * All bots, each on its own virtual clock (DESIGN.md §11 A5). Poses are read from precompiled
+   * All bots, each on its own virtual clock (DESIGN.md §8). Poses are read from precompiled
    * timelines, so two bots whose clocks differ are legitimately at different points in their
    * animations on the same frame.
    */

@@ -1,20 +1,20 @@
 /**
  * The chin of the monitor, which is where the settings are.
  *
- * `docs/AUDIT-UI.md` F19 asks for one place a player looks for preferences with everything
- * configurable in it. On a desk that place cannot be a screen — there is no menu anywhere — so it
- * is the terminal's own bezel, where a 1988 monitor carried H-SIZE and V-SIZE. Four legends
- * screen-printed on a brushed plate:
+ * It is the one place a player looks for preferences, with everything configurable in it. On a
+ * desk that place cannot be a screen — there is no menu anywhere — so it is the terminal's own
+ * bezel, where a 1988 monitor carried H-SIZE and V-SIZE. Four legends screen-printed on a brushed
+ * plate:
  *
  * - `SIZE`     — the character-size dial (`src/ui/desk/scale.ts`).
  * - `DISPLAY`  — the art direction (§6.4). Deep Site, or Signal, which is a high-contrast mode.
- * - `REPORTS`  — F7: the setting that used to be an 11px dotted-underline footnote in the corner
- *                of the run report, which read as "skip *this* animation" and was not.
- * - `SOUND`    — F19's own dialog, opened onto the terminal's screen rather than over the desk.
+ * - `REPORTS`  — the setting that used to be an 11px dotted-underline footnote in the corner of
+ *                the run report, which read as "skip *this* animation" and was not.
+ * - `SOUND`    — its own dialog, opened onto the terminal's screen rather than over the desk.
  *
- * Every one of them is hardware at rest: a knurled dial, two throw switches and a key. F11's
- * requirement is that an enabled control is visibly a control without being hovered, and a moulded
- * object is the strongest form of that — you can see which of these can be pressed in a still.
+ * Every one of them is hardware at rest: a knurled dial, two throw switches and a key. An enabled
+ * control must be visibly a control without being hovered, and a moulded object is the strongest
+ * form of that — you can see which of these can be pressed in a still.
  */
 import { useRef, useState } from 'react';
 import type { ArtId } from '../../../render/theme.ts';

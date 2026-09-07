@@ -5,7 +5,7 @@
  * work orders, and the two are deliberately different objects: the campaign has to be finishable
  * by a player who never opens the volume, so no route into a work order may live inside it. This
  * is the other thing — the player's own accumulated subroutines, which are code, and which
- * therefore live on the machine rather than on the desk (`docs/DESK-CONCEPT.md` §2).
+ * therefore live on the machine rather than on the desk.
  *
  * The regression this closes: `Workspace.tsx` was the only surface that rendered `LibraryPanel`,
  * and it was deleted with the panel workspace. A player could publish a routine and then had no
@@ -16,8 +16,7 @@
  * written for exactly this panel — it compiles TypeScript, mounts a second Monaco model and runs a
  * regression suite, so it is the likeliest thing on the desk to throw. Rendered inside the
  * terminal's own tree a fault would take the program, the objectives rail and the output log with
- * it, which is `docs/AUDIT-UI.md` F21. Rendered from `DESKWARE` it costs the player their routines
- * and nothing else.
+ * it. Rendered from `DESKWARE` it costs the player their routines and nothing else.
  *
  * The layer is drawn exactly over the terminal's glass — the same box, recomputed from the
  * stylesheets by `src/ui/__tests__/desk-frame.test.ts` — because it is not something laid *on* the

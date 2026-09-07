@@ -32,7 +32,7 @@ export interface CallerFact {
   parTicks: number;
   medal: Medal;
   /**
-   * Whether this work order carries a medal. Defaults to `true`. DESIGN.md §11 A7.
+   * Whether this work order carries a medal. Defaults to `true`. DESIGN.md §7.
    *
    * The ticks are still real and still worth showing — this is the screen that tells the player
    * where their time goes. What is not real on an ungraded work order is the bracket: there is no

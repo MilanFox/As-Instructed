@@ -15,7 +15,7 @@ import { SOLUTIONS } from './solutions.ts';
 import { formErrandOnly } from './naive.ts';
 
 /**
- * The two defects docs/FIX-FINALE.md was opened for, pinned as tests.
+ * The two defects the finale used to have, pinned as tests.
  *
  * The first is the bypass an AoC playtester found: `power(id, state)` reached any machine
  * anywhere on the map, so eight calls and sixteen ticks satisfied both grid objectives of the
@@ -226,7 +226,7 @@ function metOn(level: LevelDef, seed: number, solution: ReferenceSolution): Set<
 }
 
 /**
- * docs/PLAYTEST-VETERAN.md §6.7, the one specific that survived docs/FIX-FINALE.md: the finale
+ * The one specific that survived the finale rewrite: the finale
  * *accumulates rather than integrates*, and concretely, *"the form leg depends on nothing else"*.
  *
  * It was true, and it was cheap: `formErrandOnly` lifts KD-0001-T, pays the nine-stage toll and

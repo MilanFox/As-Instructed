@@ -137,8 +137,8 @@ function drawSmear(
 /**
  * Tread marks, drawn in code.
  *
- * ASSETS.md §4.6 warns that `overlay.tracks*` is near-invisible on `floor.metal`, which is
- * exactly World 1's floor, so the marks are painted rather than blitted: two dark strokes per
+ * `overlay.tracks*` is near-invisible on `floor.metal`, which is exactly World 1's floor, so the
+ * marks are painted rather than blitted: two dark strokes per
  * traversed cell, fading over `TREAD_FADE_TICKS`. Walks the segment list backwards from the
  * current tick and allocates nothing.
  */
@@ -380,7 +380,7 @@ export function drawBot(
   const hullLight = dead ? '#2e3742' : botTheme.hullLight;
 
   // Treads. Deliberately darker than anything the tile art can produce, so the silhouette holds
-  // on `floor.metal` (which ASSETS.md §8 warns is `#4a4a4a` with zero variance) and on ice alike.
+  // on `floor.metal` (which is `#4a4a4a` with zero variance) and on ice alike.
   ctx.fillStyle = dead ? '#1a2029' : botTheme.tread;
   roundRect(ctx, -18, -17, 36, 7, 2.5);
   ctx.fill();
@@ -411,7 +411,7 @@ export function drawBot(
   ctx.stroke();
 
   // Accent trim: a forward chevron plus two shoulder lamps. Kept small and shaped rather than a
-  // slab of colour — the accent is an identifier (DESIGN.md §11 A5), not the paint job.
+  // slab of colour — the accent is an identifier (DESIGN.md §8), not the paint job.
   ctx.globalAlpha = dead ? 0.3 : 1;
   ctx.fillStyle = dead ? '#4a5765' : accent;
   ctx.beginPath();
@@ -548,7 +548,7 @@ export function drawBot(
 }
 
 /**
- * DESIGN.md §11 A5: "a blocked move must look obviously different from a successful one".
+ * DESIGN.md §8: "a blocked move must look obviously different from a successful one".
  * A recoil alone is too subtle at low zoom, so it is backed by a red rim, an impact chevron on
  * the face the bot hit, and a hard `!` above the chassis.
  */
@@ -768,7 +768,7 @@ function drawMachineChip(
 }
 
 /**
- * A machine. ASSETS.md §8: the Kenney structure sprites are 3/4 view, so they anchor
+ * A machine. The Kenney structure sprites are 3/4 view, so they anchor
  * bottom-centre and are allowed to overhang the cell upward.
  */
 export function drawMachine(

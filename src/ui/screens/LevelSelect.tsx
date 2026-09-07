@@ -47,7 +47,7 @@ interface WorldRow {
   closed: number;
   points: number;
   maxPoints: number;
-  /** At par or under: gold, or closed where the level carries no ladder (DESIGN.md §11 A7). */
+  /** At par or under: gold, or closed where the level carries no ladder (DESIGN.md §7). */
   gold: number;
   /** Every issued work order in this world is closed. The sector is done. */
   complete: boolean;
@@ -60,7 +60,7 @@ interface Tally {
   maxPoints: number;
   /**
    * Medals held, and nothing else. An ungraded work order genuinely has no medal, so it belongs in
-   * none of these three columns however it was closed (DESIGN.md §11 A7).
+   * none of these three columns however it was closed (DESIGN.md §7).
    */
   gold: number;
   silver: number;
@@ -83,7 +83,7 @@ const MEDAL_KEY = [
   { medal: 'bronze', rule: 'a pass' },
   /*
    * The fourth mark, and the only one that is not a rung. The first two work orders on the site
-   * are ungraded (DESIGN.md §11 A7), so a first-time player's opening hour draws `✓` on the board
+   * are ungraded (DESIGN.md §7), so a first-time player's opening hour draws `✓` on the board
    * and leaves gold, silver and bronze reading zero — and a key that stopped at bronze explained
    * three of the four marks in front of them and none of the three zeros.
    */
@@ -127,7 +127,7 @@ export function buildRows(save: SaveFile): WorldRow[] {
     );
 
     // A world holding an ungraded level could otherwise never be `perfect`, and `ALL AT PAR` would
-    // be unattainable in worlds 1, 5 and 6 — a close there is worth a gold (DESIGN.md §11 A7).
+    // be unattainable in worlds 1, 5 and 6 — a close there is worth a gold (DESIGN.md §7).
     const gold = levels.filter((level) => {
       const progress = progressOf(save, level.id);
       return isGraded(level) ? progress.medal === Medal.Gold : progress.completed;
@@ -185,7 +185,7 @@ export function nodeLabel(node: WorkOrderNode): string {
   const bonus = stars === 1 ? '1 bonus star.' : `${stars} bonus stars.`;
   const state = node.progress.completed ? 'Closed' : 'Open';
   // `no medal` on a closed ungraded order announces finished work as unfinished, in the identical
-  // words an untouched graded order gets. An absent medal is not a missing one (DESIGN.md §11 A7).
+  // words an untouched graded order gets. An absent medal is not a missing one (DESIGN.md §7).
   const medal = medalOf(node.level, node.progress);
   const grade = medal === null ? 'Not graded' : medalWord(medal);
   return `Work order ${name}. ${state}. ${grade}. ${bonus}`;
@@ -488,8 +488,8 @@ export function LevelSelect(): JSX.Element {
                               across 33 discs at 44px (AUDIT-UI F1), and a legend does not help you
                               tell two warm rings apart. `MedalBadge` prints `I / II / III / ✓`,
                               which survives greyscale and survives Signal. `✓` is the ungraded
-                              close — the mark of finished work, not a fourth medal (DESIGN.md §11
-                              A7). The button above already announces the grade, so this is for the
+                              close — the mark of finished work, not a fourth medal (DESIGN.md §7).
+                              The button above already announces the grade, so this is for the
                               eye only.
                             */}
                             {node.progress.completed ? (

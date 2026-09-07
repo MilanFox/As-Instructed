@@ -6,8 +6,8 @@
  * end is a rendering bug. The cost is that the one number a player actually needs on a failed run
  * is the one the clamp throws away: a run that spent twenty-one beams against a rating of sixteen
  * reports `16 / 16` and an unticked box, which says a budget was missed and nothing about which
- * budget, by how much, or in what unit. That is the opaque failure `docs/DESIGN-REVIEW-RUBRIC.md`
- * Q1 classifies as C, and C is a design defect.
+ * budget, by how much, or in what unit. A readout that leaves out all three is a design defect:
+ * the player knows they failed and has to re-derive why from scratch, with nothing to point at.
  *
  * So the real figure is recovered here, from the trace the objective was evaluated against, and
  * nothing about it is hardcoded per level:

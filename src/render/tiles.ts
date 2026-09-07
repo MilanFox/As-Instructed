@@ -1,10 +1,15 @@
 /**
  * Tile vocabulary and the runtime atlas.
  *
- * docs/ASSETS.md ships a curated 48 px atlas (`bootstrap_tiles_48.png` + `.json`) plus a list of
- * names it deliberately does not cover — flat geometric or animated things that Canvas2D draws
- * better than a bitmap would. This module resolves *both* kinds behind one lookup, so the rest of
- * the renderer only ever asks for a semantic name.
+ * `public/assets/tiles/` ships a curated 48 px atlas (`bootstrap_tiles_48.png` + `.json`) drawn
+ * from several Kenney source packs, plus a list of names it deliberately does not cover — flat
+ * geometric or animated things that Canvas2D draws better than a bitmap would. This module
+ * resolves *both* kinds behind one lookup, so the rest of the renderer only ever asks for a
+ * semantic name.
+ *
+ * Every source pack ships at a 64 px grid and is upscaled into the atlas, except the `tanks` pack:
+ * it is Kenney's *retina* (2x) sheet, with sprites ranging 56-139 px, and is deliberately
+ * downscaled instead. That inconsistency is intentional — leave it alone.
  *
  * Two decisions worth knowing about:
  *
@@ -50,10 +55,10 @@ export interface AtlasJson {
 // ---------------------------------------------------------------------------
 
 /**
- * Names the renderer draws itself. docs/ASSETS.md §4.7 lists nine `DRAW_IN_CODE` entries; the
- * extras here are the conveyor's animation phases (a static sprite would throw away free
- * animation) and `feature.fuel_depot`, which DESIGN.md §11 A1 needs and no Kenney pack has as a
- * top-down tile.
+ * Names the renderer draws itself: flat geometric or animated things Canvas2D draws better than
+ * a bitmap would. The extras beyond that base set are the conveyor's animation phases (a static
+ * sprite would throw away free animation) and `feature.fuel_depot`, which DESIGN.md §4.4 needs
+ * and no Kenney pack has as a top-down tile.
  */
 export const CODE_TILE_NAMES: readonly string[] = [
   'floor.grating',
@@ -242,7 +247,7 @@ export const TILE_VOCABULARY: readonly string[] = [
 
 /**
  * `PLANT_STAGES[i]` is the sprite for maturity bucket `i` of `PLANT_STAGES.length`. DESIGN.md
- * §11 A5 requires the stages to be *visually* distinct — w2-02 is unsolvable if a player cannot
+ * §8 requires the stages to be *visually* distinct — w2-02 is unsolvable if a player cannot
  * read maturity at a glance — so this is a six-step ladder, not a tint ramp.
  */
 export const PLANT_STAGES: readonly string[] = [
@@ -434,7 +439,7 @@ function pick(list: readonly string[], r: number): string {
 
 /**
  * How one tile is drawn. `base` is a full-bleed floor and always exists; `prop` is a
- * transparent-background sprite composited on top (ASSETS.md §2). `animated` marks the tile as
+ * transparent-background sprite composited on top. `animated` marks the tile as
  * belonging to the dynamic layer rather than the cached terrain layer.
  */
 export interface TerrainArt {
@@ -505,7 +510,7 @@ export function terrainArt(terrain: Terrain, tile: Tile, biome: Biome, x: number
   }
 }
 
-/** Machine kind -> sprite. Machines are landmarks; ASSETS.md §8 says anchor them bottom-centre. */
+/** Machine kind -> sprite. Machines are landmarks, so they anchor bottom-centre. */
 export function machineTileName(kind: string, state: string): string {
   switch (kind) {
     case 'door':

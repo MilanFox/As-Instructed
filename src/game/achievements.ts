@@ -318,7 +318,7 @@ export function getAchievement(id: string): Achievement | undefined {
  * times this order has been run, whether it was already closed, whether the sector is finished —
  * and the verdict cannot see the save.
  *
- * `parTicks` is nullable and that is the whole of the ungraded question (DESIGN.md §11 A7). A work
+ * `parTicks` is nullable and that is the whole of the ungraded question (DESIGN.md §7). A work
  * order may carry no par at all, so every entry that reads par checks for null first and simply
  * does not fire. There is still **no medal here**: a medal is on the screen already, and restating
  * it is rule 5's one prohibition.

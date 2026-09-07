@@ -147,7 +147,7 @@ export const REFACTOR = {
   empty:
     'Shared Subroutines is empty. This is a supported configuration and no memo will be raised ' +
     'about it.',
-  /** The tab's own empty state. `empty` is the status bar's line and stays there; see AUDIT-UI F12. */
+  /** The tab's own empty state. `empty` is the status bar's line and stays there. */
   nothingToCost:
     'Publish a subroutine and this tab shows what it costs, per work order that calls it.',
   neverCalled:
@@ -200,7 +200,7 @@ export const STRUCTURE = {
      * Reuse, per routine, read off the save rather than off a run.
      *
      * The argument for the whole Repository is a routine six work orders import, and until this
-     * column the number was computed on every run and shown nowhere (docs/FIX-INCENTIVES.md §I).
+     * column the number was computed on every run and shown nowhere.
      * It buys nothing — no point, no star, no medal — which is the point: the veteran used the
      * Repository heavily with no extrinsic reward at all, and the fact was already there.
      */
@@ -317,9 +317,9 @@ export const LIBRARY_FAILURE = {
 /**
  * Shown in the Library panel when `lib.ts` holds a declaration and exports none of it.
  *
- * Never on an empty file: `docs/AUDIT-UI.md` finding 13 caught this greeting the player in red,
- * four seconds after the ceremony handed them the folder, about a state they had not caused. A
- * line is worth printing when there is something to do about it.
+ * Never on an empty file: this used to greet the player in red, four seconds after the ceremony
+ * handed them the folder, about a state they had not caused. A line is worth printing when there
+ * is something to do about it.
  */
 export const NO_EXPORTS_WARNING =
   'lib.ts exports nothing. Add `export` to a declaration and any work order can import it.';

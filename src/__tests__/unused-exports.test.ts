@@ -1,9 +1,9 @@
 /**
  * Every export in `src/` that nothing reads, written down so the list can only get shorter.
  *
- * `docs/AUDIT-CONSTANTS.md` §1 is the bug this file exists for. `BONUS_STAR_WEIGHT` was
+ * A reachable, unread export is the bug this file exists for. `BONUS_STAR_WEIGHT` was
  * `export const BONUS_STAR_WEIGHT = 1` in `src/engine/verdict.ts`, re-exported from
- * `src/engine/index.ts`, and named by `docs/ENGINE.md:132` as the number bonus stars are scored
+ * `src/engine/index.ts`, and named by `docs/ENGINE.md` §3a as the number bonus stars are scored
  * with. Nothing read it. The constant that actually ran was `BONUS_STAR_POINTS` in
  * `src/game/score.ts` — and `score.ts` imports `Medal`, `MEDAL_WEIGHT`, `SILVER_FACTOR` and
  * `medalFor` out of `verdict.ts` while pointedly not importing that one. The failure mode is not
@@ -31,8 +31,8 @@
  * two working implementations of one count with different answers; the two tick counters were both
  * running; the silver rule was wrong in `DESIGN.md`, in a docstring and in the in-game docs panel
  * while `medalFor` was right. Every one of those is invisible to a reachability scan, because
- * reachability is exactly the property they all have. `docs/AUDIT-CONSTANTS.md` G2 says so itself:
- * necessary, not sufficient. `confessed-invariants.test.ts` is where the both-copies-live half of
+ * reachability is exactly the property they all have — necessary, not sufficient.
+ * `confessed-invariants.test.ts` is where the both-copies-live half of
  * the class is held.
  *
  * **Known limits of a name-based scan.** A name reached only through a string literal, a computed
@@ -76,13 +76,13 @@ const IDENTIFIER = /[A-Za-z_$][\w$]*/g;
  *
  * Three names appear twice. `hasTerrain`, `toFragment` and `ProgressFacts` are dead at the
  * declaration and dead again at the barrel that re-exports them, and both entries are worth having:
- * the barrel line is the one a reader greps into, and it is the line `docs/ENGINE.md:132` pointed
+ * the barrel line is the one a reader greps into, and it is the line `docs/ENGINE.md` §3a pointed
  * at for `BONUS_STAR_WEIGHT`.
  */
 const KNOWN_DEAD: readonly string[] = [
   // --- Level-authoring helpers under `src/levels/*/shared.ts` and `caves.ts`. Bonus objectives
-  // and terrain queries for levels that were folded away; `docs/FIX-BONUSES.md:86` still credits
-  // `noBlockedMoves` / `shortestRoute` to `w1-02` and `w1-04`, and neither level exists. ---
+  // and terrain queries for levels that were folded away; `noBlockedMoves` / `shortestRoute`
+  // belonged to `w1-02` and `w1-04`, and neither level exists. ---
   'src/levels/world-1/shared.ts noBlockedMoves',
   'src/levels/world-1/shared.ts shortestRoute',
   'src/levels/world-2/shared.ts clearedEveryRipeTile',
@@ -105,7 +105,7 @@ const KNOWN_DEAD: readonly string[] = [
   'src/levels/world-7/__solutions__/fleet.ts holdUntil',
   'src/levels/world-7/__solutions__/fleet.ts runDir',
 
-  // --- Objective builders `docs/ENGINE.md:236-238` lists as available to level authors, that no
+  // --- Objective builders `docs/ENGINE.md` §5 lists as available to level authors, that no
   // level ever built. The closest thing in this repo to the `BONUS_STAR_WEIGHT` shape: documented,
   // reachable, never called. ---
   'src/engine/index.ts hasTerrain',
@@ -114,7 +114,7 @@ const KNOWN_DEAD: readonly string[] = [
   'src/engine/objectives.ts itemsDelivered',
   'src/engine/objectives.ts machinesAllIn',
 
-  // --- The decoys `docs/AUDIT-CONSTANTS.md` §10 named by hand. `progressFor` has a live structural
+  // --- Hand-picked decoys: `progressFor` has a live structural
   // twin in `progressOf` (`LevelSelect.tsx:61`); `SOURCE_URLS` and `MODULE_PREAMBLE_LINES` are
   // aliases of the one real constant rather than re-typed literals, so they cannot disagree. ---
   'src/game/score.ts LevelScore',
@@ -138,7 +138,7 @@ const KNOWN_DEAD: readonly string[] = [
 
 
   // --- Dead behind a barrel: the declaration and the re-export that carries it out of the module.
-  // `docs/LIBRARY.md:129,166` documents `toFragment` as part of the library's public surface. ---
+  // `toFragment` was documented as part of the library's public surface. ---
   'src/meta/index.ts ProgressFacts',
   'src/meta/index.ts toFragment',
   'src/meta/save.ts toFragment',
@@ -287,7 +287,7 @@ test('every export in src/ is read somewhere, or is on the list of ones that are
 /**
  * Reported, not enforced — and the number that should worry a reader more than the one above.
  *
- * `docs/AUDIT-CONSTANTS.md` G2 ranks this class higher than the outright dead: a constant read only
+ * This class ranks higher than the outright dead: a constant read only
  * by a test, sitting beside a live inline copy, is a decoy with an alibi. The test that imports it
  * is what makes it look load-bearing, and `score.test.ts:60` shows the alibi can be worthless —
  * `expect(levelPoints(Medal.Gold, 2)).toBe(3 + 2 * BONUS_STAR_POINTS)` puts the constant on both

@@ -7,7 +7,7 @@
  * are the station's controls — see `BezelFoot.tsx`, which is where the settings live because a desk
  * has no settings screen.
  *
- * **No paper texture ever touches the code** (`docs/DESK-CONCEPT.md` §2). The program, the run and
+ * **No paper texture ever touches the code.** The program, the run and
  * the numbers coming back are digital; the work order, the certificate and the record are paper and
  * lie on the desk around the machines.
  */
@@ -94,7 +94,7 @@ export function Terminal(): React.JSX.Element {
               {problems === 0 ? 'no problems' : `${problems} problem${problems === 1 ? '' : 's'}`}
             </span>
             {/*
-              One statement of one modifier for the one action that matters (docs/AUDIT-UI.md F17).
+              One statement of one modifier for the one action that matters.
               The old RUN button drew `⌘⏎` while this line drew `ctrl+enter to run`, on the same
               screen; there is no second hint now, and the full key list is data in `keys.ts` so
               the REFERENCE manual prints the same bindings this strip does.

@@ -45,7 +45,7 @@ export const Terrain = {
   Pit: 'pit',
   /** Power infrastructure (World 5). Walkable. */
   Cable: 'cable',
-  /** Fuel depot. Walkable. `refuel()` only succeeds while standing on one. DESIGN.md §11 A1. */
+  /** Fuel depot. Walkable. `refuel()` only succeeds while standing on one. DESIGN.md §4.4. */
   Depot: 'depot',
   /** Item transport (World 3). Walkable, carries `facing` in tile meta. */
   Conveyor: 'conveyor',
@@ -189,7 +189,7 @@ export interface Bot {
   /**
    * Remaining fuel. `Infinity` on every level that does not opt into the mechanic, which is most
    * of them. Acting burns fuel equal to the action's tick cost; sensing, waiting and syncing are
-   * free. DESIGN.md §11 A1.
+   * free. DESIGN.md §4.4.
    */
   fuel: number;
   /** What `refuel()` restores to. `Infinity` when the level does not use fuel. */

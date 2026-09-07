@@ -3,7 +3,7 @@
  *
  * Two things here are load-bearing rather than decorative:
  *
- * - **Plant growth gauges.** DESIGN.md §11 A5 requires maturity to be readable at a glance;
+ * - **Plant growth gauges.** DESIGN.md §8 requires maturity to be readable at a glance;
  *   w2-02 is unsolvable otherwise. The six-sprite stage ladder in `tiles.ts` carries most of it,
  *   and this adds an arc gauge plus a "ready" pip so the last stage is unmistakable.
  * - **`describeTile`.** The UI asks the renderer what is under the cursor. Keeping the query
@@ -27,7 +27,7 @@ import { roundRect } from './sprites.ts';
  */
 const MIN_STROKE_PX = 1.5;
 
-/** One `stroke()` for the whole viewport. ASSETS.md §4.6: never a per-tile blit. */
+/** One `stroke()` for the whole viewport. Never a per-tile blit. */
 export function drawGrid(
   ctx: CanvasRenderingContext2D,
   tilePx: number,
@@ -144,7 +144,7 @@ export function drawBrackets(
   ctx.restore();
 }
 
-/** Objective / goal cells. Pulses on an ~800 ms cycle, per ASSETS.md's `overlay.selection` note. */
+/** Objective / goal cells. Pulses on an ~800 ms cycle. */
 export function drawGoals(
   ctx: CanvasRenderingContext2D,
   cells: readonly Vec[],

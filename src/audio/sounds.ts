@@ -940,7 +940,7 @@ const BEDS: Readonly<Record<AmbienceBiome, BedShape>> = {
  * LFOs that never line up. It is closer to room tone than to music by construction — there is no
  * event in it faster than 0.067Hz.
  *
- * Off by default all the same (`AudioSettings.ambienceEnabled`). See docs/AUDIO.md.
+ * Off by default all the same (`AudioSettings.ambienceEnabled`).
  */
 export class AmbienceBed {
   private readonly level: GainNode;

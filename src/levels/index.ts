@@ -98,7 +98,7 @@ export function getLevel(id: string): LevelDef | undefined {
 }
 
 /**
- * Whether the work order with this id carries a medal. DESIGN.md §11 A7.
+ * Whether the work order with this id carries a medal. DESIGN.md §7.
  *
  * An id this build has never heard of grades, deliberately: a save written against a level that
  * has since been retired keeps the medal it recorded rather than losing it to a lookup miss.

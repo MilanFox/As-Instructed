@@ -39,7 +39,7 @@ export const DEFAULT_MAX_OPS = 2_000_000;
 /** Default ticks a freshly planted crop needs before `harvest` succeeds. */
 export const DEFAULT_GROW_TIME = 8;
 
-/** DESIGN.md §11 A6: how many all-bots-blocked rounds count as a livelock. */
+/** DESIGN.md §4.6: how many all-bots-blocked rounds count as a livelock. */
 export const DEFAULT_LIVELOCK_ROUNDS = 8;
 
 export interface SimOptions {
@@ -286,7 +286,7 @@ export class Sim {
     return bot.fuelMax;
   }
 
-  /** Resource totals for `Verdict.stats.spend`. DESIGN.md §11 A5. */
+  /** Resource totals for `Verdict.stats.spend`. DESIGN.md §4.6. */
   spendTotals(): Record<string, number> {
     return Object.fromEntries(this.spendLedger);
   }
@@ -743,7 +743,7 @@ export class Sim {
 
   /**
    * Restores the bot to `fuelMax`. Only succeeds while parked on a depot tile; it costs the same
-   * either way, and refuelling itself burns no fuel. DESIGN.md §11 A1.
+   * either way, and refuelling itself burns no fuel. DESIGN.md §4.4.
    */
   refuel(botId: number): boolean {
     const bot = this.requireActiveBot(botId);
@@ -1216,7 +1216,7 @@ export class Sim {
   }
 
   /**
-   * DESIGN.md §11 A6. A streak of blocked moves that covers every living bot, with not one
+   * DESIGN.md §4.6. A streak of blocked moves that covers every living bot, with not one
    * successful move in between, is a livelock. Single-bot levels can never trip it — a lone bot
    * bumping a wall is an ordinary bug, not a deadlock.
    */

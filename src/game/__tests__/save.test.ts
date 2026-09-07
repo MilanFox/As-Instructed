@@ -358,8 +358,8 @@ describe('importSave and the reward fields', () => {
 });
 
 /**
- * Seven work orders were withdrawn (docs/FIX-COMPRESSION.md, docs/FIX-CONTENT.md) and their ids
- * will never be reissued.
+ * Seven work orders were withdrawn — w1-02, w1-04, w2-01, w2-03, w3-03, w3-05, w4-03 — and their
+ * ids will never be reissued.
  * A save written before the cut still names them, and the rule that player code is never lost has
  * no exception for a work order that no longer exists.
  */
@@ -427,7 +427,7 @@ describe('a save that names a withdrawn work order', () => {
 });
 
 /**
- * Ten of the fifteen commendations were retired (docs/FIX-INCENTIVES.md §1). A save written by the
+ * Ten of the fifteen commendations were retired. A save written by the
  * build that issued them is the ordinary case, not the edge case, so the drop has to be surgical:
  * the retired ids go, everything beside them stays, and an id this build simply does not recognise
  * is left alone because it belongs to a build that is not this one.

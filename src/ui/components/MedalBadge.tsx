@@ -9,7 +9,7 @@ const NAME: Record<Medal, string> = {
 };
 
 /**
- * `null` is an ungraded work order (DESIGN.md §11 A7), and it is not `none` drawn differently.
+ * `null` is an ungraded work order (DESIGN.md §7), and it is not `none` drawn differently.
  * `none` is a medal not earned yet, so it draws the empty rung — a dash, dimmed. `null` is a level
  * that has no rungs, and a pass on one is worth the same three points a gold is, so it draws a
  * closed stamp: the mark of finished work, not the space where a medal would have gone.
