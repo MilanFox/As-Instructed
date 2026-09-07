@@ -145,7 +145,7 @@ export function PerformanceMemo({
         <dt>FROM</dt>
         <dd>{REVIEW.author}</dd>
         <dt>REVIEWED</dt>
-        <dd>{report.closed} work orders</dd>
+        <dd>{report.closed} graded work orders</dd>
         <dt>GRADE</dt>
         <dd className="numeric">{Math.round(report.percent)}%</dd>
       </dl>
