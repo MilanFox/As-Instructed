@@ -513,3 +513,62 @@ describe('a save written by a build that had fifteen commendations', () => {
     expect(merged.achievements['repository']).toBe(800);
   });
 });
+
+/**
+ * The two fields the commendation layer added, and the reason neither needed a version step: both
+ * are optional, and a save written by any earlier build already satisfies the shape.
+ */
+describe('the fields that outlive a session', () => {
+  it('loads a save that has never heard of either of them', () => {
+    const save = parseSave(exportSave(emptySave()));
+    expect(save.firstRunAt).toBeUndefined();
+    expect(save.routineOrders).toBeUndefined();
+  });
+
+  it('round-trips a start date and the orders a subroutine has run on', () => {
+    const save: SaveFile = {
+      ...emptySave(),
+      firstRunAt: 1_699_000_000_000,
+      routineOrders: { pathTo: ['w4-01', 'w4-02'], survey: ['w3-01'] },
+    };
+    const reloaded = parseSave(exportSave(save));
+
+    expect(reloaded.firstRunAt).toBe(1_699_000_000_000);
+    expect(reloaded.routineOrders).toEqual({ pathTo: ['w4-01', 'w4-02'], survey: ['w3-01'] });
+  });
+
+  it('drops nonsense rather than trusting it', () => {
+    const save = migrate({
+      version: SAVE_VERSION,
+      levels: {},
+      firstRunAt: 'tuesday',
+      routineOrders: { pathTo: ['w4-01', 7, 'w4-01'], survey: 'w3-01', '': ['w1-01'] },
+    });
+
+    expect(save.firstRunAt).toBeUndefined();
+    expect(save.routineOrders).toEqual({ pathTo: ['w4-01'] });
+  });
+
+  /* Import can raise a total and can never lower one. For a start date that means the earlier. */
+  it('merges on import, keeping the earlier start and the union of the orders', () => {
+    const current: SaveFile = {
+      ...emptySave(),
+      firstRunAt: 500,
+      routineOrders: { pathTo: ['w4-01'] },
+    };
+    const incoming: SaveFile = {
+      ...emptySave(),
+      firstRunAt: 900,
+      routineOrders: { pathTo: ['w4-02'], waves: ['w7-01'] },
+    };
+    const merged = importSave(current, exportSave(incoming));
+
+    expect(merged.firstRunAt).toBe(500);
+    expect(merged.routineOrders).toEqual({ pathTo: ['w4-01', 'w4-02'], waves: ['w7-01'] });
+  });
+
+  it('takes an incoming start date when there was none to keep', () => {
+    const merged = importSave(emptySave(), exportSave({ ...emptySave(), firstRunAt: 700 }));
+    expect(merged.firstRunAt).toBe(700);
+  });
+});

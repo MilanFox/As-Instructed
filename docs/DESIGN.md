@@ -256,10 +256,14 @@ loop this game is made of, and it is not coming back — see §11 A9. A save wri
 had one still loads; the retired field is dropped on read and everything beside it survives.
 
 - **Nothing is gated behind a commendation**, ever. No level, hint, doc page, or hardware.
-- **Requirements are public before they are met.** No secret achievements.
-- **There are five commendations, and the bar for a sixth is high** (§11 A9). Each names something
-  the player did that they would be pleased to have noticed. Attendance, completion, and any
-  restatement of a medal already on the screen are not commendations.
+- **An aspirational commendation states its requirement before it is met. A retrospective one may
+  stay hidden until it fires** (§11 A14). Something a player could aim at and miss has to be
+  public; something that only notices what they already did cannot be failed.
+- **Nothing may be lost by playing badly, and nothing may be earned by refusing to play** (§11
+  A14). No first-try commendation, no flawless one, no streak, and nothing a player can lock
+  themselves out of by experimenting.
+- **The bar is whether a real person would smile or feel seen** (§11 A14). Attendance and
+  completion are allowed; restating a medal already on the screen is not.
 - **Failure costs nothing but time.** No penalty, no lost progress, no downgraded medal, no
   commendation taken back. A failed run increments a counter that exists only to reward
   persistence. A program that did not compile was never dispatched and does not even do that.
@@ -384,7 +388,8 @@ waiting, so the clock cannot see the lesson — but it still graded both testers
 **"The clock cannot see the lesson" is not "the clock cannot grade."** Only the second ungrades a
 level.
 
-**A9 — The streak is deleted, and the commendation list is five.** Ruled 2026-09-06.
+**A9 — The streak is deleted, and the commendation list is five.** Ruled 2026-09-06. **The second
+half is superseded by A14; the streak half stands and is not up for revisiting.**
 
 The streak was removed earlier and §7.1 went on describing it, which left the binding document
 instructing the next agent to rebuild the anti-feature. This amendment is the record, because §11
@@ -479,3 +484,55 @@ One interim rule survives the unblocking, because it was never about the parser:
   is not a run-wide total — `w7-02`'s heaviest single bot's share, for instance — a progress bar the
   readout attributes to a run-wide meter is the `6 / 1 pickups` bug, and no bar beats a wrong bar.
   A declared meter answers "which total", not "is there one".
+
+**A14 — A commendation is a fist-bump, not a lever. The list is twenty-eight.** Ruled 2026-09-07.
+Supersedes A9's second half.
+
+A9 cut the list to five on the ground that fifteen changed both playtesters' behaviour zero times.
+The measurement was right and the criterion was wrong. **"Did it change the player's behaviour" is
+not the test for an achievement**, because behaviour modification was never the job: a commendation
+is the one place the developer speaks directly to the player. Judged as a lever every entry fails,
+including the five that survived, and the five that survived read as placeholders for a mechanic —
+structurally sound and emotionally inert. The bar is now:
+
+> **Would a real person, reading this line at the moment it appeared, smile or feel seen?**
+
+Merely being accurate does not clear it. Attendance is allowed, and so is completion in small
+quantities — no more than about a fifth of the list may be "do all of X". The one prohibition kept
+from A9 is **restating something already on the screen**: if the certificate says GOLD, a
+commendation saying "you got gold" is noise.
+
+**A9's public-requirement rule splits.** It holds for *aspirational* commendations — anything a
+player could set out to do and miss — because a secret one of those is a thing you find out you
+failed at. It does not hold for *retrospective* ones, which notice something already done and
+therefore cannot be failed: either it fires, or the player never learns it existed and loses
+nothing. `Achievement.hidden` marks the second kind, `CommendationShelf` keeps them off the shelf
+until they fire, and they are where the jokes live.
+
+**The polarity rule is new and it outranks the categories.** *Nothing may be lost by playing badly,
+and nothing may be earned by refusing to play.* No first-try commendation, no flawless one, no
+streak, and nothing a player can permanently spoil for themselves by experimenting. A reward for
+never being wrong teaches a player to hesitate before dispatching, and dispatching is the entire
+activity — this is A9's streak finding generalised, and it is why `AS PER THE BRIEF` is not coming
+back under another name. `second-look` and `raised-again` pay for persistence through failure and
+set the polarity for everything added beside them.
+
+**`RunFacts` regains `ticks`, `ops` and a nullable `parTicks`, and still carries no medal.** A7's
+hazard was never par as such; it was a commendation that assumed every work order has a ladder.
+`parTicks: number | null` is that assumption made checkable, and the two entries that read it
+decline on `null` rather than dividing by it. A medal stays out because A9's surviving prohibition
+puts it out: it is already on the screen.
+
+**Two things A9's neighbours forbid, and they still forbid them.** Nothing may score, rank or
+remark on the length of a player's program (§7, `docs/FIX-CHARCOUNT.md`) — a commendation for a
+short solution is code golf with a seal on it. And nothing may pay a second time for a move that
+was not blocked (A10) — the tick cost is the whole price.
+
+**Retired ids are never reissued.** `sector-nominal` and `sector-gold` both read a medal and stay
+retired; the sector entries in the new list are keyed to closes and stars under new ids, because
+`rescueAchievements` would award a retired id on the run and drop it on the next load.
+
+**The two save fields the list needed arrived without a `SAVE_VERSION` bump**, which is the version
+rule holding rather than bending: `firstRunAt` and `routineOrders` are both optional, so a save
+written by any earlier build already satisfies the shape and there is no step for a migration to
+perform. Version 2 added three *required* fields, which is what a step is for.

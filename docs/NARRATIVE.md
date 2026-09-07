@@ -882,12 +882,16 @@ The commendation titles and notes live in `src/game/achievements.ts` and follow 
 flat statement, then a flatter qualifier. They are read once each, in the run report, and then
 forever on the site map's shelf, so they are written to survive re-reading.
 
-Two rules on top of the voice guide:
+Three rules on top of the voice guide:
 
 - **Never congratulate the player directly.** The company notices a number moved. That is all it
   ever notices. "Gold. Finance have asked whether the budget was set correctly. It was."
 - **Never imply an unearned one is a failure.** Unearned commendations show their requirement in
   plain language, in `--ink-dim`. They are an invitation, not a scoreboard.
+- **The hidden ones carry the jokes** (DESIGN.md §11 A14). A retrospective commendation — one that
+  notices something the player has already done — stays off the shelf until it fires, so it is the
+  only slot in the game where a line lands as a surprise. It is still read forever afterwards, so
+  §1.3's rule holds: write it to survive the fortieth reading, not the first.
 
 ### Hardware requisitions
 

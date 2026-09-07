@@ -34,22 +34,27 @@ export function earnedOn(at: number): string {
 }
 
 /**
- * Every commendation, earned and unearned, in one place.
+ * Every commendation the player is entitled to know about, earned and unearned, in one place.
  *
- * Unearned ones show their requirement rather than being hidden behind a question mark: a
- * commendation is only tempting if you know what it wants, and nothing in the game is gated on
- * one, so there is nothing to spoil.
+ * An unearned *aspirational* one shows its requirement rather than a question mark: it is only
+ * tempting if you know what it wants, and nothing in the game is gated on one, so there is nothing
+ * to spoil. An unearned *retrospective* one (`hidden`) shows nothing, because there is nothing to
+ * aim at — it notices something already done, so printing its requirement would turn a fist-bump
+ * into a chore. Once earned it joins the shelf like any other and never leaves it.
  *
- * No fraction. The head used to read `2/5` against a list that has been fifteen and is now five
- * (DESIGN.md §11 A9), and a denominator that moves is a completion bar the player cannot act on —
- * at fifteen it was unreachable, and at five `1/5` reads as failing at something nothing in the
- * game asks of them. The list is the readout; five rows say five without counting them.
+ * No fraction. The head used to read `2/5`, and a denominator that moves is a completion bar the
+ * player cannot act on (DESIGN.md §11 A9). With a hidden half the denominator is not even
+ * knowable, which settles the question rather than reopening it: the rows are the readout.
  */
 export function CommendationShelf({
   achievements,
 }: {
   achievements: Record<string, number>;
 }): JSX.Element {
+  const shown = ACHIEVEMENTS.filter(
+    (achievement) => !achievement.hidden || achievements[achievement.id] !== undefined,
+  );
+
   return (
     <section className="shelf" id={SHELF_ID} aria-label="Commendations" tabIndex={-1}>
       <header className="shelf__head">
@@ -60,7 +65,7 @@ export function CommendationShelf({
       </header>
 
       <ul className="shelf__list">
-        {ACHIEVEMENTS.map((achievement) => {
+        {shown.map((achievement) => {
           const at = achievements[achievement.id];
           const has = at !== undefined;
           return (

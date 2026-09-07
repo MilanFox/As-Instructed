@@ -91,7 +91,30 @@ export interface SaveFile {
    * inert, because delivery is keyed off the live tier list rather than off this array.
    */
   reviewedRanks: number[];
+  /**
+   * Epoch ms of the first run this save ever recorded, and the only thing here that survives a
+   * session boundary.
+   *
+   * `updatedAt` cannot answer "did they come back another day" — it is rewritten on every
+   * keystroke, so it always says today. This is written once, never moved, and read by exactly one
+   * commendation.
+   */
+  firstRunAt?: number;
+  /**
+   * Repository subroutine name to the work orders it has actually been called on.
+   *
+   * Call counts come from the run, not from the source: an `import` that no code path reaches is
+   * not use. Append-only per name, like `stars`, so no run can take an entry back.
+   */
+  routineOrders?: Record<string, string[]>;
 }
+
+/*
+ * The two fields above arrived without a `SAVE_VERSION` bump, which is the version rule holding
+ * rather than bending. Both are optional and both mean "nothing recorded yet" when absent, so a
+ * save written by any earlier build already satisfies the shape and there is no step for a
+ * migration to perform. Version 2 added three *required* fields, which is what a step is for.
+ */
 
 export const DEFAULT_LAYOUT: Layout = { editorFraction: 0.44, viewportFraction: 0.58 };
 
@@ -256,7 +279,27 @@ export function migrate(raw: unknown): SaveFile {
     stats: rescueStats(working['stats']),
     seenRequisitions: rescueStrings(working['seenRequisitions']),
     reviewedRanks: rescueRanks(working['reviewedRanks']),
+    ...(isPositive(working['firstRunAt']) ? { firstRunAt: working['firstRunAt'] } : {}),
+    ...(rescueRoutineOrders(working['routineOrders']) ?? {}),
   };
+}
+
+/**
+ * Routine name to work order ids, or nothing at all.
+ *
+ * Returns the wrapper rather than the value so that a save that has never called a subroutine
+ * stays free of the key entirely — an empty object here and an absent one mean the same thing, and
+ * writing one is how a field starts appearing in every export for no reason.
+ */
+function rescueRoutineOrders(raw: unknown): { routineOrders: Record<string, string[]> } | null {
+  if (!isRecord(raw)) return null;
+  const orders: Record<string, string[]> = {};
+  for (const [name, levels] of Object.entries(raw)) {
+    if (name.length === 0 || !Array.isArray(levels)) continue;
+    const ids = [...new Set(levels.filter((id): id is string => typeof id === 'string'))];
+    if (ids.length > 0) orders[name] = ids;
+  }
+  return Object.keys(orders).length > 0 ? { routineOrders: orders } : null;
 }
 
 /**
@@ -375,6 +418,12 @@ export function importSave(current: SaveFile, text: string): SaveFile {
     achievements[id] = existing === undefined ? at : Math.min(existing, at);
   }
 
+  const routineOrders: Record<string, string[]> = { ...current.routineOrders };
+  for (const [name, ids] of Object.entries(incoming.routineOrders ?? {})) {
+    routineOrders[name] = [...new Set([...(routineOrders[name] ?? []), ...ids])];
+  }
+  const startedAt = minDefined(current.firstRunAt, incoming.firstRunAt);
+
   return {
     ...incoming,
     levels,
@@ -384,6 +433,8 @@ export function importSave(current: SaveFile, text: string): SaveFile {
     reviewedRanks: [...new Set([...current.reviewedRanks, ...incoming.reviewedRanks])].sort(
       (a, b) => a - b,
     ),
+    ...(startedAt !== undefined ? { firstRunAt: startedAt } : {}),
+    ...(Object.keys(routineOrders).length > 0 ? { routineOrders } : {}),
     version: SAVE_VERSION,
     updatedAt: Date.now(),
   };

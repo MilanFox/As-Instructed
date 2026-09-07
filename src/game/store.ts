@@ -179,8 +179,148 @@ export function runSeeds(own: readonly number[], audit?: AuditSeeds): number[] {
 let lineId = 0;
 let watchdog: ReturnType<typeof setTimeout> | null = null;
 
+/**
+ * The last program dispatched, for the one commendation that asks whether anything changed.
+ *
+ * Deliberately not in the save and not in the state: `save.levels[id].code` is rewritten on every
+ * keystroke, so it always equals what is in the editor and can never answer "is this the same
+ * program you sent last time". A session-scoped copy can, and losing it on reload costs nothing —
+ * a commendation this build does not award today it awards tomorrow.
+ *
+ * `attempt` is what keeps it honest. It has to match the run count the order is *about* to leave
+ * behind, so the record only ever describes the immediately preceding dispatch; a save that has
+ * been replaced underneath it breaks the chain instead of speaking for a run it never saw.
+ */
+let lastDispatched: { levelId: string; attempt: number; source: string } | null = null;
+
 function firstLevelId(): string | null {
   return campaignOrder()[0]?.id ?? null;
+}
+
+/**
+ * Line and block comments, near enough.
+ *
+ * Not a lexer: a `//` inside a string literal reads as a comment here. Nothing is scored on the
+ * result and the worst case is a fist-bump the player did not strictly earn, which is a better
+ * failure than carrying a second tokeniser around for it.
+ */
+const COMMENT = /\/\*[\s\S]*?\*\/|\/\/[^\n]*/g;
+
+function commentsIn(source: string): string[] {
+  return (source.match(COMMENT) ?? []).map((text) => text.trim());
+}
+
+/** True when the program is whitespace, comments, or nothing at all. */
+function dispatchedNothing(source: string): boolean {
+  return source.replace(COMMENT, '').trim().length === 0;
+}
+
+/**
+ * The handful of things a commendation asks of a trace, counted in one pass.
+ *
+ * All six are shapes rather than scores: nothing here is a budget, nothing is compared against par,
+ * and none of it is shown anywhere. They exist so that the game can notice what a program did
+ * rather than only whether it worked.
+ */
+interface TraceShape {
+  moves: number;
+  waited: number;
+  turnsInPlace: number;
+  onOneTile: number;
+  printed: boolean;
+  markedUnread: boolean;
+}
+
+function traceShape(trace: Trace | null): TraceShape {
+  const shape: TraceShape = {
+    moves: 0,
+    waited: 0,
+    turnsInPlace: 0,
+    onOneTile: 0,
+    printed: false,
+    markedUnread: false,
+  };
+  if (!trace) return shape;
+
+  const turning = new Map<number, number>();
+  const gathers = new Map<string, number>();
+  let marked = false;
+  let readBack = false;
+
+  for (const event of trace.events) {
+    switch (event.kind) {
+      case 'move': {
+        turning.set(event.botId, 0);
+        if (event.ok) shape.moves += 1;
+        break;
+      }
+      case 'turn': {
+        const spun = (turning.get(event.botId) ?? 0) + 1;
+        turning.set(event.botId, spun);
+        shape.turnsInPlace = Math.max(shape.turnsInPlace, spun);
+        break;
+      }
+      case 'wait': {
+        shape.waited += event.ticks;
+        break;
+      }
+      case 'harvest':
+      case 'mine': {
+        const tile = `${event.at.x},${event.at.y}`;
+        const worked = (gathers.get(tile) ?? 0) + 1;
+        gathers.set(tile, worked);
+        shape.onOneTile = Math.max(shape.onOneTile, worked);
+        break;
+      }
+      case 'mark': {
+        if (event.text !== null) marked = true;
+        break;
+      }
+      case 'sense': {
+        if (event.name === 'readMark') readBack = true;
+        break;
+      }
+      case 'print': {
+        shape.printed = true;
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  shape.markedUnread = marked && !readBack;
+  return shape;
+}
+
+/** Published subroutines this run actually ran, across every layout. An import is not a call. */
+function routinesCalled(results: readonly PerSeedResult[]): string[] {
+  const names = new Set<string>();
+  for (const result of results) {
+    for (const [name, use] of Object.entries(result.libraryUsage?.calls ?? {})) {
+      if (use.calls > 0) names.add(name);
+    }
+  }
+  return [...names];
+}
+
+/** Every work order in a group is closed. */
+function allClosed(group: readonly LevelDef[], levels: Record<string, LevelProgress>): boolean {
+  return group.length > 0 && group.every((level) => levels[level.id]?.completed === true);
+}
+
+/**
+ * Every bonus objective in a group has been met, and every order in it is closed.
+ *
+ * The close is part of the test rather than an extra: a group whose only bonus-bearing order is
+ * starred would otherwise report "nothing left open" over two orders nobody has touched.
+ */
+function allStarred(group: readonly LevelDef[], levels: Record<string, LevelProgress>): boolean {
+  if (!allClosed(group, levels)) return false;
+  return group.every((level) => {
+    const stars = levels[level.id]?.stars ?? [];
+    return (level.bonus ?? []).every((bonus) => stars.includes(bonus.id));
+  });
 }
 
 export const useGame = create<GameState>((set, get) => {
@@ -571,6 +711,30 @@ export const useGame = create<GameState>((set, get) => {
           stats.fails += 1;
         }
 
+        const now = Date.now();
+        const source = get().code;
+        const unchanged =
+          lastDispatched?.levelId === levelDef.id &&
+          lastDispatched.attempt === previous.attempts &&
+          lastDispatched.source === source;
+        lastDispatched = { levelId: levelDef.id, attempt, source };
+
+        /* Append-only per routine, like `stars`: a subroutine used on an order has been used on it
+           whatever any later run does. Recorded on a dispatch rather than on a close, because the
+           question is what the program called, not whether it worked. */
+        const routineOrders = { ...state.save.routineOrders };
+        const called = routinesCalled(results);
+        for (const name of called) {
+          const orders = routineOrders[name] ?? [];
+          if (!orders.includes(levelDef.id)) routineOrders[name] = [...orders, levelDef.id];
+        }
+
+        const order = campaignOrder();
+        const sector = order.filter((level) => level.world === levelDef.world);
+        const starter = new Set(commentsIn(levelDef.starter));
+        const shape = traceShape(state.trace);
+        const startedAt = state.save.firstRunAt;
+
         const facts: RunFacts = {
           passed: verdict.passed,
           attempt,
@@ -578,11 +742,38 @@ export const useGame = create<GameState>((set, get) => {
             (objective) => objective.met && isSenseBudget(objective.id),
           ),
           returnedForStar: previous.completed && previous.stars.length === 0 && earned.length > 0,
+          world: levelDef.world,
+          ticks: verdict.stats.ticks,
+          ops: verdict.stats.ops,
+          /* `null` is A7's "no medal ever", and it is the one honest reading of par on a work
+             order that carries no ladder. `medal` is not passed on: nothing below reads one. */
+          parTicks: medal === null ? null : levelDef.par.ticks,
+          seeds: results.length,
+          seedsPassed: results.filter((result) => result.passed).length,
+          waited: shape.waited,
+          moves: shape.moves,
+          turnsInPlace: shape.turnsInPlace,
+          onOneTile: shape.onOneTile,
+          printed: shape.printed,
+          markedUnread: shape.markedUnread,
+          emptyProgram: dispatchedNothing(source),
+          wroteComment: commentsIn(source).some((text) => !starter.has(text)),
+          unchanged,
+          routineCalled: called.length > 0,
+          routineOrders: Math.max(0, ...Object.values(routineOrders).map((ids) => ids.length)),
+          sectorClosed: allClosed(sector, levels),
+          sectorStarred: allStarred(sector, levels),
+          siteClosed: allClosed(order, levels),
+          siteStarred: allStarred(order, levels),
+          unclosedRuns: stats.fails,
+          hour: new Date(now).getHours(),
+          laterDay:
+            startedAt !== undefined &&
+            new Date(startedAt).toDateString() !== new Date(now).toDateString(),
         };
 
         const achievements = { ...state.save.achievements };
         const fresh: string[] = [];
-        const now = Date.now();
         for (const id of earnedBy(facts)) {
           if (achievements[id] !== undefined) continue;
           achievements[id] = now;
@@ -600,7 +791,14 @@ export const useGame = create<GameState>((set, get) => {
             ? { previous: previous.bestTicks as number, now: verdict.stats.ticks }
             : null,
         });
-        persist({ ...get().save, levels, stats, achievements });
+        persist({
+          ...get().save,
+          levels,
+          stats,
+          achievements,
+          firstRunAt: startedAt ?? now,
+          ...(Object.keys(routineOrders).length > 0 ? { routineOrders } : {}),
+        });
       }
     },
 
