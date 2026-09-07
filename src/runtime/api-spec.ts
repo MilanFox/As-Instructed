@@ -272,7 +272,7 @@ if (ore === null) {
     name: 'harvest',
     params: [],
     returns: 'ItemKind | null',
-    doc: 'Harvests the mature crop on the tile under the bot and adds it to the inventory, returning the item kind gathered. Returns null when there is no crop, when it is not ripe yet, or when the inventory is already full, which still costs the full harvest price.',
+    doc: 'Harvests the mature crop on the tile under the bot and adds it to the inventory, returning the item kind gathered. Returns null when there is no crop, when it is not ripe yet, or when the inventory is already full, which still costs the full harvest price. The console flags the full-inventory case for you.',
     example: `const picked = harvest();
 if (picked === null) {
   wait(4);

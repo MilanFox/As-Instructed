@@ -65,6 +65,18 @@ export function MonacoProgram({
 
   const { fontSize, lineHeight } = useCodeMetrics();
 
+  // `PLAYER_FILE_PATH` is one fixed URI, not one per level, so `@monaco-editor/react` finds the
+  // outgoing level's model still alive at that URI and reuses it instead of reading `value` — and
+  // it does that from the new `<Editor>`'s own mount effect, which runs before this component's
+  // effects do, so an effect keyed on `level` here would always lose that race. Evicting the old
+  // model during render, ahead of every effect on either side of the remount, is what actually wins
+  // it.
+  const previousLevelId = useRef<string | undefined>(undefined);
+  if (level?.id !== previousLevelId.current) {
+    monaco.editor.getModel(monaco.Uri.parse(PLAYER_FILE_PATH))?.dispose();
+    previousLevelId.current = level?.id;
+  }
+
   useEffect(() => {
     setupMonaco();
   }, []);

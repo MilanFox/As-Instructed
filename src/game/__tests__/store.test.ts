@@ -8,11 +8,20 @@ import { emptyProgress, emptySave } from '../save.ts';
 import type { GameState } from '../store.ts';
 import { isLevelUnlocked, useGame } from '../store.ts';
 
-/** A runner the test drives by hand, so every branch of the state machine is reachable. */
+/**
+ * A runner the test drives by hand, so every branch of the state machine is reachable.
+ *
+ * `openLevel` now fires its own background request (the silent prime) alongside whatever a test
+ * triggers on purpose, so a single instance can have several calls in flight at once. `settle`/
+ * `fail` address one by arrival order — index 0 is the first `run()` this instance ever saw —
+ * rather than assuming there is only ever one to answer.
+ */
 class ScriptedRunner implements RunnerPort {
-  settle: ((response: RunResponse) => void) | null = null;
-  /** The host itself breaking, which is the only thing `RunnerPort.run` is allowed to reject with. */
-  fail: ((error: unknown) => void) | null = null;
+  private readonly pending: {
+    settle: (response: RunResponse) => void;
+    /** The host itself breaking, which is the only thing `RunnerPort.run` is allowed to reject with. */
+    fail: (error: unknown) => void;
+  }[] = [];
   cancelled = 0;
   requests: RunSubmission[] = [];
 
@@ -21,9 +30,14 @@ class ScriptedRunner implements RunnerPort {
   run(request: RunSubmission): Promise<RunResponse> {
     this.requests.push(request);
     return new Promise((resolve, reject) => {
-      this.settle = resolve;
-      this.fail = reject;
+      this.pending.push({ settle: resolve, fail: reject });
     });
+  }
+  settle(index: number, response: RunResponse): void {
+    this.pending[index]?.settle(response);
+  }
+  fail(index: number, error: unknown): void {
+    this.pending[index]?.fail(error);
   }
   cancel(): void {
     this.cancelled++;
@@ -136,7 +150,7 @@ describe('run state machine', () => {
     expect(useGame.getState().runState).toBe('idle');
     expect(runner.cancelled).toBe(1);
 
-    runner.settle?.({ ok: false, error: { kind: 'runtime', message: 'too late' } });
+    runner.settle(0, { ok: false, error: { kind: 'runtime', message: 'too late' } });
     await Promise.resolve();
     await Promise.resolve();
 
@@ -209,7 +223,7 @@ describe('run state machine', () => {
     await vi.waitFor(() => expect(useGame.getState().verdict).not.toBeNull());
 
     const verdict = useGame.getState().verdict;
-    first.settle?.({ ok: false, error: { kind: 'runtime', message: 'stale' } });
+    first.settle(0, { ok: false, error: { kind: 'runtime', message: 'stale' } });
     await Promise.resolve();
     expect(useGame.getState().verdict).toBe(verdict);
     expect(useGame.getState().failure).toBeNull();
@@ -813,7 +827,8 @@ describe('a freshly opened work order carries no run', () => {
     useGame.getState().run();
 
     useGame.getState().openLevel('w1-03');
-    runner.fail?.(new Error('the simulator could not be started'));
+    // Index 1: request 0 is the silent prime `openLevel('w1-01')` fired on its own way in.
+    runner.fail(1, new Error('the simulator could not be started'));
     await afterTheHostAnswers();
 
     expect(runShape(useGame.getState())).toEqual(AT_REST);
@@ -833,7 +848,8 @@ describe('a freshly opened work order carries no run', () => {
       levelId: 'w1-01',
       seeds: [1],
     });
-    runner.settle?.(answer);
+    // Index 1: request 0 is the silent prime `openLevel('w1-01')` fired on its own way in.
+    runner.settle(1, answer);
     await afterTheHostAnswers();
 
     expect(runShape(useGame.getState())).toEqual(AT_REST);

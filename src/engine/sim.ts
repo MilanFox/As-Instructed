@@ -414,7 +414,8 @@ export class Sim {
     const roomLeft = bot.capacity - inventoryCount(bot);
 
     if (!ready || roomLeft <= 0 || !tile) {
-      this.builder.push({ t, botId, dt, kind: 'harvest', at, item: null, count: 0, ok: false });
+      const reason = roomLeft <= 0 ? 'full' : undefined;
+      this.builder.push({ t, botId, dt, kind: 'harvest', at, item: null, count: 0, ok: false, reason });
       this.charge(bot, dt);
       return null;
     }

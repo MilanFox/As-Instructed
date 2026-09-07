@@ -67,6 +67,8 @@ interface ItemTransfer extends BotAction {
   item: ItemKind | null;
   count: number;
   ok: boolean;
+  /** Why a failed transfer failed, when the caller bothers to distinguish. */
+  reason?: string;
 }
 
 export type HarvestEvent = ItemTransfer & { kind: 'harvest' };

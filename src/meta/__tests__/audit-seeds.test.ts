@@ -129,7 +129,8 @@ describe('the wire from the incident list to the run', () => {
     useGame.getState().openLevel(level.id);
     useGame.getState().run();
 
-    expect(runner.requests[0]?.seeds).toEqual([...level.seeds, 4471]);
+    // Index 1: request 0 is the silent prime `openLevel` fires on its own way in.
+    expect(runner.requests[1]?.seeds).toEqual([...level.seeds, 4471]);
   });
 
   test('the console says why the extra layout is there', () => {
@@ -156,6 +157,7 @@ describe('the wire from the incident list to the run', () => {
     useGame.getState().openLevel(level.id);
     useGame.getState().run();
 
-    expect(runner.requests[0]?.seeds).toEqual([...level.seeds]);
+    // Index 1: request 0 is the silent prime `openLevel` fires on its own way in.
+    expect(runner.requests[1]?.seeds).toEqual([...level.seeds]);
   });
 });

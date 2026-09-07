@@ -24,12 +24,13 @@ const FILTERS = [
   { id: 'system', label: 'system' },
 ] as const;
 
-/** The prototype's four log inks: dim stamp, error, warning, closure. */
+/** The prototype's four log inks: dim stamp, error, warning, closure. Notices borrow warning's. */
 const INK: Record<ConsoleKind, string> = {
   print: '',
   system: 'w',
   error: 'e',
   success: 'o',
+  notice: 'w',
 };
 
 export function OutputLog(): React.JSX.Element {
@@ -94,7 +95,11 @@ export function OutputLog(): React.JSX.Element {
         ) : null}
         {shown.map((line) => (
           <div key={line.id}>
-            <span className="t">{line.kind === 'print' ? String(line.t).padStart(4, '0') : '    '}</span>
+            <span className="t">
+              {line.kind === 'print' || line.kind === 'notice'
+                ? String(line.t).padStart(4, '0')
+                : '    '}
+            </span>
             {'  '}
             <span className={INK[line.kind]}>{line.text}</span>
           </div>

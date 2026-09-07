@@ -8,7 +8,7 @@
  * makes a wedged worker survivable (DESIGN.md §10.6).
  */
 import { create } from 'zustand';
-import type { PrintEvent, Trace, Verdict } from '../engine/index.ts';
+import type { PrintEvent, Trace, TraceEvent, Verdict } from '../engine/index.ts';
 import { Medal, usesFuel } from '../engine/index.ts';
 import type { PerSeedResult, RuntimeFailure } from '../runtime/protocol.ts';
 import { WORKER_TIMEOUT_MS } from '../runtime/protocol.ts';
@@ -24,7 +24,7 @@ import { medalForLevel, objectivesOnEverySeed } from './score.ts';
 
 export type Screen = 'levels' | 'workspace';
 export type RunState = 'idle' | 'running';
-export type ConsoleKind = 'print' | 'system' | 'error' | 'success';
+export type ConsoleKind = 'print' | 'system' | 'error' | 'success' | 'notice';
 
 /**
  * Layouts a work order has to close on that are not in its own `seeds`, and the line that says why.
@@ -401,6 +401,34 @@ export const useGame = create<GameState>((set, get) => {
     };
   }
 
+  /**
+   * `openLevel`'s own quiet run, so the step buttons work before the player has pressed anything.
+   * Same one-seed shape as `preview()`, but nothing about it is visible: no console line, no play,
+   * and a failure — compile or runtime — just leaves the board exactly as `openLevel` set it.
+   */
+  function primeTrace(levelId: string, code: string): void {
+    const level = getLevel(levelId);
+    if (!level) return;
+    const token = get().runToken;
+    get()
+      .runner()
+      .run({ code, levelId, seeds: [level.seeds[0] as number] })
+      .then((response) => {
+        if (get().runToken !== token || !response.ok) return;
+        get().renderer().setTrace(response.trace);
+        get().renderer().seek(0);
+        set({
+          trace: response.trace,
+          verdict: response.verdict,
+          tick: 0,
+          endTick: response.trace.endTick,
+        });
+      })
+      .catch(() => {
+        // Nothing the player asked for failed, so nothing is said about it.
+      });
+  }
+
   return {
     screen: 'levels',
     currentLevelId: startLevel,
@@ -510,6 +538,7 @@ export const useGame = create<GameState>((set, get) => {
         suppressed: 0,
         brief: 'brief',
       });
+      primeTrace(levelId, get().code);
     },
 
     setCode(code) {
@@ -655,13 +684,20 @@ export const useGame = create<GameState>((set, get) => {
         const cap = get().save.settings.consoleCap;
         const prints = trace.events.filter((event): event is PrintEvent => event.kind === 'print');
         const shown = prints.slice(0, cap);
+        const notices = trace.events.flatMap((event) => {
+          const text = actionNotice(event);
+          return text ? [{ t: event.t, kind: 'notice' as const, text }] : [];
+        });
         pushLines(
-          shown.map((event) => ({
-            t: event.t,
-            kind: 'print' as const,
-            text: event.text,
-            ...(event.line !== undefined ? { line: event.line } : {}),
-          })),
+          [
+            ...shown.map((event) => ({
+              t: event.t,
+              kind: 'print' as const,
+              text: event.text,
+              ...(event.line !== undefined ? { line: event.line } : {}),
+            })),
+            ...notices,
+          ].sort((a, b) => a.t - b.t),
         );
 
         const medal = medalForLevel(levelDef, verdict.passed, verdict.stats.ticks);
@@ -924,13 +960,20 @@ export const useGame = create<GameState>((set, get) => {
             (event): event is PrintEvent => event.kind === 'print',
           );
           const shown = prints.slice(0, cap);
+          const notices = trace.events.flatMap((event) => {
+            const text = actionNotice(event);
+            return text ? [{ t: event.t, kind: 'notice' as const, text }] : [];
+          });
           pushLines(
-            shown.map((event) => ({
-              t: event.t,
-              kind: 'print' as const,
-              text: event.text,
-              ...(event.line !== undefined ? { line: event.line } : {}),
-            })),
+            [
+              ...shown.map((event) => ({
+                t: event.t,
+                kind: 'print' as const,
+                text: event.text,
+                ...(event.line !== undefined ? { line: event.line } : {}),
+              })),
+              ...notices,
+            ].sort((a, b) => a.t - b.t),
           );
           pushLines([
             {
@@ -1184,6 +1227,23 @@ export function visibleConsole(
   return lines.filter((line) => {
     if (filter === 'print' && line.kind !== 'print') return false;
     if (filter === 'system' && line.kind === 'print') return false;
-    return line.kind !== 'print' || line.t <= upToTick;
+    // Notices are host-authored, not the player's own print() output, so 'print' filters them
+    // out — but they reveal on the same tick-by-tick schedule as prints do.
+    const gated = line.kind === 'print' || line.kind === 'notice';
+    return !gated || line.t <= upToTick;
   });
+}
+
+/**
+ * Host-authored console lines for action failures worth flagging beyond the return value.
+ * One case today (`harvest` on a full hopper); the next one is a new `case`, not a rewrite.
+ */
+export function actionNotice(event: TraceEvent): string | null {
+  switch (event.kind) {
+    case 'harvest':
+      if (event.reason === 'full') return 'No room in the hopper. Swung anyway.';
+      return null;
+    default:
+      return null;
+  }
 }
