@@ -15,7 +15,6 @@ every citation to it.
 | [`PLAYTEST.md`](PLAYTEST.md) | How does it actually play? Measured medals and tick counts from a full campaign run, where the difficulty really sits, and what must not be changed. |
 | [`../TODO.md`](../TODO.md) | What is not done? The live backlog. |
 
-`shots/` holds before/after screenshots kept alongside UI changes. Nothing here cites them.
 
 Two of these are read by tests and cannot be freely reformatted: `confessed-invariants.test.ts`
 parses the palette out of `DESIGN.md` §8 and the four memo blocks out of `NARRATIVE.md` §7. Run
