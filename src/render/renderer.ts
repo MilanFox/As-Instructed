@@ -25,6 +25,7 @@
 
 import {
   maturity,
+  sproutsIn,
   applyEvent,
   replayTo,
   reviveTrace,
@@ -45,6 +46,7 @@ import {
   drawMark,
   drawOutOfBounds,
   drawPlantGauge,
+  drawSprouting,
   drawVignette,
   describeTile,
 } from './overlays.ts';
@@ -1382,6 +1384,7 @@ export class Renderer {
       if (!tile) continue;
       const max = tile.maxGrowth ?? 0;
       const growth = maturity(tile, t);
+      const sprouting = sproutsIn(tile, t);
       if (painter) {
         paint.x = x;
         paint.y = y;
@@ -1393,10 +1396,12 @@ export class Renderer {
         paint.stage = plantStageIndex(growth, max);
         paint.ripe = growth >= max;
         painter(paint);
+        if (sprouting > 0) drawSprouting(ctx, x, y, tilePx, sprouting, this.camera.dpr);
         continue;
       }
       (tiles as TileSet).draw(ctx, plantStageName(growth, max), x * tilePx, y * tilePx, tilePx);
       drawPlantGauge(ctx, x, y, tilePx, growth, max, this.elapsed, this.camera.dpr);
+      if (sprouting > 0) drawSprouting(ctx, x, y, tilePx, sprouting, this.camera.dpr);
     }
   }
 

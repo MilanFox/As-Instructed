@@ -124,13 +124,14 @@ declare const ItemKind: {
   walkable: boolean;
   growth: number;
   maxGrowth: number;
+  sproutsIn: number;
   crop: ItemKind | null;
   items: ItemStack[];
   botId: number | null;
   machineId: string | null;
   mark: string | null;
 }`,
-    doc: 'Everything a bot perceives about one tile. A crop is ready when `growth >= maxGrowth`. Tiles outside the world come back with `inBounds: false` and `terrain: "void"`.',
+    doc: 'Everything a bot perceives about one tile. A crop is ready when `growth >= maxGrowth`. A crop can also be planted with its clock set to start in the future, in which case `growth` reads 0 and stays there until `sproutsIn` counts down to 0. Tiles outside the world come back with `inBounds: false` and `terrain: "void"`.',
   },
   {
     name: 'MachineView',

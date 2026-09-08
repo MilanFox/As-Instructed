@@ -37,6 +37,7 @@ export function readoutLine(readout: TileReadout | null): string {
   if (!readout) return '';
   const at = `${String(readout.at.x)}, ${String(readout.at.y)}`;
   if (readout.growth !== null && readout.maxGrowth !== null) {
+    if (readout.sproutsIn > 0) return `${at} · ${readout.terrain} · sprouts in ${String(readout.sproutsIn)}t`;
     return `${at} · ${readout.terrain} · ${String(readout.growth)}/${String(readout.maxGrowth)}`;
   }
   if (readout.botName) return `${at} · ${readout.botName}`;

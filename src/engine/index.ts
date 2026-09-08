@@ -133,6 +133,7 @@ export {
   Sim,
   describeBlock,
   maturity,
+  sproutsIn,
 } from './sim.ts';
 
 export type {

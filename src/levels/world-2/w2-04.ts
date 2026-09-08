@@ -92,6 +92,12 @@ export const w2_04: LevelDef = {
         'Growth climbs by one every tick, driving or not. A tile at 5 of 8 is ready in three ticks.',
     },
     {
+      label: '`sproutsIn`',
+      value:
+        'Growth stuck at 0 is not always a bare tile — some crops on this shift have not started ' +
+        'their clock. `scan()` reports `sproutsIn`, the ticks left before growth moves at all.',
+    },
+    {
       label: 'Spoilage',
       value:
         'One against the sheet for every tick a ripe crop stands in the ground with nobody on it.',
@@ -138,6 +144,7 @@ export const w2_04: LevelDef = {
     'hopper has to empty into before anything can be harvested.',
     'One pass cannot finish the plot. The crops do not all come ready at the same time.',
     'Growth climbs by one per tick, so a tile says exactly how long it needs. The clock runs whether the bot drives or stands still.',
+    'A tile reading 0 growth is not always freshly planted. Some crops on this ladder have not started yet, and sproutsIn says how many ticks until they do.',
     'Waiting on a tile until it comes ready costs no spoilage. Driving laps costs the same ticks and arrives late.',
   ],
   docs: ['inventory', 'harvest', 'plant', 'wait'],

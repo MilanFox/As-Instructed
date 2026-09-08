@@ -61,6 +61,8 @@ export interface TileView {
   /** Current maturity of a crop on this tile, relative to the observing bot's clock. */
   growth: number;
   maxGrowth: number;
+  /** Ticks remaining before this crop's growth clock starts; 0 once growing or if there's no crop. */
+  sproutsIn: number;
   crop: ItemKind | null;
   items: ItemStack[];
   botId: number | null;
@@ -106,6 +108,13 @@ export function maturity(tile: Tile, t: number): number {
     return Math.max(0, Math.min(max, t - plantedAt));
   }
   return tile.growth ?? 0;
+}
+
+/** Ticks until a crop's growth clock starts, i.e. until `meta.plantedAt` is reached. 0 once growing. */
+export function sproutsIn(tile: Tile, t: number): number {
+  const plantedAt = tile.meta?.['plantedAt'];
+  if (typeof plantedAt !== 'number') return 0;
+  return Math.max(0, plantedAt - t);
 }
 
 /** What a seed turns into when harvested. */
@@ -1064,6 +1073,7 @@ export class Sim {
         walkable: false,
         growth: 0,
         maxGrowth: 0,
+        sproutsIn: 0,
         crop: null,
         items: [],
         botId: null,
@@ -1081,6 +1091,7 @@ export class Sim {
       walkable: terrainProps(tile.terrain).walkable,
       growth: maturity(tile, t),
       maxGrowth: tile.maxGrowth ?? 0,
+      sproutsIn: sproutsIn(tile, t),
       crop: tile.crop ?? null,
       items: itemsAt(this.world, at).map((s) => ({ kind: s.kind, count: s.count })),
       botId: standing,

@@ -10,7 +10,7 @@
  *   here means the UI never has to learn the World layout.
  */
 
-import { Terrain, maturity, terrainProps, tileAt } from '../engine/index.ts';
+import { Terrain, maturity, sproutsIn, terrainProps, tileAt } from '../engine/index.ts';
 import type { ItemKind, Machine, Vec, World } from '../engine/index.ts';
 import { alpha, artDirection, luminance, metrics, overlay, palette } from './theme.ts';
 import type { ViewRange } from './camera.ts';
@@ -235,6 +235,50 @@ export function drawPlantGauge(
   ctx.restore();
 }
 
+/**
+ * A crop whose growth clock has not started yet (`sproutsIn(tile, t) > 0`). Maturity reads 0 here
+ * exactly like a freshly-started crop does, and no stage sprite carries the difference — without
+ * this the tile is a silent "0" a player can only recover by hovering. Steady, not pulsing: it is
+ * reporting a fact about the tile, not asking for attention the way a ready-to-harvest pip does.
+ */
+export function drawSprouting(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  tilePx: number,
+  ticksLeft: number,
+  dpr = 1,
+): void {
+  if (tilePx < 14 * dpr) return;
+  const cx = (x + 0.2) * tilePx;
+  const cy = (y + 0.2) * tilePx;
+  const r = Math.max(3 * dpr, tilePx * 0.11);
+
+  ctx.save();
+  ctx.fillStyle = alpha(palette.bgVoid, 0.6);
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = palette.inkDim;
+  ctx.lineWidth = Math.max(MIN_STROKE_PX * dpr, tilePx * 0.028);
+  ctx.stroke();
+  // A clock hand pointing to noon, so the ring reads as "waiting" rather than an empty circle.
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx, cy - r * 0.65);
+  ctx.stroke();
+  ctx.restore();
+
+  if (tilePx < 26 * dpr) return;
+  ctx.save();
+  ctx.font = `600 ${Math.round(tilePx * 0.17)}px 'JetBrains Mono', ui-monospace, monospace`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = palette.inkDim;
+  ctx.fillText(String(ticksLeft), cx + r + tilePx * 0.06, cy);
+  ctx.restore();
+}
+
 /** World 4 breadcrumbs written with `mark()`. */
 export function drawMark(
   ctx: CanvasRenderingContext2D,
@@ -364,6 +408,8 @@ export interface TileReadout {
   /** Crop maturity at the queried tick, or `null` on a tile with no crop. */
   growth: number | null;
   maxGrowth: number | null;
+  /** Ticks remaining before this crop's growth clock starts; 0 once growing or if there's no crop. */
+  sproutsIn: number;
   crop: ItemKind | null;
   items: { kind: ItemKind; count: number }[];
   botId: number | null;
@@ -393,9 +439,12 @@ export function describeTile(world: World, x: number, y: number, tick: number): 
     .map((s) => ({ kind: s.kind, count: s.count }));
   const hasCrop = tile.maxGrowth !== undefined && tile.maxGrowth > 0;
   const growth = hasCrop ? maturity(tile, tick) : null;
+  const sprouting = hasCrop ? sproutsIn(tile, tick) : 0;
 
   const parts: string[] = [`${x},${y}`, tile.terrain];
-  if (hasCrop && growth !== null) parts.push(`crop ${growth}/${tile.maxGrowth ?? 0}`);
+  if (hasCrop && growth !== null) {
+    parts.push(sprouting > 0 ? `crop sprouts in ${sprouting}t` : `crop ${growth}/${tile.maxGrowth ?? 0}`);
+  }
   if (bot) parts.push(bot.name);
   if (machine) parts.push(`${machine.kind}:${machine.state}`);
   for (const item of items) parts.push(`${item.kind} x${item.count}`);
@@ -407,6 +456,7 @@ export function describeTile(world: World, x: number, y: number, tick: number): 
     walkable: props.walkable,
     growth,
     maxGrowth: hasCrop ? (tile.maxGrowth ?? null) : null,
+    sproutsIn: sprouting,
     crop: hasCrop ? (tile.crop ?? null) : null,
     items,
     botId: bot ? bot.id : null,

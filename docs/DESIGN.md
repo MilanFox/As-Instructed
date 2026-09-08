@@ -140,6 +140,15 @@ persist for the whole run, and that only `mark` / `readMark` persist *in the wor
 World 4 levels are unsolvable until the player believes this, so the Memory page is always
 rendered and never behind a filter.
 
+**State never reads as "nothing happening" for a reason the player cannot see.** A timer, delayed
+start, or staged mechanic must be named and exposed through both the API and the render — never
+left to look identical to zero progress or bare ground until someone happens to hover it. The one
+exception is where withholding the information *is* the puzzle (not revealing the other seeds'
+ripening order up front, for instance) — that is a design choice about the puzzle's question. An
+implementation detail leaking through as unexplained silence is a bug. `w2-04`'s `sproutsIn` is the
+worked example: a crop can sit at `growth: 0` for dozens of ticks before its clock starts, and both
+`scan()` and the tile render say so.
+
 ## 6. Progression — 8 Worlds
 
 Progression is driven by **hardware unlocks**: the player does not have `scan()` until the level
@@ -303,6 +312,9 @@ Three things RENDER must draw, because a level's lesson is unreadable otherwise:
 
 - **Plant growth stages as distinct overlays**, so maturity is readable at a glance. `w2-02` is a
   field of ripe, unripe and bare tiles and is unsolvable if a player cannot tell them apart.
+- **A crop tile whose growth clock has not started yet, distinct from bare soil and from stage 0.**
+  Otherwise `w2-04`'s staggered ripening reads as "nothing planted here," which §5's information
+  rule forbids.
 - **All bots simultaneously with per-bot clocks in the trace viewer**, and a *blocked* move
   visibly different from a successful one. Required by `w7-01` and `w7-03`.
 - **How often each tile has been stood on, not merely that it has.** `w4-02`'s designed failure is
