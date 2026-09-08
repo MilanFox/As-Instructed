@@ -129,7 +129,8 @@ export const w2_05: LevelDef = {
     },
     {
       label: 'The hopper',
-      value: 'Holds a different amount every shift. `inventory()` is the only reading of it.',
+      value:
+        'Holds a different amount every shift and nothing on the bot reports its size. `inventory()` counts what is in it, for free, as often as you like.',
     },
     {
       label: '`harvest()`',
