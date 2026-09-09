@@ -41,9 +41,7 @@ export {
   TILE_PX,
   TILE_VOCABULARY,
   CODE_TILE_NAMES,
-  CONVEYOR_PHASES,
   PLANT_STAGES,
-  ORE_STAGES,
   biomeArt,
   biomeForWorld,
   itemTileName,
@@ -60,18 +58,30 @@ export { ParticleSystem, FX_LAYER_OVER, FX_LAYER_UNDER } from './fx.ts';
 export type { FxName, FxOptions } from './fx.ts';
 
 export {
+  BADGE_VARS,
   BRACKET_CLOSED_PX,
   BRACKET_TIGHTEN_PX,
+  badgeVarKey,
+  bandCursor,
+  bandLines,
   bracketCloseness,
   describeTile,
+  drawBuffer,
+  drawCrank,
+  drawTether,
+  drawVarBadge,
   drawBrackets,
   drawCelebration,
   drawGoals,
   drawGrid,
   drawHover,
   drawPlantGauge,
+  drawSpoiling,
+  drawSprouting,
+  drawStageRing,
   drawVignette,
   padCells,
+  ripeFor,
 } from './overlays.ts';
 export type { TileReadout } from './overlays.ts';
 

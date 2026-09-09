@@ -55,9 +55,8 @@ export interface AtlasJson {
 // ---------------------------------------------------------------------------
 
 /**
- * Names the renderer draws itself: flat geometric or animated things Canvas2D draws better than
- * a bitmap would. The extras beyond that base set are the conveyor's animation phases (a static
- * sprite would throw away free animation) and `feature.fuel_depot`, which DESIGN.md §4.4 needs
+ * Names the renderer draws itself: flat geometric things Canvas2D draws better than a bitmap
+ * would. The one extra beyond that base set is `feature.fuel_depot`, which DESIGN.md §4.4 needs
  * and no Kenney pack has as a top-down tile.
  */
 export const CODE_TILE_NAMES: readonly string[] = [
@@ -67,21 +66,9 @@ export const CODE_TILE_NAMES: readonly string[] = [
   'floor.circuit',
   'floor.circuit.b',
   'floor.hazard',
-  'feature.conveyor.0',
-  'feature.conveyor.1',
-  'feature.conveyor.2',
-  'feature.conveyor.3',
   'feature.solar_panel',
   'feature.fuel_depot',
   'item.battery',
-];
-
-/** Every conveyor phase, in animation order. */
-export const CONVEYOR_PHASES: readonly string[] = [
-  'feature.conveyor.0',
-  'feature.conveyor.1',
-  'feature.conveyor.2',
-  'feature.conveyor.3',
 ];
 
 /**
@@ -174,10 +161,6 @@ export const TILE_VOCABULARY: readonly string[] = [
   'feature.factory',
   'feature.refinery',
   'feature.drill',
-  'feature.conveyor.0',
-  'feature.conveyor.1',
-  'feature.conveyor.2',
-  'feature.conveyor.3',
   'feature.solar_panel',
   'feature.fuel_depot',
   'feature.pit',
@@ -271,14 +254,6 @@ export function plantStageIndex(growth: number, max: number): number {
 export function plantStageName(growth: number, max: number): string {
   return PLANT_STAGES[plantStageIndex(growth, max)] as string;
 }
-
-/** The size ladder for a depleting ore vein, richest first. */
-export const ORE_STAGES: readonly string[] = [
-  'ore.rich',
-  'ore.stage3',
-  'ore.stage2',
-  'ore.stage1',
-];
 
 // ---------------------------------------------------------------------------
 // Biomes
@@ -439,18 +414,16 @@ function pick(list: readonly string[], r: number): string {
 
 /**
  * How one tile is drawn. `base` is a full-bleed floor and always exists; `prop` is a
- * transparent-background sprite composited on top. `animated` marks the tile as
- * belonging to the dynamic layer rather than the cached terrain layer.
+ * transparent-background sprite composited on top.
  */
 export interface TerrainArt {
   base: string;
   prop: string | null;
-  animated: 'conveyor' | null;
   /** Terrain the player cannot walk into. Drives the wall drop-shadow pass. */
   solid: boolean;
 }
 
-const EMPTY_ART: TerrainArt = { base: 'floor.metal', prop: null, animated: null, solid: true };
+const EMPTY_ART: TerrainArt = { base: 'floor.metal', prop: null, solid: true };
 
 /**
  * Semantic terrain -> art. Pure: no canvas, no atlas, so the mapping is unit-testable and every
@@ -464,47 +437,48 @@ export function terrainArt(terrain: Terrain, tile: Tile, biome: Biome, x: number
 
   switch (terrain) {
     case Terrain.Void:
-      return { base: 'floor.metal', prop: null, animated: null, solid: true };
+      return { base: 'floor.metal', prop: null, solid: true };
+    // Conveyor rides with plain floor. `Terrain.Conveyor` promises `facing` in tile meta, the sim
+    // implements nothing, no level places one, and `TileView` has no `meta` for the facing to
+    // arrive through — so the four-phase scroll this used to animate said "something is moving
+    // here" about a mechanic that does not exist. DESIGN.md §11.2: explain it or cut it.
     case Terrain.Floor:
-      return { base: baseFloor, prop: null, animated: null, solid: false };
+    case Terrain.Conveyor:
+      return { base: baseFloor, prop: null, solid: false };
     case Terrain.Wall:
-      return { base: pick(art.wall, r), prop: null, animated: null, solid: true };
+      return { base: pick(art.wall, r), prop: null, solid: true };
     case Terrain.Pad:
-      return { base: baseFloor, prop: art.pad, animated: null, solid: false };
+      return { base: baseFloor, prop: art.pad, solid: false };
     case Terrain.Regolith:
-      return { base: pick(art.regolith, r), prop: null, animated: null, solid: false };
+      return { base: pick(art.regolith, r), prop: null, solid: false };
     case Terrain.Soil:
-      return { base: pick(art.soil, r), prop: null, animated: null, solid: false };
+      return { base: pick(art.soil, r), prop: null, solid: false };
     // Rock, ore and rubble sit on the biome's *canonical* floor rather than a stone plate or a
     // random variant. Swapping the floor punches a visible hole in the ground plane, and letting
     // the variant roll makes every obstacle a differently-coloured square. The prop, the solid
     // tint and the drop shadow are what say "you cannot walk here".
     case Terrain.Rock:
-      return { base: groundFloor, prop: pick(['rock.large', 'rock.boulder'], r), animated: null, solid: true };
+      return { base: groundFloor, prop: pick(['rock.large', 'rock.boulder'], r), solid: true };
     case Terrain.Ore:
       return {
         base: groundFloor,
         prop: pick(['ore.stage3', 'ore.rich', 'ore.rich.b'], r),
-        animated: null,
         solid: true,
       };
     case Terrain.Rubble:
-      return { base: groundFloor, prop: pick(['rock.medium', 'rock.small'], r), animated: null, solid: true };
+      return { base: groundFloor, prop: pick(['rock.medium', 'rock.small'], r), solid: true };
     case Terrain.Ice:
-      return { base: pick(['floor.ice', 'floor.ice.b'], r), prop: null, animated: null, solid: false };
+      return { base: pick(['floor.ice', 'floor.ice.b'], r), prop: null, solid: false };
     case Terrain.Pit:
-      return { base: baseFloor, prop: 'feature.pit', animated: null, solid: false };
+      return { base: baseFloor, prop: 'feature.pit', solid: false };
     case Terrain.Cable:
       return {
         base: baseFloor,
         prop: tile.meta?.['bend'] ? 'feature.cable.bend' : 'feature.cable',
-        animated: null,
         solid: false,
       };
     case Terrain.Depot:
-      return { base: baseFloor, prop: 'feature.fuel_depot', animated: null, solid: false };
-    case Terrain.Conveyor:
-      return { base: baseFloor, prop: null, animated: 'conveyor', solid: false };
+      return { base: baseFloor, prop: 'feature.fuel_depot', solid: false };
     default:
       return EMPTY_ART;
   }
@@ -704,26 +678,6 @@ function hazard(ctx: CanvasRenderingContext2D): void {
   ctx.fillRect(0, TILE_PX - 2, TILE_PX, 2);
 }
 
-function conveyor(phase: number): CodeTilePainter {
-  return (ctx) => {
-    fill(ctx, '#4d5259');
-    ctx.fillStyle = '#6d747d';
-    ctx.fillRect(0, 4, TILE_PX, 3);
-    ctx.fillRect(0, TILE_PX - 7, TILE_PX, 3);
-    ctx.fillStyle = '#33383e';
-    ctx.fillRect(0, 8, TILE_PX, TILE_PX - 16);
-    const offset = (phase * 12) / CONVEYOR_PHASES.length;
-    for (let x = -12; x < TILE_PX + 12; x += 12) {
-      ctx.fillStyle = '#565d66';
-      ctx.fillRect(x + offset, 8, 6, TILE_PX - 16);
-      ctx.fillStyle = 'rgba(255, 176, 32, 0.35)';
-      ctx.fillRect(x + offset, 8, 2, TILE_PX - 16);
-    }
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-    ctx.fillRect(0, 8, TILE_PX, 1);
-    ctx.fillRect(0, TILE_PX - 9, TILE_PX, 1);
-  };
-}
 
 function solarPanel(ctx: CanvasRenderingContext2D): void {
   fill(ctx, '#2b3644');
@@ -804,10 +758,6 @@ const CODE_PAINTERS: Readonly<Record<string, CodeTilePainter>> = {
   'floor.circuit': circuit(0),
   'floor.circuit.b': circuit(1),
   'floor.hazard': hazard,
-  'feature.conveyor.0': conveyor(0),
-  'feature.conveyor.1': conveyor(1),
-  'feature.conveyor.2': conveyor(2),
-  'feature.conveyor.3': conveyor(3),
   'feature.solar_panel': solarPanel,
   'feature.fuel_depot': fuelDepot,
   'item.battery': battery,

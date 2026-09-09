@@ -101,7 +101,7 @@ const SHOWCASE_MAP = [
 
 /**
  * Everything the renderer can draw, on one grid: growth stages, mining chips, ground items, a
- * machine, a conveyor run, a fuel depot, three bots on independent clocks, and a bot that spends
+ * machine, a cable run, a fuel depot, three bots on independent clocks, and a bot that spends
  * its whole life bumping into a wall.
  */
 export function sceneShowcase(): Scene {
@@ -112,7 +112,7 @@ export function sceneShowcase(): Scene {
     ',': Terrain.Soil,
     o: Terrain.Ore,
     r: Terrain.Rock,
-    c: Terrain.Conveyor,
+    c: Terrain.Cable,
     D: Terrain.Depot,
     p: Terrain.Pad,
   });
@@ -280,7 +280,6 @@ export function sceneBiome(world: number, label: string): Scene {
     Terrain.Pit,
     Terrain.Cable,
     Terrain.Depot,
-    Terrain.Conveyor,
   ];
   const cols = 13;
   const grid = createWorld({ w: cols, h: 5, seed: 1, fill: Terrain.Floor });

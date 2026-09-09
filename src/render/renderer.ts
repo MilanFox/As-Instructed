@@ -31,7 +31,8 @@ import {
   reviveTrace,
   eventIndexAt,
   usesFuel,
-  Terrain,
+  FED_BY,
+  MANUAL_ONLY,
 } from '../engine/index.ts';
 import type { Bot, GroundStack, Machine, Trace, TraceEvent, Vec, World } from '../engine/index.ts';
 import { Camera } from './camera.ts';
@@ -39,16 +40,26 @@ import type { ViewRange } from './camera.ts';
 import { ParticleSystem, FX_LAYER_OVER, FX_LAYER_UNDER } from './fx.ts';
 import type { FxName, FxOptions } from './fx.ts';
 import {
+  badgeVarKey,
+  bandCursor,
+  bandLines,
+  drawBuffer,
   drawCelebration,
+  drawCrank,
+  drawTether,
+  drawVarBadge,
   drawGoals,
   drawGrid,
   drawHover,
   drawMark,
   drawOutOfBounds,
   drawPlantGauge,
+  drawSpoiling,
   drawSprouting,
+  drawStageRing,
   drawVignette,
   describeTile,
+  ripeFor,
 } from './overlays.ts';
 import type { TileReadout } from './overlays.ts';
 import {
@@ -65,7 +76,6 @@ import { applyArtDirection, artDirection, botAccent, palette } from './theme.ts'
 import type { ArtId } from './theme.ts';
 import type { CropPaint, ItemPaint, MachinePaint, PostPaint } from './art/types.ts';
 import {
-  CONVEYOR_PHASES,
   TileSet,
   biomeForWorld,
   itemTileName,
@@ -230,7 +240,6 @@ export class Renderer {
   private indexedWorld: World | null = null;
   private readonly cropCells: number[] = [];
   private readonly markCells: number[] = [];
-  private readonly conveyorCells: number[] = [];
 
   /**
    * One reused options bag for every `particles.emit`.
@@ -683,7 +692,13 @@ export class Renderer {
     const cell = this.camera.tileAtScreen(cssX, cssY);
     const world = this.world;
     if (!cell || !world) return null;
-    return describeTile(world, cell.x, cell.y, Math.floor(this.currentTick));
+    return describeTile(
+      world,
+      cell.x,
+      cell.y,
+      Math.floor(this.currentTick),
+      this.trail?.visitsAt(cell.x, cell.y) ?? 0,
+    );
   }
 
   setHover(cell: Vec | null): void {
@@ -1159,14 +1174,12 @@ export class Renderer {
     this.indexedWorld = world;
     this.cropCells.length = 0;
     this.markCells.length = 0;
-    this.conveyorCells.length = 0;
     const tiles = world.tiles;
     for (let i = 0; i < tiles.length; i++) {
       const tile = tiles[i];
       if (!tile) continue;
       if (tile.maxGrowth !== undefined && tile.maxGrowth > 0) this.cropCells.push(i);
       if (tile.mark) this.markCells.push(i);
-      if (tile.terrain === Terrain.Conveyor) this.conveyorCells.push(i);
     }
   }
 
@@ -1255,7 +1268,6 @@ export class Renderer {
 
     // --- features ----------------------------------------------------------
     ctx.imageSmoothingEnabled = tilePx < cacheTile;
-    this.drawConveyors(ctx, world, tilePx);
     this.drawCrops(ctx, world, tilePx, tick);
     this.drawMachines(ctx, world, tilePx);
     this.drawMarks(ctx, world, tilePx);
@@ -1337,23 +1349,6 @@ export class Renderer {
     );
   }
 
-  private drawConveyors(ctx: CanvasRenderingContext2D, world: World, tilePx: number): void {
-    const tiles = this.tiles;
-    if (!tiles || this.conveyorCells.length === 0) return;
-    // A direction that paints its own terrain painted its own conveyors with it (art/types.ts),
-    // and this pass would drop a 48px atlas frame on top of them.
-    if (artDirection().paintTerrain) return;
-    const phase = Math.floor(this.elapsed * 8) % CONVEYOR_PHASES.length;
-    const name = CONVEYOR_PHASES[phase] as string;
-    for (let c = 0; c < this.conveyorCells.length; c++) {
-      const index = this.conveyorCells[c] as number;
-      const x = index % world.w;
-      const y = (index / world.w) | 0;
-      if (!this.inRange(x, y)) continue;
-      tiles.draw(ctx, name, x * tilePx, y * tilePx, tilePx);
-    }
-  }
-
   /**
    * Crops. Maturity is *derived* from the tick (ENGINE.md §6.4), so it changes on frames where no
    * event fired — which is exactly why crops cannot live in the cached terrain layer.
@@ -1385,6 +1380,8 @@ export class Renderer {
       const max = tile.maxGrowth ?? 0;
       const growth = maturity(tile, t);
       const sprouting = sproutsIn(tile, t);
+      // The same clock, past its mark instead of short of it. Never both on one tile.
+      const overripe = sprouting > 0 ? 0 : ripeFor(tile, t);
       if (painter) {
         paint.x = x;
         paint.y = y;
@@ -1397,11 +1394,13 @@ export class Renderer {
         paint.ripe = growth >= max;
         painter(paint);
         if (sprouting > 0) drawSprouting(ctx, x, y, tilePx, sprouting, this.camera.dpr);
+        else if (overripe > 0) drawSpoiling(ctx, x, y, tilePx, overripe, this.camera.dpr);
         continue;
       }
       (tiles as TileSet).draw(ctx, plantStageName(growth, max), x * tilePx, y * tilePx, tilePx);
       drawPlantGauge(ctx, x, y, tilePx, growth, max, this.elapsed, this.camera.dpr);
       if (sprouting > 0) drawSprouting(ctx, x, y, tilePx, sprouting, this.camera.dpr);
+      else if (overripe > 0) drawSpoiling(ctx, x, y, tilePx, overripe, this.camera.dpr);
     }
   }
 
@@ -1415,6 +1414,8 @@ export class Renderer {
     paint.time = this.elapsed;
     paint.dpr = this.camera.dpr;
     paint.reduced = this.reducedMotion;
+    // Tethers first, so a line runs under the plates it joins rather than across them.
+    this.drawMachineTethers(ctx, world, tilePx);
     for (let m = 0; m < world.machines.length; m++) {
       const machine = world.machines[m] as Machine;
       if (!this.inRange(machine.at.x, machine.at.y)) continue;
@@ -1428,19 +1429,136 @@ export class Renderer {
         paint.powered = powered;
         paint.facing = machine.facing ?? -1;
         painter(paint);
-        continue;
+      } else {
+        drawMachine(
+          ctx,
+          tiles as TileSet,
+          machineTileName(machine.kind, machine.state),
+          machine.at.x,
+          machine.at.y,
+          tilePx,
+          powered,
+          this.elapsed,
+          this.camera.dpr,
+        );
       }
-      drawMachine(
-        ctx,
-        tiles as TileSet,
-        machineTileName(machine.kind, machine.state),
-        machine.at.x,
-        machine.at.y,
-        tilePx,
-        powered,
-        this.elapsed,
-        this.camera.dpr,
-      );
+      this.drawMachineReadout(ctx, world, machine, tilePx);
+    }
+  }
+
+  /**
+   * What a machine is carrying, drawn on top of whatever painted the machine itself.
+   *
+   * Here rather than behind the `drawMachine` art hook on purpose. A direction owns machine
+   * *identity* — ten kinds a level's `link`, `power` and `transmit` verbs address by name — and
+   * these are not identity, they are the level's own content: a node's capacity, a station that
+   * refuses `power()`, an antenna with eleven packets nobody has read. That content is the same
+   * fact whichever direction is selected, and DESIGN.md §11.7 asks for it on every board, not on
+   * the boards whose direction happened to implement it. `drawSprouting` is already placed by this
+   * same argument, called after both branches of `drawCrops`.
+   */
+  private drawMachineReadout(
+    ctx: CanvasRenderingContext2D,
+    world: World,
+    machine: Machine,
+    tilePx: number,
+  ): void {
+    const dpr = this.camera.dpr;
+    const x = machine.at.x;
+    const y = machine.at.y;
+    const tile = world.tiles[y * world.w + x];
+
+    // Gated on the tile actually carrying a band rather than on a list of machine kinds, which is
+    // the same shape as `usesFuel()` gating the fuel gauge: the readout appears exactly where the
+    // state it reports exists, and a level that puts a band under a router gets it for free.
+    if (tile) {
+      const inbound = bandLines(tile, 'rx');
+      if (inbound >= 0) {
+        const unread = Math.max(0, inbound - bandCursor(tile));
+        drawBuffer(ctx, x, y, tilePx, unread, inbound, dpr);
+      }
+    }
+
+    // More than two entries means the machine has somewhere to be *partway* to. A two-state
+    // door is already told by its own sprite and does not want a ring saying `1/1`.
+    const cycle = machine.cycle;
+    let steps = 0;
+    if (cycle && cycle.length > 2) {
+      const step = cycle.indexOf(machine.state);
+      if (step >= 0) {
+        steps = cycle.length - 1;
+        drawStageRing(ctx, x, y, tilePx, step, steps, dpr);
+      }
+    }
+
+    const key = badgeVarKey(machine);
+    // A level that publishes the total as a var — `w8-05`'s `stages`, `w7-04`'s `cost` — has said
+    // the same number twice once the ring is up, and the ring says it with a position attached.
+    if (key !== '' && machine.vars[key] !== steps) {
+      drawVarBadge(ctx, x, y, tilePx, machine.vars[key] as number, dpr);
+    }
+    if (machine.vars[MANUAL_ONLY] === 1) drawCrank(ctx, x, y, tilePx, dpr);
+  }
+
+  /**
+   * The two bindings a machine has to somewhere else on the board: what feeds it, and what it
+   * moves.
+   *
+   * A pass of its own because the lines have to go under every plate, not only under the plate of
+   * the machine that owns them — a `fed:` tether crossing a third machine and stopping at its edge
+   * reads as ending there.
+   */
+  private drawMachineTethers(
+    ctx: CanvasRenderingContext2D,
+    world: World,
+    tilePx: number,
+  ): void {
+    const dpr = this.camera.dpr;
+    const machines = world.machines;
+    for (let m = 0; m < machines.length; m++) {
+      const machine = machines[m] as Machine;
+      const here = this.inRange(machine.at.x, machine.at.y);
+
+      // `links` is drawn live once the machine is powered, because that is the tick its tiles
+      // actually flip. Before then the dashed line is the only thing on the board saying those
+      // two walls are ever going to move.
+      const links = machine.links;
+      if (links) {
+        const open =
+          machine.state === 'on' || machine.state === 'open' || machine.state === 'busy';
+        for (let i = 0; i < links.length; i++) {
+          const cell = links[i] as Vec;
+          if (!here && !this.inRange(cell.x, cell.y)) continue;
+          drawTether(ctx, machine.at.x, machine.at.y, cell.x, cell.y, tilePx, open, dpr);
+        }
+      }
+
+      // `for…in` and a hand-rolled lookup rather than `Object.keys().find()`: this runs every
+      // frame and neither an array of keys nor a closure per machine may be allocated here.
+      for (const varKey in machine.vars) {
+        if (!varKey.startsWith(FED_BY)) continue;
+        const feederId = varKey.slice(FED_BY.length);
+        let feeder: Machine | undefined;
+        for (let f = 0; f < machines.length; f++) {
+          const other = machines[f] as Machine;
+          if (other.id === feederId) {
+            feeder = other;
+            break;
+          }
+        }
+        if (!feeder) continue;
+        if (!here && !this.inRange(feeder.at.x, feeder.at.y)) continue;
+        drawTether(
+          ctx,
+          machine.at.x,
+          machine.at.y,
+          feeder.at.x,
+          feeder.at.y,
+          tilePx,
+          feeder.state === 'on',
+          dpr,
+        );
+      }
     }
   }
 

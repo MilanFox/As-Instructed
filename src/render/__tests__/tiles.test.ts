@@ -6,8 +6,6 @@ import { Terrain } from '../../engine/index.ts';
 import type { Tile } from '../../engine/index.ts';
 import {
   CODE_TILE_NAMES,
-  CONVEYOR_PHASES,
-  ORE_STAGES,
   PLANT_STAGES,
   TILE_VOCABULARY,
   biomeArt,
@@ -102,11 +100,6 @@ describe('terrainArt', () => {
     }
     expect(terrainArt(Terrain.Floor, tile(Terrain.Floor), 'cave', 1, 1).solid).toBe(false);
   });
-
-  it('routes conveyors to the animated layer', () => {
-    const art = terrainArt(Terrain.Conveyor, tile(Terrain.Conveyor), 'yard', 2, 2);
-    expect(art.animated).toBe('conveyor');
-  });
 });
 
 describe('biomes', () => {
@@ -155,7 +148,7 @@ describe('growth ladders', () => {
   });
 
   it('keeps every ladder entry resolvable', () => {
-    for (const name of [...PLANT_STAGES, ...ORE_STAGES, ...CONVEYOR_PHASES]) {
+    for (const name of PLANT_STAGES) {
       expect(resolvable.has(name)).toBe(true);
     }
   });
