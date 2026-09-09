@@ -19,8 +19,14 @@ are load-bearing identifiers, not an ordering. Do not renumber to close a gap; a
    `w1-01` — single-seed, a memorized path is the intended solution (§3).
 3. Every seed list includes ≥1 degenerate case: empty/one-element set, index 0, index n−1,
    depth 1, one bot, key = 0.
-4. Par = reference ticks − ~10%, from the level's named heuristic, never an optimal solver —
-   `w5-04`/`w5-05`/`w7-04` derive par from FFD / Prim-or-Kruskal / LPT, from the *median* seed.
+4. Par = from the level's named heuristic, never an optimal solver — `w5-04`/`w5-05`/`w7-04`
+   derive par from FFD / Prim-or-Kruskal / LPT. Take it from the heuristic's **worst** seed, not
+   the median: `src/runtime/aggregate.ts` scores a run from its worst seed and
+   `src/levels/__tests__/levels.test.ts` holds every reference solution to gold on every seed, so
+   a median par puts gold out of reach of the level's own reference. Measured across the campaign
+   the shipped convention is already par/worst = 1.00 on 19 of 33 levels and never above 1.24.
+   The older "median seed, −10%" reading of this rule is what left `w5-04` at 40 and `w8-02` at
+   700, where a run 10% worse everywhere still took gold.
 5. Never require optimality — "good enough that the naive approach fails".
 6. A failing run must be legible from the trace alone.
 7. `heritage` (the textbook algorithm) never appears in player-facing text.
