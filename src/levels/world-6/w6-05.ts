@@ -35,11 +35,13 @@ const dirOf = (letter: string): Dir =>
   letter === 'N' ? Dir.North : letter === 'E' ? Dir.East : letter === 'S' ? Dir.South : Dir.West;
 
 /**
- * Nesting depth per seed. Seed 1 is depth 1 — `main` holds nothing but move groups, so a flat
- * reader passes it and learns nothing, which is the point (CURRICULUM.md §8). Seed 2 is the
- * first level of nesting; seeds 3 and 5 go to four.
+ * Nesting depth per seed. Seed 1 nests once, so a flat reader that ignores calls walks a truncated
+ * route on the first shift a player runs rather than passing it and failing the second
+ * (DESIGN.md §11.5). Seed 2 is the depth-1 case CURRICULUM.md §8 asks for — `main` holds nothing
+ * but move groups, which is the reader's base case and reads as a confirmation once the recursion
+ * is written. Seeds 3 and 5 go to four.
  */
-const DEPTHS: Readonly<Record<number, number>> = Object.freeze({ 1: 1, 2: 2, 3: 4, 4: 3, 5: 4 });
+const DEPTHS: Readonly<Record<number, number>> = Object.freeze({ 1: 2, 2: 1, 3: 4, 4: 3, 5: 4 });
 
 const depthFor = (seed: number): number => DEPTHS[seed] ?? 3;
 
@@ -340,7 +342,7 @@ export const w6_05: LevelDef = {
     {
       label: 'Corrupt blocks',
       value:
-        'One character altered, checks unchanged. Each one lies about a block that also arrived intact.',
+        'One character altered — replaced by another whose code is an odd distance from it. The checks themselves are untouched. Each one lies about a block that also arrived intact.',
     },
     {
       label: 'One shifted block',

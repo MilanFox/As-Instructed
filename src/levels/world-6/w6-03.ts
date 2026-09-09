@@ -57,14 +57,11 @@ function insertAt(values: readonly number[], index: number, value: number): numb
 }
 
 /**
- * Seed 1 keeps every count to one digit, so the one-character-per-count reading works there and
- * nowhere else. Seeds 2 to 4 carry a run of ten or more. Every seed carries a run of 1.
+ * Every seed carries a run of ten or more, seed 1 included, so the one-character-per-count reading
+ * fails on the first shift a player runs rather than passing it and failing the second
+ * (DESIGN.md §11.5). Every seed also carries a run of 1.
  */
-function eastSegments(rng: Rng, seed: number): number[] {
-  if (seed === 1) {
-    const rest = split(rng, EAST_TOTAL - 1, EAST_SEGMENTS - 1, 9);
-    return insertAt(rest, rng.int(0, EAST_SEGMENTS - 1), 1);
-  }
+function eastSegments(rng: Rng): number[] {
   const long = rng.int(10, 11);
   const rest = split(rng, EAST_TOTAL - long - 1, EAST_SEGMENTS - 2, 9);
   const withOne = insertAt(rest, rng.int(0, EAST_SEGMENTS - 2), 1);
@@ -76,8 +73,8 @@ interface Run {
   letter: string;
 }
 
-function routeRuns(rng: Rng, seed: number): Run[] {
-  const east = eastSegments(rng, seed);
+function routeRuns(rng: Rng): Run[] {
+  const east = eastSegments(rng);
   const down = split(rng, DOWN_TOTAL, 3, 9);
   const up = split(rng, UP_TOTAL, 3, 4);
   const runs: Run[] = [];
@@ -217,7 +214,7 @@ export const w6_03: LevelDef = {
   build(seed: number): World {
     const world = createWorld({ w: FIELD, h: FIELD, seed, fill: Terrain.Pit });
     const rng = new Rng(seed * 7919 + 63);
-    const runs = routeRuns(rng, seed);
+    const runs = routeRuns(rng);
     const stream = encodeRuns(rng, runs);
     const key = rng.int(1, 94);
 

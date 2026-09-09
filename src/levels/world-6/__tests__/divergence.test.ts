@@ -302,7 +302,7 @@ describe('w6-05 names the pad and the block the repair report got wrong', () => 
   });
 
   test('the flat reader clears the depth-1 seed and is still short a repair report', () => {
-    const report = diverge(w6_05, 1, 'repair-blocks', (sim, botId) => {
+    const report = diverge(w6_05, 2, 'repair-blocks', (sim, botId) => {
       flatReader.run(sim, botId);
     });
     const shown = must(report.divergence, 'a divergence');

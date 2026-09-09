@@ -235,7 +235,7 @@ export const w6_04: LevelDef = {
     {
       label: 'The straggler',
       value:
-        'The last packet has no header and a **different** shift in the same range. Send its plain text after the others.',
+        'The last packet has no header and a **different** shift in the same range. Its plain text is ordinary readable English, like every other packet once decoded. Send it straight after the others.',
     },
   ],
   seeds: [1, 2, 3, 4],

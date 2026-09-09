@@ -72,7 +72,7 @@ const cleanTraffic = (world: World): string[] => {
 /**
  * Which byte was altered. One byte moved by an odd delta, so the plain difference is invertible
  * mod 256 and the weighted difference names the position uniquely — which is what makes the
- * bonus solvable at all. Nothing player-facing says so.
+ * bonus solvable at all. The `A corrupt packet` fact card states the odd delta (DESIGN.md §11).
  */
 const faultReports = (world: World): string[] => {
   const salt = postVar(world, 'salt');
@@ -226,7 +226,8 @@ export const w6_02: LevelDef = {
     { label: 'The salt', value: "`probe('mast').vars.salt`. Free, and a new number every shift." },
     {
       label: 'A corrupt packet',
-      value: 'Exactly one payload byte altered, so the checks disagree.',
+      value:
+        'Exactly one payload byte altered, and always by an odd amount mod 256 — so both checks disagree, and exactly one position can account for the pair of differences.',
     },
     {
       label: 'Fault report',
