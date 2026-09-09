@@ -213,11 +213,16 @@ describe('randomization defeats hardcoding', () => {
     }
   });
 
-  test('w6-05: a flat reader clears the depth-1 seed and fails a nested one', () => {
+  /**
+   * DESIGN.md §11.5: the depth-1 seed is the degenerate case and no longer runs first, so the flat
+   * reader is caught on the shift a player starts on rather than on the second one. It still clears
+   * the depth-1 seed, which is what makes it a naive *reader* rather than a broken one.
+   */
+  test('w6-05: a flat reader fails the seed that runs first and clears only the depth-1 one', () => {
     const level = getLevel('w6-05') as NonNullable<ReturnType<typeof getLevel>>;
     const outcomes = level.seeds.map((seed) => survives('w6-05', seed, flatReader));
-    expect(outcomes[0]).toBe(true);
-    expect(outcomes.slice(1).some((passed) => !passed)).toBe(true);
+    expect(outcomes[0]).toBe(false);
+    expect(outcomes.filter((passed) => passed)).toEqual([true]);
   });
 
   test('w7-04: dealing the board out in advance misses par on the skewed seed', { timeout: 30_000 }, () => {
@@ -243,11 +248,17 @@ describe('randomization defeats hardcoding', () => {
     }
   });
 
-  test('w8-04: following the filed plan literally fails on a drifted seed', () => {
+  /**
+   * DESIGN.md §11.5 and CURRICULUM.md §15.3: the zero-drift instance is the degenerate case here —
+   * a run that decodes the plan and follows it without ever looking recovers the form — so it is
+   * no longer the seed that runs first. It still clears exactly one seed, which is what keeps this
+   * a naive *reconciler* rather than a program that never worked.
+   */
+  test('w8-04: following the filed plan literally fails first and clears only the zero-drift seed', () => {
     const level = getLevel('w8-04') as NonNullable<ReturnType<typeof getLevel>>;
     const outcomes = level.seeds.map((seed) => survives('w8-04', seed, literalPlanFollower));
-    expect(outcomes[0]).toBe(true);
-    expect(outcomes.slice(1).some((passed) => !passed)).toBe(true);
+    expect(outcomes[0]).toBe(false);
+    expect(outcomes.filter((passed) => passed)).toEqual([true]);
   });
 });
 
