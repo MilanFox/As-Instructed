@@ -73,6 +73,21 @@ function straightRuns(world: World): number {
   return total;
 }
 
+const rowsOf = (tiles: readonly Vec[]): string =>
+  [1, 2, 3].map((row) => tiles.filter((tile) => tile.y === row).length).join(',');
+
+/**
+ * Whether the shift would let every crate run flat.
+ *
+ * The two sidings are shuffled independently, so nothing stops them landing on the same row
+ * histogram — and when they do, `straightRuns` equals the crate count and the star falls out of
+ * `print(\`straight ${crates.length}\`)`. A board that answers the bonus without anyone pairing a
+ * row teaches the wrong rule, so `build` redraws the pads until the rows disagree. Six crates
+ * fills both sidings and can only ever be 2-2-2, which is why the count stops at five.
+ */
+const rowsMatch = (crates: readonly Vec[], pads: readonly Vec[]): boolean =>
+  rowsOf(crates) === rowsOf(pads);
+
 /** Every line the run filed about the shift, in the order it filed them. */
 const filed = (ctx: ObjectiveContext): string[] =>
   ctx.trace.events
@@ -139,7 +154,8 @@ export const w3_01: LevelDef = {
     { label: 'The crates', value: 'On the west siding. As many crates as there are pads.' },
     {
       label: 'Between shifts',
-      value: 'Which rows the crates sit in, and which rows the pads sit in, both change.',
+      value:
+        'The two sidings are stacked separately, and both restack between shifts. A row holding two crates may have no pad at all.',
     },
     { label: '`pickup()`', value: 'Takes what is lying on the tile the bot is standing on.' },
     { label: '`drop()`', value: 'Puts it back down on the tile the bot is standing on.' },
@@ -148,7 +164,7 @@ export const w3_01: LevelDef = {
     {
       label: 'The shift report',
       value:
-        'For the star: file one line, `straight <n>`, where `n` is how many of this shift\'s trips could be run without the bot ever changing row.',
+        'For the star: file one line, `straight <n>`, where `n` is the largest number of this shift\'s trips that could run flat — a trip is flat when the crate and the pad it goes to are in the same row. It is a fact about how the yard stacked, not about the route you drive.',
     },
   ],
   seeds: [1, 2, 3],
@@ -158,13 +174,12 @@ export const w3_01: LevelDef = {
     frame(world);
     const rng = world.rng;
     warm(rng);
-    const count = rng.int(3, 6);
-    for (const at of rng.shuffle(WEST_SIDING).slice(0, count)) {
-      addGroundItems(world, at, 'crate', 1);
-    }
-    for (const at of rng.shuffle(EAST_PADS).slice(0, count)) {
-      setTile(world, at, { terrain: Terrain.Pad });
-    }
+    const count = rng.int(3, 5);
+    const crates = rng.shuffle(WEST_SIDING).slice(0, count);
+    let pads = rng.shuffle(EAST_PADS).slice(0, count);
+    while (rowsMatch(crates, pads)) pads = rng.shuffle(EAST_PADS).slice(0, count);
+    for (const at of crates) addGroundItems(world, at, 'crate', 1);
+    for (const at of pads) setTile(world, at, { terrain: Terrain.Pad });
     addBot(world, { at: vec(6, rng.int(1, 3)), facing: Dir.East, name: 'RIG-04', capacity: 1 });
     return world;
   },
@@ -192,7 +207,7 @@ export const w3_01: LevelDef = {
      */
     Objectives.custom(
       'straight-runs',
-      'Report how many trips need no change of row',
+      'Report the most trips this shift could run without changing row',
       (ctx) => {
         const lines = filed(ctx);
         return lines.length === 1 && lines[0] === `straight ${String(straightRuns(ctx.initialWorld))}`;

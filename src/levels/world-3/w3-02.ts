@@ -74,7 +74,15 @@ const shortDepot = (ctx: ObjectiveContext): Divergence | undefined => {
     const want = groundTotal(ctx.initialWorld, depot.kind);
     const got = countItemsAt(ctx.world, depot.at, depot.kind);
     if (got >= want) continue;
-    return { where: `the depot at ${at(depot.at)}`, expected: crates(want), received: crates(got) };
+    const strays = countItemsAt(ctx.world, depot.at) - got;
+    return {
+      where: `the depot at ${at(depot.at)}`,
+      expected: `${crates(want)} of its class`,
+      received:
+        strays === 0
+          ? `${crates(got)} of its class`
+          : `${crates(got)} of its class, and ${crates(strays)} that belong elsewhere`,
+    };
   }
   return undefined;
 };
@@ -149,7 +157,7 @@ export const w3_02: LevelDef = {
     {
       label: 'The stencils',
       value:
-        'Repainted between shifts. Which pad takes which class changes, and so does how many classes are in the yard.',
+        'Repainted between shifts. Where the depot pads stand changes, which pad takes which class changes, and so does how many classes the yard is stocking.',
     },
     { label: 'The clamp', value: 'One crate at a time.' },
     {

@@ -555,4 +555,40 @@ describe('w3-04 — arrival order, not proximity', () => {
     expect(delivered).not.toContain(false);
     expect(ordered).toContain(false);
   });
+
+  /**
+   * Shipping the crates in the order a sweep of the racks walks past them is the wrong general
+   * rule this level exists to refuse, and a shift whose schedule agreed with its own layout would
+   * let it through. `build` redraws the numbering under `sweptFirst` until the two part company at
+   * the very first crate, so the sweep is refused on the first thing it sets down rather than
+   * somewhere in the middle of the run. Seed 4 is the one-crate yard, which has nothing to
+   * disagree about.
+   */
+  test('shipping in rack-sweep order is refused on the first crate onto the bay', () => {
+    const drive = (sim: Sim, botId: number): void => {
+      const found = survey(sim, botId);
+      const bay = found.pads[0];
+      if (!bay) return;
+      const swept = found.crates.map((crate) => crate.at).sort((a, b) => a.y - b.y || a.x - b.x);
+      for (const slot of swept) {
+        goTo(sim, botId, slot);
+        sim.pickup(botId, 'crate', 1);
+        goTo(sim, botId, bay);
+        sim.drop(botId, 'crate', 1);
+      }
+    };
+
+    for (const seed of w3_04.seeds) {
+      const crates = w3_04.build(seed).items.reduce((sum, stack) => sum + stack.count, 0);
+      const verdict = runLevel(w3_04, seed, drive).verdict;
+      const order = verdict.objectives.find((entry) => entry.id === 'bay-in-order');
+      expect(verdict.objectives.find((entry) => entry.id === 'bay-cleared')?.met).toBe(true);
+      if (crates === 1) {
+        expect(order?.met, `seed ${String(seed)}`).toBe(true);
+        continue;
+      }
+      expect(order?.met, `seed ${String(seed)}`).toBe(false);
+      expect(order?.progress?.[0], `seed ${String(seed)}`).toBe(0);
+    }
+  });
 });

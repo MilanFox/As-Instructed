@@ -97,6 +97,23 @@ const inOrder = (ctx: ObjectiveContext): number => {
   return i;
 };
 
+/**
+ * Whether arrival 1 is standing in the first slot a sweep of the racks would reach.
+ *
+ * A round that ships crates in the order it walks past them is the wrong general rule this level
+ * exists to refuse, and a shift whose schedule happens to agree with its layout lets that rule
+ * through — on seed 1 it would let it through first, which teaches it. So the numbering is redrawn
+ * until the sweep and the schedule part company at the very first crate, where the divergence says
+ * so plainly. A one-crate yard has nothing to disagree about and is left alone.
+ */
+const sweptFirst = (order: readonly Vec[], rowMajor: readonly Vec[]): boolean => {
+  const first = order[0];
+  const swept = rowMajor[0];
+  return (
+    order.length > 1 && first !== undefined && swept !== undefined && key(first) === key(swept)
+  );
+};
+
 const vacantSlots = (world: World): Set<string> => {
   const vacant = new Set<string>();
   for (const y of RACK_ROWS) {
@@ -182,8 +199,8 @@ const overTrodden = (ctx: ObjectiveContext): Divergence => {
 /**
  * Arrival order is stencilled on the slots rather than delivered by a live conveyor: the engine
  * has no scheduled spawning, so the schedule is baked into the world instead of running during
- * it. Seed 1 numbers the crates in sweep order, seed 3 numbers them against it, and seed 4 is
- * the one-crate yard.
+ * it. Seed 3 numbers the crates against the way they are laid out, seed 4 is the one-crate yard,
+ * and the rest draw a numbering at random under `sweptFirst`.
  */
 export const w3_04: LevelDef = {
   id: 'w3-04',
@@ -219,6 +236,11 @@ export const w3_04: LevelDef = {
       label: 'The layout',
       value: 'The order the crates are numbered is not the order they are laid out.',
     },
+    {
+      label: 'Racks and aisles',
+      value:
+        'The rack rows are `y` 2, 3, 6 and 7, and every crate stands in one of them. The other four floor rows — `y` 1, 4, 5 and 8 — are aisle, so every rack row has an aisle running beside it. The outbound bay is the one pad tile in the yard, and it stands in an aisle.',
+    },
     { label: 'The clamp', value: 'One crate at a time.' },
     {
       label: 'Empty rack slots',
@@ -248,7 +270,8 @@ export const w3_04: LevelDef = {
     const count = seed === 4 ? 1 : rng.int(8, 16);
     const slots = rng.shuffle(racks).slice(0, count);
     const rowMajor = slots.slice().sort((a, b) => a.y - b.y || a.x - b.x);
-    const arrivals = seed === 1 ? rowMajor : seed === 3 ? rowMajor.reverse() : rng.shuffle(slots);
+    let arrivals = seed === 3 ? rowMajor.slice().reverse() : rng.shuffle(slots);
+    while (sweptFirst(arrivals, rowMajor)) arrivals = rng.shuffle(slots);
 
     arrivals.forEach((at, i) => {
       setTile(world, at, { terrain: Terrain.Floor, mark: String(i + 1) });

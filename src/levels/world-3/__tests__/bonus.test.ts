@@ -6,8 +6,8 @@
  * the second idea passes the level and is refused.
  */
 import { describe, expect, test } from 'vitest';
-import type { ObjectiveContext, Sim, TileView, Vec } from '../../../engine/index.ts';
-import { Dir, evaluateObjectives, vec } from '../../../engine/index.ts';
+import type { ObjectiveContext, Sim, TileView, Vec, World } from '../../../engine/index.ts';
+import { Dir, countItemsAt, evaluateObjectives, vec } from '../../../engine/index.ts';
 import { must } from '../../../engine/__tests__/helpers.ts';
 import { runLevel, runReference } from '../../harness.ts';
 import { SOLUTIONS } from '../../__tests__/solutions.ts';
@@ -15,6 +15,14 @@ import type { LevelDef, ReferenceSolution } from '../../types.ts';
 import { w3_01 } from '../w3-01.ts';
 import { w3_04 } from '../w3-04.ts';
 import { key } from '../yard.ts';
+
+function countCrates(world: World): number {
+  let total = 0;
+  for (let y = 0; y < world.h; y++) {
+    for (let x = 0; x < world.w; x++) total += countItemsAt(world, vec(x, y), 'crate');
+  }
+  return total;
+}
 
 function scored(level: LevelDef, seed: number, drive: (sim: Sim, bot: number) => void) {
   const result = runLevel(level, seed, drive);
@@ -89,17 +97,35 @@ describe('w3-01 straight-runs', () => {
   });
 
   /**
-   * Seed 1 fills both sidings, so every trip is flat and the answer is the crate count. That is
-   * the honest answer for that shift and it is also the memorable one, which is why the other two
-   * seeds have to refuse it: 4 of 5 on seed 2, and 1 of 3 on seed 3.
+   * `build` redraws the pads until the two sidings disagree by row, so no shift ever answers its
+   * own bonus with the crate count. That is the rule the level exists to teach, and a board that
+   * let `straight <crates>` through would teach the opposite — so every seed refuses every fixed
+   * figure, including the count of crates in front of the bot.
    */
-  test('a memorised figure is right on the full siding and nowhere else', () => {
-    const guess = (sim: Sim, botId: number): void => {
-      sim.print(botId, 'straight 6');
-    };
-    expect(scored(w3_01, 1, guess).met('straight-runs')).toBe(true);
-    expect(scored(w3_01, 2, guess).met('straight-runs')).toBe(false);
-    expect(scored(w3_01, 3, guess).met('straight-runs')).toBe(false);
+  test('no memorised figure is right on any seed', () => {
+    for (const seed of w3_01.seeds) {
+      for (let figure = 0; figure <= 6; figure++) {
+        const guess = (sim: Sim, botId: number): void => {
+          sim.print(botId, `straight ${String(figure)}`);
+        };
+        const met = scored(w3_01, seed, guess).met('straight-runs');
+        const answers = w3_01.seeds.filter((other) => scored(w3_01, other, guess).met('straight-runs'));
+        if (met) {
+          expect(answers, `figure ${String(figure)} answers more than seed ${String(seed)}`).toEqual([seed]);
+        }
+      }
+    }
+  });
+
+  /** The crate count is the figure a run reaches for first, and no shift accepts it. */
+  test('the crate count is never the answer', () => {
+    for (const seed of w3_01.seeds) {
+      const crates = countCrates(w3_01.build(seed));
+      const guess = (sim: Sim, botId: number): void => {
+        sim.print(botId, `straight ${String(crates)}`);
+      };
+      expect(scored(w3_01, seed, guess).met('straight-runs'), `seed ${String(seed)}`).toBe(false);
+    }
   });
 
   /** A do-nothing program files nothing, so the star is refused before the level even is. */
@@ -224,14 +250,14 @@ function aisleDisciplined(sim: Sim, botId: number): void {
  * star and it grades it with three slots to spare.
  *
  * What the star costs is ticks: the survey has to walk four aisles instead of every third row, and
- * the carries have to thread the slots the shift opened full. `aisleDisciplined` runs 513 / 221 /
+ * the carries have to thread the slots the shift opened full. `aisleDisciplined` runs 493 / 221 /
  * 393 / 92 against a par of 365, so on the two fifteen-crate seeds this star and the gold medal
  * cannot both be had. That is a real finding about the calibration and it is not a claim that the
  * star is unearnable.
  */
 describe('w3-04 aisle-discipline', () => {
   test('a round that stays in the aisles earns it on every seed', () => {
-    const trodden = [4, 3, 15, 8];
+    const trodden = [2, 3, 15, 8];
     w3_04.seeds.forEach((seed, i) => {
       const run = scored(w3_04, seed, aisleDisciplined);
       expect(run.passed, `seed ${String(seed)}`).toBe(true);

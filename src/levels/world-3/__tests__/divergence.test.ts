@@ -113,8 +113,8 @@ describe('w3-02 — the depot that ended short', () => {
     const shown = must(divergence, 'a divergence');
     expect(shown).toEqual({
       where: `the depot at ${at(depot.at)}`,
-      expected: owed === 1 ? '1 crate' : `${String(owed)} crates`,
-      received: '0 crates',
+      expected: `${owed === 1 ? '1 crate' : `${String(owed)} crates`} of its class`,
+      received: '0 crates of its class',
     });
     /* The stencil is the table the level exists to make the player build. */
     expect(shown.where).not.toContain(depot.kind);
