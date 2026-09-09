@@ -242,6 +242,11 @@ export const w4_04: LevelDef = {
       value: 'Each of the four is at the end of a short side passage off the main tunnels.',
     },
     {
+      label: 'The order',
+      value:
+        'For the star: counted from the **first** time the bot stands on each point. A survey that walks into a side chamber has already spent that point — read the chamber off a ray down the passage instead.',
+    },
+    {
       label: 'The clock',
       value:
         'It pays for one look around and one good circuit. It does not pay for three separate trips.',

@@ -81,7 +81,10 @@ export const w4_01: LevelDef = {
       value:
         'Returns the tiles along that direction, nearest first. It stops at the first thing it cannot see through.',
     },
-    { label: 'Looking', value: 'Free, and as often as you like.' },
+    {
+      label: 'Looking',
+      value: 'Costs no ticks. The star below is the only thing that counts rays.',
+    },
     { label: 'The pad', value: 'The only tile in the tunnel that is not plain floor.' },
     {
       label: 'The lamp',

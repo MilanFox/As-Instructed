@@ -183,6 +183,11 @@ export const w4_02: LevelDef = {
   ].join('\n'),
   facts: [
     {
+      label: 'The cave',
+      value:
+        'It forks. On most shifts some of the forks rejoin further in, so a passage can hand the bot back to a junction it has already stood at.',
+    },
+    {
       label: 'The ore vein',
       value: 'The one pad tile in the cave, set into the rock at the vein face.',
     },

@@ -220,12 +220,12 @@ export const w4_05: LevelDef = {
     {
       label: 'The veins',
       value:
-        'Ore faces set into the tunnel walls. Stand next to one and call `mine(dir)`. Ordinary rock cannot be cut.',
+        'Ore faces set into the tunnel walls. Stand next to one and call `mine(dir)`. The plain `wall` tiles around them cannot be cut — only an ore face can.',
     },
     {
       label: 'Fuel',
       value:
-        'Acting spends fuel equal to the ticks it costs. Looking, reading and waiting spend none.',
+        'Acting spends fuel equal to the ticks it costs. Looking, reading and waiting spend none. An action the tank cannot pay for does not happen: the shift ends where the bot is standing.',
     },
     {
       label: 'The tank',
@@ -300,5 +300,5 @@ export const w4_05: LevelDef = {
     'Before each step, ask what it would take to get home from where that step lands you. When the answer is more than the tank holds, you went too far one step ago.',
     'A program that can answer that question can also write the answer down. Work the route back out of the map you kept, count it, say it, and then drive it — in that order.',
   ],
-  docs: ['look', 'mine', 'refuel', 'memory'],
+  docs: ['look', 'mine', 'fuel', 'refuel', 'memory'],
 };
