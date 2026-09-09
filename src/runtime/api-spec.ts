@@ -562,7 +562,7 @@ power('node-1', 'on');`,
     name: 'receive',
     params: [],
     returns: 'string | null',
-    doc: 'Reads the next queued packet out of the listening post buffer, or null when the buffer is empty. Taking a packet is the only thing that shortens the buffer, so `buffered()` falls by one after every read that hands one back. What arrives, and when, is defined by the level and stated in its brief.',
+    doc: 'Reads the next queued packet out of the listening post buffer, or null when the buffer is empty. Taking a packet is the only thing that shortens the buffer, so `buffered()` falls by one after every read that hands one back. What arrives, and when, is defined by the level and stated in its brief. Reading the post costs two `probe` calls against a sensing budget: one to find the post, one to read it.',
     example: `let packet = receive();
 while (packet !== null) {
   print(packet);
@@ -577,7 +577,7 @@ while (packet !== null) {
     name: 'buffered',
     params: [],
     returns: 'number',
-    doc: 'Returns how many packets are still unread in the listening post buffer, and takes none of them out of it. `buffered() === 0` is how a program learns the band is quiet without spending a packet to find out, and the count is stable until `receive()` consumes one. A work order carrying no antenna reports 0.',
+    doc: 'Returns how many packets are still unread in the listening post buffer, and takes none of them out of it. `buffered() === 0` is how a program learns the band is quiet without spending a packet to find out, and the count is stable until `receive()` consumes one. A work order carrying no antenna reports 0. Asking costs two `probe` calls against a sensing budget, the same as `receive()`.',
     example: `if (buffered() === 0) {
   print('nothing on the band this shift');
 }`,

@@ -6,6 +6,7 @@ import {
   addBot,
   addMachine,
   createWorld,
+  senseTotals,
   setTile,
   tileAt,
   vec,
@@ -144,6 +145,33 @@ describe('buffered', () => {
     expect(sim.ops).toBeGreaterThan(0);
     expect(sim.finish().events.some((event) => event.kind === 'tileChange')).toBe(false);
     expect(tileAt(sim.world, ANTENNA)?.meta?.['rxNext']).toBeUndefined();
+  });
+
+  /**
+   * Free in ticks is not free in information. Both band reads bind to the antenna through
+   * `sim.probe`, so each one lands in `senseTotals` under `probe` and spends against a
+   * `withinSenses('probe', n)` budget — and each one spends *two*, not one: `antennaFor` probes the
+   * tile the bot is on to see whether it is the post, then the read probes the post it settled on
+   * by id. Both are real reads and the count is the same however the bot is standing.
+   *
+   * `w8-03` is the only work order where the overlap is reachable — its desk is a `Router`, which
+   * `ANTENNA_KINDS` matches, and it budgets twenty-six probes — so two `receive()` calls there take
+   * four. A budget that charges for a command it does not name is DESIGN.md §11.9, and the API docs
+   * for `receive` and `buffered` now name it. This pins the number they quote so the sentence
+   * cannot go stale.
+   */
+  test('a band read is two probes against a sensing budget', () => {
+    const { sim } = listeningPost(['alpha', 'beta']);
+    const { buffered, receive } = api(sim, ['buffered', 'receive']);
+    buffered?.();
+    receive?.();
+    expect(senseTotals(sim.finish())['probe']).toBe(4);
+  });
+
+  test('the charge is the same with the bot standing on the post', () => {
+    const { sim } = listeningPost(['alpha']);
+    expect(api(sim, ['buffered']).buffered?.()).toBe(1);
+    expect(senseTotals(sim.finish())['probe']).toBe(2);
   });
 });
 
