@@ -81,14 +81,25 @@ interface Drift {
 }
 
 /**
- * Seed 1 is the zero-drift instance: the plan is perfect and following it literally works, which
+ * Seed 2 is the zero-drift instance: the plan is perfect and following it literally works, which
  * is the only way a player ever gets to believe the plan. Seed 4 is heavy drift — five legs of
  * twelve have come down — so anything that trusts the plan without checking walks into rock.
  * Neither blind trust nor blind distrust survives the set (CURRICULUM.md §10).
+ *
+ * Zero drift is the degenerate case, so it is not seed 1. It used to be, and on it "decode the
+ * plan, walk it, never check" recovered the form outright — the honest general solution and a
+ * lazy one both passing the seed everyone starts on, which is what CURRICULUM.md §15.3 and
+ * DESIGN.md §11.5 forbid. Seeds 1 and 2 swapped rows; the seed *set* is unchanged, so seed 4 is
+ * still the slowest instance and par 116 is still measured off it.
+ *
+ * No seed ships shift 0. A zero shift leaves the traffic in clear, so a run that never looked for
+ * a key at all would read the packets straight off the band and file `plan 0 <legs>` without ever
+ * learning there was a cipher — a wrong general rule passing on the friendliest seed, which is
+ * what DESIGN.md §11.5 forbids.
  */
 const DRIFTS: Readonly<Record<number, Drift>> = Object.freeze({
-  1: { legs: 11, stale: 0, cipherKey: 0, decoys: 2, trunks: 7 },
-  2: { legs: 12, stale: 2, cipherKey: 41, decoys: 3, trunks: 7 },
+  1: { legs: 12, stale: 2, cipherKey: 41, decoys: 3, trunks: 7 },
+  2: { legs: 11, stale: 0, cipherKey: 58, decoys: 2, trunks: 7 },
   3: { legs: 12, stale: 3, cipherKey: 77, decoys: 3, trunks: 7 },
   4: { legs: 12, stale: 5, cipherKey: 13, decoys: 4, trunks: 7 },
   5: { legs: 11, stale: 3, cipherKey: 94, decoys: 3, trunks: 7 },
@@ -559,7 +570,7 @@ export const w8_04: LevelDef = {
     'working too, and every one of those is signed, filed and empty. The route to the one that is',
     'not was filed eleven months ago by the contractor who put it there. Most of it is still true.',
     '',
-    'Bring the form back up. The run ends with the form in the bot.',
+    'Bring the form up. The run ends once it is in the bot.',
   ].join('\n'),
   facts: [
     {
@@ -595,7 +606,7 @@ export const w8_04: LevelDef = {
     {
       label: 'What changed',
       value:
-        'Between a sixth and a third of the sections cross tunnel that has since come down. There is always a way round, and the plan does not know about it.',
+        'How much of the plan has gone stale changes from shift to shift: none of it on a good one, five groups of moves in twelve on the worst. There is always a way round a fall, six moves longer than the stretch it replaces, and the plan does not know about either.',
     },
     {
       label: 'Still true',
@@ -613,16 +624,21 @@ export const w8_04: LevelDef = {
   budget: { maxTicks: 3000 },
   build,
   objectives: [
-    Objectives.custom('form-recovered', 'Finish the shift holding KD-0001-T', holdsForm, {
-      divergence: (ctx) => ({
-        where: 'KD-0001-T at the end of the run',
-        expected: 'in the bot',
-        received: clipValue(formStanding(ctx)),
-      }),
-    }),
+    Objectives.custom(
+      'form-recovered',
+      'Finish the shift holding KD-0001-T, wherever the bot is standing',
+      holdsForm,
+      {
+        divergence: (ctx) => ({
+          where: 'KD-0001-T at the end of the run',
+          expected: 'in the bot',
+          received: clipValue(formStanding(ctx)),
+        }),
+      },
+    ),
     Objectives.custom(
       'bot-intact',
-      'Bring the bot back in one piece',
+      'Finish the shift with the bot in one piece',
       (ctx) => ctx.world.bots[0]?.alive === true,
       { divergence: died },
     ),
@@ -659,5 +675,5 @@ export const w8_04: LevelDef = {
     'Throwing the plan away is a correct program. Count how much of the workings it makes you walk.',
     'Nothing in the tunnel will ever tell you what shift the traffic came in under. The only thing that knows is the checksum, and there are only ninety-five things to ask it.',
   ],
-  docs: ['decode', 'receive', 'look', 'canMove', 'pickup'],
+  docs: ['decode', 'receive', 'probe', 'look', 'canMove', 'pickup'],
 };

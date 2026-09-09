@@ -489,6 +489,17 @@ describe('w8-05 reports the finale without driving the finale', () => {
     const shown = must(divergence, 'a divergence');
     expect(shown.where).toBe('sub-3');
     expect(shown.expected).toBe('a station this run started after its feeders');
+    expect(shown.received).toBe('this run never started it');
+  });
+
+  test('a note naming no station at all is told that instead', () => {
+    const { met, divergence } = report(w8_05, seed, 'name-the-hold', (sim, botId) => {
+      sim.print(botId, 'held sub-99 40');
+    });
+
+    expect(met).toBe(false);
+    const shown = must(divergence, 'a divergence');
+    expect(shown.where).toBe('sub-99');
     expect(shown.received).toBe('nothing on the site answers to that');
   });
 });

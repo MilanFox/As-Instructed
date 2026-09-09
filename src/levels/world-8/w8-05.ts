@@ -123,7 +123,7 @@ function instanceFor(seed: number): Instance {
  * taking that ancestry out of order, so the door is gated on the grid coming up rather than on a
  * bot detouring past one machine.
  *
- * It buys 2, 9 and 4 feeders on seeds 1, 4 and 7 — on the chain seed the entire grid, which is the
+ * It buys 2, 9 and 5 feeders on seeds 1, 4 and 7 — on the chain seed the entire grid, which is the
  * seed where the grid is least parallelisable and the errand has the most reason to start early.
  */
 function feederIndex(deps: readonly (readonly number[])[], stationAt: Vec[], gate: Vec): number {
@@ -559,7 +559,7 @@ function darkStation(ctx: ObjectiveContext): { id: string; at: Vec; reason: stri
     if (station.state === 'on' && switched.has(station.id)) continue;
     const reason = switched.has(station.id)
       ? `${station.state} — used an even number of times`
-      : 'never used; no bot stood on it';
+      : 'never used; no bot worked this tile';
     return { id: station.id, at: station.at, reason };
   }
   return undefined;
@@ -590,12 +590,13 @@ function sealedAirlock(ctx: ObjectiveContext): Divergence | undefined {
   const feeder = airlockFeeder(ctx.world);
   const station = feeder === null ? undefined : machineById(ctx.world, feeder);
   const dark = station !== undefined && station.state !== 'on';
+  const moved = machineUseLog(ctx).filter((record) => record.machineId === 'airlock').length;
   return {
     where: `airlock at ${point(airlock.at)}`,
     expected: `open — ${String(AIRLOCK_STAGES)} uses, with ${feeder ?? 'its feeder'} on`,
     received: dark
       ? `${feeder as string} is ${station.state}; the gate took the ticks`
-      : `${airlock.state}; the chamber is still walled off`,
+      : `${airlock.state} after ${String(moved)} uses that moved it`,
   };
 }
 
@@ -768,11 +769,17 @@ function misreadHold(ctx: ObjectiveContext): Divergence {
   }
   const own = holdsIn(ctx).get(claim.id);
   if (own === undefined) {
-    return {
-      where: claim.id,
-      expected: 'a station this run started after its feeders',
-      received: 'nothing on the site answers to that',
-    };
+    const expected = 'a station this run started after its feeders';
+    const known = machinesWithPrefix(ctx.initialWorld, STATION_PREFIX).some(
+      (station) => station.id === claim.id,
+    );
+    if (!known) {
+      return { where: claim.id, expected, received: 'nothing on the site answers to that' };
+    }
+    if (!machineUseLog(ctx).some((record) => record.machineId === claim.id)) {
+      return { where: claim.id, expected, received: 'this run never started it' };
+    }
+    return { where: claim.id, expected, received: 'no feeder of it finished this run' };
   }
   return {
     where: claim.id,
@@ -887,7 +894,10 @@ function misreadGate(ctx: ObjectiveContext): Divergence {
     return {
       where: 'the airlock',
       expected: 'a gate somebody moved this shift',
-      received: gateMovedAt(ctx) === undefined ? 'nobody moved it' : 'its substation stayed off',
+      received:
+        gateMovedAt(ctx) === undefined
+          ? 'nobody moved it'
+          : `nobody threw ${feeder ?? 'its substation'}`,
     };
   }
   return {
@@ -938,8 +948,8 @@ export function filedIn(world: World): 'charter' | 'renewals' | null {
 
 const BRIEF = [
   'dot: the Yards run this every night, so nothing is where it was yesterday. the',
-  'airlock past the Yards has cycled on a nine-tick clock since before I got here,',
-  'and it draws off the grid. nobody wrote that down because nobody had to.',
+  'airlock past the Yards has wanted the same nine turns of the handle since before I',
+  'got here, and it draws off the grid. nobody wrote that down because nobody had to.',
   '',
   'Bring the grid up, clear the crates, and file KD-0001-T.',
   '',
@@ -952,7 +962,7 @@ const FACTS = [
   {
     label: 'The desk',
     value:
-      '`probe("desk")` publishes `stations` and `classes`. The stations are `sub-0` up to `sub-N`.',
+      '`probe("desk")` publishes `stations`, `classes` and `crates`. The stations are `sub-0` up to `sub-N`.',
   },
   {
     label: 'Feeders',
@@ -962,21 +972,22 @@ const FACTS = [
   {
     label: 'The order rule',
     value:
-      'A station may not **start** until every feeder has **finished**. Read off the use log, not the final state.',
+      'A station may not **start** until every feeder has **finished**. Read off the use log, not the final state. Every record in that log carries the clock of the bot that made it, and each bot keeps its own — **before** here means a lower tick, not an earlier line of your program.',
   },
   {
     label: 'Energising',
-    value: 'The cycle is `off`, `on` and it wraps. Using a station twice turns it back off.',
+    value:
+      'Every substation is hand-operated: stand on it, or beside it and pass the direction, and call `use()`. `power()` reaches none of them — `probe(id).vars.manual` is 1 on every one. The cycle is `off`, `on` and it wraps, so using a station twice turns it back off. A `use()` costs one tick here, so a station **finishes** one tick after it is thrown.',
   },
   {
     label: 'The quota',
     value:
-      'Each class has one sink, `depot-<class>` — `ore`, `ice`, `scrap`, `part` or `cell`. A crate still in a bot is not delivered.',
+      'Each class has one sink, `depot-<class>` — `ore`, `ice`, `scrap`, `part` or `cell`. Deliver by dropping the crate on the sink’s own tile; a crate still in a bot is not delivered, and a crate on the wrong class’s tile is not either. Only the classes the desk counts are on site tonight. These sinks are machines, and nothing to do with the fuel depot **terrain** below.',
   },
   {
     label: 'The band',
     value:
-      '`antenna` is live. `receive()` returns the next line or `null`. Nothing on it tonight is enciphered or corrupt.',
+      '`antenna` is live. `receive()` reads it from anywhere on the site, for nothing, and returns the next line or `null`. It is one queue for the whole fleet — a line one bot takes never comes back to another. Nothing on it tonight is enciphered or corrupt.',
   },
   {
     label: 'A line',
@@ -986,17 +997,17 @@ const FACTS = [
   {
     label: 'Fuel',
     value:
-      'Every bot starts full and a full cell has no gauge, so `fuel()` before anybody moves is the number. `refuel()` works on any depot tile, and there are several.',
+      'Every bot starts full and a full cell has no gauge, so `fuel()` before anybody moves is the number. Every bot needs the pumps more than once tonight. `refuel()` works on any depot **tile** — the terrain, not a `depot-<class>` sink: the muster bay has one on the row the desk stands on, and the rest are scattered over the site — no packet lists them, so `scan()` and `look()` on the terrain are how you find them. A bot that reaches zero does not stop on its own — it ends the shift for the whole fleet.',
   },
   {
     label: 'The airlock',
     value:
-      'Starts sealed. One `use()` advances one stage for one tick, and `probe("airlock")` publishes `vars.stages` — the uses it takes to open. It stays open after that.',
+      'Starts sealed, and is hand-operated like the substations. One `use()` advances one stage for one tick, and `probe("airlock")` publishes `vars.stages` — the nine uses it takes to open. The cycle wraps: a tenth `use()` seals it again and walls the chamber back up, so read the state rather than counting. The two tiles behind the door are the only way in.',
   },
   {
     label: 'What opens it',
     value:
-      'The door runs off the grid. `probe("airlock").vars` carries a `fed:sub-N` key: until that substation reads `on`, every `use()` at the gate costs its tick and does nothing.',
+      'The door runs off the grid. `probe("airlock").vars` carries a `fed:sub-N` key: until that substation reads `on`, every `use()` at the gate costs its tick and does nothing. It is the station furthest down the grid, never a root, so the order rule puts its whole ancestry in front of the errand east.',
   },
   {
     label: 'The form',
@@ -1004,14 +1015,19 @@ const FACTS = [
       'KD-0001-T is a chip on a marked tile in the workings. `probe` gives the positions of `slot-charter` and `slot-renewals`.',
   },
   {
+    label: 'The shift',
+    value:
+      'The work order fails if the last bot stops after tick **3000**. Par is 1050, so the shift is the wall and par is the medal — a slow, honest program closes this inside the shift.',
+  },
+  {
     label: 'Hand-over note',
     value:
-      'One line, `held <station> <n>`: the substation that stood longest between its last feeder finishing and its own first `use()`, and how many ticks that was.',
+      'One line, `held <station> <n>`: the substation that stood longest between its last feeder **finishing** and its own first `use()`, and how many ticks that was. Only fed stations have a stand — a root waited for nothing. If two are tied, either answers.',
   },
   {
     label: 'Gate note',
     value:
-      'One line, `gate <station> <n>`: the substation the airlock draws from, and the ticks between that substation being thrown and the gate first moving.',
+      'One line, `gate <station> <n>`: the substation the airlock draws from, and the ticks between that substation being **thrown** — the tick of the `use()`, not the tick it finished — and the gate first moving. Both are read off the clock of whichever bot did it, so a fleet that never squares its clocks is subtracting two different ones.',
   },
 ];
 
@@ -1019,7 +1035,7 @@ const STARTER = [
   "// import { reach, dispatch } from 'lib';",
   '',
   '// NOTE(4470): the whole site runs on your code now. mine is all switched off',
-  '// NOTE(4470): the airlock runs on its own clock and on our power. it needs both',
+  '// NOTE(4470): the airlock wants a hand on the handle and our power. it needs both',
   '',
   'const fleet = bots();',
   'print(`fleet: ${fleet.length}`);',
@@ -1135,7 +1151,7 @@ export const w8_05: LevelDef = {
        would have had to guess a meter for the bar and would have drawn the wrong one. */
     Objectives.custom(
       'name-the-hold',
-      'Name the substation your order left standing longest',
+      'Name the substation your order left standing longest, and how long it stood',
       longestHoldFiled,
       { divergence: misreadHold },
     ),
@@ -1168,5 +1184,5 @@ export const w8_05: LevelDef = {
       'If you want to know which one your order kept standing about, you have to read ' +
       'the clock as you throw each one.',
   ],
-  docs: ['fuel', 'refuel', 'power', 'use', 'receive', 'probe'],
+  docs: ['fuel', 'refuel', 'power', 'use', 'receive', 'probe', 'clock', 'scan', 'look'],
 };

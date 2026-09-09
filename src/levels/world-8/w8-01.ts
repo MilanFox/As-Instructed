@@ -71,10 +71,14 @@ function build(seed: number): World {
     vars: { x: plan.corner.x, y: plan.corner.y },
   });
 
-  const far = (at: Vec): number =>
-    Math.abs(at.x - plan.corner.x) + Math.abs(at.y - plan.corner.y);
+  const far = (at: Vec): number => Math.abs(at.x - plan.corner.x) + Math.abs(at.y - plan.corner.y);
   const pool = rng.shuffle(fieldTiles());
-  const ordered = plan.far ? pool.slice().sort((a, b) => far(b) - far(a)).slice(0, 24) : pool;
+  const ordered = plan.far
+    ? pool
+        .slice()
+        .sort((a, b) => far(b) - far(a))
+        .slice(0, 24)
+    : pool;
   const chosen = plan.far ? rng.shuffle(ordered) : ordered;
 
   const green = rng.int(3, 6);
@@ -294,12 +298,14 @@ export const w8_01: LevelDef = {
     { label: 'One beam', value: 'Every `look()` is one beam, however far it reaches.' },
     {
       label: '`scan()`',
-      value: 'Reads the tile under the bot and the four beside it. Costs ticks, not beams.',
+      value:
+        'Reads the tile under the bot and the four beside it. Free, and off the beam budget — but only those five, so the price is the walk.',
     },
     { label: 'Ripe', value: 'A crop still green at the start does not count and does not travel.' },
     {
       label: 'The bot',
-      value: 'Carries a fixed number of crops. The number changes between shifts.',
+      value:
+        'Carries a fixed number of crops. The number changes between shifts, and nothing on the bot reports it — a harvest into full arms comes back empty and still costs its ticks.',
     },
     {
       label: 'Audit note',
@@ -338,12 +344,9 @@ export const w8_01: LevelDef = {
        any run-wide total, so `budgetFor` would have had to guess a meter for the bar and would
        have drawn the wrong one. A star with no honest meter to show gets no bar rather than a
        dishonest one. */
-    Objectives.custom(
-      'name-the-row',
-      'Name the row that held the most ripe crop',
-      auditFiled,
-      { divergence: misreadAudit },
-    ),
+    Objectives.custom('name-the-row', 'Name the row that held the most ripe crop', auditFiled, {
+      divergence: misreadAudit,
+    }),
     Objectives.withinSenses('look', TIGHT_SURVEY, {
       label: `Survey the field on ${String(TIGHT_SURVEY)} beams — one a row`,
     }),

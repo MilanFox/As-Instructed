@@ -236,7 +236,12 @@ export const w8_02: LevelDef = {
     {
       label: 'A bay',
       value:
-        'Shows up as a `machineId` on any tile you can see. `probe(id)` reports it from anywhere after that.',
+        'Shows up as a `machineId` on any tile you can see, and `probe("depot-ore")` reports one from anywhere whether you have seen it or not. Knowing where a bay is does not map the rock in between.',
+    },
+    {
+      label: 'The manifest',
+      value:
+        'You do not have a copy. Nothing tells the bot how many crates are on the floor until it has looked at the floor.',
     },
     {
       label: 'Bay ids',
@@ -249,7 +254,16 @@ export const w8_02: LevelDef = {
         'Hold a fixed number of crates, with no gauge. A `pickup` that takes fewer than the tile offered means full.',
     },
     { label: 'Delivered', value: 'Lying on the right bay tile when the shift ends.' },
-    { label: 'The budget', value: 'Par does not allow a full survey and then a delivery round.' },
+    {
+      label: 'Sighted',
+      value:
+        'A crate or a bay counts as sighted the moment it stands in a straight, unblocked line — same row or column — from a tile the bot is on. Beam or no beam.',
+    },
+    {
+      label: 'The budget',
+      value:
+        'Par grades the whole shift. The star is the tight one: half the crates on their bays before the last crate or bay has been sighted.',
+    },
   ],
   seeds: [1, 2, 3, 4, 5],
   par: { ticks: PAR_TICKS },
@@ -312,7 +326,7 @@ export const w8_02: LevelDef = {
   hints: [
     'Nothing here is known before the shift starts. The bot learns by looking, and it keeps only what your program writes down.',
     'You can route through a tile you have seen. Asking for one the record does not know yet is normal here: look around, then ask again.',
-    'There is not enough budget to walk the depot once for looking and once for carrying.',
+    'Walking the depot once for looking and once for carrying loses the star: by the time the last crate is in view, half of them have to be on their bays already.',
     'Full arms are wasted arms. A bay you walk past with the right crate on board is much cheaper than a bay you come back to.',
     'The bot cannot know how many crates exist until it has seen the whole floor. That is a reason to keep looking, not a reason to stop carrying.',
   ],

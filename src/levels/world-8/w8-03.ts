@@ -268,9 +268,18 @@ export const w8_03: LevelDef = {
     {
       label: 'The desk',
       value:
-        '`probe("desk")`. Its `vars.stations` is how many substations there are, named `sub-0` up to `sub-<n-1>`.',
+        '`probe("desk")`. Its `vars.stations` is how many substations there are, named `sub-0` up to `sub-<n-1>`, and its `vars.shift` is how many ticks Finance allocated.',
     },
-    { label: 'A station', value: '`probe(id)` reads any machine from anywhere, for nothing.' },
+    {
+      label: 'The shift',
+      value:
+        'Overrunning `vars.shift` fails the work order. It is set from the grid — the longest chain of feeders and the round the busiest bot has to walk — so it moves with the layout.',
+    },
+    {
+      label: 'A station',
+      value:
+        '`probe(id)` reads any machine from anywhere and costs no ticks. The calls are counted, though — the survey bonus is scored on how many the whole fleet makes, not how many each bot makes.',
+    },
     {
       label: 'Feeders',
       value:
@@ -286,7 +295,11 @@ export const w8_03: LevelDef = {
       value:
         'A station may not **start** until every feeder has **finished**. A `use` at tick 40 finishes at 42, so 42 is legal and 41 is not. Read off the log, not the final state.',
     },
-    { label: 'The plain', value: 'Open. The cable on the ground is walkable.' },
+    {
+      label: 'The plain',
+      value:
+        'Open. The cable on the ground is walkable. The layout and the feeder lists are fixed before the shift starts — the only thing that changes while you run is a station state.',
+    },
     { label: 'Your score', value: 'The clock stops when the last bot stops.' },
   ],
   seeds: [1, 2, 3, 4, 5],
@@ -341,19 +354,23 @@ export const w8_03: LevelDef = {
     for (const site of sites) setTerrain(world, site, Terrain.Cable);
     setTerrain(world, DESK, Terrain.Pad);
 
+    const crew = Math.max(1, Math.min(layout.bots, CREW.length));
+    for (let i = 0; i < crew; i++) {
+      addBot(world, { at: CREW[i] as Vec, facing: Dir.East, name: `RIG-8${String(30 + i)}` });
+    }
+
+    /* Posted after the fleet is on the pad because the shift is a function of it: `deadlineFor`
+       divides the stations across the crew. A budget the player can only learn by overrunning it
+       is the trap `MANUAL_ONLY` is written to avoid, so it rides in `vars` where `probe` publishes
+       it, next to the station count that is read in the same call. */
     addMachine(world, {
       id: 'desk',
       kind: MachineKind.Router,
       at: DESK,
       state: 'on',
       inventory: [],
-      vars: { stations: layout.stations },
+      vars: { stations: layout.stations, shift: deadlineFor(world) },
     });
-
-    const crew = Math.max(1, Math.min(layout.bots, CREW.length));
-    for (let i = 0; i < crew; i++) {
-      addBot(world, { at: CREW[i] as Vec, facing: Dir.East, name: `RIG-8${String(30 + i)}` });
-    }
     return world;
   },
   objectives: [
@@ -400,7 +417,7 @@ export const w8_03: LevelDef = {
     ),
     Objectives.custom(
       'within-shift',
-      "Finish the whole grid inside the shift's deadline",
+      'Finish the whole grid inside the shift the desk posts',
       (ctx) => ctx.trace.endTick <= deadlineFor(ctx.initialWorld),
       {
         progress: (ctx) => [ctx.trace.endTick, deadlineFor(ctx.initialWorld)],
@@ -412,12 +429,13 @@ export const w8_03: LevelDef = {
   ],
   bonus: [
     Objectives.withinSenses('probe', SURVEY_BUDGET, {
-      label: `Plan the restart on ${String(SURVEY_BUDGET)} reads or fewer`,
+      label: `Plan the restart on ${String(SURVEY_BUDGET)} probe() calls or fewer`,
     }),
   ],
   starter: [
     "// import { waves, deal, pathTo } from 'lib';",
-    '// The desk publishes how many substations there are. Each one publishes its own feeders.',
+    '// The desk publishes how many substations there are and how long the shift is.',
+    '// Each station publishes its own feeders.',
     '',
     'const count = probe("desk").vars.stations;',
     'for (let i = 0; i < count; i++) {',

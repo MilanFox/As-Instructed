@@ -8,7 +8,7 @@
  */
 import { describe, expect, test } from 'vitest';
 import type { ObjectiveContext, Sim, Trace } from '../../../engine/index.ts';
-import { evaluateObjectives } from '../../../engine/index.ts';
+import { evaluateObjectives, machineById, manhattan } from '../../../engine/index.ts';
 import { must } from '../../../engine/__tests__/helpers.ts';
 import { runLevel, runReference } from '../../harness.ts';
 import { SOLUTIONS } from '../../__tests__/solutions.ts';
@@ -156,7 +156,7 @@ describe('w8-04 read-the-plan', () => {
   });
 
   test('a guessed shift is refused, and no one shift is right on every layout', () => {
-    for (const guess of [0, 13, 41, 77, 94]) {
+    for (const guess of [13, 41, 58, 77, 94]) {
       const all = w8_04.seeds.every(
         (seed) =>
           reportedAs(w8_04, seed, 'plan', (line) => `plan ${String(guess)} ${line.split(' ')[2] ?? ''}`).met(
@@ -164,6 +164,18 @@ describe('w8-04 read-the-plan', () => {
           ),
       );
       expect(all, String(guess)).toBe(false);
+    }
+  });
+
+  /**
+   * Shift 0 leaves the traffic in clear, so it is the reading a run that never looked for a key
+   * would file. It used to be seed 1's shift, which meant the friendliest seed rewarded never
+   * noticing the cipher. No seed ships it now, and this is what keeps one from being added back.
+   */
+  test('the shift a run that never decoded would file is refused on every seed', () => {
+    for (const seed of w8_04.seeds) {
+      const run = reportedAs(w8_04, seed, 'plan', (line) => `plan 0 ${line.split(' ')[2] ?? ''}`);
+      expect(run.met('read-the-plan'), `seed ${String(seed)}`).toBe(false);
     }
   });
 
@@ -294,6 +306,32 @@ describe('w8-05 mind-the-gate', () => {
       });
       expect(run.met('mind-the-gate'), `seed ${String(seed)}`).toBe(false);
     }
+  });
+
+  /* On seed 1 the station the door draws from is also the one standing nearest the gate, so the
+     friendliest seed cannot tell "read `fed:sub-N` off the door" from "guess the nearest one".
+     The seed list has to refuse the guess somewhere, and it does — on the chain seed the nearest
+     station is halfway up the grid, and on seed 7 it is a root. */
+  test('a guess at the station nearest the gate is refused somewhere in the seed list', () => {
+    const refused = w8_05.seeds.filter((seed) => {
+      const world = w8_05.build(seed);
+      const airlock = must(machineById(world, 'airlock'), 'the airlock');
+      const nearest = must(
+        world.machines
+          .filter((machine) => machine.id.startsWith('sub-'))
+          .sort((a, b) => manhattan(a.at, airlock.at) - manhattan(b.at, airlock.at))[0],
+        'a substation',
+      );
+      const run = reportedAs(
+        w8_05,
+        seed,
+        'gate',
+        (line) => `gate ${nearest.id} ${line.split(' ')[2] ?? ''}`,
+      );
+      return !run.met('mind-the-gate');
+    });
+
+    expect(refused.length).toBeGreaterThan(0);
   });
 
   /* The station count is on the desk and the shift length is on the rail, so a note assembled out
