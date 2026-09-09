@@ -1042,7 +1042,7 @@ const FACTS = [
   {
     label: 'The airlock',
     value:
-      'Starts sealed, and is hand-operated like the substations. One `use()` advances one stage for one tick, and `probe("airlock")` publishes `vars.stages` — the nine uses it takes to open. The cycle wraps: a tenth `use()` seals it again and walls the chamber back up, so read the state rather than counting. The two tiles behind the door are the only way in.',
+      'Starts sealed, and is hand-operated like the substations. One `use()` advances one stage for one tick, and `probe("airlock")` publishes `vars.stages` — the nine uses it takes to open. The cycle wraps: a tenth `use()` seals it again and walls the chamber back up, so read the state rather than counting. `probe("airlock").links` gives the two gate tiles it walls off, drawn on the board as a tether from the gate to each of them; they are the only way in.',
   },
   {
     label: 'What opens it',

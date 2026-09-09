@@ -34,6 +34,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import { REVIEW_TIERS } from '../game/score.ts';
 import { DIRECTIONS } from '../render/theme.ts';
+import { PLAYER_API } from '../runtime/api-spec.ts';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const SRC = join(ROOT, 'src');
@@ -95,6 +96,11 @@ const REGISTRY: readonly Confession[] = [
     file: 'src/engine/sim.ts',
     says: '`FUEL_BURNING` in trace.ts mirrors this',
     guard: 'a constant that claims to be the only copy is the only copy',
+  },
+  {
+    file: 'src/runtime/api-spec.ts',
+    says: 'Mirrors `MachineView` in `src/engine/sim.ts`',
+    guard: 'every hand-written declaration has the fields the engine interface has',
   },
 
   // --- Class B: ordinary English. Reword, do not guard. ---
@@ -439,6 +445,54 @@ test('CelebrationKind is spelled the same on both sides of the port', () => {
   const port = union('src/game/ports.ts');
   expect(port.length).toBeGreaterThan(1);
   expect(union('src/render/renderer.ts')).toEqual(port);
+});
+
+/**
+ * The `.d.ts` the player's editor reads, against the interfaces the engine actually hands back.
+ *
+ * `api-spec.ts` keeps every ambient declaration as a template *string*, because Monaco is given
+ * text and not a module. That is the right shape and it has one cost: `tsc` type-checks the
+ * engine's `MachineView` and reads the spec's copy as a sequence of characters, so the two can
+ * disagree for as long as nobody looks. The drift is silent in the worst direction — the engine
+ * returns a field, the declaration omits it, and the editor calls the player's correct line a type
+ * error on a field the runtime is already populating.
+ *
+ * Field *names* and not types: the declaration is written for a reader without the engine's
+ * imports, so `Terrain` on one side may be a narrowed union on the other and that is deliberate.
+ * A missing or extra name is the failure this exists for.
+ *
+ * `Bot` is excluded and named rather than filtered by a rule. The engine's `Bot` is the record a
+ * simulated robot *is*; the spec's `Bot` is the handle `bot(id)` returns, generated from the
+ * unlocked function list by `botHandleDeclaration`. They share a name and nothing else, and the
+ * generated one has no hand-written copy to drift from.
+ */
+const MIRRORED_VIEWS = ['Vec', 'ItemStack', 'TileView', 'MachineView', 'Message'];
+
+test('every hand-written declaration has the fields the engine interface has', () => {
+  const engine = [read('src/engine/sim.ts'), read('src/engine/types.ts')].join('\n');
+
+  const body = (source: string, name: string): string | undefined => {
+    const opening = new RegExp(`interface ${name} \\{`).exec(source);
+    if (!opening) return undefined;
+    const from = opening.index + opening[0].length;
+    return source.slice(from, source.indexOf('\n}', from));
+  };
+  const fields = (block: string): string[] =>
+    [...block.matchAll(/^ {2}(\w+)\??:/gm)].map((found) => found[1] as string);
+
+  const handWritten = PLAYER_API.types
+    .filter((type) => type.declaration.startsWith('interface '))
+    .map((type) => type.name);
+  expect(handWritten).toEqual([...MIRRORED_VIEWS, 'Bot']);
+
+  for (const name of MIRRORED_VIEWS) {
+    const spec = PLAYER_API.types.find((type) => type.name === name)?.declaration ?? '';
+    const declared = body(spec, name);
+    const real = body(engine, name);
+    expect([name, 'declared', declared !== undefined]).toEqual([name, 'declared', true]);
+    expect([name, 'in the engine', real !== undefined]).toEqual([name, 'in the engine', true]);
+    expect([name, fields(declared ?? '')]).toEqual([name, fields(real ?? '')]);
+  }
 });
 
 /**

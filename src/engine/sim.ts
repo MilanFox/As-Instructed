@@ -77,6 +77,43 @@ export interface MachineView {
   state: string;
   vars: Record<string, number>;
   inventory: ItemStack[];
+  /**
+   * The cells this machine's own state moves — `Machine.links`, the tiles whose terrain flips when
+   * it opens (`types.ts:167`). Empty on every machine that moves nothing, which is all but one.
+   *
+   * This is DESIGN.md §11.7's third leg, and it was the leg missing. `w8-05`'s airlock walls off
+   * two gate tiles and they are the only way into the chamber the level grades reaching. The board
+   * now says so — `drawTether` runs a hairline from the machine to each cell, dashed while the gate
+   * is shut — but until this field existed a program could not ask which two tiles those were. The
+   * only route was to crank the door through its nine stages and look at what changed, which is
+   * `w2-04`'s `0/8` with a wall in front of it: state that matters, reachable only by paying for
+   * the action you were trying to decide on.
+   *
+   * **A field on `probe`, not a command of its own.** `w8-05` is the only work order in the game
+   * carrying a machine with `links`, and CURRICULUM.md §10 says World 8 unlocks no new hardware —
+   * so a dedicated call would have had to be requisitioned on the finale, against that rule, or
+   * three worlds early where it would return `[]` until the last level of the campaign. Riding the
+   * snapshot `probe` already returns gates it exactly as hard as machines themselves are gated:
+   * `MachineView` reaches the player's editor when `probe` does and not before (`w5-01`).
+   *
+   * **Cells, not the machine graph.** The other two things `drawTether` draws — `link:<id>` and
+   * `fed:<id>` — already ride in `vars`, and `use`'s own API doc teaches reading them, so ids here
+   * would be a second copy of a fact the player can already reach. The cells had no route at all.
+   *
+   * **Coordinates, not what the tiles become.** These are authored at build time and never move,
+   * so publishing them says *which* walls open and never *when* or how — the nine `use()` calls and
+   * the feeder's whole ancestry are still the level. A field saying what the terrain will be once
+   * the door opens would answer "is it open yet" from across the site, and that question belongs to
+   * the board and to `scan`.
+   *
+   * **Free, and not by inheritance.** `probe` costs nothing, and the encoding the audit offered as
+   * the alternative — the level writing `gate:<x>,<y>: 1` keys into `vars` the way `fed:` writes an
+   * id — would have been free through `probe` too. Any price attached to a dedicated call would
+   * therefore have been a tax on the encoding rather than on the information, and would push a
+   * program straight back to opening the door to find out. Nothing is added to `DEFAULT_COSTS`,
+   * which is what keeps `api-cost-parity.test.ts` at its fourteen compared pairs.
+   */
+  links: Vec[];
 }
 
 const OUT_OF_BOUNDS_TERRAIN = Terrain.Void;
@@ -328,6 +365,7 @@ export class Sim {
       state: machine.state,
       vars: { ...machine.vars },
       inventory: machine.inventory.map((s) => ({ kind: s.kind, count: s.count })),
+      links: (machine.links ?? []).map((at) => ({ x: at.x, y: at.y })),
     };
   }
 

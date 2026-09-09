@@ -135,6 +135,10 @@ declare const ItemKind: {
   },
   {
     name: 'MachineView',
+    /* Mirrors `MachineView` in `src/engine/sim.ts`. Every declaration in this file is a string, so
+       `tsc` compares nothing here and a field added to the engine type and forgotten here is a
+       field the editor refuses to let the player read. Guarded by
+       `src/__tests__/confessed-invariants.test.ts`. */
     declaration: `interface MachineView {
   id: string;
   kind: string;
@@ -142,8 +146,9 @@ declare const ItemKind: {
   state: string;
   vars: Record<string, number>;
   inventory: ItemStack[];
+  links: Vec[];
 }`,
-    doc: 'A read-only snapshot of one machine. `state` is free-form but stable per machine kind, typically one of `idle`, `on`, `off`, `open`, `closed` or `busy`.',
+    doc: "A read-only snapshot of one machine. `state` is free-form but stable per machine kind, typically one of `idle`, `on`, `off`, `open`, `closed` or `busy`. `links` lists the tiles this machine's state moves — the gate a door walls off, which turns back to floor when it opens — and is empty on a machine that moves none.",
   },
   {
     name: 'Message',
@@ -512,7 +517,7 @@ refuel();`,
       },
     ],
     returns: 'MachineView | null',
-    doc: 'Returns a read-only snapshot of the machine under the bot, or of the one on the tile the bot faces, or of `machineId` anywhere in the world. Returns null when there is no such machine.',
+    doc: "Returns a read-only snapshot of the machine under the bot, or of the one on the tile the bot faces, or of `machineId` anywhere in the world. Returns null when there is no such machine. The snapshot's `links` names the tiles that machine's state moves, so a gate can be routed to before anything has opened it.",
     example: `const node = probe('node-1');
 if (node !== null && node.state === 'off') {
   print(\`\${node.id} is cold\`);
