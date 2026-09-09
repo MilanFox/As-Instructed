@@ -79,9 +79,10 @@ describe('w7-01 name-the-idle', () => {
   });
 
   /**
-   * The star is not free to a run that assumes a balanced pair. Seed 1's corridors are equal and
-   * both bots really do idle for nothing; seeds 2 and 3 are the unequal ones, and the guess is
-   * refused there — which is what stops `0` from being a memorised answer.
+   * The star is not free to a run that assumes a balanced pair. Seeds 1 and 2 are the unequal
+   * ones and the guess is refused on both — seed 1 included, so the memorised `0` is caught on
+   * the first seed the player runs rather than after a pass. Seed 3 is the equal pair, where both
+   * bots really do idle for nothing and `0` is simply the right answer.
    */
   test('reporting no idle at all is only right on the balanced pair', () => {
     const guess = (sim: Sim): void => {
@@ -94,9 +95,9 @@ describe('w7-01 name-the-idle', () => {
         sim.print(id, `idle ${String(id)} 0`);
       }
     };
-    expect(scored(w7_01, 1, guess).met('name-the-idle')).toBe(true);
+    expect(scored(w7_01, 1, guess).met('name-the-idle')).toBe(false);
     expect(scored(w7_01, 2, guess).met('name-the-idle')).toBe(false);
-    expect(scored(w7_01, 3, guess).met('name-the-idle')).toBe(false);
+    expect(scored(w7_01, 3, guess).met('name-the-idle')).toBe(true);
   });
 });
 

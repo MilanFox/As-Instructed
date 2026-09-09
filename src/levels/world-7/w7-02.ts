@@ -153,7 +153,7 @@ export const w7_02: LevelDef = {
   ].join('\n'),
   facts: [
     { label: 'Your score', value: 'The clock stops when the **last** bot stops.' },
-    { label: 'The depot', value: '`probe("depot")` is free from anywhere on the apron.' },
+    { label: 'The depot', value: '`probe("depot")` is free, and reaches it from anywhere on site.' },
     {
       label: 'Fleet size',
       value: '`vars.requisition` — how many bots you may have, counting the one already here.',
@@ -165,7 +165,7 @@ export const w7_02: LevelDef = {
     },
     {
       label: '`spawn(dir)`',
-      value: `Puts a new bot on the next tile in \`dir\` and gives back its id. Costs ${String(SPAWN_COST)} ticks, charged to the parent. A bot can spawn a bot. The fleet does not queue — see the delivery note.`,
+      value: `Puts a new bot on the next tile in \`dir\` and gives back its id. Costs ${String(SPAWN_COST)} ticks on this order, charged to the parent. A bot can spawn a bot. The fleet does not queue: a tile another bot is standing on refuses the spawn, giving back \`-1\` and charging the ${String(SPAWN_COST)} ticks anyway.`,
     },
     {
       label: 'A new bot',

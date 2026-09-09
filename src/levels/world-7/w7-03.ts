@@ -120,6 +120,16 @@ export const w7_03: LevelDef = {
       value:
         'A bot that leaves a tile frees it on that same tick, so bots going the same way can run one tick apart.',
     },
+    {
+      label: 'Held, not standing',
+      value:
+        'A tile is held for the ticks a bot was on it. A bot behind on its own clock still cannot walk through where another bot stood at that tick, however empty the aisle looks by then.',
+    },
+    {
+      label: '`canMove(dir)`',
+      value:
+        'Free, and it asks `move`\'s own question about the tick this bot would arrive on. Only another bot moving can change the answer, so a `canMove` answered by that same `move` never bounces.',
+    },
   ],
   seeds: [1, 2, 3, 4],
   par: { ticks: 200 },

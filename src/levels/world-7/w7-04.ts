@@ -299,7 +299,7 @@ export const w7_04: LevelDef = {
     {
       label: 'Shift report',
       value:
-        'One line, `last <job> <tick>`: the job whose final `use()` landed latest, and the clock reading of the bot that closed it, straight after that use.',
+        'One line, `last <job> <tick>`: the job whose final `use()` landed latest — not necessarily the last one you dispatched — and the clock reading of the bot that closed it, straight after that use.',
     },
   ],
   seeds: [1, 2, 3, 4, 5],

@@ -27,11 +27,19 @@ const HEIGHT = 5;
 const MAX_LEN = 9;
 const WIDTH = MAX_LEN + 3;
 
-/** Corridor lengths per seed. Seed 1 is the equal pair, seed 2 differs by 3x. */
+/**
+ * Corridor lengths per seed. Seed 1 is the smallest honest imbalance, seed 2 differs by 3x, and
+ * seed 3 is the equal pair.
+ *
+ * The equal pair is the degenerate one and it sits last on purpose. On two corridors of the same
+ * length nobody is behind, so `recv()` works without a `sync()` and every bot's idle is zero — a
+ * seed that opens on it hands out a pass to a program that never syncs and to a report that says
+ * `0` from memory, and neither is the thing this level asks for.
+ */
 const LENGTHS: Record<number, [number, number]> = {
-  1: [6, 6],
+  1: [6, 5],
   2: [3, 9],
-  3: [8, 4],
+  3: [6, 6],
 };
 
 function lengthsFor(seed: number): [number, number] {
