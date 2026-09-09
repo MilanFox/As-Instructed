@@ -27,19 +27,19 @@ export interface FeedRenderer {
 }
 
 /**
- * The coordinate, and the one other fact about the tile that is worth the width.
+ * Everything `describeTile` found, in the voice it already wrote.
  *
- * The ability to *name* a tile matters most, so the numbers lead. Crop maturity follows where
- * there is a crop, because ripeness is a shape at small tile sizes and a shape is exactly the
- * thing a player wants a second opinion on.
+ * This used to be the coordinate plus the one other fact judged worth the width — the strip is
+ * narrow, and naming a tile mattered more than listing it. DESIGN §11.7 reverses that tradeoff:
+ * the renderer is player-facing text exactly as the brief is, and under the old rule a sink
+ * holding twelve crates, or the tile stencilled `charter registry` that is the only thing telling
+ * two identical sinks apart, both reported themselves as the word `floor`. Nine of the twelve
+ * fields never reached a player at all.
+ *
+ * `describeTile` composes the full line already, so the honest formatter here is no formatter.
+ * The width is the strip's problem and the strip now solves it: `.osd-id` and `.osd-lag` in
+ * `monitor.css` are chrome and give their room up first, so the readout keeps its head.
  */
 export function readoutLine(readout: TileReadout | null): string {
-  if (!readout) return '';
-  const at = `${String(readout.at.x)}, ${String(readout.at.y)}`;
-  if (readout.growth !== null && readout.maxGrowth !== null) {
-    if (readout.sproutsIn > 0) return `${at} · ${readout.terrain} · sprouts in ${String(readout.sproutsIn)}t`;
-    return `${at} · ${readout.terrain} · ${String(readout.growth)}/${String(readout.maxGrowth)}`;
-  }
-  if (readout.botName) return `${at} · ${readout.botName}`;
-  return `${at} · ${readout.terrain}`;
+  return readout?.label ?? '';
 }

@@ -20,6 +20,8 @@ import type { ApiFunctionSpec, ApiTypeSpec } from '../../../runtime/protocol.ts'
 import { Markdown } from '../../components/Markdown.tsx';
 import { closeOverlay, openOverlay, useOverlay } from '../../hooks/useOverlay.ts';
 import { KEY_LIST } from '../terminal/keys.ts';
+import type { LegendSection } from './legend.ts';
+import { legendFor } from './legend.ts';
 import {
   CATEGORIES,
   GUIDES,
@@ -69,6 +71,47 @@ function Signature({ fn }: { fn: ApiFunctionSpec }): React.JSX.Element {
       <span className="sig-punct">: </span>
       <span className="sig-type">{fn.returns}</span>
     </code>
+  );
+}
+
+/**
+ * WHAT IS ON THIS BOARD — the legend, and the first thing on the left page.
+ *
+ * It sits above `Memory` because it is the page a player opens the book *for* on their first
+ * `w4-04`: the board has grown a tile they have never seen, `refuel()` will not work anywhere else,
+ * and until now the only channel that would name it was the hover strip. It is scanned rather than
+ * authored, so it is never longer than the board is (`legend.ts` says why), and the names are the
+ * API's own so the word in the book is the word a program compares against.
+ */
+function Legend({ sections }: { sections: LegendSection[] }): React.JSX.Element | null {
+  if (sections.length === 0) return null;
+  return (
+    <section className="mo-legend">
+      <h3 className="mo-entry-title">On this board</h3>
+      {sections.map((section) => (
+        <div className="mo-legend-group" key={section.id}>
+          <h4 className="mo-legend-title">{section.title}</h4>
+          <dl>
+            {section.rows.map((row) => (
+              <Fragment key={row.name}>
+                <dt>
+                  <code className="sig-type">{row.name}</code>
+                  {row.count === null ? null : (
+                    <span className="mo-legend-count numeric">×{row.count}</span>
+                  )}
+                </dt>
+                <dd>
+                  {row.what}
+                  {row.traits.length > 0 ? (
+                    <span className="mo-legend-traits"> {row.traits.join(' · ')}</span>
+                  ) : null}
+                </dd>
+              </Fragment>
+            ))}
+          </dl>
+        </div>
+      ))}
+    </section>
   );
 }
 
@@ -150,6 +193,7 @@ export function Manual(): React.ReactElement {
   const overlay = useOverlay();
   const level = useGame(currentLevel);
   const save = useGame((state) => state.save);
+  const trace = useGame((state) => state.trace);
   const [query, setQuery] = useState('');
   const [focus, setFocus] = useState<{ name: string; nonce: number } | null>(null);
   const entries = useRef(new Map<string, HTMLElement>());
@@ -183,6 +227,15 @@ export function Manual(): React.ReactElement {
     const timer = window.setTimeout(() => setFocus(null), HIGHLIGHT_MS);
     return () => window.clearTimeout(timer);
   }, [focus, open]);
+
+  /*
+   * The board the legend is about. The same expression the feed uses (`Monitor.tsx`), for the same
+   * reason: before a run there is no trace and the first seed is what is on screen.
+   */
+  const legend = useMemo(
+    () => legendFor(trace?.initialWorld ?? (level ? level.build(level.seeds[0] as number) : null)),
+    [level, trace],
+  );
 
   const installed = useMemo(() => {
     if (level) return unlockedHardware(level.id);
@@ -258,8 +311,26 @@ export function Manual(): React.ReactElement {
       functions.some((fn) => fn.name === id) ||
       [MEMORY, ...GUIDES].some((page) => page.id === id || page.aliases.includes(id)),
   );
+  /* The search narrows the legend the way it narrows everything else on the spread. */
+  const shownLegend = useMemo(
+    () =>
+      legend
+        .map((section) => ({
+          ...section,
+          rows: section.rows.filter((row) =>
+            matches(`${row.name} ${row.what} ${row.traits.join(' ')}`.toLowerCase(), needle),
+          ),
+        }))
+        .filter((section) => section.rows.length > 0),
+    [legend, needle],
+  );
+
   const nothing =
-    needle !== '' && guides.length === 0 && shown.length === 0 && shownTypes.length === 0;
+    needle !== '' &&
+    guides.length === 0 &&
+    shown.length === 0 &&
+    shownTypes.length === 0 &&
+    shownLegend.length === 0;
 
   return (
     <>
@@ -325,6 +396,8 @@ export function Manual(): React.ReactElement {
                   ))}
                 </div>
               ) : null}
+
+              <Legend sections={shownLegend} />
 
               <GuideEntry page={MEMORY} required focused={focusedName} register={register} />
               {guides.map((page) => (

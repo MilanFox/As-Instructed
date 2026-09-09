@@ -324,6 +324,24 @@
   font-size: calc(10.5 * var(--u) * var(--ts)); color: var(--ink);
 }
 
+/* ---- the crew block. Two lines a bot: who, then what its own clock, hold and queue
+   read. The hold's `--full` is the edge DESIGN.md §11.9 asks to be drawn — the limit is
+   the puzzle, being unable to see you have hit it was not. */
+.desk .crew { list-style: none; }
+.desk .crew__bot {
+  padding: calc(3 * var(--u)) 0; color: var(--ink-dim);
+  font-size: calc(11.5 * var(--u) * var(--ts)); line-height: 1.35;
+}
+.desk .crew__name { display: block; color: var(--ink); }
+.desk .crew__reads {
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: calc(4 * var(--u)) calc(9 * var(--u)); margin-top: calc(2 * var(--u));
+  font-family: var(--mono); font-size: calc(10.5 * var(--u) * var(--ts));
+}
+.desk .crew__hold--full { color: var(--amber); }
+.desk .crew__bot--lost .crew__name { color: var(--danger); }
+.desk .crew__bot--lost .crew__reads { color: var(--danger); letter-spacing: .18em; }
+
 .desk .par-note {
   margin-top: calc(7 * var(--u));
   font-size: calc(10 * var(--u) * var(--ts)); line-height: 1.4; color: #56656f;

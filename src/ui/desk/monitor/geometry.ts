@@ -56,3 +56,23 @@ export const RULER_LABEL_MIN_TILE_PX = 7;
  * completeness with it.
  */
 export const LEGIBLE_DEVICE_TILE_PX = 24;
+
+/**
+ * How many characters of hover readout fit between the site name and the signal-delay note.
+ *
+ * The strip is 638 design units wide (the 656u screen less the 9u the OSD is inset by on each
+ * side). `SITE · GRID 24×18` and `SIGNAL DELAY 41 MIN` take about 319u of that between them at
+ * 9.5u with `.18em` of tracking and leave, as it happens, the same 319u again; JetBrains Mono
+ * advances 0.6em, so a readout character at `.16em` is 7.22u and about 44 of them fit.
+ *
+ * Past that the strip changes mode rather than eating the readout. `describeTile` composes the
+ * whole tile into one line — coordinate, terrain, crop, bot, `kind:state`, every ground stack and
+ * the mark, and more as the renderer grows — and the readout is the only live text up there; the
+ * site name and the delay note are chrome that is true whether or not anyone reads it. So the
+ * chrome stands down, the tracking drops to `.04em`, and the same strip carries about 104
+ * characters. The longest line the campaign composes at t=0 is 65 — `w8-04`'s countersigned tray,
+ * `14,11 · floor · sink:open · chip x1 · mark "KD-0001-T (unsigned)"` — so there is room for the
+ * fields still arriving. Past 104 the strip truncates with an ellipsis, which is what a mark the
+ * player wrote themselves will eventually hit, and that is the strip's decision to make.
+ */
+export const READOUT_CHARS_IN_THE_GAP = 44;

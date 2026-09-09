@@ -678,6 +678,23 @@
 .desk .mo-empty { margin-top: calc(20 * var(--u)); font-size: calc(13 * var(--u) * var(--ts)); color: var(--p-dim); }
 
 /* Every key the game binds, printed from the same data the terminal states its hint from. */
+/* ---- the legend, at the top of the left page. A scanned table, so the widths are set by the
+   longest name the board actually contains rather than by the vocabulary's longest name. */
+.desk .mo-legend { margin-bottom: calc(22 * var(--u)); padding-bottom: calc(14 * var(--u)); border-bottom: calc(2 * var(--u)) solid var(--p-ink); }
+.desk .mo-legend-group { margin-top: calc(11 * var(--u)); }
+.desk .mo-legend-title {
+  font-family: var(--mono); font-size: calc(10.5 * var(--u) * var(--ts));
+  letter-spacing: .22em; text-transform: uppercase; color: var(--p-dim);
+}
+.desk .mo-legend dl {
+  display: grid; grid-template-columns: max-content 1fr;
+  gap: calc(4 * var(--u)) calc(14 * var(--u)); margin-top: calc(6 * var(--u));
+}
+.desk .mo-legend dt { display: flex; align-items: baseline; gap: calc(6 * var(--u)); }
+.desk .mo-legend-count { font-family: var(--mono); font-size: calc(10.5 * var(--u) * var(--ts)); color: var(--p-dim); }
+.desk .mo-legend dd { font-size: calc(12.5 * var(--u) * var(--ts)); line-height: 1.5; }
+.desk .mo-legend-traits { color: var(--p-dim); }
+
 .desk .mo-keys { margin-top: calc(24 * var(--u)); padding-top: calc(12 * var(--u)); border-top: calc(2 * var(--u)) solid var(--p-ink); }
 .desk .mo-keys dl { display: grid; grid-template-columns: max-content 1fr; gap: calc(5 * var(--u)) calc(14 * var(--u)); margin-top: calc(9 * var(--u)); }
 .desk .mo-keys dd { font-size: calc(12.5 * var(--u) * var(--ts)); }

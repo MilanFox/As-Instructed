@@ -29,7 +29,12 @@ import { Graticule } from './Graticule.tsx';
 import { Transport } from './Transport.tsx';
 import { usePapers } from '../paper/papers.ts';
 import { divergenceCells, divergenceLine } from './divergence.ts';
-import { FEED_INSET, LEGIBLE_DEVICE_TILE_PX, RULER_LABEL_MIN_TILE_PX } from './geometry.ts';
+import {
+  FEED_INSET,
+  LEGIBLE_DEVICE_TILE_PX,
+  READOUT_CHARS_IN_THE_GAP,
+  RULER_LABEL_MIN_TILE_PX,
+} from './geometry.ts';
 import type { FeedRenderer } from './feed.ts';
 import { readoutLine } from './feed.ts';
 
@@ -236,6 +241,13 @@ export function Monitor(): React.ReactElement {
   const site = level ? (worldMeta(level.world)?.name ?? 'SITE').toUpperCase() : 'NO SITE';
   const grid = world ? `${String(world.w)}×${String(world.h)}` : '—';
 
+  /*
+   * A tile with a machine, a stack and a mark on it outruns the gap between the two static notes,
+   * and the composition only grows. When it does, the strip belongs to the readout.
+   */
+  const line = readoutLine(readout);
+  const wide = line.length > READOUT_CHARS_IN_THE_GAP;
+
   return (
     <section className="display display--feed">
       <div className="bezel bezel--feed">
@@ -251,11 +263,11 @@ export function Monitor(): React.ReactElement {
             } as React.CSSProperties
           }
         >
-          <div className="feed-osd">
+          <div className={wide ? 'feed-osd feed-osd--long' : 'feed-osd'}>
             <span className="osd-id">
               {site} · GRID {grid}
             </span>
-            <span className="osd-xy">{readoutLine(readout)}</span>
+            <span className="osd-xy">{line}</span>
             <span className="osd-lag">SIGNAL DELAY 41 MIN</span>
           </div>
 

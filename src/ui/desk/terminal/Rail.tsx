@@ -14,6 +14,7 @@
  * what those words have to be.
  */
 import { useMemo } from 'react';
+import type { World } from '../../../engine/index.ts';
 import { replayTo } from '../../../engine/index.ts';
 import type { Budget, Meter } from '../../../game/budgets.ts';
 import { budgetFor, budgetReadout, overBudgetLine } from '../../../game/budgets.ts';
@@ -111,13 +112,62 @@ export function Rail(): React.JSX.Element {
     return level.objectives.filter((objective) => ids.has(objective.id)).length;
   }, [level, banked]);
 
+  /*
+   * The world under the playhead, replayed once and read by everything below it.
+   *
+   * The fuel gauge used to do this on its own; the crew block needs the same object at the same
+   * tick, and `replayTo` clones a whole world, so it is hoisted rather than called twice. Before
+   * the first run there is no trace and the board on screen is the first seed — the same
+   * expression the feed uses, for the same reason.
+   */
+  const board = useMemo<World | null>(() => {
+    if (trace) return replayTo(trace, flooredTick);
+    return level ? level.build(level.seeds[0] as number) : null;
+  }, [level, trace, flooredTick]);
+
   const showFuel = useMemo(() => (level ? levelUsesFuel(level) : false), [level]);
   const fuel = useMemo(() => {
-    if (!showFuel || !trace) return null;
-    const world = replayTo(trace, flooredTick);
-    const bot = world.bots.find((candidate) => Number.isFinite(candidate.fuelMax));
+    if (!showFuel || !trace || !board) return null;
+    const bot = board.bots.find((candidate) => Number.isFinite(candidate.fuelMax));
     return bot ? { fuel: bot.fuel, max: bot.fuelMax } : null;
-  }, [showFuel, trace, flooredTick]);
+  }, [showFuel, trace, board]);
+
+  /*
+   * What each bot is doing right now, in words.
+   *
+   * Three things had no text anywhere in the game. **Per-bot clocks**, which DESIGN.md §8 requires
+   * by name for `w7-01` and `w7-03` — `api-spec.ts` explains causality entirely in terms of them
+   * ("a bot only sees a message once its own clock has reached the moment the message was sent")
+   * and a player debugging an empty inbox could not look at either clock. **Inbox depth**, which
+   * `recv()` pops destructively and never reports. And **the edge of `capacity`**: nothing on the
+   * bot reports its own limit — that omission is a designed limit under DESIGN.md §11.9 and it
+   * stays — but §11.9's second half says to *draw the edge*, and a full bot and a half-full bot
+   * were the same picture. At `capacity: 1`, which is the premise of three World 3 orders, that is
+   * the difference between the level working and not.
+   *
+   * The clock and the inbox are drawn only where there is more than one bot. On a single-bot
+   * order the bot's clock is the playhead, and the playhead is the transport's number.
+   */
+  const crew = useMemo(() => {
+    if (!board) return [];
+    return board.bots.map((bot) => {
+      const carrying = bot.inventory.reduce((total, stack) => total + stack.count, 0);
+      const kinds = new Set(bot.inventory.filter((stack) => stack.count > 0).map((s) => s.kind));
+      return {
+        id: bot.id,
+        name: bot.name,
+        alive: bot.alive,
+        clock: Math.round(bot.clock),
+        carrying,
+        capacity: bot.capacity,
+        cargo: kinds.size === 1 ? ([...kinds][0] ?? null) : null,
+        waiting: bot.inbox.length,
+      };
+    });
+  }, [board]);
+
+  const manyBots = crew.length > 1;
+  const showHold = crew.some((row) => Number.isFinite(row.capacity));
 
   if (!level) return <aside className="rail" aria-label="Objectives and targets" />;
 
@@ -236,6 +286,20 @@ export function Rail(): React.JSX.Element {
           <FuelGauge fuel={fuel.fuel} max={fuel.max} />
         </div>
       ) : null}
+
+      {manyBots || showHold ? (
+        <div className="rail-block">
+          <h3>
+            BOTS
+            {manyBots ? <em className="numeric">{crew.length}</em> : null}
+          </h3>
+          <ul className="crew">
+            {crew.map((row) => (
+              <CrewItem key={row.id} row={row} clocks={manyBots} hold={showHold} />
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </aside>
   );
 }
@@ -297,6 +361,71 @@ function ObjectiveItem({ row }: { row: ObjectiveRow }): React.JSX.Element {
             : row.active
               ? 'in progress'
               : 'outstanding'}
+      </span>
+    </li>
+  );
+}
+
+interface CrewRow {
+  id: number;
+  name: string;
+  alive: boolean;
+  clock: number;
+  carrying: number;
+  capacity: number;
+  /** The one kind in the hold, when there is exactly one. Named because a coloured pip is not. */
+  cargo: string | null;
+  waiting: number;
+}
+
+/**
+ * One bot, as its own clock, its own hold and its own queue.
+ *
+ * `full` is the whole point of the hold readout. `pickup` returning less than it was asked for is
+ * the puzzle and stays the puzzle; being unable to see *that you are full* was the mystery, and a
+ * word is the cheapest form that edge can take. A bot that walked into a pit reads `lost` and keeps
+ * its row, because a crew that silently got shorter is the same defect one layer up.
+ */
+function CrewItem({
+  row,
+  clocks,
+  hold,
+}: {
+  row: CrewRow;
+  clocks: boolean;
+  hold: boolean;
+}): React.JSX.Element {
+  const capped = hold && Number.isFinite(row.capacity);
+  const full = capped && row.carrying >= row.capacity;
+  return (
+    <li className={`crew__bot${row.alive ? '' : ' crew__bot--lost'}`}>
+      <span className="crew__name">{row.name}</span>
+      {row.alive ? (
+        <span className="crew__reads numeric">
+          {clocks ? <span className="crew__clock">clock {row.clock}</span> : null}
+          {capped ? (
+            <span className={`crew__hold${full ? ' crew__hold--full' : ''}`}>
+              {row.cargo ?? 'hold'} {row.carrying}/{row.capacity}
+              {full ? ' full' : ''}
+            </span>
+          ) : null}
+          {clocks ? <span className="crew__inbox">inbox {row.waiting}</span> : null}
+        </span>
+      ) : (
+        <span className="crew__reads">lost</span>
+      )}
+      <span className="sr-only">
+        {row.alive
+          ? [
+              clocks ? `clock ${String(row.clock)}` : '',
+              capped
+                ? `carrying ${String(row.carrying)} of ${String(row.capacity)}${full ? ', full' : ''}`
+                : '',
+              clocks ? `${String(row.waiting)} messages waiting` : '',
+            ]
+              .filter(Boolean)
+              .join(', ')
+          : 'lost'}
       </span>
     </li>
   );

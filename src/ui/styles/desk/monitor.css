@@ -187,7 +187,16 @@
   border-left: 1px solid rgba(150,178,186,.8);
   border-top: 1px solid rgba(150,178,186,.8);
 }
-.desk .osd-xy { flex: 1; text-align: center; overflow: hidden; white-space: nowrap; }
+.desk .osd-xy {
+  flex: 1 1 auto; min-width: 0;
+  text-align: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+
+/* The strip stands its chrome down rather than cropping the tile the player asked about.
+   `READOUT_CHARS_IN_THE_GAP` in geometry.ts is where the two modes are derived and why. */
+.desk .feed-osd--long .osd-id,
+.desk .feed-osd--long .osd-lag { display: none; }
+.desk .feed-osd--long .osd-xy { text-align: left; letter-spacing: .04em; }
 
 /* ---- the transport's track, and the run as acts ------------------- */
 
