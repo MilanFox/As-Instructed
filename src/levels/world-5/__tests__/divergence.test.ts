@@ -185,6 +185,24 @@ describe('w5-03 — the cable, the order and the walk', () => {
   });
 
   /**
+   * `dependencies` can only point a station at one built before it, so until `relabel` was added
+   * the ids were a topological order of themselves and bringing the district up in id order
+   * cleared the objective the level is about with the graph unread. This is that answer, refused
+   * on every seed — a program that cables and switches everything, and still gets the order wrong.
+   */
+  test('a bare ascending loop over the ids is refused on every seed', () => {
+    for (const seed of w5_03.seeds) {
+      const count = withPrefix(w5_03, seed, 'sub-').length;
+      const { met } = diverge(w5_03, seed, 'in-order', (sim, botId) => {
+        const { link, power } = playerApi(sim, botId, 'w5-03');
+        for (let i = 1; i <= count; i++) link('reactor', `sub-${String(i)}`);
+        for (let i = 1; i <= count; i++) power(`sub-${String(i)}`, 'on');
+      });
+      expect(met, `seed ${String(seed)}`).toBe(false);
+    }
+  });
+
+  /**
    * The allowance is on the reactor, so the number is not news. Which two stations the crew was
    * walking between when it ran out is, and it names no better order to have taken.
    */
@@ -408,7 +426,12 @@ describe('w5-05 — the island, the drum and the dead cable', () => {
   test('name-the-weak-link says a line was wanted when the run filed none', () => {
     const world = w5_05.build(1);
     const stations = world.machines.filter((machine) => machine.id.startsWith('sub-'));
-    const { met, divergence } = diverge(w5_05, 1, 'name-the-weak-link', starDriver(stations.length));
+    const { met, divergence } = diverge(
+      w5_05,
+      1,
+      'name-the-weak-link',
+      starDriver(stations.length),
+    );
     expect(met).toBe(false);
     expect(divergence).toEqual({
       where: 'the outage report',

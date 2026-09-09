@@ -88,14 +88,27 @@ describe('w6-03 names the tick and the cell the bot left the route on', () => {
 // w8-03 / w8-05 — precedence
 // ---------------------------------------------------------------------------
 
-/** The first station in the grid that hangs off something, and the feeder it hangs off. */
+/** The number a station id carries, so `sub-10` sorts after `sub-9` rather than after `sub-1`. */
+function idNumber(id: string): number {
+  return Number(id.slice('sub-'.length));
+}
+
+/**
+ * The first station in the grid that hangs off exactly one root, and the root it hangs off.
+ *
+ * A two-feeder station is in breach the moment a test energises it having driven only the first of
+ * them, and a feeder that is itself fed is in breach on its own account — either way the report
+ * would be about a station these cases never meant to name. One station, one feeder, and the
+ * feeder waits for nothing: then the only thing on the board is the tick arithmetic being pinned.
+ */
 function pickChain(machines: readonly Machine[]): { station: Machine; feeder: Machine } {
   for (const station of machines) {
-    const [feederId] = dependenciesOf(station);
-    const feeder = machines.find((candidate) => candidate.id === feederId);
-    if (feeder) return { station, feeder };
+    const feeders = dependenciesOf(station);
+    if (feeders.length !== 1) continue;
+    const feeder = machines.find((candidate) => candidate.id === feeders[0]);
+    if (feeder && dependenciesOf(feeder).length === 0) return { station, feeder };
   }
-  throw new Error('expected at least one station with a feeder');
+  throw new Error('expected at least one station hanging off a single root');
 }
 
 describe('w8-03 names the station that jumped its feeder', () => {
@@ -127,6 +140,41 @@ describe('w8-03 names the station that jumped its feeder', () => {
 
     expect(report.met).toBe(true);
     expect(report.divergence).toBeUndefined();
+  });
+
+  /**
+   * `build` can only point a station at a feeder in the band above it, so before `relabel` the ids
+   * were themselves a topological order and `for (i = 0; i < n; i++) use("sub-" + i)` passed the
+   * one objective the level is about without ever reading `vars.deps`. The names are permuted
+   * after the DAG is drawn now, and this is the assertion from the losing side.
+   *
+   * The loop is a *correct-looking* program, not an idle one — `grid-live` is met, every station
+   * ends on — which is what makes it the answer worth refusing.
+   */
+  test('a bare ascending loop over the ids breaches precedence on every seed', () => {
+    for (const seed of w8_03.seeds) {
+      const inIdOrder = machinesWithPrefix(w8_03.build(seed), 'sub-').sort(
+        (a, b) => idNumber(a.id) - idNumber(b.id),
+      );
+      const result = runLevel(w8_03, seed, (sim, botId) => {
+        for (const station of inIdOrder) {
+          walkTo(sim, botId, station.at);
+          sim.use(botId);
+        }
+      });
+      const objectives = result.verdict.objectives;
+      const live = must(
+        objectives.find((objective) => objective.id === 'grid-live'),
+        'grid-live',
+      );
+      const precedence = must(
+        objectives.find((objective) => objective.id === 'precedence-held'),
+        'precedence-held',
+      );
+
+      expect(live.met, `seed ${String(seed)}`).toBe(true);
+      expect(precedence.met, `seed ${String(seed)}`).toBe(false);
+    }
   });
 });
 
@@ -199,6 +247,29 @@ describe('w8-05 names the station that jumped its feeder', () => {
 
     expect(objective.evaluate(ctx)).toBe(true);
     expect(objective.divergence?.(ctx)).toBeUndefined();
+  });
+
+  /**
+   * The finale's headline mechanic, held from the losing side. `deps` is only ever drawn from an
+   * already-numbered station, so before `relabel` the ids were a topological order of themselves
+   * and `for (i = 0; i < n; i++) use("sub-" + i)` cleared `precedence` on every seed with the
+   * graph unread. Permuting the names after the DAG is drawn costs the geometry nothing and makes
+   * the loop wrong; `w8-03` carries the same test for the same reason.
+   */
+  test('a bare ascending loop over the ids breaches precedence on every seed', () => {
+    for (const seed of w8_05.seeds) {
+      const world = w8_05.build(seed);
+      const uses = machinesWithPrefix(world, 'sub-')
+        .sort((a, b) => idNumber(a.id) - idNumber(b.id))
+        .map((machine, order) => ({ t: order * 2, machineId: machine.id }));
+      const ctx: ObjectiveContext = {
+        world: cloneWorld(world),
+        initialWorld: world,
+        trace: traceOfUses(world, uses),
+      };
+
+      expect(objectiveIn(w8_05, 'precedence').evaluate(ctx), `seed ${String(seed)}`).toBe(false);
+    }
   });
 });
 

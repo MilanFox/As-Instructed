@@ -199,19 +199,30 @@ function deliveredBeforeSurveyDone(ctx: ObjectiveContext): number {
   return early;
 }
 
-/* The reference heuristic's worst seed is 632 ticks; par leaves a working margin over it and
-   nothing like enough for a survey followed by a separate delivery round, which is the whole
-   claim the brief makes about the budget. */
-const PAR_TICKS = 700;
+/* Par is the reference heuristic — explore, route and deliver interleaved — on the seed it costs
+   the most, measured 319 / 518 / 632 / 465 / 450. The medal is taken from the worst seed of the
+   run (`runtime/aggregate.ts`), so 632 is the tightest par under which a program of the
+   reference's quality still golds, and every tick above it is a rung handed out for nothing: at
+   700 a run 10% worse than the reference everywhere was gold, and the ladder said nothing.
+
+   Not the median (465) that CURRICULUM §2 rule 4 nominates. A par below 632 gives this level no
+   attainable gold at all, and it would not rank the thing it looks like it ranks either: the
+   full-survey-then-deliver program the level's own copy used to call unaffordable costs
+   448 / 555 / 581 / 449 / 519, so it is *cheaper* than the reference at the worst seed and outlives
+   any par that refuses it. What separates the two is the star, `ship-while-you-look`, and the
+   fact cards now say so. */
+const PAR_TICKS = 632;
 
 /**
  * Explore, route and deliver, with no seam between them.
  *
- * Every piece here is something World 3 and World 4 already taught. What is new is the budget:
- * par is set below a full survey plus a separate delivery round, so a crate that is already on
- * board when its bay comes into view has to be dropped then, not later. The map, the crate
- * census and the class-to-bay mapping are all unknown at write time and all discoverable only
- * by looking.
+ * Every piece here is something World 3 and World 4 already taught. What is new is the seam, and
+ * the thing that grades it is the star rather than the clock: `ship-while-you-look` deadlines
+ * every bay on the tick it was first in view, so a crate that is already on board when its bay
+ * comes into view has to be dropped then, not later. A full survey followed by a separate
+ * delivery round is affordable in ticks — measured, it golds — and loses the star, which is the
+ * honest shape of the lesson. The map, the crate census and the class-to-bay mapping are all
+ * unknown at write time.
  */
 export const w8_02: LevelDef = {
   id: 'w8-02',

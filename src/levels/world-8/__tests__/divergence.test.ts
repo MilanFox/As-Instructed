@@ -11,10 +11,11 @@
  * because a naive program is exactly the run whose failure has to be legible.
  */
 import { describe, expect, test } from 'vitest';
-import type { Objective, ObjectiveContext, Sim, Vec } from '../../../engine/index.ts';
+import type { Objective, ObjectiveContext, Sim, Trace, Vec } from '../../../engine/index.ts';
 import {
   DIVERGENCE_VALUE_CHARS,
   Dir,
+  FED_BY,
   ItemKind,
   NOTHING,
   SILVER_FACTOR,
@@ -337,9 +338,7 @@ describe('w8-04 says whether the run reached the locker, and never says where it
       initialWorld,
       trace: {
         initialWorld,
-        events: [
-          { kind: 'die', t: 88, dt: 0, botId: bot.id, at, reason: 'out of fuel' },
-        ],
+        events: [{ kind: 'die', t: 88, dt: 0, botId: bot.id, at, reason: 'out of fuel' }],
         keyframes: [],
         endTick: 88,
       },
@@ -490,6 +489,45 @@ describe('w8-05 reports the finale without driving the finale', () => {
     expect(shown.where).toBe('sub-3');
     expect(shown.expected).toBe('a station this run started after its feeders');
     expect(shown.received).toBe('this run never started it');
+  });
+
+  /**
+   * The gate note reads one bot's clock against another's, and `Sim.unfed` tests the shared world
+   * rather than the two clocks — so a carrier parked at the handle while the electrician waits out
+   * the grid turns it at a *lower* tick than the throw it was waiting for. That subtraction used
+   * to come out negative and `readClaim` used to accept the negative, which made `gate <feeder>
+   * -648` the graded-correct answer to "how long it stood powered and shut".
+   *
+   * There is no such interval on that shift, so the star is refused and the report says which two
+   * ticks it is refusing. The log is written directly: provoking the case for real means driving a
+   * whole two-bot shift to make one subtraction come out backwards.
+   */
+  test('a gate opened before its substation was thrown has no interval to file', () => {
+    const world = w8_05.build(seed);
+    const airlock = must(machineById(world, 'airlock'), 'the airlock');
+    const feeder = must(
+      Object.entries(airlock.vars).find(([name, value]) => value === 1 && name.startsWith(FED_BY)),
+      'the airlock feeder',
+    )[0].slice(FED_BY.length);
+    const trace: Trace = {
+      initialWorld: world,
+      events: [
+        { t: 41, botId: 0, dt: 1, kind: 'use', at: airlock.at, machineId: 'airlock', ok: true },
+        { t: 689, botId: 1, dt: 1, kind: 'use', at: airlock.at, machineId: feeder, ok: true },
+        { t: 700, kind: 'print', text: `gate ${feeder} -648` },
+      ],
+      keyframes: [],
+      endTick: 701,
+    };
+    const ctx: ObjectiveContext = { world: cloneWorld(world), initialWorld: world, trace };
+    const objective = objectiveIn(w8_05, 'mind-the-gate');
+
+    expect(objective.evaluate(ctx)).toBe(false);
+    expect(objective.divergence?.(ctx)).toEqual({
+      where: 'the airlock',
+      expected: `a gate moved after ${feeder} was thrown`,
+      received: 'moved at tick 41, thrown at tick 689',
+    });
   });
 
   test('a note naming no station at all is told that instead', () => {

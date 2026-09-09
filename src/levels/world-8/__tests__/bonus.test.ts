@@ -20,7 +20,11 @@ import { w8_05 } from '../w8-05.ts';
 
 function starsOn(level: LevelDef, ctx: ObjectiveContext) {
   const scored = evaluateObjectives(level.bonus ?? [], ctx);
-  return (id: string): boolean => must(scored.find((star) => star.id === id), id).met;
+  return (id: string): boolean =>
+    must(
+      scored.find((star) => star.id === id),
+      id,
+    ).met;
 }
 
 /** The reference has to earn a star on *every* seed now: a bonus is graded on the worst one. */
@@ -99,11 +103,10 @@ describe('w8-01 name-the-row', () => {
    * heaviest row held and guesses which row it was is still refused.
    */
   test('the right count under the wrong row is refused', () => {
-    const earned = w8_01.seeds.filter(
-      (seed) =>
-        reportedAs(w8_01, seed, 'row', (line) => `row 0 ${line.split(' ')[2] ?? ''}`).met(
-          'name-the-row',
-        ),
+    const earned = w8_01.seeds.filter((seed) =>
+      reportedAs(w8_01, seed, 'row', (line) => `row 0 ${line.split(' ')[2] ?? ''}`).met(
+        'name-the-row',
+      ),
     );
     expect(earned.length).toBeLessThan(w8_01.seeds.length);
   });
@@ -111,8 +114,8 @@ describe('w8-01 name-the-row', () => {
   /** And no single answer is right on every layout, which is what a star is graded on now. */
   test('one memorised line does not carry the campaign', () => {
     for (const guess of ['row 2 4', 'row 9 3', 'row 0 1']) {
-      const all = w8_01.seeds.every(
-        (seed) => reportedAs(w8_01, seed, 'row', () => guess).met('name-the-row'),
+      const all = w8_01.seeds.every((seed) =>
+        reportedAs(w8_01, seed, 'row', () => guess).met('name-the-row'),
       );
       expect(all, guess).toBe(false);
     }
@@ -157,11 +160,13 @@ describe('w8-04 read-the-plan', () => {
 
   test('a guessed shift is refused, and no one shift is right on every layout', () => {
     for (const guess of [13, 41, 58, 77, 94]) {
-      const all = w8_04.seeds.every(
-        (seed) =>
-          reportedAs(w8_04, seed, 'plan', (line) => `plan ${String(guess)} ${line.split(' ')[2] ?? ''}`).met(
-            'read-the-plan',
-          ),
+      const all = w8_04.seeds.every((seed) =>
+        reportedAs(
+          w8_04,
+          seed,
+          'plan',
+          (line) => `plan ${String(guess)} ${line.split(' ')[2] ?? ''}`,
+        ).met('read-the-plan'),
       );
       expect(all, String(guess)).toBe(false);
     }
@@ -207,6 +212,26 @@ describe('w8-04 read-the-plan', () => {
 // w8-05 — name the substation the schedule left standing
 // ---------------------------------------------------------------------------
 
+/** Some substation on the seed's board other than `id`. */
+function otherStation(seed: number, id: string): string {
+  const world = w8_05.build(seed);
+  return must(
+    world.machines.find((machine) => machine.id.startsWith('sub-') && machine.id !== id),
+    'a second substation',
+  ).id;
+}
+
+/** A substation nothing feeds, on the seed's own board rather than by name. */
+function rootStation(seed: number): string {
+  const world = w8_05.build(seed);
+  return must(
+    world.machines.find(
+      (machine) => machine.id.startsWith('sub-') && (machine.vars['deps'] ?? 0) === 0,
+    ),
+    'a substation with no feeder',
+  ).id;
+}
+
 describe('w8-05 name-the-hold', () => {
   test('the reference solution earns it on every seed', () => {
     referenceEarns(w8_05, 'name-the-hold');
@@ -220,9 +245,18 @@ describe('w8-05 name-the-hold', () => {
     }
   });
 
+  /* A root, because the ids are permuted after the DAG is drawn and `sub-0` is no longer reliably
+     one. The station has to be one that *cannot* be the answer however the schedule ran: a station
+     with no feeder waited for nothing, so it never carries a hold and ties can never include it. */
   test('the right figure under the wrong station is refused on every seed', () => {
     for (const seed of w8_05.seeds) {
-      const run = reportedAs(w8_05, seed, 'held', (line) => `held sub-0 ${line.split(' ')[2] ?? ''}`);
+      const root = rootStation(seed);
+      const run = reportedAs(
+        w8_05,
+        seed,
+        'held',
+        (line) => `held ${root} ${line.split(' ')[2] ?? ''}`,
+      );
       expect(run.met('name-the-hold'), `seed ${String(seed)}`).toBe(false);
     }
   });
@@ -286,14 +320,14 @@ describe('w8-05 mind-the-gate', () => {
     }
   });
 
+  /* Any station but the one the reference named, since the ids are permuted per seed and there is
+     only ever one door to draw from — unlike the hold, this answer has no ties to fall into. */
   test('the right figure under the wrong substation is refused on every seed', () => {
     for (const seed of w8_05.seeds) {
-      const run = reportedAs(
-        w8_05,
-        seed,
-        'gate',
-        (line) => `gate sub-0 ${line.split(' ')[2] ?? ''}`,
-      );
+      const run = reportedAs(w8_05, seed, 'gate', (line) => {
+        const parts = line.split(' ');
+        return `gate ${otherStation(seed, parts[1] ?? '')} ${parts[2] ?? ''}`;
+      });
       expect(run.met('mind-the-gate'), `seed ${String(seed)}`).toBe(false);
     }
   });

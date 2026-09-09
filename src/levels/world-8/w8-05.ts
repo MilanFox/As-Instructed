@@ -1,10 +1,4 @@
-import type {
-  Divergence,
-  Machine,
-  ObjectiveContext,
-  Vec,
-  World,
-} from '../../engine/index.ts';
+import type { Divergence, Machine, ObjectiveContext, Vec, World } from '../../engine/index.ts';
 import {
   Dir,
   FED_BY,
@@ -116,7 +110,7 @@ function instanceFor(seed: number): Instance {
  * The substation the airlock draws from: the one furthest down the grid, and of those the one
  * standing nearest the gate.
  *
- * Furthest down rather than simply nearest. Nearest is a *root* on seed 7 — `sub-9` stands three
+ * Furthest down rather than simply nearest. Nearest is a *root* on seed 7 — `sub-6` stands three
  * tiles from the gate with nothing behind it — and an airlock fed by a root is a form leg that
  * depends on one switch rather than on the shift, which is the defect this is here to close. The
  * deepest station drags its whole ancestry along with it, because `precedence` already forbids
@@ -144,6 +138,32 @@ function feederIndex(deps: readonly (readonly number[])[], stationAt: Vec[], gat
     bestGap = gap;
   }
   return best;
+}
+
+/**
+ * Hands the station ids out in an order the feeders do not follow.
+ *
+ * The draw above can only ever point a station at one built before it, so left alone every seed
+ * accepted `sub-0, sub-1, … sub-n` as an energisation order: the finale's headline mechanic —
+ * `precedence`, everything at once — was passable by counting, without reading `vars.deps` once.
+ * The names are dealt again until ascending id order breaks somewhere. Only the names move; the
+ * sites, the edges and the shift are the board the draw already made, so nothing here touches par.
+ *
+ * Its own generator, because the site draw is a running `take()` off the shared `rng` and pulling
+ * a shuffle out of that stream would deal a different board.
+ */
+function relabel(seed: number, deps: readonly (readonly number[])[]): number[] {
+  const identity = Array.from({ length: deps.length }, (_, i) => i);
+  const ascendingWorks = (label: readonly number[]): boolean =>
+    deps.every((feeders, slot) =>
+      feeders.every((feeder) => (label[feeder] as number) < (label[slot] as number)),
+    );
+  const rng = localRng(seed * 613 + 29);
+  for (let attempt = 0; attempt < 64; attempt++) {
+    const label = rng.shuffle(identity);
+    if (!ascendingWorks(label)) return label;
+  }
+  return identity;
 }
 
 // ---------------------------------------------------------------------------
@@ -247,7 +267,11 @@ function build(seed: number): World {
 
   carveRect(world, SPAWN);
   const bayMouth: Vec = { x: SPAWN.x + SPAWN.w - 1, y: EXIT_ROW };
-  const junction = nearestFloor(world, { x: CARVE_MARGIN, y: EXIT_ROW }, (at) => at.x >= CARVE_MARGIN);
+  const junction = nearestFloor(
+    world,
+    { x: CARVE_MARGIN, y: EXIT_ROW },
+    (at) => at.x >= CARVE_MARGIN,
+  );
   carveLine(world, bayMouth, { x: junction.x, y: bayMouth.y });
   carveLine(world, { x: junction.x, y: bayMouth.y }, junction);
 
@@ -345,13 +369,14 @@ function build(seed: number): World {
     }
   }
 
+  const label = relabel(seed, deps);
   for (let i = 0; i < spec.stations; i++) {
     const vars: Record<string, number> = { deps: (deps[i] ?? []).length, [MANUAL_ONLY]: 1 };
     (deps[i] ?? []).forEach((d, n) => {
-      vars[`dep${n}`] = d;
+      vars[`dep${n}`] = label[d] as number;
     });
     addMachine(world, {
-      id: `${STATION_PREFIX}${i}`,
+      id: `${STATION_PREFIX}${String(label[i] as number)}`,
       kind: MachineKind.Node,
       at: stationAt[i] as Vec,
       state: 'off',
@@ -398,7 +423,7 @@ function build(seed: number): World {
     vars: { stations: spec.stations, classes: classes.length, crates: spec.crates },
   });
 
-  const feeder = `${STATION_PREFIX}${String(feederIndex(deps, stationAt, gateStand))}`;
+  const feeder = `${STATION_PREFIX}${String(label[feederIndex(deps, stationAt, gateStand)] as number)}`;
   addMachine(world, {
     id: 'airlock',
     kind: MachineKind.Door,
@@ -823,12 +848,20 @@ function feederThrownAt(ctx: ObjectiveContext): number | undefined {
  * Undefined when either end of it never happened, which is what keeps the star away from a
  * program that did not do the work — there is no such interval on a shift where nobody opened the
  * gate, and no honest number to print about one.
+ *
+ * Undefined too when the gate moved first. Both ends are read off the clock of whichever bot did
+ * it, and `Sim.unfed` tests the shared world rather than the two clocks, so a carrier parked at
+ * the handle while the electrician waits out six hundred ticks turns it at a *lower* tick number
+ * than the throw it was waiting for — measured −648 on seed 1. A negative reading is not a
+ * shorter wait, and the note asks for "how long it stood powered and shut", so the answer is that
+ * this shift has no such interval rather than a number below zero. The star is the join between
+ * the two threads; a fleet whose clocks disagree by ten minutes has not made the join.
  */
 function gateSlack(ctx: ObjectiveContext): number | undefined {
   const powered = feederThrownAt(ctx);
   const moved = gateMovedAt(ctx);
   if (powered === undefined || moved === undefined) return undefined;
-  return moved - powered;
+  return moved < powered ? undefined : moved - powered;
 }
 
 /**
@@ -891,13 +924,20 @@ function misreadGate(ctx: ObjectiveContext): Divergence {
     };
   }
   if (gateSlack(ctx) === undefined) {
+    const moved = gateMovedAt(ctx);
+    const thrown = feederThrownAt(ctx);
+    if (moved !== undefined && thrown !== undefined) {
+      return {
+        where: 'the airlock',
+        expected: `a gate moved after ${feeder ?? 'its substation'} was thrown`,
+        received: `moved at tick ${String(moved)}, thrown at tick ${String(thrown)}`,
+      };
+    }
     return {
       where: 'the airlock',
       expected: 'a gate somebody moved this shift',
       received:
-        gateMovedAt(ctx) === undefined
-          ? 'nobody moved it'
-          : `nobody threw ${feeder ?? 'its substation'}`,
+        moved === undefined ? 'nobody moved it' : `nobody threw ${feeder ?? 'its substation'}`,
     };
   }
   return {
@@ -1027,7 +1067,7 @@ const FACTS = [
   {
     label: 'Gate note',
     value:
-      'One line, `gate <station> <n>`: the substation the airlock draws from, and the ticks between that substation being **thrown** — the tick of the `use()`, not the tick it finished — and the gate first moving. Both are read off the clock of whichever bot did it, so a fleet that never squares its clocks is subtracting two different ones.',
+      'One line, `gate <station> <n>`: the substation the airlock draws from, and the ticks between that substation being **thrown** — the tick of the `use()`, not the tick it finished — and the gate first moving. Both are read off the clock of whichever bot did it. A fleet that never squares its clocks can turn the handle at a lower tick than the throw it was waiting for: that shift has no such interval and the note cannot be filed for it.',
   },
 ];
 

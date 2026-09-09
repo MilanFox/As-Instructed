@@ -91,6 +91,33 @@ function bandSizes(total: number, layers: number): number[] {
   return sizes;
 }
 
+/**
+ * Hands the station ids out in an order the bands do not follow.
+ *
+ * A station's feeders are only ever drawn from the band above it, and the bands take consecutive
+ * blocks of indices, so left alone `sub-0, sub-1, … sub-n` was a legal energisation order on every
+ * seed: a level about a partial order accepted a run that never read `vars.deps`. The names are
+ * dealt again until ascending id order breaks somewhere.
+ *
+ * Only the names move. A site keeps the band it was dealt into, so the tiles, the cable, the
+ * critical chain and therefore `deadlineFor` are all the board the draw already made — what
+ * re-measures is the reference's tie-breaking, which prefers the lower id when two stations are
+ * ready at the same tick. `w5-03` closed the identical hole the same way.
+ */
+function relabel(seed: number, feedersOf: readonly (readonly number[])[]): number[] {
+  const identity = Array.from({ length: feedersOf.length }, (_, i) => i);
+  const ascendingWorks = (label: readonly number[]): boolean =>
+    feedersOf.every((feeders, slot) =>
+      feeders.every((feeder) => (label[feeder] as number) < (label[slot] as number)),
+    );
+  const rng = localRng(seed * 613 + 29);
+  for (let attempt = 0; attempt < 64; attempt++) {
+    const label = rng.shuffle(identity);
+    if (!ascendingWorks(label)) return label;
+  }
+  return identity;
+}
+
 /** Scattered station tiles, kept apart so the fleet is not queueing on one square of the plain. */
 function stationSites(seed: number, count: number): Vec[] {
   const rng = localRng(seed);
@@ -159,6 +186,11 @@ function deadlineFor(world: World): number {
  * band the verdict has already refused is not a ladder. `w8-03 grades and fails on one axis` in
  * `src/levels/world-8/__tests__/divergence.test.ts` holds this on every seed, and it is what any
  * future change to `deadlineFor`, to a `LAYOUTS` row or to par has to keep true.
+ *
+ * Re-measured after `relabel`, which moves the reference's tie-breaks and nothing else: list
+ * scheduling now costs 63 / 84 / 48 / 51 / 71 against 63 / 84 / 55 / 57 / 71 before it. The medal
+ * is taken from the worst seed, that seed is unmoved at 84, and the silver cut of 105 still sits
+ * under the shortest shift in the table (138), so the figure stands where it was.
  */
 const PAR_TICKS = 84;
 
@@ -324,31 +356,34 @@ export const w8_03: LevelDef = {
     setTerrain(world, DESK, Terrain.Pad);
     carveLine(world, DESK, vec(WIDTH - 2, DESK.y), Terrain.Cable);
 
-    for (let band = 0; band < bands.length; band++) {
-      const feeders = band === 0 ? [] : (bands[band - 1] as number[]);
+    const feedersOf: number[][] = sites.map(() => []);
+    for (let band = 1; band < bands.length; band++) {
+      const feeders = bands[band - 1] as number[];
       for (const index of bands[band] as number[]) {
-        const at = sites[index] as Vec;
-        const chosen =
-          feeders.length === 0
-            ? []
-            : rng.shuffle(feeders).slice(0, Math.min(feeders.length, rng.int(1, 2)));
-        const vars: Record<string, number> = { deps: chosen.length, [MANUAL_ONLY]: 1 };
-        chosen.forEach((feeder, i) => {
-          vars[`dep${i}`] = feeder;
-          const from = sites[feeder] as Vec;
-          carveLine(world, from, vec(at.x, from.y), Terrain.Cable);
-          carveLine(world, vec(at.x, from.y), at, Terrain.Cable);
-        });
-        addMachine(world, {
-          id: `sub-${index}`,
-          kind: MachineKind.Node,
-          at,
-          state: 'off',
-          inventory: [],
-          vars,
-          cycle: ['off', 'on'],
-        });
+        feedersOf[index] = rng.shuffle(feeders).slice(0, Math.min(feeders.length, rng.int(1, 2)));
       }
+    }
+
+    const label = relabel(seed, feedersOf);
+    for (let index = 0; index < sites.length; index++) {
+      const at = sites[index] as Vec;
+      const chosen = feedersOf[index] as number[];
+      const vars: Record<string, number> = { deps: chosen.length, [MANUAL_ONLY]: 1 };
+      chosen.forEach((feeder, i) => {
+        vars[`dep${i}`] = label[feeder] as number;
+        const from = sites[feeder] as Vec;
+        carveLine(world, from, vec(at.x, from.y), Terrain.Cable);
+        carveLine(world, vec(at.x, from.y), at, Terrain.Cable);
+      });
+      addMachine(world, {
+        id: `sub-${String(label[index] as number)}`,
+        kind: MachineKind.Node,
+        at,
+        state: 'off',
+        inventory: [],
+        vars,
+        cycle: ['off', 'on'],
+      });
     }
 
     for (const site of sites) setTerrain(world, site, Terrain.Cable);

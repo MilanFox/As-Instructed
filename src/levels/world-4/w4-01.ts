@@ -36,12 +36,18 @@ function build(seed: number): World {
 /**
  * The allowance for the whole shift, in rays.
  *
- * Measured, not guessed. A run that looks one tile ahead before every step casts 85, 108 and 101
+ * Measured, not guessed. A run that looks one tile ahead before every step casts 85, 108 and 69
  * rays on the three declared seeds; a run that looks *down* each corridor and drives the straight
- * stretch it sees casts 35, 41 and 34 for the identical route and the identical tick count. Sixty
+ * stretch it sees casts 35, 41 and 19 for the identical route and the identical tick count. Sixty
  * sits between the two families with room on both sides: it admits a bot that checks all four
  * directions at every bend rather than stopping at the first opening, and refuses anything that
  * treats the ray as a one-tile feeler.
+ *
+ * The seed the two families crowd on is the short one, and that is what picked it out of the
+ * candidates: seed 46 is a shortest-possible tunnel on which the feeler still overspends (69), so
+ * the budget separates the two programs on every seed rather than on the long ones only. The other
+ * minimum draws in reach — seeds 7, 35 and 45 — hand the star to the feeler at 52, 55 and 55, and
+ * a degenerate case that also degrades the star is a different level on that seed.
  */
 const LOOK_BUDGET = 60;
 
@@ -53,6 +59,13 @@ const raysCast = (ctx: ObjectiveContext): number =>
  * A single tunnel with no branches and no cycles, so the only decision on each tile is "which way
  * is not the way I came from". Par is the longest seed's tunnel: the route is forced, the
  * reference walks it once, and there is nothing honest left to shave off.
+ *
+ * Seed 46 is the degenerate case CURRICULUM §2 rule 3 and §15 rule 3 ask for, and §15 rule 3 is
+ * also why it is third rather than first. `tunnelCells` declares `rng.int(16, 30)` and the list
+ * used to draw 25, 27 and 26 — three middling tunnels, so the shortest instance the generator can
+ * produce had never been played. Seed 46 draws the floor of that range: 16 cells, 31 floor tiles,
+ * the reference on it costs 30 ticks and 19 rays. Par is unmoved at 52, which is seed 2's exact
+ * cost, because a shorter tunnel cannot raise the longest one.
  */
 export const w4_01: LevelDef = {
   id: 'w4-01',
@@ -75,7 +88,7 @@ export const w4_01: LevelDef = {
     'Drive the bot onto that pad.',
   ].join('\n'),
   facts: [
-    { label: 'The tunnel', value: 'A different shape every shift.' },
+    { label: 'The tunnel', value: 'A different shape every shift, and a different length.' },
     {
       label: '`look(dir)`',
       value:
@@ -91,7 +104,7 @@ export const w4_01: LevelDef = {
       value: `For the star: reach the pad having cast at most ${String(LOOK_BUDGET)} rays in the whole shift. One ray reports a whole corridor.`,
     },
   ],
-  seeds: [1, 2, 3],
+  seeds: [1, 2, 46],
   par: { ticks: 52 },
   build,
   objectives: [

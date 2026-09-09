@@ -229,8 +229,17 @@ function consumerAt(rng: Rng, taken: Set<string>): Vec {
 }
 
 /**
- * Par: the reference lays exactly one cable per consumer, so its clock is 2 × consumers — 40 ticks
- * on the twenty-consumer seed. There is no cheaper assignment, so par is that figure exactly.
+ * Par: the reference lays exactly one cable per consumer and never moves, so *every* correct run
+ * costs 2 × consumers. The five seeds draw 16 / 18 / 12 / 16 / 14 of them, measured, so the clock
+ * reads 32 / 36 / 24 / 32 / 28 and no program of any quality reads lower on a given seed — FFD and
+ * a perfect packing cost the same ticks here, because what varies is whether the yard packs at all.
+ *
+ * 36 is therefore the figure: the worst seed, which is the one the medal is taken from
+ * (`runtime/aggregate.ts` scores the worst seed of the run). 40 was the ceiling of a `rng.int(14,
+ * 20)` draw no seed has ever made — the "twenty-consumer seed" it named does not exist. The median
+ * seed reads 32, which CURRICULUM §2 rule 4 would nominate, and it is the wrong number *on this
+ * level*: seed 2 costs 36 whatever the player writes, so a par of 32 does not tighten the ladder,
+ * it deletes the top rung and hands out silver for a draw the player did not make.
  */
 export const w5_04: LevelDef = {
   id: 'w5-04',
@@ -271,7 +280,7 @@ export const w5_04: LevelDef = {
     },
   ],
   seeds: [1, 2, 3, 4, 5],
-  par: { ticks: 40 },
+  par: { ticks: 36 },
   build(seed: number): World {
     const { capacities, draws } = yardPlan(seed);
     const rng = new Rng(seed * 8677 + 23);
