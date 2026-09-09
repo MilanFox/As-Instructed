@@ -334,3 +334,71 @@ Agents own directories exclusively. Do not write outside your assigned paths.
 5. The game must be fully playable with keyboard; Run = `Ctrl/Cmd+Enter`.
 6. It must not be possible to soft-lock the UI. A hung program is always recoverable.
 7. Nothing may block the main thread for more than a frame.
+
+---
+
+## 11. Perfect Information
+
+This is a puzzle game about writing code. The puzzle is always *how do I make this work*, never
+*what is that even*. A player who reads the brief, the fact cards and the API docs has been told
+everything the level grades. Difficulty comes from the problem being hard to solve, never from
+the problem being hard to see.
+
+1. **Every graded thing is stated.** If an objective or a bonus checks it, the player-facing text
+   names it. A mechanic that only surfaces on failure is a bug in the level, not a difficulty
+   knob.
+2. **Explain it or cut it.** A rule that is hidden and load-bearing gets stated in the brief or
+   facts. A rule that is hidden and carries no weight gets deleted. Nothing stays hidden merely
+   because it is small.
+3. **Hints are not the premise.** A hint sharpens an idea the player already has the pieces for.
+   If the *only* statement of a graded rule lives in a hint, the fact cards are incomplete.
+4. **Seeds catch laziness, not the player.** Later seeds exist to refuse hardcoded answers — a
+   memorised constant, a fixed path, an assumption read off seed 1. That is fair: the run was
+   lazy and got caught. What is never fair is a later seed introducing a *rule* seed 1 gave no
+   reason to expect. Seeds may differ in their numbers and in which case they exercise; they may
+   not differ in what the level is about.
+5. **Seed 1 is representative, not degenerate.** Per CURRICULUM §15 seed 1 is the friendliest
+   instance, and friendly means *the honest general solution works*. A seed 1 on which a wrong
+   general rule also happens to pass teaches the wrong rule to every player who starts there.
+   Degenerate cases (§2 rule 3) belong later in the list. Generators must reject a seed-1 draw
+   that a lazy answer would satisfy — see `w3-01`'s `rowsMatch` redraw.
+6. **The divergence says what, not why.** Naming the tile, the value or the missing line is
+   information the player is owed. The *reason* it is wrong is the puzzle and stays theirs.
+7. **A mechanic ships on three legs, or it does not ship.** Anything the player is expected to
+   discover and work with needs all three:
+   - **A reason in the fiction.** It is a thing in the world with a name, not an implementation
+     detail leaking through.
+   - **A form on the board.** The renderer is player-facing text exactly as the brief is. The
+     player never reads a tile that draws as plain floor while carrying state that matters, and
+     never has to `print()` a value to find out what the level contains. If a mechanic exists and
+     the preview cannot show it, that is a missing sprite, not a puzzle. §8 Visual Language owns
+     the vocabulary any new state has to join.
+   - **A way to reach it in code.** If solving the level requires knowing a value, the API returns
+     that value. A player cannot write software against state they can only see.
+
+   The precedent is `w2-04`: the sim planted crops in the future, the board drew `0/8` for several
+   ticks, and `0/8` is indistinguishable from nothing happening — the level expected the player to
+   find plants that had not been planted yet. The fix was all three legs at once. The delay got an
+   in-lore name, `sproutsIn`; it was drawn on the tile; and it was exposed in the API.
+
+   None of this makes a level easy. Levels are meant to be hard, and the puzzle is not given away
+   — a player still has to work out what to *do* with `sproutsIn`. What may never be missing is
+   direct information the solution depends on.
+9. **A limit is a mechanic, not a secret.** Constraining what a bot can sense — a scan that
+   reaches one tile, an information budget, a sensor that reads only the tile underneath — is
+   level design, and good level design. The player knows the limit exists, knows its shape, and
+   plans around it; that is the puzzle. What §11 forbids is different: state the player has no way
+   to learn *and* no way to know is there. "You may only see one tile ahead" is fair. "There was a
+   rule here you were never told about" is not. State the limit, draw its edge (§11.8), and the
+   restriction is honest.
+8. **Hidden state is drawn as hidden.** Where a level withholds information on purpose — the
+   exception below, or a later gimmick — the preview shows a *known unknown*: a fogged tile, an
+   unread packet, a sensor edge. "I cannot know what is here, and the level means me not to" is
+   perfect information. A blank the player cannot tell from empty floor is not.
+
+The single exception: withholding information is allowed when uncovering it **is** the level's
+stated question — `w5-02`, where sensing is the mechanic, and `w8-01`, where re-sensing replaces
+remembering. In both the brief says so. "The player has to discover the rule by failing" is not
+an instance of this exception, and neither is "the player can find it with `print()`" — a console
+the player drives themselves is a debugger, not the game telling them anything. What a level is
+*about* is legible from the board and the brief before a single line is written.

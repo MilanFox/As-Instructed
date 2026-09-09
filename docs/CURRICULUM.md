@@ -29,6 +29,9 @@ w3-03, w3-05, w4-03` do not exist; the gaps are normal, not missing content.
     it looks — spread hints across distinct blockers, not repetitions of one.
 12. The field-note glossary (`THE PARTITION`, `A SWING`, …) is the only teaching mechanism in the
     game and replaces a tutorial. Do not add a tutorial.
+13. Perfect information (DESIGN.md §11). Everything a level grades is stated in its brief, facts
+    or docs. Later seeds refuse hardcoded answers; they never introduce a rule seed 1 gave no
+    reason to expect, and seed 1 never passes a wrong general rule.
 
 **Information budget** (`Objectives.withinSenses`, DESIGN.md §7): use only where sensing itself
 is the puzzle (`w5-02`) or re-sensing substitutes for remembering (`w8-01`). Omit where the
@@ -183,7 +186,13 @@ These constants and behaviours look like mistakes. They are deliberate — do no
 1. Seed 1 is the friendliest instance — a player's first honest idea works or nearly works.
 2. Seed 1 runs first in the UI; a run stops on first failure.
 3. Every seed list includes ≥1 degenerate case, named in the per-level tables above (§2 rule 3).
+   **It is never seed 1.** Friendly means the honest general solution works, not that a lazy one
+   also happens to. A degenerate seed 1 teaches its shortcut to every player who starts there —
+   see `w3-01`, where a full west siding made the bonus answer equal the crate count. Where a
+   generator can draw such a board, it rejects the draw rather than trusting the seed list.
 4. A seed differing from another only in its numbers, not a decision, is padding — remove it.
+5. Later seeds refuse hardcoded answers — a memorised constant, a fixed path, an assumption read
+   off seed 1. They never introduce a rule seed 1 gave no reason to expect (DESIGN.md §11.4).
 
 ---
 
