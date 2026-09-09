@@ -6,6 +6,10 @@ per-level randomization and the live bonus list belong in each level's own sourc
 33 levels ship. Ids are non-contiguous within a world by design — `w1-02, w1-04, w2-01, w2-03,
 w3-03, w3-05, w4-03` do not exist; the gaps are normal, not missing content.
 
+The section numbers below are gappy too — there is no §1, and §11 is followed by §15. Level source
+files cite these sections **by number** (`CURRICULUM §15` appears in seven files), so the numbers
+are load-bearing identifiers, not an ordering. Do not renumber to close a gap; append instead.
+
 ---
 
 ## 2. Global Rules for Level Authors

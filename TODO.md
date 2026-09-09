@@ -110,10 +110,11 @@ conjunct adding.
    `setAuditSeeds` and `runSeeds(own, audit)`, and nothing in `src/ui/**` reads them. The seed-count
    readout should be `runSeeds(level.seeds, audit).length` while a discrepancy is open on that work
    order, and the per-seed results list should mark which row is the audit layout.
-4. **`w7-01` and `w7-03` list `'ticks'` in `docs:`, and no such verb exists.** The real call is
-   `bot(id).clock()`, so the in-game reference renders a chip that is a dead link. One word per
-   file — `src/levels/world-7/w7-01.ts:264` and `w7-03.ts:175` — but nothing tests `docs:` ids
-   against the API surface, so the class stays open until it does.
+4. **Nothing tests `docs:` ids against what the Manual can actually render.** `Manual.tsx`
+   resolves a `docs:` id against function names *and* against `[MEMORY, ...GUIDES]`, so a guide id
+   is as valid as a verb — `'ticks'` in `w7-01` and `w7-03` is the `GuidePage` at
+   `src/ui/desk/furniture/reference.ts:105`, not the dead link this entry used to claim. The gap
+   is the missing guard: a typo'd id would still ship as a chip that jumps nowhere.
 5. **`src/levels/world-8/w8-05.ts:1054` sets `maxTicks: 16000` with no comment**, next to a par with
    a four-sentence justification. It is 5.3x the level's own deadline objective and can never decide
    a verdict. Either explain it or lower it.

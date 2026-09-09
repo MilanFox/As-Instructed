@@ -323,7 +323,27 @@ Three things RENDER must draw, because a level's lesson is unreadable otherwise:
 
 ## 9. Directory Ownership
 
-Agents own directories exclusively. Do not write outside your assigned paths.
+Agents own directories exclusively. Do not write outside your assigned paths. The barrel file
+(`src/<dir>/index.ts`) is the seam: an owner may change anything behind it freely, and changing
+what it exports is a cross-directory edit that needs the other owner.
+
+| Directory | Owns | Governed by |
+| --- | --- | --- |
+| `src/engine/` | The deterministic sim: world, bots, per-bot clocks, cost model, trace format, objectives, verdicts. Pure — no DOM, no React, no canvas, and ESLint enforces it | §4 here; `ENGINE.md` |
+| `src/runtime/` | The sandbox: Monaco transpile, the sim Web Worker, the player API bindings and spec, tick/op/watchdog budgets, source-mapped errors | §3 here; `ENGINE.md` §7 |
+| `src/render/` | The Canvas2D trace player: tiles, sprites, terrain, camera, interpolation, FX, overlays, theme. Reads a trace; never talks to the sim | §8 here |
+| `src/levels/` | The 33 work orders — world builders, objectives, briefs, facts, hints, par, starter code — plus the `__solutions__/` fixtures that prove each is solvable on every seed | §5 and §11 here; `CURRICULUM.md`; `ENGINE.md` §5 |
+| `src/ui/` | The React shell: workspace, desk, site map, panels, screens, styles, and the adapters wiring runtime, renderer, audio and Repository into the store. All shipped player-facing copy | §8 here; `NARRATIVE.md` |
+| `src/game/` | Save file (versioned, migrating), scoring and medals, commendations, budgets, playback state, and the one zustand store the shell reads | §7 and §7.1 here |
+| `src/meta/` | The Shared Subroutines Repository: `lib.ts` publishing, revisions, hashing, regression re-runs, discrepancies, per-level profiles, and its own React under `src/meta/ui/` | **No owning doc.** See below |
+| `src/audio/` | WebAudio synthesized in code — synth, sounds, settings, and the conductor that runs as a cursor over `trace.events` on the renderer's clock | **No owning doc.** See below |
+| `src/__tests__/` | Repo-wide guards that hold conventions rather than behaviour | `AGENTS.md` |
+
+**`src/meta/` and `src/audio/` have no governing document.** Every other directory can be checked
+against a written contract; these two can only be checked against themselves, so an agent editing
+either has nothing to be wrong about and nothing to cite in review. Their barrel comments are the
+closest thing to a spec either has. Until that is fixed, treat a change in either as needing the
+user rather than a doc.
 
 ## 10. Non-Negotiables
 

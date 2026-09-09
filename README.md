@@ -6,7 +6,7 @@ A puzzle-programming game. You are Contractor #4471 at Kessler & Daughters Terra
 never go to the planets — you write the TypeScript that the planets' robots run, and then you watch
 the recording of what they did with it.
 
-Forty work orders across eight worlds, from "drive East four times" to a fleet of a hundred bots
+Thirty-three work orders across eight worlds, from "drive East four times" to a fleet of a hundred bots
 sharing a schedule. Everything runs in the browser. There is no server and no account.
 
 ## Running it
@@ -55,7 +55,7 @@ draws the trace.** The renderer never talks to the simulation.
 | `src/engine/` | The simulation. Pure data and pure functions — no DOM, no canvas, no React. Worlds, bots, per-bot clocks, the cost model, the trace format, objectives and verdicts. It runs unchanged in Node under Vitest, which is why it is the most heavily tested thing in the repo. |
 | `src/runtime/` | The sandbox. Compiles your TypeScript with Monaco's own TS worker on the main thread, then runs the emitted JS inside a Web Worker with the player API bound to a `Sim`. Three independent stops for runaway code: a tick budget, an op budget, and a main-thread watchdog that terminates the worker. Errors are mapped back through the source map to the line you are looking at. |
 | `src/render/` | The Canvas2D trace player. 48px tiles from the Kenney sheets, camera, interpolated movement, a particle system, and the bots themselves drawn in code. Owns the frame loop and reports its playback position outward. |
-| `src/levels/` | The forty work orders: world builders, objectives, briefs, par, starter code, hints. Each ships a reference solution under `__solutions__/` that Vitest asserts is solvable on every seed. Those are test fixtures — `vite.config.ts` fails the build if one ever becomes reachable from the client bundle. |
+| `src/levels/` | The 33 work orders: world builders, objectives, briefs, par, starter code, hints. Each ships a reference solution under `__solutions__/` that Vitest asserts is solvable on every seed. Those are test fixtures — `vite.config.ts` fails the build if one ever becomes reachable from the client bundle. |
 | `src/ui/` | The React shell: workspace layout, Monaco panel, site map, timeline, results, the management memo, and the adapters that wire the runtime, renderer, audio and Repository into the store. |
 | `src/game/` | Save file (versioned, migrating, and never allowed to lose your source), scoring, and the one zustand store the shell reads from. |
 | `src/audio/` | WebAudio, synthesized in code — there are no audio files. Because playback is a trace being scrubbed rather than a game being played, the audio is a cursor over `trace.events` driven by the renderer's clock, with rate limiting so 64x becomes texture rather than a machine gun. Ambience ships off; the toggle is in the sound settings. |

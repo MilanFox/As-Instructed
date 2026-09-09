@@ -22,6 +22,14 @@ export default tseslint.config(
     },
   },
   {
+    // `use()` is the player-API verb that operates a machine, not a React hook, and there is no
+    // React in src/levels — every World 5 level and solution calling it would otherwise be an error.
+    files: ['src/levels/**/*.ts'],
+    rules: {
+      'react-hooks/rules-of-hooks': 'off',
+    },
+  },
+  {
     files: ['src/engine/**/*.ts'],
     rules: {
       'no-restricted-globals': [

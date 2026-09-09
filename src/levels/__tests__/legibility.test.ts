@@ -2,7 +2,7 @@
  * Every objective in the campaign can say *where* a run went wrong.
  *
  * 71 of the 82 objective calls were `Objectives.custom`
- * with no divergence, so 31 of 34 work orders could only ever report the string `not met`. The
+ * with no divergence, so 31 of 33 work orders could only ever report the string `not met`. The
  * core loop is run → fail → read → revise, and with nothing to read it degrades to guessing.
  * `src/levels/__tests__/divergence.test.ts` is the same idea applied to four specific levels; this
  * file is the one that makes the silence impossible to reintroduce anywhere.
