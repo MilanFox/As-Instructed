@@ -14,7 +14,8 @@ import { PLAYER_API } from '../api-spec.ts';
 import { assertApiComplete, buildPlayerScope, implementedApiNames } from '../api-bindings.ts';
 
 /**
- * The four commands `Sim` deliberately leaves open — `link`, `receive`, `transmit`, `decode`.
+ * The five commands `Sim` deliberately leaves open — `link`, `receive`, `buffered`, `transmit`,
+ * `decode`.
  *
  * `api-spec.ts` hands World 5 and 6 semantics to RUNTIME to define on top of the engine's
  * extension points, so these tests are the contract CONTENT authors levels against. Everything
@@ -94,6 +95,55 @@ describe('receive', () => {
   test('an empty post returns null rather than throwing', () => {
     const { sim } = listeningPost();
     expect(api(sim, ['receive']).receive?.()).toBeNull();
+  });
+});
+
+/**
+ * `receive` used to be the only way to learn anything about the band, and it learns by consuming:
+ * a program could not tell an empty buffer from a full one without emptying it (DESIGN.md §11.7).
+ * These tests hold `buffered` to the one property that closes that gap — asking never costs a
+ * packet — as well as to the count itself.
+ */
+describe('buffered', () => {
+  test('counts the unread packets without taking any of them', () => {
+    const { sim } = listeningPost(['alpha', 'beta', 'gamma']);
+    const { buffered, receive } = api(sim, ['buffered', 'receive']);
+    expect(buffered?.()).toBe(3);
+    expect(buffered?.()).toBe(3);
+    expect(receive?.()).toBe('alpha');
+  });
+
+  test('falls by one per packet taken, and reaches 0 on a drained band', () => {
+    const { sim } = listeningPost(['alpha', 'beta']);
+    const { buffered, receive } = api(sim, ['buffered', 'receive']);
+    receive?.();
+    expect(buffered?.()).toBe(1);
+    receive?.();
+    expect(buffered?.()).toBe(0);
+    expect(buffered?.()).toBe(0);
+    expect(receive?.()).toBeNull();
+  });
+
+  test('an empty post reads 0 before a single packet is spent finding out', () => {
+    const { sim } = listeningPost();
+    expect(api(sim, ['buffered']).buffered?.()).toBe(0);
+  });
+
+  test('a work order with no antenna reads 0 rather than throwing', () => {
+    const world = createWorld({ w: 4, h: 4, seed: 1 });
+    addBot(world, { at: vec(1, 1) });
+    expect(api(new Sim(world), ['buffered']).buffered?.()).toBe(0);
+  });
+
+  test('costs no ticks and writes no tile change, so the band is untouched', () => {
+    const { sim } = listeningPost(['alpha']);
+    const { buffered } = api(sim, ['buffered']);
+    buffered?.();
+    buffered?.();
+    expect(sim.ticks).toBe(0);
+    expect(sim.ops).toBeGreaterThan(0);
+    expect(sim.finish().events.some((event) => event.kind === 'tileChange')).toBe(false);
+    expect(tileAt(sim.world, ANTENNA)?.meta?.['rxNext']).toBeUndefined();
   });
 });
 

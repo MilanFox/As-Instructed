@@ -45,7 +45,7 @@ export const w6_01: LevelDef = {
   world: 6,
   index: 1,
   title: 'Carrier Wave',
-  hardware: ['receive'],
+  hardware: ['receive', 'buffered'],
   brief: [
     '**FROM:** Field Engineer D. Halloran',
     '',
@@ -59,6 +59,11 @@ export const w6_01: LevelDef = {
     {
       label: '`receive()`',
       value: 'The next packet as a string, or `null` once the queue is empty. Free.',
+    },
+    {
+      label: '`buffered()`',
+      value:
+        'How many packets are still unread, without taking one. Free, and reading it takes nothing off the queue, so `buffered() === 0` is an empty queue.',
     },
     { label: 'The queue', value: 'A different length every shift. Some shifts it is empty.' },
   ],
@@ -106,5 +111,5 @@ export const w6_01: LevelDef = {
     'The queue tells you when it is finished by handing you something that is not a packet.',
     'A shift with no traffic is a normal shift. Your program has to survive arriving at one.',
   ],
-  docs: ['receive', 'print'],
+  docs: ['receive', 'buffered', 'print'],
 };

@@ -237,6 +237,11 @@ export const w6_04: LevelDef = {
       value:
         'The last packet has no header and a **different** shift in the same range. Its plain text is ordinary readable English, like every other packet once decoded. Send it straight after the others.',
     },
+    {
+      label: '`buffered()`',
+      value:
+        'How many packets are still unread, without taking one. Free. The straggler is the last on the band, so it is the packet after which `buffered()` reads 0.',
+    },
   ],
   seeds: [1, 2, 3, 4],
   par: { ticks: 14 },
@@ -309,5 +314,5 @@ export const w6_04: LevelDef = {
     'One shift in the space is not interesting at all, and it is still a shift. A program that skips it will pass three shifts and fail the fourth.',
     'The straggler has no header, so nothing can confirm a candidate outright. Something else about English text is true of the plain version and untrue of the other ninety-four.',
   ],
-  docs: ['decode', 'receive', 'transmit'],
+  docs: ['decode', 'receive', 'buffered', 'transmit'],
 };

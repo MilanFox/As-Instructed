@@ -65,11 +65,11 @@ function botHandles(
 }
 
 /**
- * `link`, `receive`, `transmit` and `decode` have no `Sim` method: DESIGN.md leaves World 5 and 6
- * semantics open and `api-spec.ts` hands them to RUNTIME to satisfy on top of the engine's
- * extension points. The defaults below are deliberately generic and fully replay-safe — every
- * world mutation goes through `applyMachineChange` / `applyTileChange`, so a trace still replays
- * exactly. CONTENT should treat them as the contract to author levels against.
+ * `link`, `receive`, `buffered`, `transmit` and `decode` have no `Sim` method: DESIGN.md leaves
+ * World 5 and 6 semantics open and `api-spec.ts` hands them to RUNTIME to satisfy on top of the
+ * engine's extension points. The defaults below are deliberately generic and fully replay-safe —
+ * every world mutation goes through `applyMachineChange` / `applyTileChange`, so a trace still
+ * replays exactly. CONTENT should treat them as the contract to author levels against.
  */
 
 const ANTENNA_KINDS = new Set(['antenna', 'router']);
@@ -112,6 +112,29 @@ function receivePacket(sim: Sim, botId: number): string | null {
     target.meta = { ...(target.meta ?? {}), rxNext: next + 1 };
   });
   return packets[next] as string;
+}
+
+/**
+ * The same buffer `receive` pops, counted instead of consumed: `rx` behind the `rxNext` cursor.
+ *
+ * Free, and for a stronger reason than "sensing is free" (DESIGN.md §4.4). `receive` is itself
+ * free, so any price here would make *finding out* the buffer is empty dearer than emptying it,
+ * and every program would go back to popping packets to count them — which is the gap this call
+ * exists to close (DESIGN.md §11.7). It charges the op `probe` charges, exactly as `receive`
+ * does, so the read is bounded and shows up in the trace; it writes no tile change, because
+ * asking how many are waiting is the one read on this band that changes nothing.
+ */
+function bufferedPackets(sim: Sim, botId: number): number {
+  const antenna = antennaFor(sim, botId);
+  void sim.probe(botId, antenna?.id);
+  if (!antenna) return 0;
+
+  const tile = tileAt(sim.world, antenna.at);
+  const queued = metaString(tile, 'rx');
+  if (queued === '') return 0;
+
+  const unread = queued.split('\n').length - metaNumber(tile, 'rxNext');
+  return unread > 0 ? unread : 0;
 }
 
 /**
@@ -293,6 +316,7 @@ const BINDERS: Record<string, Binder> = {
     (fromId, toId): boolean =>
       linkMachines(sim, botId, String(fromId), String(toId), sim.costs.link),
   receive: (sim, botId) => (): string | null => receivePacket(sim, botId),
+  buffered: (sim, botId) => (): number => bufferedPackets(sim, botId),
   transmit:
     (sim, botId) =>
     (text): boolean =>

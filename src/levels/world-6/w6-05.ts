@@ -340,6 +340,11 @@ export const w6_05: LevelDef = {
     },
     { label: 'The salt', value: "`probe('mast').vars.salt`. Free, and a new number every shift." },
     {
+      label: '`buffered()`',
+      value:
+        'How many blocks are still unread, without taking one. Free, and it takes nothing off the band — it is the size of the band before you read any of it, and 0 once you have drained it.',
+    },
+    {
       label: 'Corrupt blocks',
       value:
         'One character altered — replaced by another whose code is an odd distance from it. The checks themselves are untouched. Each one lies about a block that also arrived intact.',
@@ -430,5 +435,5 @@ export const w6_05: LevelDef = {
     'Going down a level means putting your place somewhere and picking it back up after. There are two well-known places to put it.',
     'For the repair: the two checks are each out by a number. One is the size of the change. The other is that size times where it happened.',
   ],
-  docs: ['decode', 'probe', 'receive'],
+  docs: ['decode', 'probe', 'receive', 'buffered'],
 };

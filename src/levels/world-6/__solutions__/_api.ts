@@ -8,7 +8,7 @@ import { buildPlayerScope } from '../../../runtime/api-bindings.ts';
  * The exact surface a player has at `levelId`, bound to a live `Sim`.
  *
  * Reference solutions drive this rather than `Sim` directly for two reasons. `link`, `receive`,
- * `transmit` and `decode` have no `Sim` method — they are RUNTIME compositions over
+ * `buffered`, `transmit` and `decode` have no `Sim` method — they are RUNTIME compositions over
  * `applyMachineChange` / `applyTileChange` — so a solution that called `Sim` would be testing
  * something the player cannot write. And `unlockedApiNames` throws the level's own hardware gate
  * across the fixture: a solution that reaches for a verb the level has not unlocked fails loudly
@@ -27,6 +27,7 @@ export interface PlayerApi {
   power(machineId: string, state: string): boolean;
   link(fromId: string, toId: string): boolean;
   receive(): string | null;
+  buffered(): number;
   transmit(text: string): boolean;
   decode(text: string, key: number): string;
 }
@@ -57,6 +58,7 @@ export function playerApi(sim: Sim, botId: number, levelId: string): PlayerApi {
     power: (machineId, state) => call<boolean>('power', [machineId, state]),
     link: (fromId, toId) => call<boolean>('link', [fromId, toId]),
     receive: () => call<string | null>('receive', []),
+    buffered: () => call<number>('buffered', []),
     transmit: (text) => call<boolean>('transmit', [text]),
     decode: (text, key) => call<string>('decode', [text, key]),
   };

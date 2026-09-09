@@ -225,6 +225,11 @@ export const w6_02: LevelDef = {
     { label: '`W`', value: '`(salt + 1*b0 + 2*b1 + ... + (n+1)*bn) mod 256`' },
     { label: 'The salt', value: "`probe('mast').vars.salt`. Free, and a new number every shift." },
     {
+      label: '`buffered()`',
+      value:
+        'How many packets are still unread, without taking one. Free, and it takes nothing off the band — it is the length of the band before you read any of it, and 0 once you have drained it.',
+    },
+    {
       label: 'A corrupt packet',
       value:
         'Exactly one payload byte altered, and always by an odd amount mod 256 — so both checks disagree, and exactly one position can account for the pair of differences.',
@@ -319,5 +324,5 @@ export const w6_02: LevelDef = {
     'The salt is not in this text and it is not the same on the next shift. The antenna knows it, and asking costs nothing.',
     'Declining to send is an action. Some shifts nothing is wrong, and some shifts the first thing you see is.',
   ],
-  docs: ['transmit', 'probe', 'receive'],
+  docs: ['transmit', 'probe', 'receive', 'buffered'],
 };

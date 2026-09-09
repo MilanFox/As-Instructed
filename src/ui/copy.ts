@@ -261,6 +261,11 @@ const HARDWARE: Record<string, HardwareNote> = {
     spec: 'Returns the next frame on the listening band, or null when the band is quiet. Sensing is free.',
     opens: 'Something on a dead band has been transmitting for some time.',
   },
+  buffered: {
+    spec: 'Returns how many frames are still unread in the buffer, and takes none of them out of it. Sensing is free.',
+    opens:
+      'The band can be asked how much it is holding, before a single frame is spent finding out.',
+  },
   transmit: {
     spec: 'Sends one frame on the outbound band. Costs 1 tick.',
     opens: 'The listening post can, for the first time, answer.',

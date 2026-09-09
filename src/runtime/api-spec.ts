@@ -14,9 +14,9 @@ import type { ApiFunctionSpec, ApiTypeSpec, PlayerApiSpec } from './protocol.ts'
  * decides which entries appear there, and the `Bot` interface the editor sees is generated from
  * that same list, so the handle cannot drift from the free functions.
  *
- * Specified, not yet implemented in `Sim`: `link`, `receive`, `transmit`, `decode`. World 5 and 6
- * semantics are deliberately open in DESIGN.md, so these four are contracts for the RUNTIME and
- * CONTENT agents to satisfy on top of `Sim.applyMachineChange`; each `doc` says so.
+ * Specified, not yet implemented in `Sim`: `link`, `receive`, `buffered`, `transmit`, `decode`.
+ * World 5 and 6 semantics are deliberately open in DESIGN.md, so these five are contracts for the
+ * RUNTIME and CONTENT agents to satisfy on top of `Sim.applyMachineChange`; each `doc` says so.
  *
  * Unlock ordering: `functions` is stored in unlock order, and level ids (`w<world>-<index>`, both
  * single-digit world and zero-padded index) sort lexicographically in that same order, which is
@@ -557,11 +557,24 @@ power('node-1', 'on');`,
     name: 'receive',
     params: [],
     returns: 'string | null',
-    doc: 'Reads the next queued packet out of the listening post buffer, or null when the buffer is empty. What arrives, and when, is defined by the level and stated in its brief.',
+    doc: 'Reads the next queued packet out of the listening post buffer, or null when the buffer is empty. Taking a packet is the only thing that shortens the buffer, so `buffered()` falls by one after every read that hands one back. What arrives, and when, is defined by the level and stated in its brief.',
     example: `let packet = receive();
 while (packet !== null) {
   print(packet);
   packet = receive();
+}`,
+    cost: 0,
+    unlockedBy: 'w6-01',
+    world: 6,
+    category: 'signal',
+  },
+  {
+    name: 'buffered',
+    params: [],
+    returns: 'number',
+    doc: 'Returns how many packets are still unread in the listening post buffer, and takes none of them out of it. `buffered() === 0` is how a program learns the band is quiet without spending a packet to find out, and the count is stable until `receive()` consumes one. A work order carrying no antenna reports 0.',
+    example: `if (buffered() === 0) {
+  print('nothing on the band this shift');
 }`,
     cost: 0,
     unlockedBy: 'w6-01',

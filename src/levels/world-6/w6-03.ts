@@ -197,6 +197,11 @@ export const w6_03: LevelDef = {
   facts: [
     { label: 'The key', value: "`probe('mast').vars.key`. Free, and a new key every shift." },
     {
+      label: '`buffered()`',
+      value:
+        'How many packets are still unread, without taking one. Free. This band carries one packet, so it reads 1 before you take the route and 0 after.',
+    },
+    {
       label: 'Route format',
       value:
         'Groups run together, like `4E12S1W`: a count of one or more digits, then `N`, `E`, `S` or `W`.',
@@ -266,7 +271,7 @@ export const w6_03: LevelDef = {
     'A count is not a character. Read digits until you run out of digits, and only then read the direction.',
     'The stream may say the same direction twice in a row. Nothing says a group has to be as long as it could be.',
   ],
-  docs: ['decode', 'probe', 'receive', 'transmit'],
+  docs: ['decode', 'probe', 'receive', 'buffered', 'transmit'],
 };
 
 function encipherStream(stream: string, key: number): string {
