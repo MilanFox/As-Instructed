@@ -107,6 +107,40 @@ function dependencies(rng: Rng, shape: GraphShape, count: number): string[][] {
 }
 
 /**
+ * Hands the ids out in an order the dependencies do not follow.
+ *
+ * `dependencies` can only point a station at one built before it, so left alone every seed would
+ * accept `sub-1, sub-2, … sub-n` as an energisation order and the district would grade counting
+ * rather than sorting. The deal is redealt until ascending id order breaks somewhere. The first
+ * slot keeps its id, so `sub-1` is always the station wired straight to the reactor and the first
+ * thing a run probes shows the `prereq:` form without any hunting.
+ */
+function relabel(rng: Rng, prereqs: readonly string[][]): string[][] {
+  const count = prereqs.length;
+  const dealt = (slot: readonly number[]): string[][] => {
+    const out: string[][] = Array.from({ length: count }, () => []);
+    for (let k = 0; k < count; k++) {
+      out[slot[k] ?? k] = (prereqs[k] ?? []).map((id) =>
+        id === 'reactor'
+          ? id
+          : `sub-${String((slot[Number(id.slice('sub-'.length)) - 1] ?? 0) + 1)}`,
+      );
+    }
+    return out;
+  };
+  const ascendingWorks = (lists: readonly string[][]): boolean =>
+    lists.every((list, index) =>
+      list.every((id) => id === 'reactor' || Number(id.slice('sub-'.length)) - 1 < index),
+    );
+
+  for (let attempt = 0; attempt < 64; attempt++) {
+    const out = dealt([0, ...rng.shuffle(Array.from({ length: count - 1 }, (_, i) => i + 1))]);
+    if (!ascendingWorks(out)) return out;
+  }
+  return prereqs.map((list) => list.slice());
+}
+
+/**
  * The nearest-available walk: from wherever the crew is standing, go to the closest station whose
  * prerequisites are already done. Ties go to the lower id, in both this and the reference, so the
  * two produce the same number.
@@ -143,7 +177,7 @@ export function gridPlan(seed: number): GridPlan {
   const rng = new Rng(seed * 6151 + 907);
   const shape = shapeFor(seed);
   const count = STATION_COUNT[shape];
-  const prereqs = dependencies(rng, shape, count);
+  const prereqs = relabel(rng, dependencies(rng, shape, count));
 
   const taken = new Set<string>([`${REACTOR_AT.x},${REACTOR_AT.y}`]);
   const stations: StationPlan[] = [];
@@ -244,23 +278,33 @@ const missingCable = (ctx: ObjectiveContext): Divergence | undefined => {
  *
  * The station's own list of what it waits on is a free read, so naming the one that was not ready
  * hands back the run's own ordering decision rather than the order the district wants.
+ *
+ * An early call the run later made good is not the fault and is not reported: the objective
+ * forgives it, so the retry-until-stable loop CURRICULUM.md §7 lets through is never handed a
+ * divergence pointing at its own first pass. Only a station left stranded by one is named.
  */
 const poweredEarly = (ctx: ObjectiveContext): Divergence | undefined => {
   const live = new Set<string>(['reactor']);
   const valid = new Set<string>();
+  const early: { id: string; t: number; waiting: string }[] = [];
   for (const { id, t } of energisations(ctx)) {
     const machine = machineById(ctx.world, id);
     if (!machine || !machine.id.startsWith('sub-')) continue;
     const waiting = prereqsOf(machine).find((prereq) => !live.has(prereq));
     if (waiting !== undefined) {
-      return {
-        where: `tick ${String(t)} · ${id}`,
-        expected: `${waiting} already on`,
-        received: `${waiting} was still off`,
-      };
+      early.push({ id, t, waiting });
+      continue;
     }
     live.add(id);
     valid.add(id);
+  }
+  const stranded = early.find((call) => !valid.has(call.id));
+  if (stranded !== undefined) {
+    return {
+      where: `tick ${String(stranded.t)} · ${stranded.id}`,
+      expected: `${stranded.waiting} already on`,
+      received: `${stranded.waiting} was still off`,
+    };
   }
   const missed = substations(ctx.world).find((machine) => !valid.has(machine.id));
   if (missed === undefined) return undefined;
@@ -336,7 +380,7 @@ export const w5_03: LevelDef = {
     {
       label: 'Upstream',
       value:
-        'Each station lists what it waits on as `vars` keys of the form `prereq:<id>`. That may be the reactor or another station. Some list none.',
+        'Each station lists what it waits on as `vars` keys of the form `prereq:<id>`. That may be the reactor or another station. Some list none. The numbering says nothing about the order — `sub-2` can wait on `sub-12`.',
     },
     {
       label: 'The cable',
@@ -345,12 +389,12 @@ export const w5_03: LevelDef = {
     {
       label: 'Bringing one up',
       value:
-        '`power(stationId, "on")`, 2 ticks. It only latches once every prerequisite is `on`, and a futile call costs the same as a useful one.',
+        '`power(stationId, "on")`, 2 ticks. The switch always throws — nothing refuses a call made too early, and the station reads `on` afterwards either way. What is graded is the tick you called it at, not the state you read back. A futile call costs the same as a useful one and does no lasting harm: call the station again once its upstream is up and that second call counts.',
     },
     {
       label: 'The crew walk',
       value:
-        'The crew walks between stations in the order you energise them. The reactor reports the allowance in `vars.travelBudget`.',
+        "The crew starts at the reactor and walks between stations in the order you energise them, and every `power` call is a visit — a futile one and a second call on the same station each add their leg. The reactor reports the allowance in `vars.travelBudget`. It is one good walk's length, not a margin over one.",
     },
     {
       label: 'The Repository',
@@ -459,6 +503,7 @@ export const w5_03: LevelDef = {
     'Reading the whole district costs nothing. Read all of it before you spend a single tick, and you will know what depends on what.',
     'A station is ready when every machine it lists is already on. At the start, only the reactor is on, so ask which stations are ready right now.',
     'Bringing one station up can make several others ready. Work out what became ready, not what comes next in the list.',
+    'Several stations are usually ready at the same moment. Which of them you take next changes nothing about the order being legal, and everything about how far the crew walks.',
   ],
   docs: ['probe', 'link', 'power'],
 };

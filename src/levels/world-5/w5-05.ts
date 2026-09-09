@@ -217,7 +217,8 @@ const outageReport = (ctx: ObjectiveContext): string[] =>
  * A run that named a station gets told that the station is wrong and nothing about which one is
  * right; a run that named the right station and miscounted gets told only that the figure is wrong,
  * which is the same trade `w6-02`'s fault report makes — one fact back, the arithmetic still the
- * player's.
+ * player's. A line that is not of the shape at all is told that, rather than being read as a claim
+ * about the wrong station: the shape is in the facts and getting it wrong is not the puzzle.
  */
 const misread = (ctx: ObjectiveContext): Divergence | undefined => {
   const lines = outageReport(ctx);
@@ -237,8 +238,15 @@ const misread = (ctx: ObjectiveContext): Divergence | undefined => {
     };
   }
   const claim = readClaim(said);
+  if (claim === null) {
+    return {
+      where: 'the outage report',
+      expected: 'a line reading `weak <id> <n>`',
+      received: clipValue(said),
+    };
+  }
   const { ids } = weakestLinks(ctx.world);
-  if (claim !== null && ids.has(claim.id)) {
+  if (ids.has(claim.id)) {
     return { where: claim.id, expected: 'a different figure', received: String(claim.load) };
   }
   return {
@@ -263,8 +271,8 @@ export function cableSpent(ctx: ObjectiveContext): number {
  */
 interface LiveOrder {
   valid: Set<string>;
-  /** The first station switched on with no live cable already reaching it. */
-  dead?: { id: string; t: number };
+  /** Every station switched on with no live cable already reaching it, in trace order. */
+  early: { id: string; t: number }[];
 }
 
 function liveOrder(ctx: ObjectiveContext): LiveOrder {
@@ -279,7 +287,7 @@ function liveOrder(ctx: ObjectiveContext): LiveOrder {
   };
   const live = new Set<string>(['reactor']);
   const valid = new Set<string>();
-  let dead: LiveOrder['dead'];
+  const early: LiveOrder['early'] = [];
 
   for (const event of ctx.trace.events) {
     if (event.kind === 'machineChange') {
@@ -298,13 +306,13 @@ function liveOrder(ctx: ObjectiveContext): LiveOrder {
     if (id === undefined || !id.startsWith('sub-')) continue;
     const touchesLive = [...(graph.get(id) ?? [])].some((other) => live.has(other));
     if (!touchesLive) {
-      dead ??= { id, t: event.t };
+      early.push({ id, t: event.t });
       continue;
     }
     live.add(id);
     valid.add(id);
   }
-  return dead === undefined ? { valid } : { valid, dead };
+  return { valid, early };
 }
 
 const liveOrderCount = (ctx: ObjectiveContext): number => liveOrder(ctx).valid.size;
@@ -313,12 +321,18 @@ const liveOrderCount = (ctx: ObjectiveContext): number => liveOrder(ctx).valid.s
  * The first switch-on the cable could not carry, or — when every switch-on landed — the station
  * the run never came back for. The tree the player laid is their own; what the report adds is the
  * tick at which the order they switched it on in ran ahead of it.
+ *
+ * A station switched on early and then switched on again over live cable is not the fault and is
+ * not named: `liveOrder` counts the second call, so the objective already forgave it, and pointing
+ * the report at the first pass of a retry loop would name a tick the run was right to move on
+ * from. Only a station left stranded by an early call is reported.
  */
 const notLive = (ctx: ObjectiveContext): Divergence | undefined => {
-  const { valid, dead } = liveOrder(ctx);
-  if (dead !== undefined) {
+  const { valid, early } = liveOrder(ctx);
+  const stranded = early.find((call) => !valid.has(call.id));
+  if (stranded !== undefined) {
     return {
-      where: `tick ${String(dead.t)} · ${dead.id}`,
+      where: `tick ${String(stranded.t)} · ${stranded.id}`,
       expected: 'a live cable already reaching it',
       received: 'nothing live was joined to it',
     };
@@ -367,8 +381,7 @@ export const w5_05: LevelDef = {
     '**RE:** District 9, reconnection',
     '',
     'District 9 lost its cabling on Tuesday. Stores have issued a drum against the works',
-    'order. The drum holds what the works order says the job takes, which is what it took',
-    'the last time anybody measured it.',
+    'order. It holds the shortest run that joins the district, plus eight per cent for waste.',
     '',
     'Re-cable District 9, then bring every substation up.',
   ].join('\n'),
@@ -389,17 +402,17 @@ export const w5_05: LevelDef = {
     {
       label: 'The drum',
       value:
-        'Finite. The reactor reports the whole of it in `vars.cableBudget`. Going over fails the job.',
+        'Finite. The reactor reports the whole of it in `vars.cableBudget`, and that figure is the shortest possible total run of cable for this district plus eight per cent for waste. A network a little off the cheapest still fits; one of the wrong shape does not. Going over fails the job.',
     },
     {
       label: '`power(id, "on")`',
       value:
-        '2 ticks. A substation only comes up if a cable already joins it to the reactor through machines that are already on.',
+        '2 ticks, and the switch throws whatever you do. A substation is only *up*, though, if a cable already joins it to the reactor through machines that are already on — one switched on ahead of its cable reads `on` and is not.',
     },
     {
       label: 'The outage report',
       value:
-        'For the star: file one line, `weak <id> <n>` — a substation whose loss would cut the most of the district off from the reactor, and how many stations go dark with it, counting itself.',
+        'For the star: file one line, `weak <id> <n>` — a substation whose loss would cut the most of the district off from the reactor, and how many stations go dark with it, counting itself. It is read off the grid you leave behind, so the answer follows the cabling you laid. Printing otherwise costs nothing; only lines beginning `weak ` are read.',
     },
   ],
   seeds: [1, 2, 3, 4, 5],

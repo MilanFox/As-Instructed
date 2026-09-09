@@ -184,12 +184,13 @@ export const w5_01: LevelDef = {
     },
     {
       label: '`use()`',
-      value: 'Switches the substation under the bot from `off` to `on`. Costs 2 ticks.',
+      value:
+        'Steps the substation under the bot one place along its cycle, `off` → `on` → `off`. Costs 2 ticks, so a second call takes the same station back off again.',
     },
     {
       label: 'Latching',
       value:
-        '`use()` flips a substation on either way. It only **counts** if the machine feeding it was already `on`.',
+        '`use()` flips a substation on either way. It only **counts** if the machine feeding it was already `on`, and a station latched early stays uncounted for the rest of the shift — there is no repairing it later.',
     },
     {
       label: '`probe(id)`',

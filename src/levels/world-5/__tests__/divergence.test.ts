@@ -170,8 +170,8 @@ describe('w5-03 — the cable, the order and the walk', () => {
     expect(met).toBe(false);
     expect(divergence).toEqual({
       where: 'tick 0 · sub-2',
-      expected: 'sub-1 already on',
-      received: 'sub-1 was still off',
+      expected: 'sub-12 already on',
+      received: 'sub-12 was still off',
     });
   });
 
@@ -362,6 +362,41 @@ describe('w5-05 — the island, the drum and the dead cable', () => {
       where: 'tick 0 · sub-1',
       expected: 'a live cable already reaching it',
       received: 'nothing live was joined to it',
+    });
+  });
+
+  /**
+   * An early switch-on the run came back and made good is forgiven by the objective, so the report
+   * must not point at it. Naming the first pass of a retry loop would send the player after a tick
+   * the run had already corrected.
+   */
+  test('energised looks past a switch-on the run came back and made good', () => {
+    const { met, divergence } = diverge(w5_05, 1, 'energised', (sim, botId) => {
+      const { link, power } = playerApi(sim, botId, 'w5-05');
+      power('sub-1', 'on');
+      link('reactor', 'sub-1');
+      power('sub-1', 'on');
+    });
+    const second = must(withPrefix(w5_05, 1, 'sub-')[1], 'sub-2');
+    expect(met).toBe(false);
+    expect(divergence).toEqual({
+      where: `sub-2 · ${at(second.at)}`,
+      expected: 'on',
+      received: 'off',
+    });
+  });
+
+  /* The shape of the line is in the facts, so a line that is not that shape is told so rather
+     than being read as a claim about some station the run never named. */
+  test('name-the-weak-link tells a malformed line what shape was wanted', () => {
+    const { met, divergence } = diverge(w5_05, 1, 'name-the-weak-link', (sim, botId) => {
+      playerApi(sim, botId, 'w5-05').print('weak sub-1');
+    });
+    expect(met).toBe(false);
+    expect(divergence).toEqual({
+      where: 'the outage report',
+      expected: 'a line reading `weak <id> <n>`',
+      received: 'weak sub-1',
     });
   });
 

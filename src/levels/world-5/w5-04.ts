@@ -33,9 +33,12 @@ export interface YardPlan {
  * The bonus asks for the largest feeder to end cold, which is only possible when the remaining
  * feeders can hold the whole load. That forces the reduced set to be the tight problem and the
  * full set to look roomy. Seed 1 is the teaching instance and seed 3 is built by hand below.
+ *
+ * Seed 1 carries the most slack of the drawn seeds and still refuses a run that cables consumers
+ * in the order it read them — see `orderDecides`.
  */
 const REDUCED_SLACK: Readonly<Record<number, number>> = Object.freeze({
-  1: 1.25,
+  1: 1.15,
   2: 1.12,
   4: 1.08,
   5: 1.08,
@@ -54,20 +57,49 @@ const CONSTRUCTED: Readonly<Record<number, YardPlan>> = Object.freeze({
   },
 });
 
-export function yardPlan(seed: number): YardPlan {
-  const constructed = CONSTRUCTED[seed];
-  if (constructed)
-    return { capacities: [...constructed.capacities], draws: [...constructed.draws] };
+/** Every feeder but the largest, in world order — the set the bonus has to pack into. */
+const workingSet = (capacities: number[]): number[] => {
+  const largest = capacities.reduce((best, capacity) => Math.max(best, capacity), 0);
+  const at = capacities.indexOf(largest);
+  return capacities.filter((_, index) => index !== at);
+};
 
-  const rng = new Rng(seed * 3121 + 449);
-  const consumers = rng.int(12, 20);
+const packs = (capacities: number[], order: number[]): boolean => {
+  const room = [...capacities];
+  for (const draw of order) {
+    const at = room.findIndex((left) => left >= draw);
+    if (at < 0) return false;
+    room[at] = (room[at] as number) - draw;
+  }
+  return true;
+};
+
+/**
+ * Does this draw make the order matter?
+ *
+ * Cabling consumers in the order they were read has to strand one, and taking the heaviest first
+ * has to fit them all. A draw roomy enough that any order works teaches the wrong rule to whoever
+ * starts on it (CURRICULUM.md §15.3), so `yardPlan` redraws rather than ship it.
+ */
+const orderDecides = ({ capacities, draws }: YardPlan): boolean => {
+  const bins = workingSet(capacities);
+  const heaviestFirst = [...draws].sort((a, b) => b - a);
+  return !packs(bins, draws) && packs(bins, heaviestFirst);
+};
+
+/**
+ * One candidate yard. The floor on the consumer count is what keeps the yards full-sized: a tight
+ * fit is easiest to draw in a small yard, so a redraw left to itself collects nothing else.
+ */
+function drawPlan(rng: Rng, slack: number): YardPlan {
+  const consumers = rng.int(14, 20);
   const draws: number[] = [];
   for (let i = 0; i < consumers; i++) draws.push(rng.int(3, 9));
   const load = draws.reduce((sum, draw) => sum + draw, 0);
 
   const feeders = rng.int(5, 8);
   const working = feeders - 1;
-  const reduced = Math.ceil(load * (REDUCED_SLACK[seed] ?? 1.08));
+  const reduced = Math.ceil(load * slack);
 
   const capacities: number[] = [];
   let left = reduced;
@@ -81,6 +113,18 @@ export function yardPlan(seed: number): YardPlan {
 
   const largest = capacities.reduce((best, capacity) => Math.max(best, capacity), 0);
   return { capacities: rng.shuffle([...capacities, largest + rng.int(2, 6)]), draws };
+}
+
+export function yardPlan(seed: number): YardPlan {
+  const constructed = CONSTRUCTED[seed];
+  if (constructed)
+    return { capacities: [...constructed.capacities], draws: [...constructed.draws] };
+
+  const rng = new Rng(seed * 3121 + 449);
+  for (;;) {
+    const plan = drawPlan(rng, REDUCED_SLACK[seed] ?? 1.08);
+    if (orderDecides(plan)) return plan;
+  }
 }
 
 const feeders = (world: World): Machine[] =>
@@ -220,6 +264,11 @@ export const w5_04: LevelDef = {
       label: 'Over its ceiling',
       value: 'A feeder whose cabled consumers add up to more `draw` than its `capacity`.',
     },
+    {
+      label: 'Room is not a fit',
+      value:
+        'The ceilings added together leave the yard headroom, and consumers can still end up with nowhere left to take them. Whether they do depends on the order you cable them in.',
+    },
   ],
   seeds: [1, 2, 3, 4, 5],
   par: { ticks: 40 },
@@ -313,7 +362,7 @@ export const w5_04: LevelDef = {
   hints: [
     'Reading every capacity and every draw is free. Work the whole assignment out on paper before you lay a single cable, because a cable is permanent.',
     'A feeder with four units of headroom left is no use to a consumer that draws six. The awkward consumers are the big ones, and they get more awkward the later you get to them.',
-    'The same set of consumers packs or does not pack depending only on the order you consider them in. Try the hardest ones while the most feeders are still empty.',
+    'The star wants the highest-capacity feeder cold, so work the yard out as though it were not there at all. Every unit you spill onto it is the star gone, and the cable does not come back.',
   ],
   docs: ['probe', 'link'],
 };
