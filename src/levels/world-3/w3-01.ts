@@ -119,7 +119,7 @@ const misfiled = (ctx: ObjectiveContext): Divergence | undefined => {
   if (said === undefined) {
     return {
       where: 'the shift report',
-      expected: 'a line saying how many trips run flat',
+      expected: 'a line saying how many pairs share a row',
       received: NOTHING,
     };
   }
@@ -204,7 +204,7 @@ export const w3_01: LevelDef = {
     {
       label: 'The shift report',
       value:
-        "For the star: file one line, `straight <n>`, where `n` is the largest number of this shift's trips that could run flat — a trip is flat when the crate and the pad it goes to are in the same row. It is a fact about how the yard stacked, not about the route you drive.",
+        'For the star: file one line, `straight <n>`. Pair up as many crates as you can with pads in their own row, one crate to one pad. `n` is the total across all three rows. Where the bot drives does not change it.',
     },
   ],
   seeds: [1, 2, 3],
@@ -244,10 +244,28 @@ export const w3_01: LevelDef = {
      * The shift's flat trips are the one fact about the yard nothing else grades. Loading the pads
      * needs a crate and a pad; counting the straight runs needs both sidings read *by row* and
      * matched, which is the shape of thinking the level is for.
+     *
+     * The wording is on its third pass, and both earlier ones lost a player to the same word.
+     * "How many trips need no change of row" graded the route. "The most trips this shift could
+     * run without changing row" fixed that and was then read as one unbroken run — the player
+     * filed the largest single row instead of the sum, because "the most X without Y" is a streak
+     * in English whatever the rest of the sentence says. The fact card's "not about the route you
+     * drive" did not overturn it; a frame set by the sentence you read first is not undone by a
+     * denial further down.
+     *
+     * So the graded quantity is now described as a pairing rather than as a run: pair crates to
+     * pads in their own row, one to one, and `n` is the total. A pairing has no streak reading,
+     * "one crate to one pad" is what stops two crates and one pad in a row counting twice, and
+     * "the total across all three rows" is the sum stated outright instead of left to hint 5.
+     *
+     * The word "flat" is gone from every player-facing string. `straight <n>` is already the token
+     * the player types, so "flat" was a second name for the same idea that had to be defined
+     * wherever it appeared — and it appeared on the fact card, in the missing-report divergence and
+     * in hint 5. It survives in this file only as internal vocabulary.
      */
     Objectives.custom(
       'straight-runs',
-      'Report the most trips this shift could run without changing row',
+      'Report how many crates can be paired with a pad in their own row',
       (ctx) => {
         const lines = filed(ctx);
         return (
@@ -269,7 +287,7 @@ export const w3_01: LevelDef = {
     'The crate rows and the pad rows are not the same rows, and they change between shifts.',
     'A pickup that takes nothing still costs a tick, and the log shows it as a failure.',
     'One trip across the shed moves one crate. Fetch, carry, set down, go back for the next.',
-    'A trip is flat when the crate and the pad share a row. Count the crates in each row and the pads in each row, and a row can only offer as many flat trips as the smaller of the two.',
+    'Count the crates in each row and the pads in each row. A row offers as many pairs as the smaller of those two numbers.',
   ],
   docs: ['pickup', 'drop'],
 };

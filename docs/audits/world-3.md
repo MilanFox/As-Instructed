@@ -40,12 +40,37 @@ today and got a verification pass only; `w3-02` and `w3-04` are first audits.
   states the maximum, defines the word the divergence uses, and says outright that the route does
   not enter into it.
 
+**Follow-up (2026-09-10) — the second wording lost a playtester too:**
+
+A player read *"the most trips this shift could run without changing row"* as one unbroken run and
+filed the largest single row instead of the sum of the per-row minima. "The most X without Y" is a
+streak in English regardless of what the rest of the sentence says, and the fact card's "It is a
+fact about how the yard stacked, not about the route you drive" did not overturn it — a frame set
+by the sentence read first is not undone by a denial further down. Finding 1 above had the
+diagnosis right and the cure wrong: naming the maximum ("the most") kept the reader inside the
+route frame instead of leaving it.
+
+- `src/levels/world-3/w3-01.ts` — the graded quantity is now described as a pairing, not a run.
+  Title: *"Report how many crates can be paired with a pad in their own row"*. Fact card: *"Pair up
+  as many crates as you can with pads in their own row, one crate to one pad. `n` is the total
+  across all three rows. Where the bot drives does not change it."* A pairing has no streak
+  reading; "one crate to one pad" is what stops two crates and one pad in a row counting twice; and
+  the sum is now stated outright rather than left to hint 5, since the sum was the exact step the
+  playtester missed.
+- The word "flat" is gone from every player-facing string on this level. `straight <n>` is already
+  the token the player types, so "flat" was a second name for the same idea — and it had to be
+  defined in all three places it appeared (fact card, missing-report divergence, hint 5). The
+  divergence now reads "a line saying how many pairs share a row" — the divergence fields carry a
+  44-character budget (`legibility.test.ts`), so it says less than the fact card by design and the
+  card is where the definition lives. Hint 5 keeps only the technique: "Count the crates in each row and the pads in each row. A row offers as
+  many pairs as the smaller of those two numbers." This retires finding 2's second half — the term
+  a failure message used is no longer a term at all.
+
 **For the user:**
 
-- Hint 5 now partly restates the fact card ("A trip is flat when the crate and the pad share a
-  row"). It still earns its place — it goes on to give the per-row `min` technique, which the fact
-  card deliberately does not. Left as is; CURRICULUM §2 rule 11 is about hint budgets spent
-  restating *one idea*, and this budget still covers five distinct blockers.
+- Hint 5 no longer restates the fact card at all (see the follow-up above): the card owns the
+  definition and the sum, the hint owns the per-row `min` technique. The budget still covers five
+  distinct blockers.
 
 ## w3-02 — Sorted by Colour
 

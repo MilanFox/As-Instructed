@@ -68,7 +68,7 @@ describe('w3-01 — the pad the shift walked past', () => {
     expect(met).toBe(false);
     expect(divergence).toEqual({
       where: 'the shift report',
-      expected: 'a line saying how many trips run flat',
+      expected: 'a line saying how many pairs share a row',
       received: '(nothing)',
     });
   });
