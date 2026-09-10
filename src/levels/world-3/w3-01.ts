@@ -65,7 +65,8 @@ function straightRuns(world: World): number {
     for (let x = 0; x < world.w; x++) {
       const here = vec(x, y);
       if (countItemsAt(world, here, 'crate') > 0) crates.set(y, (crates.get(y) ?? 0) + 1);
-      if (world.tiles[y * world.w + x]?.terrain === Terrain.Pad) pads.set(y, (pads.get(y) ?? 0) + 1);
+      if (world.tiles[y * world.w + x]?.terrain === Terrain.Pad)
+        pads.set(y, (pads.get(y) ?? 0) + 1);
     }
   }
   let total = 0;
@@ -182,7 +183,15 @@ export const w3_01: LevelDef = {
     ],
   },
   facts: [
-    { label: 'The crates', value: 'On the west siding. As many crates as there are pads.' },
+    {
+      label: 'The crates',
+      value: 'Crates (an item) lying on the west siding. As many crates as there are pads.',
+    },
+    {
+      label: 'The pads',
+      value:
+        'Pad (a terrain) on the east side of the shed. A loaded pad is a pad with a crate lying on it.',
+    },
     {
       label: 'Between shifts',
       value:
@@ -195,7 +204,7 @@ export const w3_01: LevelDef = {
     {
       label: 'The shift report',
       value:
-        'For the star: file one line, `straight <n>`, where `n` is the largest number of this shift\'s trips that could run flat — a trip is flat when the crate and the pad it goes to are in the same row. It is a fact about how the yard stacked, not about the route you drive.',
+        "For the star: file one line, `straight <n>`, where `n` is the largest number of this shift's trips that could run flat — a trip is flat when the crate and the pad it goes to are in the same row. It is a fact about how the yard stacked, not about the route you drive.",
     },
   ],
   seeds: [1, 2, 3],
@@ -241,7 +250,9 @@ export const w3_01: LevelDef = {
       'Report the most trips this shift could run without changing row',
       (ctx) => {
         const lines = filed(ctx);
-        return lines.length === 1 && lines[0] === `straight ${String(straightRuns(ctx.initialWorld))}`;
+        return (
+          lines.length === 1 && lines[0] === `straight ${String(straightRuns(ctx.initialWorld))}`
+        );
       },
       { divergence: misfiled },
     ),
