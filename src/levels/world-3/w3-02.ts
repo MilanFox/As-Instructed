@@ -185,6 +185,11 @@ export const w3_02: LevelDef = {
   },
   facts: [
     {
+      label: 'The crates',
+      value:
+        'Crates (an item) lying loose on the yard floor. A crate has no stencil — its class is the kind of item it is.',
+    },
+    {
       label: '`scan(dir).mark`',
       value: 'Reads a stencil. Gives back the class name, or `null` on an unpainted tile.',
     },

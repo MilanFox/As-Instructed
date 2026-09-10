@@ -194,7 +194,11 @@ const unfiled = (ctx: ObjectiveContext): Divergence | undefined => {
       received: NOTHING,
     };
   }
-  return { where: 'the trip home', expected: 'a different figure', received: clipValue(trip.filed) };
+  return {
+    where: 'the trip home',
+    expected: 'a different figure',
+    received: clipValue(trip.filed),
+  };
 };
 
 /**
@@ -257,7 +261,7 @@ export const w4_05: LevelDef = {
     {
       label: 'The veins',
       value:
-        'Ore faces set into the tunnel walls. Stand next to one and call `mine(dir)`. The plain `wall` tiles around them cannot be cut — only an ore face can.',
+        'Ore (a terrain) set into the tunnel walls. Stand next to one and call `mine(dir)`. Cutting a face clears it to floor and puts ore (an item) in the hold. The plain `wall` tiles around them cannot be cut — only an ore face can.',
     },
     {
       label: 'Fuel',

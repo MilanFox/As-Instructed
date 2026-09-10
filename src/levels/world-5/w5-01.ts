@@ -206,7 +206,7 @@ export const w5_01: LevelDef = {
     {
       label: 'The line',
       value:
-        'The bot starts on the reactor. The substations run away from it in one straight line.',
+        'One row of cable (a terrain), walkable, walled on every side. The bot starts on the reactor. The substations run away from it in one straight line.',
     },
     {
       label: '`use()`',

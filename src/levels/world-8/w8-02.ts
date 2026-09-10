@@ -277,6 +277,11 @@ export const w8_02: LevelDef = {
       value: `${String(DEPOT_W)} by ${String(DEPOT_H)}, none of it mapped. The rock is opaque, so \`look\` stops at the first wall.`,
     },
     {
+      label: 'A crate',
+      value:
+        "An item, not terrain. A tile's `items` gives each stack's `kind`, and that kind is the crate's class — the word its bay id ends in.",
+    },
+    {
       label: 'A bay',
       value:
         'Shows up as a `machineId` on any tile you can see, and `probe("depot-ore")` reports one from anywhere whether you have seen it or not. Knowing where a bay is does not map the rock in between.',

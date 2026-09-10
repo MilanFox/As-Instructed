@@ -122,6 +122,11 @@ export const w4_01: LevelDef = {
   facts: [
     { label: 'The tunnel', value: 'A different shape every shift, and a different length.' },
     {
+      label: 'The rock',
+      value:
+        'Rock (a terrain) fills everything the tunnel is not. It cannot be walked on and a ray cannot see through it.',
+    },
+    {
       label: '`look(dir)`',
       value:
         'Returns the tiles along that direction, nearest first. It stops at the first thing it cannot see through.',

@@ -113,8 +113,7 @@ const inBox = (at: Vec): boolean =>
   at.x >= EDGE + 1 && at.y >= EDGE + 1 && at.x <= SIZE - EDGE - 2 && at.y <= SIZE - EDGE - 2;
 
 /** The filed route is held inside the box; the old workings may run anywhere on the site. */
-const onSite = (at: Vec): boolean =>
-  at.x >= 1 && at.y >= 1 && at.x <= SIZE - 2 && at.y <= SIZE - 2;
+const onSite = (at: Vec): boolean => at.x >= 1 && at.y >= 1 && at.x <= SIZE - 2 && at.y <= SIZE - 2;
 
 const cell = (at: Vec): number => at.y * SIZE + at.x;
 
@@ -384,7 +383,8 @@ function build(seed: number): World {
     });
     if (eq(at, locker)) return;
     const tile = tileAt(world, at);
-    if (tile) tile.mark = `KD-${String(rng.int(1000, 9999))}-${LETTER[rng.pick(ALL_DIRS)]} (signed)`;
+    if (tile)
+      tile.mark = `KD-${String(rng.int(1000, 9999))}-${LETTER[rng.pick(ALL_DIRS)]} (signed)`;
   });
 
   addMachine(world, {
@@ -401,7 +401,10 @@ function build(seed: number): World {
     plain.push(sealPacket(['SEC', i, sectionText(survey, i)]));
   }
   for (let i = 0; i < survey.decoys; i++) {
-    const body = ['KD4470', 'SEC', String(rng.int(0, survey.sections.length - 1)),
+    const body = [
+      'KD4470',
+      'SEC',
+      String(rng.int(0, survey.sections.length - 1)),
       `${String(rng.int(2, 9))}${LETTER[rng.pick<Dir>([Dir.North, Dir.East, Dir.South, Dir.West])]}`,
     ].join('|');
     plain.push(`${body}|${String((rng.int(1, 999) + 1) % 1000)}`);
@@ -631,6 +634,16 @@ export const w8_04: LevelDef = {
       label: 'The lockers',
       value:
         '`locker-0` upwards, one per working. `probe(id)` finds any of them from anywhere, and the numbering is shuffled every shift.',
+    },
+    {
+      label: 'A locker tile',
+      value:
+        'Carries the locker machine and a stencil giving the form number and whether it is signed. `scan(dir).mark` reads the stencil back as a string; `look` reports it too, so a locker can be read without standing on it.',
+    },
+    {
+      label: 'The form',
+      value:
+        'KD-0001-T is an item lying on the tile of the locker the plan leads to. `pickup()` takes it — nothing about the locker machine has to be used.',
     },
     {
       label: 'The workings',

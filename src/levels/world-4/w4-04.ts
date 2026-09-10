@@ -272,7 +272,7 @@ export const w4_04: LevelDef = {
   },
   facts: [
     { label: 'Collection points', value: 'Three pad tiles.' },
-    { label: 'The lift', value: 'One depot tile.' },
+    { label: 'The lift', value: 'Depot (a terrain). One tile of it.' },
     {
       label: 'Where they sit',
       value: 'Each of the four is at the end of a short side passage off the main tunnels.',

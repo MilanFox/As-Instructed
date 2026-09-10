@@ -98,7 +98,7 @@ export const w2_02: LevelDef = {
     {
       label: 'Bare soil',
       value:
-        'Plant it. Reads `crop: null` and `growth: 0` of `maxGrowth: 0`. Seed only goes into bare soil.',
+        'Soil (a terrain) with nothing on it. Reads `crop: null` and `growth: 0` of `maxGrowth: 0`. Plant it — seed only goes into bare soil.',
     },
     { label: 'Not ready', value: 'Leave it standing. It already counts as planted.' },
     {
