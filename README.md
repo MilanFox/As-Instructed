@@ -2,6 +2,27 @@
 
 *or: How I Learned to Stop Worrying and Automate the Regolith.*
 
+## An experiment in agentic development
+
+**Not one line of the code in this repository was written by hand.** Every file — the engine,
+the renderer, the thirty-three levels, the tests that guard them and the documents that specify
+them — was produced by an agent, from prose, under review.
+
+That is the actual point of the project. The game is real and it is meant to be good, because an
+experiment that only has to *compile* proves nothing; the interesting question is what happens
+when the thing has to be played, has to stay coherent across eight worlds, and has to survive its
+own regression suite. The brief was never "generate a game" — it was to find out where AI
+genuinely fits in software development, and where it does not.
+
+So the parts worth reading may not be the parts that run. `docs/DESIGN.md` is a binding contract
+rather than documentation, because an agent that treats a spec as a suggestion will quietly
+rewrite the rules it finds inconvenient. `docs/audits/` records what each pass shipped **and what
+it declined**. The long, arguing comments throughout the source are deliberate: they are the
+repo's memory, and several are the only surviving record of a bug that was expensive to find.
+Read them as findings, not as decoration.
+
+No conclusions yet. The commit history is the dataset.
+
 A puzzle-programming game. You are Contractor #4471 at Kessler & Daughters Terraforming Ltd. You
 never go to the planets — you write the TypeScript that the planets' robots run, and then you watch
 the recording of what they did with it.
