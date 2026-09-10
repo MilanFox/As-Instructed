@@ -275,6 +275,37 @@ export const w7_04: LevelDef = {
     '',
     'Clear the board. Every job has to be `done` when your program stops.',
   ].join('\n'),
+  /**
+   * DESIGN.md §11.10.
+   *
+   * The redrawn half of this order is the level. Two numbers and a distribution move, and the
+   * distribution is the one that decides whether dealing the board out before anybody walks is a
+   * correct answer or twice the shift — it is a correct answer on the near-uniform draw, and a
+   * player who met that one first has no way of telling it apart from the skewed draw waiting
+   * behind it. Naming the axis is CURRICULUM.md §2 rule 2 said to the player; it names the shape
+   * of the board and not what to do about it, which is where rule 7 draws the line.
+   *
+   * The fixed half is the yard. The empty row between every row of jobs is a generator
+   * guarantee — a bot parked on a finished job is a wall from then on, and without the gaps a
+   * late job can be walled in by the fleet that already served its neighbours — so a run may take
+   * it that no job is ever unreachable, which is not a thing the one board in front of it shows.
+   */
+  board: {
+    fixed: [
+      'the yard is 26 by 18 of open floor inside its wall',
+      'the whole fleet starts at Depot 0 on the west wall, one bot to a row',
+      'the jobs stand in a block seven columns wide, with an empty row between every row of them',
+      'the jobs are `job-0` upward with no gaps, and the board never gains one mid-shift',
+      'no job costs more than twenty uses, and `probe` reports every cost before anybody moves',
+    ],
+    redrawn: [
+      'how many bots the requisition approves, four to eight',
+      'how many jobs are on the board, fifteen to thirty',
+      'what each job costs',
+      'how the costs are spread — one shift is all much of a muchness, another puts a handful of long jobs among short ones',
+      'which yard tile each job stands on',
+    ],
+  },
   facts: [
     { label: 'Your score', value: 'The clock stops when the **last** bot stops.' },
     {

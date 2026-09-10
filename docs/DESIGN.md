@@ -415,6 +415,17 @@ the problem being hard to see.
    exception below, or a later gimmick — the preview shows a *known unknown*: a fogged tile, an
    unread packet, a sensor edge. "I cannot know what is here, and the level means me not to" is
    perfect information. A blank the player cannot tell from empty floor is not.
+10. **The board says which half of itself is the level.** A player sees one draw and cannot tell,
+    from the board alone, which of the things on it every seed shares. That line decides what they
+    are allowed to write down as a constant, so every work order states both halves in
+    `board.fixed` and `board.redrawn` (`src/levels/types.ts`), rendered on the sheet. The question
+    that wrote this clause was asked of `w3-01` — *is it always a three-row corridor?* It is, on
+    every seed, and no player-facing text said so; the rows the crates sit in are redrawn and look
+    exactly the same on the one board in front of you. `board.redrawn` is §11.4's anti-hardcode
+    axis said to the player instead of only to the next author: seeds may catch a lazy answer, but
+    a player guessing at the shape because nobody named it was not being lazy. Where finding the
+    shape *is* the question, the field is omitted under the exception below and
+    `src/levels/__tests__/board.test.ts` holds the list.
 
 The single exception: withholding information is allowed when uncovering it **is** the level's
 stated question — `w5-02`, where sensing is the mechanic, and `w8-01`, where re-sensing replaces

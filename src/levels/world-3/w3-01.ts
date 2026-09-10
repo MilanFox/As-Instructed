@@ -150,6 +150,37 @@ export const w3_01: LevelDef = {
     '',
     'Every pad on the east side of the shed must end the shift holding a crate.',
   ].join('\n'),
+  /**
+   * DESIGN.md §11.10, and the level the clause was written about.
+   *
+   * "Is it always a three-high corridor?" was asked of this board by a player who had one seed in
+   * front of them. It is — `build` fixes 14x5 on every seed, so the interior is rows 1 to 3
+   * forever — and the answer changes the program: a run that knows it can index the three rows
+   * directly, and a run that surveys for a wall it will never find, are different programs and the
+   * second one is longer for nothing. Meanwhile the rows the crates *sit* in are redrawn, and on
+   * one board the two facts look identical. Both halves are stated because the player cannot get
+   * either from the board alone.
+   *
+   * The row-histogram line earns its place on the sheet: the star grades a number that is smaller
+   * than the crate count on every shipped seed, and the reason is the `rowsMatch` redraw below. A
+   * player who did not know the sidings never agree row-for-row could reasonably read
+   * `straight <n>` as "count the crates" and be right on a board that does not exist.
+   */
+  board: {
+    fixed: [
+      'the shed is 12 wide and 3 deep inside its wall',
+      'the west siding is the two columns at the west wall, the pads the two at the east',
+      'one crate for every pad',
+      'RIG-04 starts mid-shed with a one-crate clamp',
+      'the crate rows and the pad rows never agree row for row',
+    ],
+    redrawn: [
+      'three, four or five crates',
+      'which siding tiles hold them',
+      'which east tiles are pads',
+      'the row RIG-04 starts in',
+    ],
+  },
   facts: [
     { label: 'The crates', value: 'On the west siding. As many crates as there are pads.' },
     {

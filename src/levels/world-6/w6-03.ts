@@ -194,6 +194,39 @@ export const w6_03: LevelDef = {
     'One packet is waiting: the route from the tile you are standing on to the landing pad,',
     'enciphered. Decode it, drive it, and park on the pad.',
   ].join('\n'),
+  /**
+   * DESIGN.md §11.10.
+   *
+   * `EAST_TOTAL`, `DOWN_TOTAL` and `UP_TOTAL` are constants, so the route is 37 moves and ends on
+   * (18, 13) on all four shifts. Only the splits and the key move. Both halves of that matter with
+   * a pit under every tile that is not the route: knowing the length is fixed makes an off-by-one
+   * in the reader a thing a run can check for before it drives, and knowing the route never doubles
+   * back rules out the reading where a group cancels an earlier one. Neither is guessable from a
+   * board, because a single route is consistent with almost any rule about routes.
+   *
+   * The two-digit group is the line this level would be dishonest without. `eastSegments` plants a
+   * run of ten or eleven on every seed and `encodeRuns` refuses to split it, precisely so the
+   * one-character-per-count reader fails on the first shift a player runs rather than the second
+   * (DESIGN.md §11.5). That is a fair trap only if the sheet admits a count can be two characters
+   * long — the `Route format` card says "one or more digits", and this says it will happen.
+   */
+  board: {
+    fixed: [
+      'the field is 20 by 20 and every tile off the route is a pit',
+      'RIG-06 starts on the antenna at (1, 5); the pad is at (18, 13)',
+      'one packet on the band, and it is the whole route',
+      'the route is exactly 37 moves, and it works east across the field without ever doubling back',
+      'every shift carries a group whose count is two digits long, and that group never arrives split',
+      'a group of a single move turns up on every shift as well',
+    ],
+    redrawn: [
+      'the key',
+      'where the route turns',
+      'how the 37 moves divide into groups',
+      'which groups arrive split in two where one would have done',
+      'how many characters the packet arrives as',
+    ],
+  },
   facts: [
     { label: 'The key', value: "`probe('mast').vars.key`. Free, and a new key every shift." },
     {

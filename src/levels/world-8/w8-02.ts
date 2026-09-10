@@ -239,6 +239,38 @@ export const w8_02: LevelDef = {
     'Every crate on the floor belongs to a class, and every class has one bay. Carry each crate',
     'to its bay and drop it there.',
   ].join('\n'),
+  /**
+   * DESIGN.md §11.10, on an order whose whole premise is an unmapped depot.
+   *
+   * Nothing here names a tile, and the crate count is named as an axis with no range on it: the
+   * required objective is every crate on its bay and the star is half of them shipped early, so a
+   * number would be the graded figure and a bound would quietly answer "have I seen the whole
+   * floor yet" — the question the fact table has already told the player to take themselves.
+   *
+   * What is stated is the structure, because it is what makes the search terminate honestly.
+   * `build` draws bays and crates from the tiles reachable from the room the bot wakes in, so
+   * nothing is ever walled off; there is one bay per class and no two share a room; and the arms
+   * hold the same number all shift even though the shift decides what that number is. That last
+   * pair is the line a player cannot see from one board — a gauge-less hold that never changes
+   * mid-shift is a constant to be measured once, and measuring it once is cheap only if you know
+   * it is safe.
+   */
+  board: {
+    fixed: [
+      'the depot is 34 by 26 of rock with caves cut through it, and none of it is mapped',
+      'one bot, and it starts in one of the cave rooms rather than at a bay',
+      'every crate and every bay is reachable on foot from where the bot starts',
+      'one bay per class on site, and no two bays in the same room',
+      'the arms hold the same number of crates all shift, with no gauge on them',
+    ],
+    redrawn: [
+      'which classes the shift draws, and which bay takes each of them',
+      'the cave layout, and where the bays and the crates sit in it',
+      'how many crates are on the floor',
+      'how many crates the arms hold',
+      'whether the crates lie among the bays or off in the far quarter of the depot',
+    ],
+  },
   facts: [
     {
       label: 'The depot',

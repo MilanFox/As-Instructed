@@ -234,6 +234,42 @@ export const w4_04: LevelDef = {
     '',
     'Stand on all three collection points, then end the run on the lift.',
   ].join('\n'),
+  /**
+   * DESIGN.md §11.10.
+   *
+   * This sheet says nothing about what the shift costs. The clock, the survey and the three trips
+   * it does not pay for are the level (CURRICULUM §11), and they are stated where they already are
+   * — in the facts, as a budget the player reads before writing anything. What the board adds is
+   * only the shape the survey runs over, which is the half a player cannot get from one draw.
+   *
+   * The load-bearing row is that the cave is carved everywhere. A map built by walking towards the
+   * nearest unknown terminates because there is nothing unreachable in it, and a program that
+   * cannot rely on that has to decide when to give up looking — a decision with no honest answer
+   * and no reason to be in this level. The lift standing at the side passage furthest from the
+   * start is the same kind of fact: it is why the route home is worth planning rather than
+   * stumbling into, and on one board it looks like where the lift happened to land.
+   *
+   * How the three points are scattered is the redrawn axis, and it is the whole of the star. Two
+   * of the four modes push them apart and one bunches two of them together, so the best order is a
+   * different order on different shifts and no memorised sequence survives. The row names the axis
+   * and stops there: six permutations is the work, and the sheet is not going to rank them.
+   */
+  board: {
+    fixed: [
+      'the map is 30 tiles square',
+      'tunnels are one tile wide, and a tile with an even `x` and an even `y` is always rock',
+      'the cave is carved throughout — every tunnel is reachable from every other, and nothing is sealed off',
+      'three collection points and one lift, each at the blind end of a side passage',
+      'RIG-04 starts at a blind end too, and the lift is the one furthest from it',
+    ],
+    redrawn: [
+      'the layout of the tunnels',
+      'one to three tunnels that rejoin further in',
+      'where the three points and the lift sit',
+      'how far apart the three points are — some shifts leave two of them almost together, others push all three as far apart as the cave allows',
+      'which side passage RIG-04 starts in',
+    ],
+  },
   facts: [
     { label: 'Collection points', value: 'Three pad tiles.' },
     { label: 'The lift', value: 'One depot tile.' },

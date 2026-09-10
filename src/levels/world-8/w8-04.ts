@@ -572,6 +572,40 @@ export const w8_04: LevelDef = {
     '',
     'Bring the form up. The run ends once it is in the bot.',
   ].join('\n'),
+  /**
+   * DESIGN.md §11.10, on an order where the plan is the thing being checked.
+   *
+   * The two figures the reading asks for are named as axes and left without numbers. Both are the
+   * star: the shift is only recoverable by trying all ninety-five against the checksum, and the
+   * leg count only by throwing away the traffic that does not add up and reading what is left in
+   * section order. A range on either would be most of the answer, and the sections the antenna
+   * publishes would finish it.
+   *
+   * The fixed half is the guarantee the whole level rests on, asserted in `build` rather than
+   * hoped for: the workings are a tree, so the filed route is the shortest walk to the locker
+   * there is, every old working is a dead end that joins nothing, and a fall never seals the
+   * route — the way round is six moves dearer than the stretch it replaces. Without those on the
+   * sheet, "throw the plan away and search" reads like a program with unknown cost rather than
+   * one whose cost is the plan plus whichever dead ends it tried first.
+   */
+  board: {
+    fixed: [
+      'the site is 28 by 28 of rock inside the wall, and the lift is the only way in',
+      'RIG-11 starts on the lift, and section 0 of the plan starts there too',
+      'no two corridors ever run side by side, so there is one route to any tile and a wrong turn is a walk back',
+      'the old workings are dead ends: no working joins the route twice, or joins another working',
+      'every working ends in a locker, and the form is in the one the plan leads to',
+      'a fall never seals the route, and the way round is six moves longer than the stretch it replaces',
+    ],
+    redrawn: [
+      'where the route runs, and which of the ninety-five shifts the traffic was filed under',
+      'how many groups of moves the plan describes',
+      'how much of the plan has gone stale',
+      'how many decoy packets are on the band',
+      'which locker id names which working',
+      'where the old workings run, and how far in they go',
+    ],
+  },
   facts: [
     {
       label: 'The band',

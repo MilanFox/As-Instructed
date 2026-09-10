@@ -30,6 +30,7 @@ export function WorkOrder(): React.JSX.Element | null {
 
   const world = worldMeta(level.world);
   const facts = level.facts ?? [];
+  const board = level.board;
   const routines = requirementsFor(level.id);
   const hints = level.hints;
 
@@ -109,6 +110,27 @@ export function WorkOrder(): React.JSX.Element | null {
               </span>
             </div>
           ))}
+        </div>
+      ) : null}
+
+      {board ? (
+        <div className="facts">
+          <div>
+            <b>THE BOARD</b>
+            <span>Every seed of this order shares the first row. The second row is redrawn.</span>
+          </div>
+          <div>
+            <b>SAME EVERY SEED</b>
+            <span>
+              <InlineMarkdown source={board.fixed.join(' · ')} />
+            </span>
+          </div>
+          <div>
+            <b>REDRAWN PER SEED</b>
+            <span>
+              <InlineMarkdown source={board.redrawn.join(' · ')} />
+            </span>
+          </div>
         </div>
       ) : null}
 

@@ -178,6 +178,31 @@ export const w7_01: LevelDef = {
     'Park each bot on the pad at the end of its own corridor, and have each one hear from',
     'the other.',
   ].join('\n'),
+  /**
+   * DESIGN.md §11.10.
+   *
+   * World 7 is scored on the finish time of the last bot, and the first thing a player needs to
+   * know about a fleet is how big it is. Here it is two, on every shift, and nothing in the brief
+   * or the facts said so — a run that reads `bots()` and a run that writes `bot(0)` and `bot(1)`
+   * are the same program on this order and only one of them knows it. What moves is the pair of
+   * walks, including the draw where they are the same length: on that board nobody is behind,
+   * `recv()` lands without a `sync()` and every idle figure is zero, so a report that carries a
+   * remembered zero passes one shift and fails the other two. Both halves are stated because the
+   * one corridor in front of the player looks identical either way.
+   */
+  board: {
+    fixed: [
+      'two bots, one to a corridor, on every shift',
+      'both corridors run East from the west wall, one tile deep, no branches',
+      'each corridor is a dead end and its pad is the last tile of it',
+      'RIG-07 starts in the north corridor and RIG-08 in the south, both facing East',
+    ],
+    redrawn: [
+      'the length of each corridor, three to nine tiles',
+      'which of the two is the longer walk',
+      'whether one is longer at all — some shifts draw them equal',
+    ],
+  },
   facts: [
     { label: 'Your score', value: 'The clock stops when the **last** bot stops. Not the total.' },
     {

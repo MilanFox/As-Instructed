@@ -216,6 +216,41 @@ export const w6_02: LevelDef = {
     '',
     'Relay every packet whose check values match, unchanged and in order. Relay nothing else.',
   ].join('\n'),
+  /**
+   * DESIGN.md §11.10.
+   *
+   * The salt is the axis and the level's own header comment already says so to the next author:
+   * drawn per shift, readable only from the antenna, so a check with a number written into it
+   * passes once and never again. Saying it on the sheet is the same claim made to the player, and
+   * it costs nothing — the salt is a free `probe` and the facts publish both check formulas.
+   *
+   * The corruption rate belongs beside it, because it is the axis that decides whether a run's
+   * *structure* is right rather than its arithmetic. A shift with nothing wrong on it and a shift
+   * whose very first packet is wrong both exist, and hint 3 is currently the only place either is
+   * mentioned — which §11.3 says is one place too few for something the objective grades. A run
+   * that quietly assumes at least one clean packet, or at least one corrupt one, is a run that
+   * passes the shift in front of it and fails a sibling.
+   *
+   * The two check values are computed over the payload *before* `build` spoils a byte and are
+   * never touched afterwards, so they are always the truth about what was sent. That is what makes
+   * the star's arithmetic possible at all, and it is not visible from a packet.
+   */
+  board: {
+    fixed: [
+      'the post is a 12 by 6 shack; RIG-06 stays on the antenna',
+      'the whole band is queued before the shift starts, and it is drained once, in arrival order',
+      'every packet carries its own two check values, over four to ten payload bytes',
+      'a corrupt packet has exactly one payload byte altered; the check values themselves are never touched',
+    ],
+    redrawn: [
+      'the salt',
+      'twenty to forty packets on the band',
+      'how many bytes each packet carries',
+      'how much of the band is corrupt — a tenth to a third of it, or none of it',
+      'which byte of a corrupt packet was altered',
+      'whether the first packet you read is one of them',
+    ],
+  },
   facts: [
     {
       label: 'A packet',

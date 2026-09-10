@@ -223,6 +223,42 @@ export const w3_04: LevelDef = {
     '',
     'Move every crate onto the outbound bay pad, lowest arrival number first.',
   ].join('\n'),
+  /**
+   * DESIGN.md §11.10.
+   *
+   * The rack and aisle rows are already in the facts, and they are repeated here for the one thing
+   * the facts cannot say: that they are the same four rows on every shift. Read as a description of
+   * this board they are a survey result; read as a fixed frame they are four constants, and a run
+   * that knows it can step from aisle to aisle reading both rack rows beside it is the run hint 3
+   * describes. The player cannot tell those two readings apart from one board.
+   *
+   * The slot allowance is on the fixed side for the same reason in reverse. It does not scale with
+   * the crate count, so a sixteen-crate shift has proportionally less of it than a small one, and
+   * a player who assumes the number grows with the yard spends it without noticing. The figure
+   * itself stays where it already is, on the objective label.
+   *
+   * The sweep line is `sweptFirst` said to the player. The generator redraws the numbering until
+   * the first crate a rack sweep reaches is not arrival 1, precisely so that "ship them in the
+   * order I walk past them" fails on the first crate rather than the ninth — but a player who has
+   * only seen one board cannot know that disagreement is guaranteed rather than this shift's luck,
+   * and the one-crate shift is the honest exception to it.
+   */
+  board: {
+    fixed: [
+      'the yard is 16 wide and 8 deep inside its wall',
+      'the rack rows are `y` 2, 3, 6 and 7 on every shift, and the aisles `y` 1, 4, 5 and 8',
+      'one outbound bay, always standing in an aisle',
+      'on any shift holding more than one crate, arrival 1 is not the first crate a sweep of the racks would reach',
+      'the empty-slot allowance is the same figure however many crates arrive',
+      'RIG-04 starts in an aisle, one crate to the clamp',
+    ],
+    redrawn: [
+      'how many crates the shift holds — as many as sixteen, as few as one',
+      'which rack slots they stand in',
+      'which arrival number is stencilled on which slot',
+      'where the outbound bay stands, and where RIG-04 starts',
+    ],
+  },
   facts: [
     {
       label: 'Arrival number',

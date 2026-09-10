@@ -107,6 +107,33 @@ export const w7_03: LevelDef = {
     '',
     'Every crate in the east yard has to end up in the silo. All of it goes through the tunnel.',
   ].join('\n'),
+  /**
+   * DESIGN.md §11.10, written as narrowly as this order allows.
+   *
+   * This level is on the Frustration Watch (CURRICULUM.md §11): the livelock has to land cold, so
+   * the sheet says what the site *is* and nothing whatever about what happens when two bots meet
+   * in the tunnel. Everything below is geometry and stock. The fleet size is the axis worth
+   * naming — it is two on the opening shift and six on another, and a program written against a
+   * pair of bots is not the program six of them need. The load line is here for the same reason:
+   * no shift is one trip each, because `siteFor` forces a second crate into a pile when the draw
+   * would have made every pile a single, so a run that plans one crossing per bot has planned for
+   * a board that does not ship.
+   */
+  board: {
+    fixed: [
+      'one tunnel between the rooms, one bot wide, on row 7 every shift',
+      'both rooms are seven columns wide and the site is seven rows deep inside its wall',
+      'the silo is the whole of column 1 — any tile in it counts as delivered',
+      'one pile of crates per bot, in the row that bot starts in',
+      'no shift is one trip each: at least one pile holds two crates',
+    ],
+    redrawn: [
+      'how many bots the shift fields, two to six',
+      'the length of the tunnel, six to twelve tiles',
+      'which column of the east yard each pile stands in',
+      'whether a pile holds one crate or two',
+    ],
+  },
   facts: [
     { label: 'Your score', value: 'The clock stops when the **last** bot stops.' },
     { label: 'The silo', value: 'The whole west wall. Any tile in **column 1** counts.' },

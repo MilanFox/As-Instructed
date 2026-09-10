@@ -55,6 +55,32 @@ export const w6_01: LevelDef = {
     '',
     'Print every packet on the band, in order, exactly as it arrived.',
   ].join('\n'),
+  /**
+   * DESIGN.md §11.10.
+   *
+   * The rest beat has one thing to get wrong and it is the empty shift, so the sheet says outright
+   * that the length is the axis and that none at all is one of its values. The `The queue` card
+   * says "some shifts it is empty"; what it cannot say is that nothing else about the band moves.
+   *
+   * The line that earns its place is the second one. The whole band is queued before the shift
+   * starts — `installPost` writes it onto the tile once and nothing is ever added — so `buffered()`
+   * is a length, not a sample, and a run does not have to sit and wait for traffic that will never
+   * arrive. A player who suspects packets are still coming in writes a polling loop against a
+   * queue that has been finished since tick zero, on the one level in the game built to be small.
+   */
+  board: {
+    fixed: [
+      'the post is a 10 by 6 shack; RIG-06 is parked on the antenna and nothing here needs it to move',
+      'the whole band is queued before the shift starts — nothing arrives while you read it',
+      'every packet is one line of text, handed over in arrival order',
+      "a status ping that is not the post's sits somewhere on every band that has traffic",
+    ],
+    redrawn: [
+      'how long the queue is — five to fifteen packets, or none at all',
+      'what each packet says',
+      'where the ping sits in the queue',
+    ],
+  },
   facts: [
     {
       label: '`receive()`',

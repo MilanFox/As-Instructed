@@ -1093,6 +1093,40 @@ export const w8_05: LevelDef = {
   title: 'The Kessler Contract',
   hardware: [],
   brief: BRIEF,
+  /**
+   * DESIGN.md §11.10, on the finale, where everything at once is the point.
+   *
+   * Three authored instances rather than a draw (CURRICULUM.md §10), and the sheet has to say
+   * which of the things on one of them is the instance. The fleet, the grid and the crate list
+   * all move; the site does not. The bay is hand-built west of the carve box so it is always
+   * there, with a fuel depot tile on the desk row, and `sealStrandedGround` fills in anything the
+   * bay cannot reach — so the only shut thing on the site is the chamber, and the two gate tiles
+   * are the only way into it. A run may treat all of that as a constant, and no board shows it.
+   *
+   * The ids line is the same repair as `w8-03`: `relabel` deals the station names again until
+   * ascending order breaks, so counting to n is not a schedule. Naming the constraint leaves the
+   * feeder lists to be read and the order to be built, and it keeps `precedence` — the headline
+   * mechanic of the finale — a thing the player is beaten by on merit rather than by the sheet
+   * having said nothing.
+   */
+  board: {
+    fixed: [
+      'the site is 46 by 38 inside the wall — the muster bay west, the Yards in the middle, the airlock and the chamber east',
+      'the whole fleet musters in the bay on full cells, six crates of hold each, beside a fuel depot tile on the row the desk stands on',
+      'every tile the shift needs is walkable from the bay; the chamber is the only shut part of the site, and the two gate tiles are the only way in',
+      'nine turns of the handle at the airlock, and the substation it draws off always has feeders of its own',
+      'the station numbers are not an energising order: some station is fed by one numbered above it',
+      'the shift is 3000 ticks on all three draws',
+    ],
+    redrawn: [
+      'how many bots, six or seven',
+      'how many substations, and the shape of the grid — one draw is a pure chain, the others branch',
+      'how many crates, and which classes the night draws',
+      'which substation the airlock draws from',
+      'how much fuel a full cell holds',
+      'the cave layout, the row the airlock stands on, and where the depots, the sinks, the antenna and the form sit in it',
+    ],
+  },
   facts: FACTS,
   seeds: [1, 4, 7],
   /* Both halves of the reference — the `Sim` driver at 514 / 779 / 894 and the player-facing

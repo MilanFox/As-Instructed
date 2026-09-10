@@ -70,6 +70,41 @@ export const w2_04: LevelDef = {
     'These are not the same tile list — a tile can satisfy the second without ever having grown',
     'anything for the first.',
   ].join('\n'),
+  /**
+   * DESIGN.md §11.10. The ladder is the level, so the ladder goes on the sheet.
+   *
+   * `RIPEN_LADDER` is a structural guarantee dressed as a constant: the ripening times climb far
+   * enough apart that no single pass over six tiles can finish the plot, on any seed, ever. The
+   * hint budget spends a line on that ("one pass cannot finish the plot") and the facts table does
+   * not, which is §11.3 the wrong way round — interrupt-and-resume is the whole thing this order
+   * teaches, and a player who thinks the spread is this shift's bad luck writes a single sweep and
+   * reads the failure as a near miss rather than as the wrong shape of program.
+   *
+   * What stays off the sheet is where on the ladder the far tile lands relative to a lap of the
+   * plot. That is the `withinSpoilage` star, it is arithmetic the player can do from `scan()` on
+   * the board in front of them, and handing over the conclusion would be handing over the star.
+   * `fixed` says the crops arrive spread out; it does not say what to do while waiting.
+   *
+   * The hopper is on both halves and means a different thing on each. That it *starts full* is
+   * fixed and is the only reason `inventory()` can be read as a capacity at all; how full is
+   * redrawn, which is why the reading has to happen at runtime instead of being typed in.
+   */
+  board: {
+    fixed: [
+      'the plot is 3 across and 2 deep — six tiles of soil, walled on every side',
+      'every tile is soil, so a bare tile is empty rather than blocked',
+      'one or two tiles come up bare — never none',
+      'the hopper leaves the depot full, whatever full is this shift',
+      'the crops come ready spread across the shift, never all at once',
+      'FIELD-02 starts in the north-west corner, facing East',
+    ],
+    redrawn: [
+      'how much the hopper holds, six to ten',
+      'which tiles came up bare, and whether it is one or two',
+      'how long each crop has left before it is ready',
+      'which crops have not started their clock, and what `sproutsIn` reports for them',
+    ],
+  },
   facts: [
     { label: 'The plot', value: 'Six tiles. Three across, two deep.' },
     {

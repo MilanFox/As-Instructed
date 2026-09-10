@@ -257,6 +257,42 @@ export const w5_04: LevelDef = {
     '',
     'Put every consumer on a feeder. Take no feeder over its ceiling.',
   ].join('\n'),
+  /**
+   * DESIGN.md §11.10.
+   *
+   * The cable is permanent, so this is the one order in the district where a wrong assumption
+   * cannot be walked back — which makes the fixed half worth more here than anywhere else in the
+   * world. Three things the generator guarantees and the yard does not show:
+   *
+   * `yardPlan` draws until exactly one feeder is strictly the largest, so "the highest-capacity
+   * feeder" the star names is never a tie the player has to break; the feeders other than that one
+   * can always hold the whole load, so the star is available on every seed rather than on the
+   * roomy ones; and `orderDecides` rejects any draw where taking the consumers as reported fits
+   * anyway, so the level's premise holds on seed 1 as well as on seed 5 (CURRICULUM.md §15.3).
+   * The last of those states which order fails and stops there. Which order works is the level.
+   *
+   * `link` addresses both ends by id, so nothing in the yard has to be walked to — worth saying
+   * because every earlier order in World 3 was a driving job, and a run that assumes it has to
+   * park next to a feeder spends its whole budget on travel that buys nothing.
+   */
+  board: {
+    fixed: [
+      'yard 4 is 26 by 20 of open floor',
+      'the feeders stand in one column at the west wall; the consumers are scattered across the yard',
+      'RIG-01 works from the depot corner — `link` takes both ends by id, so nothing has to be driven to',
+      'the ceilings added together always leave the yard headroom',
+      'exactly one feeder is strictly the largest',
+      'without that feeder the rest can still hold the whole load, though never in the order the consumers are reported in',
+    ],
+    redrawn: [
+      'six to eight feeders',
+      "each feeder's ceiling",
+      'twelve to eighteen consumers',
+      'what each one draws, three to nine',
+      'which feeder in the column is the largest',
+      'where the consumers stand',
+    ],
+  },
   facts: [
     {
       label: 'What reports what',

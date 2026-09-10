@@ -181,6 +181,38 @@ export const w4_02: LevelDef = {
     '',
     'Reach the ore vein.',
   ].join('\n'),
+  /**
+   * DESIGN.md §11.10.
+   *
+   * Two guarantees here are worth more than the geometry. The cave is carved everywhere — every
+   * chamber in the grid is open and reachable from every other — so a search that has run out of
+   * unvisited openings has finished the cave rather than found a wall it should go around. And the
+   * vein is at the dead end furthest from the start, which says what the level costs: this is a
+   * long walk on every shift, not a lucky one, and a program that gives up on depth is not going
+   * to arrive.
+   *
+   * The loop count is the redrawn axis and its floor is what has to be stated. `CYCLE_CHOICES`
+   * includes zero, so one shift in four hands back a plain tree on which nothing that guards
+   * against a loop ever fires. Left unsaid, a player who drew that shift first concludes the
+   * breadcrumbs were ceremony; the facts say "on most shifts", and this row is where "most" is
+   * given its edge.
+   */
+  board: {
+    fixed: [
+      'the map is 20 tiles square',
+      'passages are one tile wide, and a tile with an even `x` and an even `y` is always rock',
+      'the cave is carved throughout — every passage is reachable from every other, and nothing is sealed off',
+      'RIG-04 starts at a dead end',
+      'the vein is at the dead end furthest from that start',
+      'one pad tile in the cave, and it is the vein',
+    ],
+    redrawn: [
+      'the layout of the passages',
+      'how many forks rejoin further in — four at most, and on some shifts none at all',
+      'where the dead ends fall, and which one holds the vein',
+      'which dead end RIG-04 starts in',
+    ],
+  },
   facts: [
     {
       label: 'The cave',

@@ -87,6 +87,38 @@ export const w4_01: LevelDef = {
     'There is one tunnel. It bends, it does not fork, and it ends on a marked pad.',
     'Drive the bot onto that pad.',
   ].join('\n'),
+  /**
+   * DESIGN.md §11.10.
+   *
+   * The brief says the tunnel bends and does not fork, which is the level's premise. What it does
+   * not say is the stronger thing `carveTunnel` guarantees: two cells are two tiles apart, so the
+   * corridor never runs alongside itself and no tile on it ever shows more than two openings. That
+   * is the difference between "I have not seen a fork yet" and "there is no fork", and only the
+   * second one licenses hint 2's rule — the openings are two, one of them is where I came from,
+   * therefore the other is the way on. A player who does not know the corridor cannot touch itself
+   * writes a program that handles a third opening that will never arrive.
+   *
+   * The ray allowance is fixed while the tunnel length is not, which is the one place on this sheet
+   * where the two halves have to be read together. Sixty rays is generous for a feeler on the short
+   * draw and nowhere near enough on the long one, so a run tuned to the board in front of it takes
+   * the star on one shift and loses it on the next for no reason it can see.
+   */
+  board: {
+    fixed: [
+      'the map is 23 tiles square, and rock everywhere the tunnel is not',
+      'one tunnel and nothing else — every floor tile belongs to it',
+      'the tunnel is one tile wide and never runs alongside itself, so no tile on it has more than two openings',
+      'a tile with an even `x` and an even `y` is always rock',
+      'RIG-04 starts at one end of the tunnel and the pad is at the other',
+      'the ray allowance is for the whole shift, however long the tunnel is drawn',
+    ],
+    redrawn: [
+      'the shape of the tunnel, bend for bend',
+      'its length — 31 to 59 tiles of floor',
+      'where in the rock it is carved',
+      'which end of it RIG-04 starts from',
+    ],
+  },
   facts: [
     { label: 'The tunnel', value: 'A different shape every shift, and a different length.' },
     {

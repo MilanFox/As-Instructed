@@ -39,7 +39,11 @@ are load-bearing identifiers, not an ordering. Do not renumber to close a gap; a
     it looks — spread hints across distinct blockers, not repetitions of one.
 12. The field-note glossary (`THE PARTITION`, `A SWING`, …) is the only teaching mechanism in the
     game and replaces a tutorial. Do not add a tutorial.
-13. Perfect information (DESIGN.md §11). Everything a level grades is stated in its brief, facts
+13. `board.fixed` / `board.redrawn` state, on the sheet, what every seed of the order shares and
+    what the generator rolls (DESIGN.md §11.10). `redrawn` is rule 2's anti-hardcode axis in the
+    player's words; `fixed` is the half that lets a run treat a dimension as a constant instead of
+    surveying for it. Omitted only under the §11 exception — `w5-02`, `w8-01`.
+14. Perfect information (DESIGN.md §11). Everything a level grades is stated in its brief, facts
     or docs. Later seeds refuse hardcoded answers; they never introduce a rule seed 1 gave no
     reason to expect, and seed 1 never passes a wrong general rule.
 

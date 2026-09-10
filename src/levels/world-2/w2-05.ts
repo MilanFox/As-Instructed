@@ -122,6 +122,40 @@ export const w2_05: LevelDef = {
     '',
     '**Come back with the hopper full of crop.**',
   ].join('\n'),
+  /**
+   * DESIGN.md §11.10, written as narrowly as this order's arithmetic allows.
+   *
+   * `sowField` places one ripe crop per equal slice of the sweep order, so ripe crop is spread the
+   * length of the field on every seed and cannot bunch into a corner the route declines to visit.
+   * That guarantee has to be stated: the shift buys 62 ticks against 72 tiles, so the run is a bet
+   * that the crop it needs is reachable from the lanes it drives, and a bet nobody told the player
+   * was safe is the §11.4 unfairness — a lane route that came home short would look like the wrong
+   * idea rather than an unlucky draw.
+   *
+   * What is deliberately *not* on the sheet is `ripeCount = capacity + 4`. The offset is a fixed
+   * property of the generator and stating it would be a second instrument for reading the hopper:
+   * count the ripe crop with the sensor, subtract four, and the size the facts table says nothing
+   * on the bot reports falls out without ever calling `inventory()`. Choosing what to harvest
+   * against a capacity you can only measure by measuring it is the order's question. So `fixed`
+   * says there is more ripe crop than the hopper holds — which is the part the run needs, the
+   * promise that it will not be starved — and stops there. The same reasoning keeps the seven-to-
+   * nine range off `redrawn`: the axis is named, the number stays behind `inventory()`.
+   */
+  board: {
+    fixed: [
+      'the west field is 12 by 6 of soil inside its wall, and every tile of it takes wheels',
+      'ripe crop is spread the length of the field, never bunched into one stretch of it',
+      'always more ripe crop standing than the hopper can hold',
+      'ice-scrub grows in the same soil as the crop and is never told apart by the arm',
+      'FIELD-02 starts in the north-west corner, facing East',
+    ],
+    redrawn: [
+      'how much the hopper holds this shift',
+      'where in each stretch of the field the ripe crop stands',
+      'how much ice-scrub there is, and where',
+      'which crops are still coming on, and how far out they are',
+    ],
+  },
   facts: [
     {
       label: 'The field',

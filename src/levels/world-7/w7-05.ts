@@ -254,6 +254,36 @@ export const w7_05: LevelDef = {
     '',
     'Bring every relay site up. No bot may bring up a site it was not sent to.',
   ].join('\n'),
+  /**
+   * DESIGN.md §11.10, on an order that hides where the sites are.
+   *
+   * The hiding is legitimate and stated — the sites are on no plan, the brief says so, and
+   * `probe()` with no argument is the only thing that finds one — so this sheet does not name a
+   * tile. What it does name is the geometry the generator guarantees around them, because a
+   * search that cannot rule anything out is a different program from one that can: nothing is
+   * sealed behind rock (`build` fills in every pocket the muster cannot reach), no site stands
+   * near the muster, and no two stand near each other. §11.8 asks a withheld thing to be drawn as
+   * a known unknown; the honest sheet version of that is to say which unknown it is.
+   *
+   * The scout count is the anti-hardcode axis. Two scouts is not one scout twice, and whatever
+   * collects the findings has to survive both of them reporting the same site.
+   */
+  board: {
+    fixed: [
+      'the workings are 34 by 26 inside the wall, with standing rock scattered through them',
+      'the whole crew musters in two columns at the west wall, the scouts first in id order',
+      'every relay site is reachable from the muster — nothing is sealed behind rock',
+      'no site stands within fourteen steps of the muster, and no two within seven tiles of each other',
+      'the muster publishes how many sites, scouts and workers there are before anybody moves',
+    ],
+    redrawn: [
+      'how many relay sites there are, six to nine',
+      'where they are — they are on no plan, and finding them is the order',
+      'how many scouts, one or two',
+      'how many workers, four to eight',
+      'where the standing rock lies, and so what a `look` can see past',
+    ],
+  },
   facts: [
     { label: 'Your score', value: 'The clock stops when the **last** bot stops.' },
     {

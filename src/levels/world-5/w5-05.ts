@@ -385,6 +385,38 @@ export const w5_05: LevelDef = {
     '',
     'Re-cable District 9, then bring every substation up.',
   ].join('\n'),
+  /**
+   * DESIGN.md §11.10.
+   *
+   * The drum is the hard part of this order and it is already stated twice — the memo and the
+   * `The drum` card both say it is the shortest run that joins the district plus eight per cent,
+   * which is the Frustration Watch entry (CURRICULUM.md §11) working exactly as intended: the
+   * margin is deliberate, and a player who did not know it was a margin would read a failure as
+   * the level being impossible. Repeating the figure on the sheet costs nothing and settles that
+   * it is the same eight per cent on every shift rather than a slack that varies with the draw.
+   *
+   * What is genuinely unstated is the floor. There are no walls anywhere in the district and the
+   * reactor never moves, so the whole cost of a network is arithmetic on positions a `probe`
+   * hands over for free, and no cable is ever obstructed or made longer by the terrain. A run that
+   * cannot rely on that has to survey, and surveying a 30 by 24 field of nothing is the one way to
+   * lose this order to travel rather than to cable. The point set is on the redrawn side because
+   * it is the axis: an evenly scattered district and a district in three clumps want the same
+   * program and produce very different trees, and only one of the two is in front of the player.
+   */
+  board: {
+    fixed: [
+      'district 9 is 30 by 24 of open floor — nothing stands between two machines, and a cable costs the grid distance between its ends',
+      'the reactor stands in the middle of the district, already on',
+      'RIG-01 starts on the reactor and never has to leave it — `link` and `power` both take their machines by id',
+      'every substation starts off',
+      'the drum is the shortest run that joins the district, plus eight per cent, on every shift',
+    ],
+    redrawn: [
+      'ten to fourteen substations',
+      'where they stand — some shifts scatter them across the district, some pack them into three clumps',
+      'the size of the drum',
+    ],
+  },
   facts: [
     {
       label: '`probe(id)`',

@@ -149,6 +149,40 @@ export const w3_02: LevelDef = {
     '',
     'Every crate on the yard floor belongs on the depot pad stencilled with its class.',
   ].join('\n'),
+  /**
+   * DESIGN.md §11.10.
+   *
+   * Everything this level redraws is a mapping, and the facts already say so. What they do not say
+   * is that the mapping is the *only* thing redrawn: the yard is the same open rectangle every
+   * shift, and every class on the floor has a pad waiting for it. Both matter to the shape of the
+   * program. A run that cannot rely on "there is a depot for this class" has to carry a fallback
+   * branch for a crate that belongs nowhere — a branch that will never fire on any shift the
+   * generator can draw — and a run that cannot rely on the open floor has to walk around walls
+   * the shed does not contain. `yard.ts` states the second guarantee for the whole world in its
+   * header; the player has never been told it once.
+   *
+   * The class count is on the redrawn side because it is the axis rule 2 names: a fixed if-chain
+   * passes seed 1 at four classes and misses the fifth. That is exactly hint 3, said before the
+   * run rather than after it, which is the difference between catching a lazy answer and taxing a
+   * reasonable guess.
+   */
+  board: {
+    fixed: [
+      'the yard is 14 wide and 10 deep inside its wall',
+      'open floor throughout — any tile is reachable by running along `x`, then along `y`',
+      'one depot pad for each class the yard is stocking',
+      'every crate on the floor has a depot painted for its class',
+      'one crate to a tile, and no crate starts on a pad',
+      'RIG-04 works the yard with a one-crate clamp',
+    ],
+    redrawn: [
+      'four or five classes stocked',
+      'which pad takes which class',
+      'where the depot pads stand',
+      'eight to fourteen crates, and how they divide between the classes',
+      'the tile RIG-04 starts on',
+    ],
+  },
   facts: [
     {
       label: '`scan(dir).mark`',

@@ -39,6 +39,38 @@ export const w1_05: LevelDef = {
     '',
     'Head Office has asked, in writing, why Bay 7 files more entries than it has floor.',
   ].join('\n'),
+  /**
+   * DESIGN.md §11.10, and the two guarantees `bayLayout` enforces without saying so anywhere.
+   *
+   * The facts table says the bay is a rectangle, a different size every shift, with the partition
+   * in a different column. What it never says is that `divider` is drawn from `3` to `width - 2`,
+   * so both halves are at least two columns wide on every seed. That matters to a snake: a
+   * one-column half has no second column to climb back through, and a run written to handle the
+   * degenerate case it will never meet is longer than the run that ships. Same for the doorway —
+   * "always the southern end of the partition" is on the table, but not that the partition itself
+   * always reaches the north wall, which is what makes the door the *only* gap in it.
+   *
+   * The parity line is the one that decides the star. `oneMovePerFloorTile` allows no re-entered
+   * tile, and which wall a snake finishes at is settled by whether the half it just swept had an
+   * even or an odd number of columns. That was in the hint budget and nowhere else, which
+   * §11.3 rules out: a hint sharpens an idea, it does not carry the premise. Stating that the
+   * parity is redrawn says the run has to read it at runtime. It does not say what to do about it.
+   */
+  board: {
+    fixed: [
+      'Bay 7 is a rectangle of floor inside a solid wall, with nothing in it but the partition',
+      'one partition and one doorway, and the partition reaches the north wall',
+      'the doorway is the southernmost row, so both halves join along the bottom',
+      'at least two columns of floor either side of the partition',
+      'RIG-01 starts in the north-west corner, facing East',
+    ],
+    redrawn: [
+      'the width of the bay, six to ten columns',
+      'the depth of the bay, five to eight rows',
+      'the column the partition stands in',
+      'whether each half has an even or an odd number of columns',
+    ],
+  },
   facts: [
     { label: 'Inspected', value: 'Any tile the bot stands on. The tile you start on is done.' },
     { label: 'The bay', value: 'A rectangle. A different size every shift.' },

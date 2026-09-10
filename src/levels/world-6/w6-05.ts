@@ -321,6 +321,41 @@ export const w6_05: LevelDef = {
     'The blocks on the band spell out a route from the tile you are standing on to the landing',
     'pad. Read them all, start from `main`, and drive the route.',
   ].join('\n'),
+  /**
+   * DESIGN.md §11.10.
+   *
+   * The band here is three kinds of traffic at once — intact, shifted, corrupt — and the counts of
+   * each are what a run has to be structured around. `CORRUPT_BLOCKS` is 3 on every shift and the
+   * shifted block is exactly one, so the sheet says both. Neither is the answer to anything: the
+   * bonus grades the repaired text, and knowing that three copies are lying does not say which
+   * character in them lies. What it does say is that a band of five packets holding two real blocks
+   * is a normal band, which is otherwise indistinguishable from a shift that has gone wrong.
+   *
+   * The nesting depth is the axis (`DEPTHS`), and it is on the sheet because one of the five shifts
+   * has no calls in it at all. A reader written for that shift is a flat reader, and it walks a
+   * truncated route on every other one; a player who was never told the depth moves has no reason
+   * to write the recursion the order exists to teach until it has already cost them a shift.
+   *
+   * Where the route starts is redrawn, which is unusual enough to state: `telemetryFor` places the
+   * start from the extent of the walk, so the antenna and the pad move between shifts. The route's
+   * length does not — 60 moves on all five — so par means the same thing on each.
+   */
+  board: {
+    fixed: [
+      'the field is 30 by 30 and every tile off the route is a pit',
+      'RIG-06 starts on the antenna, which stands on the first tile of the route',
+      'the route is exactly 60 moves',
+      'the whole band is queued before the shift starts, and `main` is always on it',
+      'three corrupt copies arrive alongside the real blocks, and exactly one real block arrives shifted',
+    ],
+    redrawn: [
+      'where the route starts, and where the pad ends up',
+      'how deep the blocks nest — one shift is nothing but move groups, others go four deep',
+      'the body of every block',
+      'the salt, and the shift on the block that came through the repeater',
+      'the order the blocks arrive in, and which blocks the corrupt copies misquote',
+    ],
+  },
   facts: [
     {
       label: 'A block',

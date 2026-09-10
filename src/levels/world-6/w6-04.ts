@@ -222,6 +222,42 @@ export const w6_04: LevelDef = {
     'Transmit the plain text of every headed packet, whole and in order. Transmit nothing else',
     'before them.',
   ].join('\n'),
+  /**
+   * DESIGN.md §11.10.
+   *
+   * This order is on the Frustration Watch (CURRICULUM.md §11) for stating the keyspace and the
+   * header outright, and the sheet is where that statement belongs rather than a place it leaks
+   * from: a search is only a plan if the player knows the space is small enough to walk and knows
+   * what a hit looks like. Both are already on the fact cards. The sheet adds that they are the
+   * same on every shift — one shift for all the headed traffic, its own for the straggler, and the
+   * straggler always last on the band — so a run can sort the traffic by position and be right.
+   *
+   * The shift being drawn from the whole space, zero included, is the line the level cannot do
+   * without. `SHIFTS` gives seed 3 key 0 on purpose, and a program that treats "already plain" as
+   * a special case rather than as a shift passes three shifts and fails the fourth. Hint 3 says so
+   * today, which is one place too few for something the objective grades (DESIGN.md §11.3).
+   *
+   * The absence of a key anywhere readable is the other half. `build` puts it on the world rather
+   * than the antenna deliberately, so a player who spends the shift probing for it is not being
+   * lazy, they are being told nothing. The memo says there is no key on site; this says the same
+   * thing in the one place a player checks before writing the search.
+   */
+  board: {
+    fixed: [
+      'the post is a 12 by 6 shack; RIG-06 stays on the antenna',
+      'the whole band is queued before the shift starts, and it is drained once, in arrival order',
+      `every headed packet opens with \`${MAGIC}\` at position 0 of its plain text`,
+      'one shift covers every headed packet; the straggler carries its own',
+      'the straggler is the last packet on the band',
+      'nothing on the site reports either shift — no `probe` will hand one over',
+    ],
+    redrawn: [
+      'the shift, anywhere in the space from 0 to 94 — including the one that changes nothing',
+      "the straggler's own shift",
+      'eight to thirteen headed packets',
+      'what the packets say, and how long they run',
+    ],
+  },
   facts: [
     {
       label: 'The cipher',

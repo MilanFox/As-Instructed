@@ -176,6 +176,32 @@ export const w5_01: LevelDef = {
     '',
     'Bring every substation on the line to `on`.',
   ].join('\n'),
+  /**
+   * DESIGN.md §11.10.
+   *
+   * This order is one axis wide, and the axis is the direction: `mainsLayout` puts the reactor on
+   * the east end for even seeds and the west end for odd ones, so the three seeds can never agree
+   * and a memorised heading loses the shift. That much the memo says. What nothing says is that
+   * *only* the direction and the spacing move. The line is one row of cable inside a solid frame on
+   * every seed, and the chain is always `sub-1` outward with each station fed by the one before it,
+   * so a run can follow `feed` and trust it rather than defending against a fork or a branch the
+   * generator cannot draw. The bonus asks for one pass and never a double back, which is a fair ask
+   * only if the player knows the line is a line — on the one board in front of them, a corridor
+   * that happens to be straight and a corridor that is straight on every seed look the same.
+   */
+  board: {
+    fixed: [
+      'feeder line 7 is one row of cable, twenty tiles long, walled on every side',
+      'the reactor sits on one end of it, already on, and RIG-01 starts on the reactor',
+      'every substation starts off, and `sub-1` is the one the reactor feeds',
+      'each station after that is fed by the one before it',
+    ],
+    redrawn: [
+      'which end of the line the reactor sits on',
+      'six to nine substations',
+      'the gaps between them',
+    ],
+  },
   facts: [
     {
       label: 'The line',

@@ -371,6 +371,39 @@ export const w5_03: LevelDef = {
     '',
     'Cable the district, then bring every substation up.',
   ].join('\n'),
+  /**
+   * DESIGN.md §11.10.
+   *
+   * Two of these lines are guarantees the generator spends real work on, and neither is visible
+   * from one board. `relabel` redeals the ids until ascending order stops being a legal
+   * energisation order, so "walk the list" is refused on every seed rather than on some of them;
+   * and the dependencies only ever point backwards through the deal, so the lists cannot close a
+   * circle. A player who does not know the second one writes cycle detection for a graph that will
+   * never contain a cycle, and a player who does not know the first has no way to tell whether
+   * seed 1 accepted their loop because it was right or because the ids happened to be kind.
+   *
+   * The shape of the graph is on the redrawn side because it is the anti-hardcode axis
+   * (CURRICULUM.md §2.2), and it is a shape rather than a number: one shift is a single deep chain,
+   * one is three stations wide and flat, one arrives in two halves that never touch. The count of
+   * reads the star allows is on the objective label already, so it is not repeated here.
+   */
+  board: {
+    fixed: [
+      'the district is 24 by 18 of open floor — the crew walk between two stations is the difference in `x` plus the difference in `y`',
+      'the reactor stands at (2, 9), already on, and RIG-01 starts on it',
+      '`sub-1` is the station the reactor feeds',
+      'the upstream lists never close a circle',
+      'ascending station number is never a legal order to bring the district up in',
+    ],
+    redrawn: [
+      'ten to sixteen stations',
+      'where each one stands',
+      'the shape of the upstream lists — one deep chain on one shift, one wide flat layer on another, two halves that never touch on another',
+      'which station number sits where in that shape',
+      'whether any station lists no upstream at all',
+      'the crew-walk allowance',
+    ],
+  },
   facts: [
     {
       label: '`probe(id)`',

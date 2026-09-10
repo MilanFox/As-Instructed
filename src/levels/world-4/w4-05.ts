@@ -215,6 +215,43 @@ export const w4_05: LevelDef = {
     '',
     `Bring back ${ORE_QUOTA} ore and end the run standing on the lift.`,
   ].join('\n'),
+  /**
+   * DESIGN.md §11.10.
+   *
+   * The tank row is the one that had to be on the fixed side. `build` draws it as a slice of what
+   * a full survey would cost, and the slice is always about half, so "map the cave, then go and
+   * mine it" is not a plan that runs short on an unlucky shift — it is a plan that cannot work on
+   * any shift. Stated, the player is being told what the level is about before the tank runs dry
+   * at depth; unstated, the only way to learn it is the run that strands the bot, and the trace of
+   * that run looks exactly like bad luck with a number.
+   *
+   * `veinSites` puts every ore face straight ahead of a dead end for a reason the player is owed:
+   * it is what makes hint 2 true. A ray down a side passage terminates on the ore and reports it,
+   * so finding veins is looking down corridors rather than walking them, and that is the whole
+   * difference between a shift that fits in the tank and one that does not. The row about the
+   * nearest six is the same argument from the other end — the quota is reachable without crossing
+   * the cave, so a program that turns back early is being careful rather than failing.
+   *
+   * What is deliberately absent: anything about how far the nearest faces actually are. That
+   * number is the arithmetic the star grades, and it is different on every shift.
+   */
+  board: {
+    fixed: [
+      'the map is 40 tiles square; corridors are one tile wide, and a tile with an even `x` and an even `y` is always solid',
+      'the cave is carved throughout — every corridor is reachable from every other',
+      'RIG-04 starts on the lift, and the lift stands well inside the cave rather than against its outer wall',
+      'every ore face is set square into the blind end of a side passage, so a ray down that passage ends on it',
+      'six of the ore faces are among those nearest the lift, so the quota never asks for the far end of the cave',
+      'the tank never holds more than about half of what walking every corridor would cost',
+    ],
+    redrawn: [
+      'the layout of the corridors',
+      'four to eight corridors that rejoin further in',
+      'six to ten ore faces, and which passages they end',
+      'where in the middle of the cave the lift stands',
+      'the size of the tank',
+    ],
+  },
   facts: [
     { label: 'The lift', value: 'The depot tile the bot starts on.' },
     {

@@ -65,6 +65,32 @@ export const w1_01: LevelDef = {
     '> WELCOME, NEW HIRE! TIP ONE OF THREE: REPETITION IS THE FOUNDATION OF ALL SAFE—',
     '> `[EVALUATION LICENCE — 0 SEATS REMAINING]`',
   ].join('\n'),
+  /**
+   * DESIGN.md §11.10 on the one order in the campaign that has nothing to redraw.
+   *
+   * The `redrawn` row looks like a formality here and is the opposite. This is the declared
+   * hardcode exception (CURRICULUM §2 rule 2) — a typed-out route is the intended answer — and a
+   * player arriving from nowhere has no reason to assume that. Every other work order they will
+   * ever open redraws something, so the default posture is to survey; a first-run contractor who
+   * writes a `canMove` sweep here because they assumed the hangar moves between attempts spends
+   * ticks on a question the level never asks, and the booking is only twelve ticks wider than the
+   * route. Saying "nothing" out loud is what licences the counted loop the level is for.
+   *
+   * The `fixed` half stays structural rather than restating the legs. The five leg lengths are
+   * already on the facts table, where they belong; what the table does not say is that the route
+   * is one tile wide with no branches, which is the fact that makes "drive 19 East" safe to write
+   * without checking anything on the way.
+   */
+  board: {
+    fixed: [
+      'Test Hangar 3 is solid wall apart from the service route',
+      'the route is one tile wide, with no branches and no dead ends',
+      'the pillar is two tiles East, and the gap above it is the only way round',
+      'the pad is the far tile of the last leg',
+      'RIG-01 starts at the west end of the route, facing East',
+    ],
+    redrawn: ['nothing — this order runs on one seed, and the hangar is the same on every attempt'],
+  },
   facts: [
     { label: 'The pillar', value: 'Two tiles East. The gap above it is the only way round.' },
     { label: 'Route after it', value: '**19 East, 5 South, 22 West, 5 South, 22 East.**' },

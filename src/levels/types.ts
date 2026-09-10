@@ -25,6 +25,24 @@ export interface LevelDef {
   brief: string;
   /** The numbers and formats the brief used to spell out. Rendered as a table, not as prose. */
   facts?: LevelFact[];
+  /**
+   * What every seed of this work order shares, and what the site redraws between them.
+   *
+   * DESIGN.md §11.10. A player reading one board cannot tell which of the things on it are the
+   * level and which are this draw of it, and the difference decides what they are allowed to write
+   * down as a constant. Left unstated, the only way to find the line is to lose gold on seed 2 —
+   * which is §11.4's "seeds catch laziness" collecting from a player who was not being lazy.
+   *
+   * `fixed` is the load-bearing half. "The shed is three rows deep on every seed" is what lets a
+   * run index rows directly instead of surveying for a wall it will never find. `redrawn` names
+   * the axes the generator actually rolls, in the same words the facts use for them — it is the
+   * anti-hardcode claim (CURRICULUM §2.2), said to the player rather than only to the next author.
+   *
+   * Omitted only where finding the shape *is* the level's stated question — the §11 exception,
+   * `w5-02` and `w8-01`. `src/levels/__tests__/board.test.ts` holds that allowlist, so omitting it
+   * anywhere else fails rather than passes quietly.
+   */
+  board?: { fixed: string[]; redrawn: string[] };
   /** API names unlocked BY this level. Cumulative across the campaign. */
   hardware: string[];
   /** Must be pure and deterministic given `seed`. */

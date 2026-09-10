@@ -296,6 +296,40 @@ export const w8_03: LevelDef = {
     '',
     'Energise every substation before the shift ends.',
   ].join('\n'),
+  /**
+   * DESIGN.md §11.10.
+   *
+   * One line here is load-bearing beyond the rest: the station numbers are not an energising
+   * order. `relabel` deals the names again until ascending id order breaks somewhere, on every
+   * seed, which is the difference between a level about a partial order and a level that accepts
+   * counting to n. A player who reads `sub-0 … sub-n` off a board where it happens to work has
+   * been misled by the board rather than caught being lazy, and §11.4 only licences the second.
+   * Stating that ascending order is never legal states the constraint and not the schedule: the
+   * feeder lists are still the thing that has to be read, and the order still has to be built.
+   *
+   * The shape of the grid is the redrawn axis — one draw is a single chain of fourteen, another
+   * is three wide bands — and the shift Finance allocates is a function of it, which is why the
+   * desk posts the two figures in one read rather than leaving a run to discover the deadline by
+   * overrunning it.
+   */
+  board: {
+    fixed: [
+      'the plain is 30 by 22 inside its wall and open; the cable on the ground is walkable',
+      'the whole fleet starts in the yard around the desk, on the west wall',
+      'every substation tile is east of the yard, and they are kept apart from one another',
+      'the layout and the feeder lists are settled before the shift starts and never change',
+      'the station numbers are not an energising order: on every shift some station is fed by one numbered above it',
+      'the desk posts the shift alongside the station count, in the same read',
+    ],
+    redrawn: [
+      'how many substations, fourteen to twenty',
+      'how many bots, four to eight',
+      'the shape of the grid — one shift is a single chain of feeders, another is three bands deep',
+      'which stations feed which',
+      'where the station tiles sit on the plain',
+      'the shift Finance allocates, since it is a function of the two above',
+    ],
+  },
   facts: [
     {
       label: 'The desk',

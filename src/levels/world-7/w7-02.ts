@@ -151,6 +151,32 @@ export const w7_02: LevelDef = {
     '',
     'Harvest every crop in the field.',
   ].join('\n'),
+  /**
+   * DESIGN.md §11.10, and the inverse of `w7-01`.
+   *
+   * There the fleet was the constant; here it is the whole redrawn axis, and the memo says so in
+   * its own voice ("please do not write the number down") without ever saying what a player *may*
+   * write down. The field does not move: the same walled 22 by 14 of open floor, one bot on the
+   * apron, a hopper nobody has to haul to, and a crop that is ripe when the shift opens and stays
+   * that way. The requisition and the shape of the patch move, and the star turns on the second
+   * one — on the uniform field an equal-area cut is also an equal-work cut, and on the others it
+   * is not. That was in the hint budget and nowhere else, which §11.3 rules out.
+   */
+  board: {
+    fixed: [
+      'the field is 22 by 14 of open floor inside its wall',
+      'one bot on the north apron at the start; the rest of the fleet is whatever it raises',
+      'the depot publishes the requisition and every crop position before anything moves',
+      'every crop is ripe when the shift opens, and none of it ripens during it',
+      'every bot holds 99 crops, so nothing has to be hauled anywhere',
+    ],
+    redrawn: [
+      'the requisition — one to eight bots, counting the one already on the apron',
+      'how many crops the field carries',
+      'where the patch sits and what shape it is',
+      'whether an equal-area cut is also an equal-work cut',
+    ],
+  },
   facts: [
     { label: 'Your score', value: 'The clock stops when the **last** bot stops.' },
     { label: 'The depot', value: '`probe("depot")` is free, and reaches it from anywhere on site.' },
