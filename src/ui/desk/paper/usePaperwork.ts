@@ -8,10 +8,10 @@
  * again. **That is a data-loss bug, not a styling complaint.**
  *
  * So nothing here opens anything. It *issues* paper, and paper stays on the desk until it is
- * filed — stamped or acknowledged — and filed paper goes to the Repository rather than to nowhere.
- * The standing sheet is never filed, because a grade delivered once and then deleted is not a
- * grade, it is an event (F18). Signing a requisition is not filing either — it stows the sheet
- * rather than sending it to the Repository, so the delivery note it signed for stays reachable.
+ * filed — stamped or acknowledged — and filed paper goes into the commendation book rather than
+ * to nowhere. The standing sheet is never filed, because a grade delivered once and then deleted
+ * is not a grade, it is an event (F18). Signing a requisition is not filing either — it stows the sheet
+ * rather than filing it into the book, so the delivery note it signed for stays reachable.
  *
  * `deliverPaperwork` is the whole of it and it is a plain function: every issue is idempotent by
  * id, so running it too often is free and running it once too few times is the only failure mode

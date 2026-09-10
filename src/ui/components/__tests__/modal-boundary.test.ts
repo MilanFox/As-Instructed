@@ -401,7 +401,7 @@ describe('the fallback is a way out', () => {
   test('the panel boundary has no way out, which is why a modal needs its own', () => {
     const tree = driverFor(() =>
       createElement(PanelBoundary, {
-        label: 'The Repository',
+        label: 'The Commendation Book',
         children: createElement(ThrowingModal, {}),
       }),
     ).render();

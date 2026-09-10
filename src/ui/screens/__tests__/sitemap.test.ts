@@ -279,13 +279,19 @@ describe('the world numeral fits inside its own plate', () => {
 });
 
 /*
- * The spine means "these eight worlds are one run of track", and the commendation shelf is not a
- * stop on it.
+ * The spine means "these eight worlds are one run of track", and nothing that is not a stop on it
+ * may sit inside what the spine measures.
  *
- * The rule used to hang off `.sitemap__route`, which is the shelf's parent as well as the worlds',
- * so it spanned the route's whole height and ran down the side of the panel. The fix is the
- * container, not a `bottom:` tuned to clear a shelf of today's length — so what this holds is the
- * ownership: whatever element the spine measures must not contain the shelf.
+ * The rule used to hang off `.sitemap__route`, which was the commendation shelf's parent as well
+ * as the worlds', so it spanned the route's whole height and ran down the side of a panel that is
+ * not a world. The fix was the container, not a `bottom:` tuned to clear a shelf of that day's
+ * length — so what this holds is the ownership rather than a measurement.
+ *
+ * The shelf itself has since left the site map for the commendation book, where its count sits
+ * beside it (AUDIT-UI F14). That is why the third assertion below is now a *negative* one: the
+ * shelf must not be anywhere in this file. It once read `expect(MARKUP).toContain(...)`, pinning
+ * the shelf to the screen it was leaving, and a guard that outlives the arrangement it was
+ * written for stops being a guard.
  */
 describe('the route spine ends with the last world', () => {
   const worlds = (): string => {
@@ -310,10 +316,10 @@ describe('the route spine ends with the last world', () => {
     expect(CSS).toContain('.sitemap__worlds::before');
   });
 
-  test('the container the spine measures does not hold the commendation shelf', () => {
+  test('the container the spine measures holds the worlds and nothing else', () => {
     expect(worlds()).toContain('className={row.complete');
     expect(worlds()).not.toContain('<CommendationShelf');
-    expect(MARKUP).toContain('<CommendationShelf');
+    expect(MARKUP).not.toContain('<CommendationShelf');
   });
 
   test('the spine is inset evenly, not cleared past a panel', () => {

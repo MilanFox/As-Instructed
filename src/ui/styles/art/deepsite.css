@@ -663,13 +663,16 @@
   text-transform: uppercase;
 }
 
-[data-art='deepsite'] .sitemap .shelf,
+[data-art='deepsite'] .shelf,
 [data-art='deepsite'] .sitemap .memo__body {
   border-radius: 0;
 }
 
-[data-art='deepsite'] .sitemap .shelf__title,
-[data-art='deepsite'] .sitemap .shelf__head {
+/* Unscoped, because the shelf is not on the site map any more: it hangs in the commendation book
+   on the desk, and an art direction that stopped at `.sitemap` would have left it rounded and
+   proportional there while every neighbouring panel went square. */
+[data-art='deepsite'] .shelf__title,
+[data-art='deepsite'] .shelf__head {
   font-family: var(--font-mono);
   font-weight: 700;
   letter-spacing: 0.2em;

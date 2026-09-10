@@ -1,11 +1,11 @@
 /**
  * `~/lib.ts` — the routines the player has written and kept, loaded on the terminal.
  *
- * **Not the bound Repository volume.** That is `Binder.tsx`, it is the company's record of closed
- * work orders, and the two are deliberately different objects: the campaign has to be finishable
- * by a player who never opens the volume, so no route into a work order may live inside it. This
- * is the other thing — the player's own accumulated subroutines, which are code, and which
- * therefore live on the machine rather than on the desk.
+ * **Not the bound commendation book.** That is `Binder.tsx`, it is the company's record of what
+ * the site has recognised, and the two are deliberately different objects: the campaign has to be
+ * finishable by a player who never opens the volume, so no route into a work order may live inside
+ * it. This is the other thing — the player's own accumulated subroutines, which are code, and
+ * which therefore live on the machine rather than on the desk.
  *
  * The regression this closes: `Workspace.tsx` was the only surface that rendered `LibraryPanel`,
  * and it was deleted with the panel workspace. A player could publish a routine and then had no

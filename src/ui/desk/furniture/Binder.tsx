@@ -1,14 +1,21 @@
 /**
- * THE REPOSITORY — the bound volume on the desk, and the record of closed work orders.
+ * THE COMMENDATION BOOK — the bound volume on the desk, and the record of what was recognised.
  *
- * Not the library of routines. That is `src/meta`, it is a different feature with a different job,
- * and it keeps its name inside the terminal. This is the ring binder the company keeps: every work
- * order the site has issued, in the order Finance prefers them closed, with the grade that was
- * stamped on it. A grade shown once and then deleted is not a grade, it is an event.
+ * Not the Shared Subroutines Repository. That is `src/meta`, a different feature with a different
+ * job, and it keeps its name inside the terminal. This volume answered to that name too, and the
+ * collision was not merely confusing — it is what let the book grow into a second site map with a
+ * paper texture, printing the same grades, the same medal counts and the same points against the
+ * same 33 orders. Two surfaces owning one number is one surface too many.
+ *
+ * So the two have been cut apart along what each is *for*. **Grades, points, status and every
+ * route into a work order are the site map's.** The book keeps recognition: stars in aggregate,
+ * the commendation shelf, and which certificates the player put in by hand. The per-order grid
+ * survives because the book is still a book and wants pages, but a card here names the order and
+ * what was recognised on it, never what it scored.
  *
  * Two sources, deliberately. `save` is the campaign record and is what the game scores. `filedDocs`
- * is what the *player* has actually put in the binder with the stamp block, and where the two
- * disagree the binder shows the sheet, because a certificate lying unstamped on the desk is a work
+ * is what the *player* has actually put in the book with the stamp block, and where the two
+ * disagree the book shows the sheet, because a certificate lying unstamped on the desk is a work
  * order the player has not closed yet.
  *
  * **Nothing here is required to finish the campaign.** The ruling binds it: the volume is a record,
@@ -16,9 +23,8 @@
  */
 import { Fragment, useEffect, useMemo, useState } from 'react';
 
-import { Medal, medalOf, starsFor } from '../../../game/score.ts';
+import { starsFor } from '../../../game/score.ts';
 import { useGame } from '../../../game/store.ts';
-import { useLibrary } from '../../../meta/store.ts';
 import { CommendationShelf } from '../../components/CommendationShelf.tsx';
 import { buildRows, campaignTally } from '../../screens/LevelSelect.tsx';
 import { filedDocs, usePapers } from '../paper/papers.ts';
@@ -27,7 +33,6 @@ import { filedDocs, usePapers } from '../paper/papers.ts';
 const TABS = [0, 1, 2, 3, 4, 5, 6, 7];
 
 export function Binder(): React.ReactElement {
-  const unlocked = useLibrary((state) => state.save.unlocked);
   const save = useGame((state) => state.save);
   /*
    * The pile itself, not `filedDocs`. That helper builds a new array on every call, and a zustand
@@ -54,8 +59,6 @@ export function Binder(): React.ReactElement {
   const rows = useMemo(() => buildRows(save), [save]);
   const tally = useMemo(() => campaignTally(rows), [rows]);
 
-  if (!unlocked) return <></>;
-
   /** The mark the player stamped on this order's certificate, where one has been filed. */
   const stamped = new Map<string, string>();
   for (const doc of filedDocs(usePapers.getState())) {
@@ -65,20 +68,31 @@ export function Binder(): React.ReactElement {
     }
   }
 
+  /**
+   * Every commendation the save holds a timestamp for.
+   *
+   * `save.achievements` is only ever written when one is earned and nothing ever removes a key
+   * (achievements rule 3), so the key count *is* the earned count — the shelf below reaches the
+   * same set the long way round, by testing `achievements[id] !== undefined` per row. This number
+   * used to be printed on the site map header; it moved here rather than being recomputed,
+   * because the count and the record it counts belong on one surface.
+   */
+  const commendations = Object.keys(save.achievements).length;
+
   return (
     <>
       <button
         type="button"
         className="binder"
         aria-expanded={open}
-        aria-label="Open the Repository"
+        aria-label="Open the Commendation Book"
         onClick={() => setOpen(true)}
       >
         <div className="bnd-board">
           <div className="bnd-plate">
-            <b>THE REPOSITORY</b>
-            <span>CLOSED WORK ORDERS</span>
-            <span className="bnd-vol">VOL. I &nbsp;·&nbsp; #4471</span>
+            <b>THE COMMENDATION BOOK</b>
+            <span>STARS · COMMENDATIONS · FILINGS</span>
+            <span className="bnd-vol">VOL. II &nbsp;·&nbsp; #4471</span>
           </div>
           <div className="bnd-tabs">
             {TABS.map((tab) => (
@@ -91,7 +105,7 @@ export function Binder(): React.ReactElement {
       </button>
 
       {open ? (
-        <div className="binder-open" role="dialog" aria-label="The Repository">
+        <div className="binder-open" role="dialog" aria-label="The Commendation Book">
           <div className="bo-sheet">
             <div className="bo-holes" aria-hidden="true">
               <i />
@@ -109,36 +123,23 @@ export function Binder(): React.ReactElement {
             </button>
             <header className="bo-head">
               <div>
-                <b>THE REPOSITORY</b>
+                <b>THE COMMENDATION BOOK</b>
                 <span>
-                  Kessler &amp; Daughters Terraforming Ltd. — closed work orders, in order of
-                  closure
+                  Kessler &amp; Daughters Terraforming Ltd. — commendations, stars and filings
                 </span>
               </div>
               <div className="bo-tally numeric">
                 <div>
-                  <b>{tally.points}</b>
-                  <span>POINTS</span>
-                </div>
-                <div>
-                  <b>{tally.closed}</b>
-                  <span>CLOSED</span>
-                </div>
-                <div>
-                  <b>{tally.gold}</b>
-                  <span>GOLD</span>
-                </div>
-                <div>
-                  <b>{tally.silver}</b>
-                  <span>SILVER</span>
-                </div>
-                <div>
-                  <b>{tally.bronze}</b>
-                  <span>BRONZE</span>
-                </div>
-                <div>
                   <b>{tally.stars}</b>
                   <span>STARS</span>
+                </div>
+                <div>
+                  <b>{commendations}</b>
+                  <span>COMMENDATIONS</span>
+                </div>
+                <div>
+                  <b>{stamped.size}</b>
+                  <span>ENTERED</span>
                 </div>
               </div>
             </header>
@@ -153,30 +154,40 @@ export function Binder(): React.ReactElement {
                     <i />
                   </div>
                   {row.nodes.map((node) => {
-                    const closed = node.status === 'CLOSED';
                     /*
-                     * The grade is the company's and comes from the campaign record. `medalOf` is
-                     * `null` on an order that carries no ladder, and an ungraded close is finished
-                     * work rather than a missing medal (DESIGN.md §7) — so it reads CLOSED,
-                     * which is the die the contractor actually holds.
+                     * A card names the order and what was recognised on it: the stars it earned,
+                     * and whether the player filed its certificate by hand. **No grade.** The
+                     * medal used to be stamped here as a rotated GOLD/SILVER/BRONZE/CLOSED die,
+                     * which made this grid a paper reprint of the site map's discs — and a number
+                     * printed in two places is a number that can disagree with itself. The site
+                     * map owns the ladder (DESIGN.md §7) and owns every route into an order; the
+                     * book owns recognition. That split is the reason the book exists separately
+                     * at all.
+                     *
+                     * `open` is the only state class left, and it is not a grade either — it dims
+                     * an order the site has not issued yet, so a mostly empty book in world 1
+                     * reads as pages waiting rather than as work missed.
                      */
-                    const medal = medalOf(node.level, node.progress);
-                    const graded = medal !== null && medal !== Medal.None;
-                    const mark = closed ? (graded ? medal : 'closed') : 'open';
+                    const closed = node.status === 'CLOSED';
+                    const stars = starsFor(node.level.bonus, node.progress.stars);
                     return (
-                      <div className={`bo-card ${mark}`} key={node.id}>
+                      <div className={`bo-card${closed ? '' : ' open'}`} key={node.id}>
                         <div className="id">{node.id.toUpperCase()}</div>
                         <div className="ti">{node.playable ? node.level.title : '—'}</div>
-                        <div className="mk">{closed ? mark.toUpperCase() : node.status}</div>
                         {/* Filed by hand, rather than merely on the record. */}
                         {stamped.has(node.id) ? (
                           <div className="fl" title="filed by hand">
                             ENTERED
                           </div>
                         ) : null}
-                        {starsFor(node.level.bonus, node.progress.stars) > 0 ? (
+                        {/*
+                          One glyph per star, not one glyph for any. Three work orders carry two
+                          bonus objectives, and a single ★ told a player who found both exactly
+                          what a player who found one was told.
+                        */}
+                        {stars > 0 ? (
                           <div className="star" aria-hidden="true">
-                            ★
+                            {'★'.repeat(stars)}
                           </div>
                         ) : null}
                       </div>
@@ -187,9 +198,18 @@ export function Binder(): React.ReactElement {
             </div>
 
             {/*
-              The commendation record lives in the volume it belongs to. It is also on the site
-              map, where its count is printed and now links to it (AUDIT-UI F14) — the count and
-              the record have to be in the same place, and the count is on the site map.
+              The count and the record are on one surface, which is what AUDIT-UI F14 actually
+              asked for. The first answer to F14 kept the count on the site map header and spent
+              an anchor getting from it to the shelf down here; that satisfied the letter of it
+              and left the two halves of one fact on two screens, joined by a link the player had
+              to notice. So the count moved instead. Both are in the book, a hand's width apart,
+              and no anchor spans anything.
+
+              Reachability survives the move. The book is a permanent object on the desk, present
+              from the first work order rather than provisioned by one, and its door is a real
+              `<button>` that is always drawn — so it is reachable by pointer and by keyboard
+              (DESIGN.md §10.5), and `desk-frame.test.ts` holds it on screen at every viewport.
+              Nothing here is gated and nothing here is required.
             */}
             <CommendationShelf achievements={save.achievements} />
 

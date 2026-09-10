@@ -5,7 +5,7 @@
  * files the oldest unfiled sheet when a new one arrives, five failed dispatches on `w8-01` put
  * five HALT NOTICEs in the tray, and the memo went under. Eviction does not delete the document —
  * it sets `filed` — but no surface on this desk draws filed paper: `looseDocs` and `trayDocs` both
- * exclude it and the Repository binder reads filed *certificates* only, for one `ENTERED` flag. So
+ * exclude it and the commendation book reads filed *certificates* only, for one `ENTERED` flag. So
  * the memo was on the record and unreachable, and `issueOnce` in `usePaperwork.ts` never hands out
  * an id it has already issued, so it could not come back. The only route to it was clearing
  * `bootstrap.desk` by hand.

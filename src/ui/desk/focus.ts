@@ -29,9 +29,9 @@
  *   budgets, its par and its crew readouts are stated, which is the material DESIGN §11 is about.
  *   It is the same 224u at the same type size in both views.
  * - **It does not build a way around what it hides.** The player accepted that reaching the
- *   reference, the Repository or the paperwork means throwing the switch back, so there is no
- *   floating toolbar and no second dispatch key. The two exceptions are §11 obligations rather than
- *   conveniences and both are one line of copy: `ctrl+enter` is already printed on the terminal's
+ *   reference, the commendation book or the paperwork means throwing the switch back, so there
+ *   is no floating toolbar and no second dispatch key. The two exceptions are §11 obligations
+ *   rather than conveniences and both are one line of copy: `ctrl+enter` is already printed on the terminal's
  *   status strip, and the strip states that a passing work order is ready to close and how to get
  *   to the stamp block.
  *

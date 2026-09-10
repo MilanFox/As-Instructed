@@ -249,6 +249,7 @@ engine's word wins over the fiction's preference.
 | **the dead band** | Radio band the listening post monitors, dead since 2198 — #4470's ping is on it. |
 | **ONBOARD** | The onboarding AI, always all-caps; licence expired 2209. |
 | **a HALT notice** | A program terminated by the tick or op budget; filed, never actioned. |
+| **the Commendation Book** | Vol. II, the bound volume on the desk: stars, commendations and which certificates the contractor filed by hand. Never "the binder" in copy, and never the Shared Subroutines Repository, which is a different thing on a different surface. |
 | **Survey / Facilities / Finance / Shipping / Legal / Payroll** | Departments — capitalised, plural collective, never a person. |
 
 ## 9. Templates for content agents

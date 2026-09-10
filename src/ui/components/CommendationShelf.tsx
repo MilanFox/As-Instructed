@@ -1,8 +1,8 @@
 import type { JSX } from 'react';
 import { ACHIEVEMENTS } from '../../game/achievements.ts';
 
-/** The anchor the header's count points at. */
-export const SHELF_ID = 'commendations';
+/** The landmark on the section, so the shelf is addressable wherever it is mounted. */
+const SHELF_ID = 'commendations';
 
 const MONTHS = [
   'Jan',

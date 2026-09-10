@@ -3,7 +3,7 @@
  *
  * These are **the doors**. Four of the game's five information surfaces used to be reachable only
  * through 10px dim uppercase chips in a corner; the desk's answer is that a door should weigh what
- * is behind it. A bound Repository is not a chip.
+ * is behind it. A bound volume is not a chip.
  */
 export { Dispatch } from './Dispatch.tsx';
 export { SitePlan } from './SitePlan.tsx';

@@ -114,7 +114,7 @@ const KNOWN_DEAD: readonly string[] = [
   'src/engine/objectives.ts machinesAllIn',
 
   // --- Hand-picked decoys: `progressFor` has a live structural
-  // twin in `progressOf` (`LevelSelect.tsx:61`); `SOURCE_URLS` and `MODULE_PREAMBLE_LINES` are
+  // twin in `progressOf` (`LevelSelect.tsx:74`); `SOURCE_URLS` and `MODULE_PREAMBLE_LINES` are
   // aliases of the one real constant rather than re-typed literals, so they cannot disagree. ---
   'src/game/score.ts LevelScore',
   'src/game/store.ts progressFor',

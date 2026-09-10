@@ -190,9 +190,10 @@
    Three consequences. Two the player accepted, and one they were not
    asked to accept:
 
-   - The reference, the Repository, the site plan, the in-tray and the
-     paperwork are unreachable in FOCUS. The way to them is the switch,
-     which is the only reason the bezel plate is load-bearing here.
+   - The reference, the commendation book, the site plan, the in-tray
+     and the paperwork are unreachable in FOCUS. The way to them is
+     the switch, which is the only reason the bezel plate is
+     load-bearing here.
    - The DISPATCH key is unreachable, so `ctrl+enter` is the only way to
      run. It always was the announced way, `always: true` in `keys.ts`,
      and the terminal's own status strip prints the hint inside the

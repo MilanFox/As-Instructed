@@ -19,7 +19,6 @@ import {
 } from '../../game/score.ts';
 import { isLevelUnlocked, useGame } from '../../game/store.ts';
 import { campaignOrder, levelsByWorld } from '../../levels/index.ts';
-import { CommendationShelf, SHELF_ID } from '../components/CommendationShelf.tsx';
 import { MedalBadge } from '../components/MedalBadge.tsx';
 import type { LevelDef, WorldMeta } from '../../levels/index.ts';
 import '../styles/screens.css';
@@ -212,7 +211,6 @@ function LockGlyph(): JSX.Element {
 export function LevelSelect(): JSX.Element {
   const save = useGame((state) => state.save);
   const openLevel = useGame((state) => state.openLevel);
-  const commendations = Object.keys(save.achievements).length;
 
   const rows = useMemo(() => buildRows(save), [save]);
   const tally = useMemo(() => campaignTally(rows), [rows]);
@@ -320,23 +318,6 @@ export function LevelSelect(): JSX.Element {
           <div className="screen-stat">
             <dt>BRONZE</dt>
             <dd className="screen-stat__bronze">{tally.bronze}</dd>
-          </div>
-          <div className="screen-stat">
-            <dt>STARS</dt>
-            <dd>{tally.stars}</dd>
-          </div>
-          {/*
-            The count is the door to the shelf. It used to be a `<dd>` printing a number against a
-            record 2,900px further down the scroll with no link, no tab and no anchor to it
-            (AUDIT-UI F14) — a control proportionate to what is behind it costs one anchor.
-          */}
-          <div className="screen-stat">
-            <dt>COMMENDATIONS</dt>
-            <dd>
-              <a className="screen-stat__link" href={`#${SHELF_ID}`}>
-                {commendations}
-              </a>
-            </dd>
           </div>
         </dl>
 
@@ -507,8 +488,6 @@ export function LevelSelect(): JSX.Element {
               );
             })}
           </div>
-
-          <CommendationShelf achievements={save.achievements} />
         </div>
       </div>
     </div>

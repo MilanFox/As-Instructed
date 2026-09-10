@@ -61,8 +61,9 @@ export function Pen(): React.ReactElement {
       const id = sheet?.dataset['docId'] ?? line.dataset['signline'];
       useGame.getState().signRequisition();
       /*
-       * Not `file()` — the requisition already did its job by being seen. Signing is a quiet way
-       * back to the tray, not a trip to the Repository, so it stays reachable for reference.
+       * Not `file()` — the requisition already did its job by being seen. Signing is a quiet
+       * way back to the tray, not a trip to the commendation book, so it stays reachable for
+       * reference.
        */
       if (id) usePapers.getState().stow(id, 'signed');
       stop();

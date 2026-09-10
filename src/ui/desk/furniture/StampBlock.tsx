@@ -6,7 +6,7 @@
  * answer is that **paper persists until it is filed** — so filing has to be an act the player
  * performs, not a timeout and not a backdrop click. You pick up the closure die and press it into
  * the box on the certificate. That call is `usePapers.file(id, mark)`, and the sheet moves to the
- * Repository rather than being destroyed.
+ * commendation book rather than being destroyed.
  *
  * `CLOSED` is the contractor's die, and pressing it is how a sheet leaves the desk. The grade a
  * work order earned is read off the certificate and the medal badge, not stamped here — a rack of

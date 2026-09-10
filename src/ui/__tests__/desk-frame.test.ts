@@ -53,7 +53,7 @@ const MUST_CONTAIN: Record<string, string> = {
   'display--term': 'the program. the largest thing on the desk while writing',
   'display--feed': 'the site. the picture the whole work order describes',
   manual: 'the REFERENCE. a door',
-  binder: 'the Repository. a door',
+  binder: 'the COMMENDATION BOOK. a door',
   dispatch: 'the only way to run a program',
   stampblock: 'how a work order is closed',
   copystand: 'what is pinned has to stay readable',
@@ -73,7 +73,7 @@ const MAY_OVERFLOW: Record<string, string> = {
   mug: 'cut — subtraction beat placement',
   station: 'a bare wrapper. its two displays are measured instead',
   'paper-layer': 'a full-bleed layer. the sheets inside it are draggable anywhere',
-  'binder-open': 'a full-bleed spread when the Repository is open',
+  'binder-open': 'a full-bleed spread when the commendation book is open',
   room: 'the room is the viewport',
 };
 
@@ -104,7 +104,7 @@ const FOCUS_KEEPS: Record<string, string> = {
 const FOCUS_HIDES: Record<string, string> = {
   room: 'no lamp and nothing to light. a half-lit desk with no desk on it reads as a bug',
   manual: 'the REFERENCE is paper on the desk. the switch is the door to it',
-  binder: 'the Repository is a bound book on the desk',
+  binder: 'the commendation book is a bound book on the desk',
   'binder-open': 'its spread has nothing to lie on',
   dispatch: 'ctrl+enter is the only way to run, and the status strip has always printed it',
   stampblock: 'the strip states that a passed order is ready to close, and names the key',

@@ -3,8 +3,8 @@
  *
  * The player is a remote contract programmer at Kessler & Daughters and the screen is their
  * workstation. Nothing here is chrome: there is a terminal, a site monitor, a dispatch key, a
- * stamp block, a copy stand, a bound Repository, a wire-bound reference, an in-tray, a keyboard
- * and loose paper. This is the wiring for that arrangement.
+ * stamp block, a copy stand, a bound commendation book, a wire-bound reference, an in-tray, a
+ * keyboard and loose paper. This is the wiring for that arrangement.
  *
  * **The screen is the work; the paper is the company.** The program, the site view, the run and
  * the numbers are digital and live on two screens. The work order, the requisition, the memo and
@@ -104,7 +104,7 @@ export const DESKWARE: readonly DeskObject[] = [
    * cannot get out of a level in is broken. A door nobody can see is a door that is not there.
    */
   ['The site plan', SitePlan],
-  ['The Repository', Binder],
+  ['The Commendation Book', Binder],
   ['The reference', Manual],
   /*
    * `~/lib.ts`, the player's own routines, drawn on the terminal's glass. It is on this list and
