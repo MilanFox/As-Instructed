@@ -289,7 +289,7 @@ export const w8_01: LevelDef = {
   facts: [
     {
       label: 'The field',
-      value: `${String(FIELD_W)} by ${String(FIELD_H)} of open regolith. Nothing on it blocks a beam.`,
+      value: `${String(FIELD_W)} by ${String(FIELD_H)} of open soil. Nothing on it blocks a beam.`,
     },
     {
       label: 'The silo',

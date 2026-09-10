@@ -164,7 +164,7 @@ export const w7_02: LevelDef = {
    */
   board: {
     fixed: [
-      'the field is 22 by 14 of open floor inside its wall',
+      'the field is 22 by 14 inside its wall, open floor except where a crop stands on soil',
       'one bot on the north apron at the start; the rest of the fleet is whatever it raises',
       'the depot publishes the requisition and every crop position before anything moves',
       'every crop is ripe when the shift opens, and none of it ripens during it',
@@ -179,7 +179,10 @@ export const w7_02: LevelDef = {
   },
   facts: [
     { label: 'Your score', value: 'The clock stops when the **last** bot stops.' },
-    { label: 'The depot', value: '`probe("depot")` is free, and reaches it from anywhere on site.' },
+    {
+      label: 'The depot',
+      value: '`probe("depot")` is free, and reaches it from anywhere on site.',
+    },
     {
       label: 'Fleet size',
       value: '`vars.requisition` — how many bots you may have, counting the one already here.',

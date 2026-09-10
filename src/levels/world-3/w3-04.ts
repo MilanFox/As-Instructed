@@ -262,7 +262,8 @@ export const w3_04: LevelDef = {
   facts: [
     {
       label: 'Arrival number',
-      value: 'Stencilled on the slot, not on the crate. Counts up from 1 with no gaps.',
+      value:
+        'Stencilled on the slot, not on the crate. Counts up from 1 with no gaps. When the shift opens, every slot holding a crate is stencilled and no other tile in the yard is.',
     },
     {
       label: '`scan(dir).mark`',
@@ -363,7 +364,6 @@ export const w3_04: LevelDef = {
     '',
   ].join('\n'),
   hints: [
-    'Every occupied slot has a number painted on it. The number is not a distance.',
     'The nearest crate and the next crate are hardly ever the same crate.',
     'A bot in an aisle can read the rack row above it and the rack row below it without leaving the aisle.',
     'Nothing stops you learning the whole yard before you lift anything.',

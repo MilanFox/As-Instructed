@@ -230,7 +230,7 @@ Canon spellings and definitions. Do not invent synonyms.
 | **the Kessler Contract** | Terraforming contract since 2185; client dissolved 2198; continues for lack of a signature. |
 | **the engagement** | Employment — never "job"/"hired"; *engaged*, *concluded*, never ended. |
 | **retained** | Flag preventing a record from closing; applied to strong performers, and to #4470. |
-| **regolith** | Ground rock, the soil substrate — never "dirt" or "soil". |
+| **regolith** | Ground rock, the soil substrate — never "dirt" or "soil" in prose. Also a live `Terrain` value, and not the same one as `soil`: where a string names what a read returns — fact card, objective label, error text — the engine's word wins. |
 | **the Yards** | The Sorting Yards, logistics depot — always "the Yards". |
 | **a bootstrap** | Site slang for the first working version left running for the next person. |
 | **hardware requisition** | Form unlocking a sensor/actuator (DESIGN.md §6 gating); Vance approves, Dot delivers. |
