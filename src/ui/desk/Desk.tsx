@@ -15,12 +15,28 @@
  * position in the stylesheets is written in design units against `DESK_FRAME`. It is not a
  * responsive layout and it is not meant to be: the arrangement is the approved one and moving the
  * furniture is not polish.
+ *
+ * `data-focus` does not break that sentence, because it does not move anything. There are two
+ * *views*, and the player throws a switch between them. `desk` is the arrangement above, exactly as
+ * approved. `program` is FOCUS: the room and every piece of deskware go off screen and `.station`
+ * becomes a two-column grid against the window — the terminal, and the site feed as a preview. The
+ * player asked for it in those terms, "only Terminal and preview". Throw the switch back and the
+ * furniture is where it was, unit for unit, because not one of the rules that place it is touched.
+ *
+ * It is done in CSS, on `.desk[data-focus='program']`, and not by rendering a shorter list. The
+ * lists below exist so there is exactly one place a boundary can be omitted; a view that rendered
+ * a different set of objects would be a second list to keep in step with this one. Every object is
+ * mounted in both views, with its boundary, and the stylesheet decides what is on screen.
+ * `src/ui/desk/focus.ts` argues the case, `src/ui/styles/desk/desk.css` is where the view is
+ * written, and `src/ui/__tests__/desk-frame.test.ts` guards the desk by extent and FOCUS by what is
+ * present and how the player gets out.
  */
 import { useEffect, useRef, useState } from 'react';
 
 import { useGame } from '../../game/store.ts';
 import { storedArt } from '../art.ts';
 import { PanelBoundary } from '../components/PanelBoundary.tsx';
+import { useDeskFocus } from './focus.ts';
 import { DESK_FRAME, deskUnit, useDeskSize } from './scale.ts';
 import { Terminal } from './terminal/Terminal.tsx';
 import { Monitor } from './monitor/Monitor.tsx';
@@ -133,6 +149,7 @@ function useDeskUnit(): number {
 export function Desk(): React.ReactElement {
   const unit = useDeskUnit();
   const size = useDeskSize();
+  const focused = useDeskFocus();
   const runState = useGame((state) => state.runState);
   const playing = useGame((state) => state.playing);
   const trace = useGame((state) => state.trace);
@@ -172,6 +189,7 @@ export function Desk(): React.ReactElement {
       data-mode={mode}
       data-art={storedArt()}
       data-doc={lifted ? 'up' : 'none'}
+      data-focus={focused ? 'program' : 'desk'}
       style={
         {
           '--u': `${unit}px`,

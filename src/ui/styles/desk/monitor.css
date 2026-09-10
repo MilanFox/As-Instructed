@@ -5,7 +5,7 @@
 
 /* ---- the site feed. the company's. older, and it shows. ---------- */
 
-.desk .display--feed { left: calc(50% + 64 * var(--u)); top: calc(50% - 486 * var(--u)); width: calc(700 * var(--u)); }
+.desk .display--feed { left: calc(50% + 64 * var(--u)); top: calc(50% - 486 * var(--u)); width: calc(700 * var(--u)); --feed-glass-ts: 1; }
 .desk .bezel--feed {
   padding: calc(22 * var(--u)) calc(22 * var(--u)) calc(20 * var(--u));
   background: #b0ac9c;
@@ -33,6 +33,17 @@
    transport, not the SIZE dial. Type on the *case* — the transport readout, the legends, the asset
    tag — scales normally.
 
+   They do multiply by --feed-glass-ts, which is 1 here and is not the SIZE dial. It is the FOCUS
+   view's knob and only that view moves it: there the screen is 316u wide instead of 656u, and
+   `SITE · GRID 24x18` beside `SIGNAL DELAY 41 MIN` wants about 319u of that between them, so the
+   header strip's own chrome would overflow the picture it is supposed to stay clear of. The answer
+   cannot be the type scale — the paragraph above is the reason, and it still holds, because the
+   player turning the SIZE dial must never cost the board a rung. So it is a second factor with a
+   different owner: one is the player's, this one is the composition's. `monitor-margin` guards the
+   first of them by reading this file as text and refusing to find the SIZE dial named anywhere
+   above `.feed-controls` — including in this comment, which is why the dial is spelled out in
+   words here and not in the form the stylesheet would consume.
+
    The width and the height are stated rather than left to the four insets. A canvas is a replaced
    element: with `width: auto` it takes its *intrinsic* 300x150 and CSS 2.1 §10.3.8 then drops the
    `right` and `bottom` constraints, so the board draws into a 300x150 box in the corner of the
@@ -48,23 +59,23 @@
 .desk .feed-osd {
   position: absolute; left: calc(9 * var(--u)); top: calc(7 * var(--u)); right: calc(9 * var(--u));
   display: flex; justify-content: space-between;
-  font-family: var(--mono); font-size: calc(9.5 * var(--u));
+  font-family: var(--mono); font-size: calc(9.5 * var(--u) * var(--feed-glass-ts));
   letter-spacing: .18em; color: rgba(196,224,218,.9); pointer-events: none;
   text-shadow: 0 0 calc(6 * var(--u)) #000;
 }
 .desk .osd-xy {
-  font-family: var(--mono); font-size: calc(9.5 * var(--u));
+  font-family: var(--mono); font-size: calc(9.5 * var(--u) * var(--feed-glass-ts));
   letter-spacing: .16em; color: rgba(120,232,214,.95);
 }
 .desk .feed-tick {
   position: absolute; right: calc(10 * var(--u)); bottom: calc(2 * var(--u)); line-height: 1;
-  font-family: var(--mono); font-size: calc(26 * var(--u)); font-weight: 300;
+  font-family: var(--mono); font-size: calc(26 * var(--u) * var(--feed-glass-ts)); font-weight: 300;
   color: rgba(53,224,200,.9); letter-spacing: .06em; pointer-events: none;
   text-shadow: 0 0 calc(12 * var(--u)) rgba(53,224,200,.4), 0 0 calc(4 * var(--u)) #000;
 }
 .desk .feed-stamp {
   position: absolute; left: calc(10 * var(--u)); bottom: calc(8 * var(--u));
-  font-family: var(--mono); font-size: calc(10 * var(--u)); letter-spacing: .3em;
+  font-family: var(--mono); font-size: calc(10 * var(--u) * var(--feed-glass-ts)); letter-spacing: .3em;
   color: rgba(206,220,230,.6); pointer-events: none;
 }
 
@@ -158,7 +169,7 @@
 .desk .feed-tick-mark { position: absolute; background: currentColor; }
 .desk .feed-tick-mark b {
   position: absolute; font-family: var(--mono); font-weight: 400; line-height: 1;
-  font-size: calc(8.5 * var(--u)); letter-spacing: .04em; white-space: nowrap;
+  font-size: calc(8.5 * var(--u) * var(--feed-glass-ts)); letter-spacing: .04em; white-space: nowrap;
   opacity: var(--gnum, 1);
 }
 .desk .feed-rule--x .feed-tick-mark {
@@ -252,3 +263,79 @@
 }
 .desk .fk:disabled { opacity: .45; cursor: default; }
 .desk #board:active { cursor: grabbing; }
+
+/* ============================== FOCUS ============================= */
+/* The feed as a preview, which is the other half of `terminal.css`'s
+   FOCUS section.
+
+   In this view there is no desk to put the monitor on, so it is not
+   placed: `desk.css` gives `.station` a two-column grid against the
+   viewport and the feed takes the fixed column. `left` and `top` are
+   handed back, the width comes from the column, and the housing keeps
+   its proportions — 360:226 against the resting 700:438 — so it reads as
+   the same object seen smaller rather than as a squashed one.
+
+   The column is 360u because that is the smallest this housing gets away
+   with. Below it the transport strip's hardware stops fitting: the
+   playback keys are 141u of the row and the zoom ladder another 134u,
+   both drawn in `--u` and neither of them type, so a narrower column
+   costs the player a control rather than a few pixels of tracking. */
+
+.desk[data-focus='program'] .display--feed {
+  position: relative; left: auto; top: auto; width: auto;
+  align-self: start;
+  --feed-glass-ts: .72;
+  --ts: var(--feed-ts);
+}
+.desk[data-focus='program'] .bezel--feed .screen { height: calc(226 * var(--u)); }
+
+/* The transport strip, on two rows.
+
+   It does not fit on one and it cannot be made to: 141u of playback keys
+   plus 134u of zoom ladder is 275u of moulded hardware out of the 339u
+   the strip has inside its own padding, and the readout, the speed and
+   the scrub still have to go somewhere. Left to overflow it did the
+   worst available thing — the scrub bar collapsed to nothing and the
+   zoom ladder hung 164u off the right of the case, past the edge of
+   everything.
+
+   So it wraps, in DOM order, with no `order` and no grid placement:
+   keys and scrub on the first row, readout, speed and zoom on the
+   second. Reading order and focus order stay the sequence they are in
+   the markup, which is the reason not to reach for `order` even though
+   it would have laid out identically. The scrub is given a `flex-basis`
+   big enough that it cannot be squeezed onto the first row as a sliver,
+   which is what forces the readout down to the second. */
+.desk[data-focus='program'] .feed-controls { flex-wrap: wrap; gap: calc(6 * var(--u)) calc(8 * var(--u)); }
+.desk[data-focus='program'] .fc-scrub { flex: 1 1 calc(140 * var(--u)); }
+/* The mode lamp lands on a third line of its own, and it is left there.
+   Row two is 240u of readout, speed and zoom ladder in 242u of strip,
+   and the only column gap that pulls a 9u lamp up onto it is 4u —
+   between three pieces of moulded case, which is not a gap, it is a
+   join. So the lamp gets the corner of the plate instead of the crumb of
+   space at the left where the wrap dropped it, which is where a mode
+   lamp lives on a monitor anyway. */
+.desk[data-focus='program'] .fc-lamp { margin-left: auto; }
+
+/* Why this is not a `transform: scale()`, which would have been one line
+   instead of thirty.
+
+   Everything the housing is made of is tuned in `--u` at the size it is
+   drawn: the four bezel arrises are one hard rule plus a row of falloff
+   per DESIGN §8, the graticule's ticks are single physical pixels, and
+   the canvas is a bitmap the renderer sizes to device pixels itself. A
+   `scale(0.51)` puts all of it through a resample — the arris softens
+   into the gradient §8 forbids, the ruler's 1px marks alias in and out,
+   and the board goes blurry, which is the one thing a preview of the
+   board may not be. Relaying out the boxes instead means the renderer's
+   own `ResizeObserver` sees a new canvas box and re-fits the camera to
+   it, so the picture is drawn at the size it is shown at. Measured after
+   a run in this view: a 202x117 backing store in a 202x117 CSS box.
+
+   The type is the part a box change does not solve, so it gets two
+   knobs. `--feed-ts` is the case type — the transport readout, the zoom
+   legends, the asset tag — and it is set from the player's own type
+   scale one level up on `.station`, so it composes with the SIZE dial
+   instead of discarding it. `--feed-glass-ts` is the type on the glass,
+   which has never followed the SIZE dial and still does not. */
+.desk[data-focus='program'] .station { --feed-ts: calc(var(--ts) * .72); }

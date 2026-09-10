@@ -528,3 +528,182 @@
 }
 .desk .rt-body { flex: 1 1 auto; min-height: 0; display: flex; }
 .desk .rt-body > .lib { flex: 1 1 auto; min-width: 0; }
+
+/* ============================== FOCUS ============================= */
+/* The second view, and the terminal's half of it.
+
+   A player writing a World 6 routine said the terminal was too small
+   for the work, and the numbers agreed: the glass is 776u wide, the
+   objectives rail takes 224 of them, and Monaco's own line-number
+   margin another 37, which leaves the program 513u — 63 columns of
+   JetBrains Mono, and 22 lines of the 660u screen once the bar, the log
+   and the status strip have had theirs.
+
+   The first attempt at this widened the terminal inside the desk and
+   shrank the feed beside it. It worked, and it was still a compromise:
+   1160u of glass is what fits between the terminal's left edge and the
+   copy stand, and no arrangement of the furniture gives the program
+   more. The player's answer was to drop the furniture — "the 'Focus
+   Mode' can be an entirely different view. Without all the clutter of
+   the desk and stuff. Only Terminal and preview." So FOCUS is not a
+   second arrangement of the desk. It is a second *view*, in which there
+   is no desk: `desk.css`'s FOCUS section takes the room and every piece
+   of deskware off screen, and `.station` becomes a grid laid against the
+   viewport rather than a stage inside `DESK_FRAME`.
+
+   What that means for the terminal is that it stops being placed and
+   starts being sized. `left`, `top` and `width` are handed back, the
+   display becomes a column, and the bezel and the screen inside it take
+   whatever height the viewport has left after the station's padding and
+   the plate. Everything in the terminal that was tuned in `--u` still is
+   — the bezel's padding and arrises, the rail's 224u, the type — so the
+   only thing that changes is how many rows and columns of it there are.
+   `--ts` is not touched: the SIZE dial is the only thing in this game
+   that changes the size of a letter, and a "focus mode" that shrank the
+   code to fit more of it in would be answering a question nobody asked.
+
+   Measured at 1440x860: 117 columns by 38 lines, against 63 by 22 on
+   the desk, at an identical 11.56px on an 18px line. */
+
+.desk[data-focus='program'] .display--term {
+  position: relative; left: auto; top: auto; width: auto;
+  min-width: 0; min-height: 0;
+  display: flex; flex-direction: column;
+}
+.desk[data-focus='program'] .display--term .bezel { flex: 1 1 auto; display: flex; min-height: 0; }
+/* `height: auto` and not a number: the screen is now as tall as the
+   window lets it be. The two and a half rules of arris on the bezel are
+   unchanged, because they are drawn in `--u` and `--u` did not move. */
+.desk[data-focus='program'] .display--term .screen { flex: 1 1 auto; height: auto; min-height: 0; }
+
+/* The log collapses to its head bar while there is nothing in it, and
+   only while there is nothing in it.
+
+   Idle, the log is 128u of `Nothing on the wire.` directly under the
+   code, which on the desk is honest furniture and in this view is the
+   last thing the player asked for. Collapsed it is the head bar alone —
+   still legended `OUTPUT`, still carrying the filter and `clear`, so the
+   log has not disappeared and neither has the way back to it.
+
+   `data-empty` is set by `OutputLog.tsx` off the whole console rather
+   than off the filtered, playhead-clipped view it renders. That
+   distinction is the important one: filter the log to `print` with an
+   error sitting in it and the *view* is empty while the log is not, and
+   an error collapsed out of sight is exactly the failure this must not
+   have. A run in flight counts as content too, so the body is already
+   open when the first line lands instead of the code jumping down a
+   step underneath the player's hands. */
+.desk[data-focus='program'] .term-log[data-empty='yes'] { flex: 0 0 auto; }
+.desk[data-focus='program'] .term-log[data-empty='yes'] .log-body { display: none; }
+
+/* The statement of the two things this view takes away.
+
+   `ctrl+enter` was always the way to run and the strip has always said
+   so; in FOCUS it is the *only* way, because the DISPATCH key is on the
+   desk. That needed no new copy — it needed the strip to still be on
+   screen, and it is, because it is inside the glass.
+
+   Closing a work order did need one line. The stamp block is on the desk
+   too, so a passing verdict in this view lands on a surface the player
+   cannot see, and DESIGN §11 does not allow the way to finish a level to
+   be a thing you have to already know. `Terminal.tsx` prints it on the
+   strip beside the run hint, in the strip's own register: no joke, no
+   button, one sentence naming the key and what is behind it. `--ok`
+   because it is the same news the log's `work order closed` line
+   carries, and the strip already reserves `--danger` for the count of
+   problems in the program. */
+.desk .ts-close { color: var(--ok); }
+
+/* `~/lib.ts`, still exactly the terminal's glass.
+
+   On the desk that identity is arithmetic: the bezel's padding comes off
+   `.display--term`'s stated width and the screen states its own height,
+   and `desk-frame.test.ts` recomputes both from this stylesheet so the
+   panel cannot drift off the screen it is drawn on. In this view there
+   is no arithmetic to do — the glass is whatever the window left it — so
+   the glass measures itself instead. `Terminal.tsx` observes the screen
+   and publishes `--glass-x/-y/-w/-h` onto `.desk`, and the panel is
+   those four numbers and nothing else. Same identity, established the
+   only way it can be once a box is laid out rather than placed, and
+   `.routines` reaching the desk, the paper or the site feed is still
+   impossible by construction. */
+.desk[data-focus='program'] .routines {
+  left: var(--glass-x); top: var(--glass-y);
+  width: var(--glass-w); height: var(--glass-h);
+}
+
+/* No desk, so no stand. A monitor standing on nothing, with its cast
+   shadow falling on nothing, reads as a bug rather than as a monitor. */
+.desk[data-focus='program'] .stand { display: none; }
+
+/* Five controls on an 806u plate, and the binding case is SIZE 1.5.
+
+   The note further up already found this plate's limit once: type scales
+   with the SIZE dial and the hardware does not, so 1.5 is where the row
+   runs out of plate, and stacking each reading under its label is what
+   bought the fourth control its room. Measured at 1.5 with the fifth
+   control added, in design units, because the whole plate scales with
+   `--u` and the fit does not depend on the viewport:
+
+   - four controls, as shipped: 783.2u of the plate's 805.8u. 22.5u of
+     slack, which is how tight it already was.
+   - five, unchanged: 857u. Over by 51u, and the row wraps onto the
+     DISPATCH key exactly as that note describes.
+   - five, with the three changes below: 779.1u. 26.6u of slack, which is
+     the four-control plate's own margin and a little over.
+
+   The three changes, and why these three. The plate's `gap` goes 10u to
+   7u and its side padding 14u to 10u, which is the plate's own spacing
+   and costs no legend anything. The *readings* drop from `.22em` to
+   `.08em` — the readings only, not the labels. `REPORTS`' reading is
+   `ONE LINE AT A TIME`, eighteen characters, and at `.22em` the tracking
+   alone is a quarter of its width; the legends are stacked, so that one
+   string sets the width of its whole control. The silkscreen labels keep
+   `.22em` untouched, which is the part that reads as a moulded plate
+   rather than as a toolbar: the label is printed on the case and the
+   reading is what the control is set to, and they were never the same
+   kind of type.
+
+   Nothing was removed to make room. Deleting `ISOMER 21 · TERMINAL`
+   would delete the thing that makes this a monitor chin, and deleting a
+   control would be answering "the terminal is too small" by taking away
+   a setting. */
+.desk .bezel-foot { gap: calc(7 * var(--u)); padding: calc(4 * var(--u)) calc(10 * var(--u)) 0; }
+.desk .sk-legend b,
+.desk .dsw-legend b,
+.desk .rsw-legend b,
+.desk .fsw-legend b { letter-spacing: .08em; }
+
+/* FOCUS itself. A throw switch, the same object as DISPLAY and REPORTS,
+   with its own marks for the same reason `.repsw` has its own: the state
+   selectors are descendant rules and a shared `i` would throw every knob
+   on the plate at once. */
+
+.desk .focussw {
+  display: flex; align-items: center; gap: calc(6 * var(--u));
+  background: none; border: 0; cursor: pointer; padding: 0;
+}
+.desk .fsw-track {
+  position: relative; display: block;
+  width: calc(26 * var(--u)); height: calc(12 * var(--u));
+  border-radius: calc(2 * var(--u));
+  background: #24262a;
+  box-shadow: inset calc(1.5 * var(--u)) calc(1.5 * var(--u)) 0 rgb(var(--ink-sh) / .5);
+}
+.desk .fsw-track i {
+  position: absolute; top: calc(1.5 * var(--u)); left: calc(1.5 * var(--u));
+  width: calc(11 * var(--u)); height: calc(9 * var(--u));
+  border-radius: calc(1.5 * var(--u));
+  background: #9aa4ad;
+  box-shadow: inset calc(1 * var(--u)) calc(1 * var(--u)) 0 rgb(var(--key) / .5);
+  transition: left .13s var(--drop), background .13s linear;
+}
+.desk .focussw[aria-pressed='true'] .fsw-track i { left: calc(13.5 * var(--u)); background: #ffb030; }
+.desk .fsw-legend {
+  display: flex; flex-direction: column;
+  line-height: 1.25; white-space: nowrap;
+  font-family: var(--mono); font-size: calc(8.5 * var(--u) * var(--ts));
+  color: #7d8087;
+}
+.desk .fsw-legend b { color: #b9c2cb; }
+.desk .focussw:hover .fsw-legend { color: #b9c2cb; }

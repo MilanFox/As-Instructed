@@ -162,6 +162,96 @@
   font-size: 12px;
 }
 
+/* ============================== FOCUS ============================= */
+/* The second view. There are two, and the player throws a switch
+   between them.
+
+   The desk is one composition fitted to `DESK_FRAME` and the header of
+   `Desk.tsx` is emphatic that it is not a responsive layout and that
+   moving the furniture is not polish. Nothing here moves any furniture.
+   The player asked for something else — "the 'Focus Mode' can be an
+   entirely different view. Without all the clutter of the desk and
+   stuff. Only Terminal and preview" — so FOCUS takes the furniture
+   *away* and lays the two machines out against the window instead. Throw
+   the switch back and the approved arrangement is exactly where it was,
+   unit for unit, because not one of the rules that place it has been
+   touched.
+
+   It is done in CSS on `.desk[data-focus='program']` rather than by
+   branching the tree in `Desk.tsx`. That file renders every object from
+   a list precisely so there is one place a `PanelBoundary` can be
+   omitted, and `src/ui/__tests__/desk-boundaries.test.ts` fails if an
+   object is missing from the lists at all — a view that rendered a
+   shorter list would have to be a second list to keep in step with the
+   first. Hidden here, every object is still mounted with its boundary
+   and still on the list; the view decides what is on screen, not what
+   exists.
+
+   Three consequences. Two the player accepted, and one they were not
+   asked to accept:
+
+   - The reference, the Repository, the site plan, the in-tray and the
+     paperwork are unreachable in FOCUS. The way to them is the switch,
+     which is the only reason the bezel plate is load-bearing here.
+   - The DISPATCH key is unreachable, so `ctrl+enter` is the only way to
+     run. It always was the announced way, `always: true` in `keys.ts`,
+     and the terminal's own status strip prints the hint inside the
+     glass, so it survives into this view unchanged.
+   - The stamp block is unreachable, and *that* one is a DESIGN §11
+     problem rather than a convenience: a passing verdict would land on a
+     surface the player cannot see. `Terminal.tsx` states it on the
+     status strip while focused. One sentence, factual, naming the key.
+
+   `~/lib.ts` survives, because it is the player's own code drawn on the
+   terminal's own glass and this is the view for looking at code. It is
+   the one thing on the `DESKWARE` list that is not deskware. */
+
+/* No room. There is no lamp in this view and nothing for it to light —
+   a half-lit desk with no desk on it reads as a rendering bug, so the
+   background is the flat void `.desk` already sits on. The bezels keep
+   their arrises, which are drawn from DESIGN §8's one lamp in `--u` and
+   are the same rule they always were. */
+.desk[data-focus='program'] .room { display: none; }
+
+/* Everything loose on the desk, off screen. Absent, not dimmed and not
+   pushed out of frame: a dimmed control is still a control, and a
+   control the player can see and cannot use is worse than one that is
+   not there. `src/ui/__tests__/desk-frame.test.ts` holds this list
+   against the policy, so a new piece of deskware forces a decision about
+   this view instead of leaking into it. */
+.desk[data-focus='program'] .slot,
+.desk[data-focus='program'] .tray,
+.desk[data-focus='program'] .dispatch,
+.desk[data-focus='program'] .siteplan,
+.desk[data-focus='program'] .binder,
+.desk[data-focus='program'] .binder-open,
+.desk[data-focus='program'] .manual,
+.desk[data-focus='program'] .manual-open,
+.desk[data-focus='program'] .stampblock,
+.desk[data-focus='program'] .copystand,
+.desk[data-focus='program'] .pen,
+.desk[data-focus='program'] .keyboard,
+.desk[data-focus='program'] .paper-layer { display: none; }
+
+/* The station, against the window.
+
+   Two columns: the program takes everything the preview does not, and
+   the preview is a fixed 360u because its transport strip is moulded
+   hardware in `--u` and does not shrink (see `monitor.css`). The padding
+   and the gap are in `--u` so the view breathes the same amount at every
+   viewport, and `--u` itself is untouched — which is the whole point.
+   The terminal's box grows in pixels and the letters in it do not.
+
+   `align-items: stretch` gives the terminal the height; the feed opts
+   out with `align-self: start`, because a preview stretched to a
+   window's height would be a 360u-wide letterbox of empty case. */
+.desk[data-focus='program'] .station {
+  position: fixed; inset: 0; z-index: 5;
+  display: grid; grid-template-columns: minmax(0, 1fr) calc(360 * var(--u));
+  gap: calc(26 * var(--u)); padding: calc(26 * var(--u));
+  align-items: stretch;
+}
+
 /* ============================== MOTION ============================ */
 
 @media (prefers-reduced-motion: reduce) {

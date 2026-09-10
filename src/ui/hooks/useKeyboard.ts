@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useGame } from '../../game/store.ts';
 import { useLibrary } from '../../meta/index.ts';
 import { usePapers } from '../desk/paper/papers.ts';
+import { toggleDeskFocus } from '../desk/focus.ts';
 import { KEY_LIST, type KeyId } from '../desk/terminal/keys.ts';
 import { closeOverlay, overlayState, toggleOverlay } from './useOverlay.ts';
 
@@ -77,6 +78,16 @@ export function useKeyboard(): void {
           else if (overlayState().open === 'docs') closeOverlay();
           else if (useLibrary.getState().panelOpen) useLibrary.getState().setPanelOpen(false);
           else if (state.screen !== 'levels' && !isEditorTarget(event.target)) state.goto('levels');
+        },
+
+        /*
+         * The same throw the switch on the bezel makes, from the keyboard, without moving the
+         * caret. It is deliberately not gated on `state.screen`: the desk is the only screen the
+         * composition exists on, and a key that silently did nothing on the site map would be a
+         * key the player learns not to trust.
+         */
+        focus: () => {
+          toggleDeskFocus();
         },
 
         play: () => {

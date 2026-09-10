@@ -61,8 +61,19 @@ export function OutputLog(): React.JSX.Element {
   const meta =
     runState === 'running' ? 'on the wire' : verdict ? (verdict.passed ? 'closed' : 'halted') : 'idle';
 
+  /*
+   * Whether the log is holding anything, which is what lets FOCUS collapse it to its head bar and
+   * give the code the 128 units back. Read off `all` and never off `shown`: the rendered view is
+   * filtered and clipped to the playhead, so filtering to `print` with an error in the log, or
+   * scrubbing back to tick 0, empties the *view* while the log is full. An error collapsed out of
+   * sight is the one failure this attribute must not cause. A run in flight counts as content for
+   * the same reason in reverse — the body is open before the first line lands, rather than the
+   * code stepping down under the player's hands as it arrives.
+   */
+  const holding = all.length > 0 || suppressed > 0 || runState === 'running';
+
   return (
-    <div className="term-log">
+    <div className="term-log" data-empty={holding ? 'no' : 'yes'}>
       <div className="log-head">
         <span>OUTPUT</span>
         <span className="log-tools">

@@ -14,7 +14,16 @@
  * modifier, printed once, on the terminal's status strip.
  */
 
-export type KeyId = 'run' | 'escape' | 'play' | 'back' | 'forward' | 'first' | 'last' | 'reference';
+export type KeyId =
+  | 'run'
+  | 'escape'
+  | 'focus'
+  | 'play'
+  | 'back'
+  | 'forward'
+  | 'first'
+  | 'last'
+  | 'reference';
 
 export interface KeyBinding {
   id: KeyId;
@@ -55,6 +64,20 @@ export const KEY_LIST: readonly KeyBinding[] = [
     what: 'put down what is held, then leave the work order',
     always: true,
     matches: (event) => event.key === 'Escape',
+  },
+  {
+    id: 'focus',
+    keys: 'ctrl+shift+f',
+    what: 'widen the terminal and shrink the site feed to a preview',
+    /*
+     * `always`, because the whole point of it is to be pressed while writing. A player who has to
+     * take their hands off the program, find a switch on the bezel and click it has been given a
+     * preference rather than a way of working — and Shift plus a letter is a chord no editor
+     * command in Monaco's default keymap claims, so nothing is stolen from the caret either.
+     */
+    always: true,
+    matches: (event) =>
+      (event.metaKey || event.ctrlKey) && event.shiftKey && (event.key === 'f' || event.key === 'F'),
   },
   {
     id: 'play',
