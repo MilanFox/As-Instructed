@@ -58,6 +58,35 @@ export interface TileView {
   inBounds: boolean;
   terrain: Terrain;
   walkable: boolean;
+  /**
+   * Whether ending a move on this tile kills the bot — `TerrainProps.lethal` (`types.ts:64`),
+   * which is `true` on `Terrain.Pit` and on nothing else in the game.
+   *
+   * `walkable` is not the answer to "is it safe to step here?", and on exactly one terrain it is
+   * the opposite of the answer. A pit is `walkable: true` deliberately: `move` onto one
+   * *succeeds*, the bot arrives, and then it dies (`sim.ts:438`). That is the mechanic. Making
+   * the pit unwalkable so the free read would come out honest would turn it into a wall and
+   * delete the mechanic, so the dishonesty had to be fixed on the reading side instead.
+   *
+   * This is DESIGN.md §11.7's third leg, the leg `MachineView.links` below was also added for.
+   * The pit had the other two — a thing in the fiction with a name, and a hole drawn on the board
+   * — and no way to reach it in code. A defensive program that asked the only free question the
+   * API offered about the tile it was about to enter got back `walkable: true` and drove into the
+   * hole. The single route to the fact that decided the run was to make the move and read the
+   * verdict, which is `w2-04`'s `0/8` with the price raised: state reachable only by paying for
+   * the action you were trying to decide on, except the payment here is the bot.
+   *
+   * **A field on the view, not a call.** `scan` and `look` already hand back this snapshot for
+   * nothing, so caution stays free, no entry is added to `DEFAULT_COSTS`, and `w6-03` — where pit
+   * is introduced — requisitions no new hardware to read it. A priced "is this safe" call would
+   * have taxed the careful program and pushed it back to finding out by driving.
+   *
+   * **Out of bounds reads `false`.** `Terrain.Void` carries no `lethal` (`world.ts:92`), and more
+   * to the point a bot cannot end a move off the edge at all — that `move` fails, costs its tick
+   * and leaves the bot where it stood. `walkable: false` is the whole story out there; a `true`
+   * here would name a death that has no way of happening.
+   */
+  lethal: boolean;
   /** Current maturity of a crop on this tile, relative to the observing bot's clock. */
   growth: number;
   maxGrowth: number;
@@ -462,7 +491,17 @@ export class Sim {
 
     if (!ready || roomLeft <= 0 || !tile) {
       const reason = roomLeft <= 0 ? 'full' : undefined;
-      this.builder.push({ t, botId, dt, kind: 'harvest', at, item: null, count: 0, ok: false, reason });
+      this.builder.push({
+        t,
+        botId,
+        dt,
+        kind: 'harvest',
+        at,
+        item: null,
+        count: 0,
+        ok: false,
+        reason,
+      });
       this.charge(bot, dt);
       return null;
     }
@@ -1109,6 +1148,7 @@ export class Sim {
         inBounds: false,
         terrain: OUT_OF_BOUNDS_TERRAIN,
         walkable: false,
+        lethal: false,
         growth: 0,
         maxGrowth: 0,
         sproutsIn: 0,
@@ -1127,6 +1167,7 @@ export class Sim {
       inBounds: true,
       terrain: tile.terrain,
       walkable: terrainProps(tile.terrain).walkable,
+      lethal: terrainProps(tile.terrain).lethal,
       growth: maturity(tile, t),
       maxGrowth: tile.maxGrowth ?? 0,
       sproutsIn: sproutsIn(tile, t),

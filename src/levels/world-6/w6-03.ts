@@ -127,8 +127,7 @@ export function expand(stream: string): string[] {
   return digits === '' ? moves : [];
 }
 
-const inbound = (world: World): string =>
-  decipher(queued(world)[0] ?? '', postVar(world, 'key'));
+const inbound = (world: World): string => decipher(queued(world)[0] ?? '', postVar(world, 'key'));
 
 /**
  * What the return packet got wrong: the wrong number of lines, a stream that does not parse, the
@@ -240,7 +239,11 @@ export const w6_03: LevelDef = {
         'Groups run together, like `4E12S1W`: a count of one or more digits, then `N`, `E`, `S` or `W`.',
     },
     { label: 'Watch for', value: 'The same direction can turn up in two groups in a row.' },
-    { label: 'Off the route', value: 'Pit. Every tile that is not on the route is a pit.' },
+    {
+      label: 'Off the route',
+      value:
+        'Pit (a terrain). Every tile that is not on the route is a pit, and a bot that ends a move on one does not come back. `scan(dir).walkable` is `true` on a pit; `scan(dir).lethal` is the field that says it kills.',
+    },
     {
       label: 'Shorter encoding',
       value: 'Transmit one line: the same moves, the same format, fewer characters than arrived.',

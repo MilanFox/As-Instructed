@@ -76,7 +76,7 @@ declare const Terrain: {
   readonly Depot: Terrain;
   readonly Conveyor: Terrain;
 };`,
-    doc: 'What a tile is made of. `void` is outside the playable area, `pit` is walkable but kills a bot that stops on it.',
+    doc: 'What a tile is made of. `void` is outside the playable area, `pit` is walkable but kills a bot that stops on it. `ore`, `ice` and `regolith` name both a terrain and an `ItemKind`: the terrain is the face in the wall, the item is what `mine()` puts in the hold.',
   },
   {
     name: 'ItemKind',
@@ -122,6 +122,7 @@ declare const ItemKind: {
   inBounds: boolean;
   terrain: Terrain;
   walkable: boolean;
+  lethal: boolean;
   growth: number;
   maxGrowth: number;
   sproutsIn: number;
@@ -131,7 +132,7 @@ declare const ItemKind: {
   machineId: string | null;
   mark: string | null;
 }`,
-    doc: 'Everything a bot perceives about one tile. A crop is ready when `growth >= maxGrowth`. A crop can also be planted with its clock set to start in the future, in which case `growth` reads 0 and stays there until `sproutsIn` counts down to 0. Tiles outside the world come back with `inBounds: false` and `terrain: "void"`.',
+    doc: 'Everything a bot perceives about one tile. `lethal` is true where ending a move kills the bot, which `walkable` does not tell you: a pit is walkable and fatal. A crop is ready when `growth >= maxGrowth`. A crop can also be planted with its clock set to start in the future, in which case `growth` reads 0 and stays there until `sproutsIn` counts down to 0. Tiles outside the world come back with `inBounds: false` and `terrain: "void"`.',
   },
   {
     name: 'MachineView',
