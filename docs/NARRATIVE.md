@@ -221,7 +221,9 @@ Contractor #4470 is also retained. I have never been able to withdraw it.
 
 ## 8. Glossary — in-fiction terms
 
-Canon spellings and definitions. Do not invent synonyms.
+Canon spellings and definitions. Do not invent synonyms. Several of these are also live engine
+values; where a string names what a read returns — fact card, objective label, error text — the
+engine's word wins over the fiction's preference.
 
 | Term | Meaning |
 |---|---|
@@ -230,7 +232,8 @@ Canon spellings and definitions. Do not invent synonyms.
 | **the Kessler Contract** | Terraforming contract since 2185; client dissolved 2198; continues for lack of a signature. |
 | **the engagement** | Employment — never "job"/"hired"; *engaged*, *concluded*, never ended. |
 | **retained** | Flag preventing a record from closing; applied to strong performers, and to #4470. |
-| **regolith** | Ground rock, the soil substrate — never "dirt" or "soil" in prose. Also a live `Terrain` value, and not the same one as `soil`: where a string names what a read returns — fact card, objective label, error text — the engine's word wins. |
+| **regolith** | The planet's raw ground rock, loose and unworked — never "dirt". A live `Terrain` value: mineable, and what World 2's Regolith Fields were cut out of. Not another word for soil. |
+| **soil** | Worked ground, the only thing that takes seed — laid into the regolith, not a synonym for it. A live `Terrain` value, and the one every field in the campaign is built from. |
 | **the Yards** | The Sorting Yards, logistics depot — always "the Yards". |
 | **a bootstrap** | Site slang for the first working version left running for the next person. |
 | **hardware requisition** | Form unlocking a sensor/actuator (DESIGN.md §6 gating); Vance approves, Dot delivers. |

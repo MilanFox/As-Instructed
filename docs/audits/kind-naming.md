@@ -522,10 +522,14 @@ fact card names both fields because the trap is the pair.
 `NARRATIVE.md` mandates "regolith" for farmable ground and forbids "soil", while the engine has
 two distinct terrain values — `Terrain.Soil`, which every farming level is built from, and
 `Terrain.Regolith`, which no work order places at all. `w8-01` called its field "open regolith"
-over `Terrain.Soil`, making `scan().terrain === 'regolith'` false forever there. The rule now in
-the glossary: the prose ban stands, but where a string names what a read returns — fact card,
-objective label, error text — the engine's word wins. `w8-01` and `w7-02` were the only boards
-whose copy claimed a terrain they did not have.
+over `Terrain.Soil`, making `scan().terrain === 'regolith'` false forever there. `w8-01` and
+`w7-02` were the only boards whose copy claimed a terrain they did not have.
+
+Resolved in the glossary by dropping the ban rather than by an escape hatch: **soil** is a canon
+term of its own now — worked ground that takes seed — and **regolith** is the raw ground rock it
+is laid into. Both words are real in the fiction because both are real in the engine, which is
+also what World 2's name has always meant. The general rule moved up to the glossary preamble:
+where a string names what a read returns, the engine's word wins.
 
 ### `w3-04`'s hint-only premise
 

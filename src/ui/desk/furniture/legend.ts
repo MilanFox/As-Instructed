@@ -62,7 +62,7 @@ const TERRAIN_IS: Record<Terrain, string> = {
   [Terrain.Floor]: 'Bare decking. The default surface, and it does nothing else.',
   [Terrain.Wall]: 'Structure. The site was built around it.',
   [Terrain.Pad]: 'A marked spot. What an objective usually counts.',
-  [Terrain.Regolith]: 'Loose dust — the ground rock this whole moon is made of.',
+  [Terrain.Regolith]: 'Loose dust — the ground rock this whole planet is made of.',
   [Terrain.Soil]: 'Farmable ground. The only thing `plant()` accepts.',
   [Terrain.Rock]: 'Solid stone.',
   [Terrain.Ore]: 'An ore vein.',
