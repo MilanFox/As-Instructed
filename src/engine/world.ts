@@ -93,6 +93,7 @@ export const TERRAIN_PROPS: Readonly<Record<Terrain, TerrainProps>> = Object.fre
   [T.Cable]: props({ walkable: true }),
   [T.Depot]: props({ walkable: true }),
   [T.Conveyor]: props({ walkable: true }),
+  [T.Rack]: props({ walkable: true }),
 });
 
 export function terrainProps(terrain: Terrain): TerrainProps {

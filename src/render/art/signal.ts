@@ -486,6 +486,18 @@ function paintStructure(ctx: CanvasRenderingContext2D, world: World, t: number):
         continue;
       }
 
+      if (tile.terrain === Terrain.Rack) {
+        ctx.fillStyle = alpha(WARM, 0.12);
+        ctx.fillRect(px, py, t, t);
+        ctx.fillStyle = join;
+        if (tileAt(world, { x, y: y - 1 })?.terrain !== Terrain.Rack) ctx.fillRect(px, py, t, lw);
+        if (tileAt(world, { x, y: y + 1 })?.terrain !== Terrain.Rack) {
+          ctx.fillRect(px, py + t - lw, t, lw);
+        }
+        ctx.fillRect(px, py, lw, t);
+        continue;
+      }
+
       if (tile.terrain === Terrain.Cable) {
         const cw = Math.max(1, Math.round(t / 12));
         const cx = Math.round(px + t / 2 - cw / 2);

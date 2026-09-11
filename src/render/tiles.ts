@@ -364,6 +364,8 @@ export function terrainArt(
   switch (terrain) {
     case Terrain.Void:
       return { base: 'floor.metal', prop: null, solid: true };
+    case Terrain.Rack:
+      return { base: 'floor.grating', prop: null, solid: false };
     case Terrain.Floor:
     case Terrain.Conveyor:
       return { base: baseFloor, prop: null, solid: false };

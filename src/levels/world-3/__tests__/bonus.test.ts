@@ -133,6 +133,7 @@ describe('w3-01 straight-runs', () => {
 function aisleDisciplined(sim: Sim, botId: number): void {
   const DETOUR = 10;
   const racks = new Set([2, 3, 6, 7]);
+  const aisleCols = new Set([1, 6, 11, 16]);
   const opened = new Map<string, TileView>();
   const walls = new Set<string>();
 
@@ -144,9 +145,10 @@ function aisleDisciplined(sim: Sim, botId: number): void {
     for (const dir of [Dir.North, Dir.South, Dir.East, Dir.West]) see(sim.scan(botId, dir));
   };
   const charge = (at: Vec): number => {
-    if (!racks.has(at.y)) return 1;
     const slot = opened.get(key(at));
-    return slot?.items.some((stack) => stack.kind === 'crate') === true ? 1 : DETOUR;
+    if (slot === undefined) return racks.has(at.y) && !aisleCols.has(at.x) ? DETOUR : 1;
+    if (slot.terrain !== 'rack') return 1;
+    return slot.items.some((stack) => stack.kind === 'crate') ? 1 : DETOUR;
   };
 
   const towards = (target: Vec): Dir | null => {
@@ -222,12 +224,13 @@ function aisleDisciplined(sim: Sim, botId: number): void {
 
 describe('w3-04 aisle-discipline', () => {
   test('a round that stays in the aisles earns it on every seed', () => {
-    const trodden = [2, 3, 15, 8];
+    const trodden = [0, 0, 0, 0];
     w3_04.seeds.forEach((seed, i) => {
       const run = scored(w3_04, seed, aisleDisciplined);
       expect(run.passed, `seed ${String(seed)}`).toBe(true);
       expect(run.spent('aisle-discipline'), `seed ${String(seed)}`).toBe(trodden[i]);
       expect(run.met('aisle-discipline'), `seed ${String(seed)}`).toBe(true);
+      expect(run.ticks, `seed ${String(seed)}`).toBeLessThanOrEqual(w3_04.par.ticks);
     });
   });
 

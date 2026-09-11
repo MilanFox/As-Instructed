@@ -29,6 +29,7 @@ const TERRAIN_IS: Record<Terrain, string> = {
   [Terrain.Cable]: 'Power run.',
   [Terrain.Depot]: 'Fuel depot. The only tile `refuel()` succeeds on.',
   [Terrain.Conveyor]: 'Item transport.',
+  [Terrain.Rack]: 'A storage rack slot. Walkable, and what a slot objective counts.',
 };
 
 const ITEM_IS: Record<ItemKind, string> = {

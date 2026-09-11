@@ -36,7 +36,8 @@ type Dir = number;`,
   | 'pit'
   | 'cable'
   | 'depot'
-  | 'conveyor';
+  | 'conveyor'
+  | 'rack';
 declare const Terrain: {
   readonly Void: Terrain;
   readonly Floor: Terrain;
@@ -52,8 +53,9 @@ declare const Terrain: {
   readonly Cable: Terrain;
   readonly Depot: Terrain;
   readonly Conveyor: Terrain;
+  readonly Rack: Terrain;
 };`,
-    doc: 'What a tile is made of. `void` is outside the playable area, `pit` is walkable but kills a bot that stops on it. `ore`, `ice` and `regolith` name both a terrain and an `ItemKind`: the terrain is the face in the wall, the item is what `mine()` puts in the hold.',
+    doc: 'What a tile is made of. `void` is outside the playable area, `pit` is walkable but kills a bot that stops on it, and `rack` is walkable storage decking. `ore`, `ice` and `regolith` name both a terrain and an `ItemKind`: the terrain is the face in the wall, the item is what `mine()` puts in the hold.',
   },
   {
     name: 'ItemKind',

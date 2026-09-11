@@ -30,6 +30,7 @@ export const Terrain = {
   Cable: 'cable',
   Depot: 'depot',
   Conveyor: 'conveyor',
+  Rack: 'rack',
 } as const;
 export type Terrain = (typeof Terrain)[keyof typeof Terrain];
 

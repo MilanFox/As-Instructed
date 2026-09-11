@@ -1,6 +1,13 @@
 import { describe, expect, test } from 'vitest';
 import type { ItemKind, Objective, ObjectiveContext, Sim, Vec } from '../../../engine/index.ts';
-import { Dir, countItemsAt, evaluateObjectives, medalFor } from '../../../engine/index.ts';
+import {
+  Dir,
+  Terrain,
+  countItemsAt,
+  evaluateObjectives,
+  medalFor,
+  tileAt,
+} from '../../../engine/index.ts';
 import type { LevelRunResult } from '../../harness.ts';
 import { runLevel, runReference } from '../../harness.ts';
 import type { LevelDef, ReferenceSolution } from '../../types.ts';
@@ -50,9 +57,9 @@ function survey(sim: Sim, botId: number): Survey {
 }
 
 const RACK_ROWS = [2, 3, 6, 7];
+const AISLE_COLS = [1, 6, 11, 16];
 const YARD_EAST = 16;
 const YARD_SOUTH = 8;
-const SLOT_BUDGET = 18;
 
 interface Yard {
   bay: Vec | null;
@@ -80,7 +87,7 @@ function readAround(sim: Sim, botId: number, found: Yard): void {
 }
 
 const treadCost = (found: Yard, at: Vec): number =>
-  RACK_ROWS.includes(at.y) && !found.stocked.has(key(at)) ? 1 : 0;
+  RACK_ROWS.includes(at.y) && !AISLE_COLS.includes(at.x) && !found.stocked.has(key(at)) ? 1 : 0;
 
 function routeThroughAisles(found: Yard, from: Vec, to: Vec): Vec[] {
   const index = (at: Vec): number => at.y * (YARD_EAST + 2) + at.x;
@@ -174,7 +181,7 @@ const slotsTrodden = (result: LevelRunResult): number =>
     (event) =>
       event.kind === 'move' &&
       event.ok &&
-      RACK_ROWS.includes(event.to.y) &&
+      tileAt(result.initialWorld, event.to)?.terrain === Terrain.Rack &&
       countItemsAt(result.initialWorld, event.to, 'crate') === 0,
   ).length;
 
@@ -317,28 +324,28 @@ describe('w3-02 — one depot at a time', () => {
 });
 
 describe('w3-04 — read the racks from the aisle', () => {
-  test('an aisle round ships the yard inside the slot budget on every seed', () => {
+  test('an aisle round ships the yard treading no empty slot on every seed', () => {
     for (const seed of w3_04.seeds) {
       const result = runLevel(w3_04, seed, aisleRound);
       expect(result.verdict.passed).toBe(true);
-      expect(slotsTrodden(result)).toBeLessThanOrEqual(SLOT_BUDGET);
+      expect(slotsTrodden(result)).toBe(0);
       expect(bonusMet(w3_04, result)).toBe(true);
     }
   });
 
-  test('the rack-walking survey ships the yard and blows the slot budget on every seed', () => {
+  test('the rack-walking survey ships the yard and treads empty slots on every seed', () => {
     for (const seed of w3_04.seeds) {
       const result = runReference(w3_04, seed, w3_04Solution);
       expect(result.verdict.passed).toBe(true);
-      expect(slotsTrodden(result)).toBeGreaterThan(SLOT_BUDGET);
+      expect(slotsTrodden(result)).toBeGreaterThan(0);
       expect(bonusMet(w3_04, result)).toBe(false);
     }
   });
 
-  test('never reaching the outer aisles is cheap in slots and cannot ship the yard', () => {
+  test('never reaching the outer aisles treads no slot and cannot ship the yard', () => {
     for (const seed of [1, 2, 3]) {
       const result = runLevel(w3_04, seed, middleAislesOnly);
-      expect(slotsTrodden(result)).toBeLessThan(SLOT_BUDGET);
+      expect(slotsTrodden(result)).toBe(0);
       expect(result.verdict.passed).toBe(false);
     }
   });

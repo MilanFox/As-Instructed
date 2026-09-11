@@ -257,21 +257,22 @@ const ROW = {
   pad: 10,
   depot: 11,
   conveyor: 12,
-  faceWall: 13,
-  faceRock: 14,
-  faceOre: 15,
-  faceRubble: 16,
-  faceVoid: 17,
-  litN: 18,
-  litW: 19,
-  darkE: 20,
-  castN: 21,
-  castW: 22,
-  castNW: 23,
-  aoS: 24,
-  aoE: 25,
+  rack: 13,
+  faceWall: 14,
+  faceRock: 15,
+  faceOre: 16,
+  faceRubble: 17,
+  faceVoid: 18,
+  litN: 19,
+  litW: 20,
+  darkE: 21,
+  castN: 22,
+  castW: 23,
+  castNW: 24,
+  aoS: 25,
+  aoE: 26,
 } as const;
-const SHEET_ROWS = 26;
+const SHEET_ROWS = 27;
 const SHEET_COLS = 4;
 
 const SOLID_ROW: Readonly<Record<string, number>> = {
@@ -670,6 +671,55 @@ function paintConveyor(c: Ctx, T: number, floor: Ramp, metal: Ramp): void {
   }
 }
 
+function paintRack(c: Ctx, T: number, col: number, deck: Ramp, metal: Ramp, site: Site): void {
+  const g = Math.max(1, Math.round(T / 12));
+  const beam = Math.max(2, Math.round(T * 0.17));
+  const post = Math.max(2, Math.round(T * 0.12));
+  const e = Math.max(1, Math.round(T * 0.045));
+
+  c.fillStyle = deck.dark;
+  c.fillRect(0, 0, T, T);
+  dither(c, 0, 0, T, T, g, deck.deep, 0.3, 1);
+  dither(c, 0, 0, T, T, g, alpha(site.grit, 0.4), site.dust * 0.16, 3);
+
+  const slat = Math.max(1, Math.round(T * 0.06));
+  for (let i = 1; i < 3; i++) {
+    const y = Math.round((i * T) / 3) - (slat >> 1);
+    c.fillStyle = deck.deep;
+    c.fillRect(0, y, T, slat);
+    c.fillStyle = alpha(PALETTE.silver, 0.08);
+    c.fillRect(0, y - e, T, e);
+  }
+
+  if ((col & 1) === 0) {
+    c.fillStyle = metal.mid;
+    c.fillRect(0, 0, T, beam);
+    c.fillStyle = metal.lit;
+    c.fillRect(0, 0, T, e);
+    c.fillStyle = metal.deep;
+    c.fillRect(0, beam - e, T, e);
+    c.fillStyle = UMBRA;
+    c.fillRect(0, beam, T, Math.max(1, Math.round(T * CONTACT_DEPTH)));
+  }
+  if ((col & 2) === 0) {
+    c.fillStyle = metal.mid;
+    c.fillRect(0, T - beam, T, beam);
+    c.fillStyle = metal.lit;
+    c.fillRect(0, T - beam, T, e);
+    c.fillStyle = metal.deep;
+    c.fillRect(0, T - e, T, e);
+  }
+
+  c.fillStyle = metal.dark;
+  c.fillRect(0, 0, post, T);
+  c.fillStyle = metal.lit;
+  c.fillRect(0, 0, e, T);
+  c.fillStyle = metal.deep;
+  c.fillRect(post - e, 0, e, T);
+  c.fillStyle = UMBRA;
+  c.fillRect(post, 0, e, T);
+}
+
 function paintEdge(c: Ctx, T: number, row: number): void {
   const g = Math.max(1, Math.round(T / 12));
   const lit = '#dbe8f0';
@@ -751,6 +801,7 @@ function buildSheet(T: number, biome: Biome): HTMLCanvasElement | null {
   const loose = ramp(mix(site.floor, site.grit, 0.32), FLOOR_SPREAD);
   const soil = ramp(mix(site.floor, '#4a3524', 0.3), FLOOR_SPREAD);
   const ice = ramp(mix(site.floor, '#8fb6c8', 0.28), FLOOR_SPREAD);
+  const deck = ramp(mix(site.floor, site.wall, 0.62), FLOOR_SPREAD);
   const stone = ramp(shade(site.wall, 1.35), SOLID_SPREAD);
   const wall = ramp(site.wall, SOLID_SPREAD);
   const outside = ramp(shade(site.wall, 0.5), SOLID_SPREAD);
@@ -839,6 +890,9 @@ function buildSheet(T: number, biome: Biome): HTMLCanvasElement | null {
           break;
         case ROW.depot:
           if (col === 0) paintDepot(c, T, floor, metal, site);
+          break;
+        case ROW.rack:
+          paintRack(c, T, col, deck, metal, site);
           break;
         case ROW.conveyor:
           break;
@@ -935,6 +989,7 @@ function paintTerrain(paint: TerrainPaint): void {
   const solid = new Uint8Array(stride * (h + 2)).fill(1);
   const cable = new Uint8Array(stride * (h + 2));
   const pit = new Uint8Array(stride * (h + 2));
+  const rack = new Uint8Array(stride * (h + 2));
   const rise = new Uint8Array(stride * (h + 2)).fill(risePx(T, 1));
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
@@ -946,6 +1001,7 @@ function paintTerrain(paint: TerrainPaint): void {
       rise[i] = isSolid ? risePx(T, RISE_SCALE[tile.terrain] ?? 1) : 0;
       if (tile.terrain === Terrain.Cable || tile.terrain === Terrain.Depot) cable[i] = 1;
       if (tile.terrain === Terrain.Pit) pit[i] = 1;
+      if (tile.terrain === Terrain.Rack) rack[i] = 1;
     }
   }
 
@@ -1001,6 +1057,14 @@ function paintTerrain(paint: TerrainPaint): void {
               ((cable[i + 1] as number) << 1) |
               ((cable[i + stride] as number) << 2) |
               ((cable[i - 1] as number) << 3),
+          );
+          break;
+        case Terrain.Rack:
+          blit(
+            ROW.rack,
+            (rack[i - stride] as number) | ((rack[i + stride] as number) << 1),
+            ox,
+            oy,
           );
           break;
         default:

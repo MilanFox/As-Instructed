@@ -13,13 +13,14 @@ import {
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
 import { at, crates, ordinal } from './objectives.ts';
-import { frame, key, tilePicker, warm } from './yard.ts';
+import { frame, interior, key, tilePicker, warm } from './yard.ts';
 
-const PAR_TICKS = 365;
-const SLOT_BUDGET = 18;
+const PAR_TICKS = 380;
 
 const RACK_ROWS = [2, 3, 6, 7];
-const AISLE_ROWS = [1, 4, 5, 8];
+const AISLE_COLS = [1, 6, 11, 16];
+
+const isRack = (at: Vec): boolean => RACK_ROWS.includes(at.y) && !AISLE_COLS.includes(at.x);
 
 const bayOf = (world: World): Vec => {
   for (let y = 0; y < world.h; y++) {
@@ -100,9 +101,10 @@ const sweptFirst = (order: readonly Vec[], rowMajor: readonly Vec[]): boolean =>
 
 const vacantSlots = (world: World): Set<string> => {
   const vacant = new Set<string>();
-  for (const y of RACK_ROWS) {
-    for (let x = 1; x < world.w - 1; x++) {
+  for (let y = 0; y < world.h; y++) {
+    for (let x = 0; x < world.w; x++) {
       const at = vec(x, y);
+      if (world.tiles[y * world.w + x]?.terrain !== Terrain.Rack) continue;
       if (countItemsAt(world, at, 'crate') === 0) vacant.add(key(at));
     }
   }
@@ -146,23 +148,17 @@ const outOfOrder = (ctx: ObjectiveContext): Divergence | undefined => {
   };
 };
 
-const overTrodden = (ctx: ObjectiveContext): Divergence => {
+const overTrodden = (ctx: ObjectiveContext): Divergence | undefined => {
   const vacant = vacantSlots(ctx.initialWorld);
   const steps = ctx.trace.events.filter(
     (event): event is MoveEvent => event.kind === 'move' && event.ok && vacant.has(key(event.to)),
   );
-  const breaking = steps[SLOT_BUDGET];
-  if (breaking === undefined) {
-    return {
-      where: 'empty slots trodden',
-      expected: `at most ${String(SLOT_BUDGET)}`,
-      received: String(steps.length),
-    };
-  }
+  const breaking = steps[0];
+  if (breaking === undefined) return undefined;
   return {
     where: `tick ${String(breaking.t)} · ${at(breaking.to)}`,
-    expected: `${String(SLOT_BUDGET)} empty slots at most`,
-    received: `the ${ordinal(SLOT_BUDGET + 1)}, of ${String(steps.length)} in the run`,
+    expected: 'an aisle tile',
+    received: `an empty slot, 1 of ${String(steps.length)}`,
   };
 };
 
@@ -190,10 +186,11 @@ export const w3_04: LevelDef = {
   board: {
     fixed: [
       'the yard is 16 wide and 8 deep inside its wall',
-      'the rack rows are `y` 2, 3, 6 and 7 on every shift, and the aisles `y` 1, 4, 5 and 8',
+      'the racking stands in rows `y` 2, 3, 6 and 7 on every shift',
+      'the aisles are rows `y` 1, 4, 5 and 8 and columns `x` 1, 6, 11 and 16, on every shift',
       'one outbound bay, always standing in an aisle',
       'on any shift holding more than one crate, arrival 1 is not the first crate a sweep of the racks would reach',
-      'the empty-slot allowance is the same figure however many crates arrive',
+      'no step into an empty slot is allowed, however many crates arrive',
       'RIG-04 starts in an aisle, one crate to the clamp',
     ],
     redrawn: [
@@ -220,13 +217,13 @@ export const w3_04: LevelDef = {
     {
       label: 'Racks and aisles',
       value:
-        'The rack rows are `y` 2, 3, 6 and 7, and every crate stands in one of them. The other four floor rows — `y` 1, 4, 5 and 8 — are aisle, so every rack row has an aisle running beside it. The outbound bay is the one pad tile in the yard, and it stands in an aisle.',
+        'Racking fills rows `y` 2, 3, 6 and 7 except where an aisle column cuts through it, and every crate stands in one of those slots. Aisle runs along rows `y` 1, 4, 5 and 8 and down columns `x` 1, 6, 11 and 16, so every slot has an aisle tile directly above or below it. The outbound bay is the one pad tile in the yard, and it stands in an aisle.',
     },
     { label: 'The clamp', value: 'One crate at a time.' },
     {
       label: 'Empty rack slots',
       value:
-        'Not a walkway. Every step into one is logged. Aisles are free, and so are slots that started the shift full.',
+        'Not a walkway. `scan(dir).terrain` reads `rack` on a slot and `floor` on an aisle. One step into a slot that started the shift empty loses the commendation. Aisles are free, and so are slots that started the shift full.',
     },
   ],
   seeds: [1, 2, 3, 4],
@@ -239,10 +236,9 @@ export const w3_04: LevelDef = {
 
     const racks: Vec[] = [];
     const aisles: Vec[] = [];
-    for (let x = 1; x <= 16; x++) {
-      for (const y of RACK_ROWS) racks.push(vec(x, y));
-      for (const y of AISLE_ROWS) aisles.push(vec(x, y));
-    }
+    for (const tile of interior(world)) (isRack(tile) ? racks : aisles).push(tile);
+
+    for (const slot of racks) setTile(world, slot, { terrain: Terrain.Rack });
 
     const openTile = tilePicker(rng, aisles);
     setTile(world, openTile(), { terrain: Terrain.Pad });
@@ -255,7 +251,7 @@ export const w3_04: LevelDef = {
     while (sweptFirst(arrivals, rowMajor)) arrivals = rng.shuffle(slots);
 
     arrivals.forEach((at, i) => {
-      setTile(world, at, { terrain: Terrain.Floor, mark: String(i + 1) });
+      setTile(world, at, { terrain: Terrain.Rack, mark: String(i + 1) });
       addGroundItems(world, at, 'crate', 1);
     });
     return world;
@@ -290,10 +286,10 @@ export const w3_04: LevelDef = {
   bonus: [
     Objectives.custom(
       'aisle-discipline',
-      `Tread no more than ${String(SLOT_BUDGET)} slots that started the shift empty`,
-      (ctx) => slotsTrodden(ctx) <= SLOT_BUDGET,
+      'Enter a rack slot only if it started the shift full',
+      (ctx) => slotsTrodden(ctx) === 0,
       {
-        progress: (ctx) => [slotsTrodden(ctx), SLOT_BUDGET],
+        progress: (ctx) => [slotsTrodden(ctx), 0],
         divergence: overTrodden,
       },
     ),

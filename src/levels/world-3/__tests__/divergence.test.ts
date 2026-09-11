@@ -11,8 +11,6 @@ import { w3_01 } from '../w3-01.ts';
 import { w3_02 } from '../w3-02.ts';
 import { w3_04 } from '../w3-04.ts';
 
-const RACK_ROWS = [2, 3, 6, 7];
-
 function diverge(
   level: LevelDef,
   seed: number,
@@ -212,13 +210,13 @@ describe('w3-04 — the crate, the place in the stack and the step', () => {
     expect(must(divergence, 'a divergence').received).toBe('(nothing)');
   });
 
-  test('aisle-discipline names the step that spent the allowance', () => {
+  test('aisle-discipline names the first step into an empty slot', () => {
     const world = w3_04.build(1);
     const vacant = new Set<string>();
-    for (const y of RACK_ROWS) {
-      for (let x = 1; x < world.w - 1; x++) {
-        const tile = world.tiles[y * world.w + x];
-        if (!world.items.some((stack) => stack.at.x === x && stack.at.y === y) && tile) {
+    for (let y = 0; y < world.h; y++) {
+      for (let x = 0; x < world.w; x++) {
+        if (world.tiles[y * world.w + x]?.terrain !== Terrain.Rack) continue;
+        if (!world.items.some((stack) => stack.at.x === x && stack.at.y === y)) {
           vacant.add(key(vec(x, y)));
         }
       }
@@ -234,13 +232,13 @@ describe('w3-04 — the crate, the place in the stack and the step', () => {
     const steps = result.trace.events.filter(
       (event): event is MoveEvent => event.kind === 'move' && event.ok && vacant.has(key(event.to)),
     );
-    expect(steps.length).toBeGreaterThan(18);
-    const breaking = must(steps[18], 'the nineteenth empty slot');
+    expect(steps.length).toBeGreaterThan(0);
+    const breaking = must(steps[0], 'the first empty slot');
     expect(met).toBe(false);
     expect(divergence).toEqual({
       where: `tick ${String(breaking.t)} · ${at(breaking.to)}`,
-      expected: '18 empty slots at most',
-      received: `the 19th, of ${String(steps.length)} in the run`,
+      expected: 'an aisle tile',
+      received: `an empty slot, 1 of ${String(steps.length)}`,
     });
   });
 });
