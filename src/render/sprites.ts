@@ -1,19 +1,3 @@
-/**
- * Bots, machines and items, drawn in code.
- *
- * DESIGN.md §2 and §8: units and FX are Canvas2D paths, not sprites, and they must animate —
- * interpolated movement, a squash on stop, a bobbing antenna, a directional headlight cone,
- * tread marks, a sparkle when acting. That list is the difference between a demo and a product,
- * so all of it is here rather than approximated.
- *
- * Everything draws in *world space*: the caller has already applied `translate(originX, originY)`
- * and passes `tilePx`, so a bot at tile (3, 4) draws around `(3.5 * tilePx, 4.5 * tilePx)`.
- *
- * Gradients are cached per zoom level. A `createRadialGradient` per bot per frame is the single
- * easiest way to put allocation back into the RAF loop, and gradient coordinates resolve against
- * the transform in force at *fill* time, so a locally-defined gradient is safe to reuse.
- */
-
 import type { Dir } from '../engine/index.ts';
 import type { BotDrawOptions } from './art/types.ts';
 import type { BotPose, BotSegment, BotTimeline } from './timeline.ts';
@@ -22,7 +6,6 @@ import { alpha, artDirection, bot as botTheme, metrics, palette } from './theme.
 import type { TileSet } from './tiles.ts';
 import { TILE_PX } from './tiles.ts';
 
-/** Reference geometry is authored against the 48 px tile and scaled from there. */
 const REF = TILE_PX;
 
 const FACING_ANGLE = [-Math.PI / 2, 0, Math.PI / 2, Math.PI];
@@ -31,10 +14,6 @@ export function facingAngle(dir: Dir): number {
   return FACING_ANGLE[dir] ?? 0;
 }
 
-/**
- * `String(n)` inside a draw path allocates once per label per frame. Bot ids and stack counts are
- * both small integers, so they come out of a table instead.
- */
 const SMALL_NUMBERS: readonly string[] = Array.from({ length: 128 }, (_, i) => String(i));
 
 function numberLabel(value: number): string {
@@ -95,12 +74,6 @@ const gradients = new GradientCache();
 
 export type { BotDrawOptions } from './art/types.ts';
 
-/**
- * The smear behind a bot in transit, plus the speed lines at high playback rates.
- *
- * Drawn in the bot's local frame (+X is the way it faces) and stretched backwards, so it costs
- * one rounded rect and three line segments and reads as momentum rather than as a ghost.
- */
 function drawSmear(
   ctx: CanvasRenderingContext2D,
   tilePx: number,
@@ -134,14 +107,6 @@ function drawSmear(
   ctx.stroke();
 }
 
-/**
- * Tread marks, drawn in code.
- *
- * `overlay.tracks*` is near-invisible on `floor.metal`, which is exactly World 1's floor, so the
- * marks are painted rather than blitted: two dark strokes per
- * traversed cell, fading over `TREAD_FADE_TICKS`. Walks the segment list backwards from the
- * current tick and allocates nothing.
- */
 export function drawTreads(
   ctx: CanvasRenderingContext2D,
   timeline: BotTimeline,
@@ -190,12 +155,6 @@ export function drawTreads(
   ctx.restore();
 }
 
-/**
- * The headlight cone. Drawn under the bots so overlapping bots do not wash each other out.
- *
- * A direction with its own `drawBot` owns its own light and gets none of this: the cone is an
- * additive radial gradient, which is a claim about the medium that only some of them make.
- */
 export function drawHeadlight(
   ctx: CanvasRenderingContext2D,
   pose: BotPose,
@@ -221,30 +180,10 @@ export function drawHeadlight(
   ctx.restore();
 }
 
-/**
- * One bot. Local geometry faces +X and is rotated into place, so "squash along the direction of
- * travel" is just a non-uniform scale on the local X axis.
- */
-/**
- * Below this many *screen* pixels per tile the detailed chassis collapses into mush — 1.8 px
- * strokes become 0.6 px and the whole bot reads as a grey smudge. World 7 spends most of its time
- * here, so there is a dedicated low-zoom form instead.
- *
- * Screen, not device: on a retina display a 22-device-pixel tile is 11 px of actual screen, and
- * comparing against the device number keeps the detailed chassis switched on for the entire range
- * where it is unreadable — which is most of where the game is played.
- *
- * A direction that implements `drawBot` owns this threshold itself, and is not obliged to change
- * shape at it.
- */
 export function botDetailTilePx(): number {
   return metrics.botDetailTilePx;
 }
 
-/**
- * The far-zoom bot: a solid accent chip with a dark rim and a nose that points the way it faces.
- * Loses every detail and keeps the two things that matter at this size — *where* and *which one*.
- */
 function drawBotChip(
   ctx: CanvasRenderingContext2D,
   pose: BotPose,
@@ -333,21 +272,14 @@ export function drawBot(
   const dead = !pose.alive;
   const reduced = options.reduced;
 
-  /** Peaks in the middle of a move and is zero at rest. Everything about momentum reads off it. */
   const glide = pose.travel > 0 && pose.travel < 1 ? Math.sin(Math.PI * pose.travel) : 0;
-  /**
-   * Cargo is heavy and the suspension is not good. Four items is as bad as it gets, because a
-   * sorting-yard bot carrying twenty of something should still be legible.
-   */
   const load = Math.min(1, options.carrying / 4);
   const wobble = reduced ? 0 : Math.sin(options.time * 6.5 + pose.id * 2.1) * load * (0.35 + glide);
-  /** The bot shaking off a wall it just drove into. Comic, and gone in under a tick. */
   const shimmy = reduced ? 0 : Math.sin(pose.recoil * 30) * pose.recoil * 0.09;
 
   ctx.save();
   ctx.translate(cx, cy);
 
-  // Ground shadow, drawn before the rotation so it stays axis-aligned.
   ctx.save();
   ctx.translate(0, 5 * s);
   ctx.scale(1, 0.42);
@@ -379,8 +311,6 @@ export function drawBot(
   const hull = dead ? '#242b34' : botTheme.hull;
   const hullLight = dead ? '#2e3742' : botTheme.hullLight;
 
-  // Treads. Deliberately darker than anything the tile art can produce, so the silhouette holds
-  // on `floor.metal` (which is `#4a4a4a` with zero variance) and on ice alike.
   ctx.fillStyle = dead ? '#1a2029' : botTheme.tread;
   roundRect(ctx, -18, -17, 36, 7, 2.5);
   ctx.fill();
@@ -394,7 +324,6 @@ export function drawBot(
     ctx.fillRect(x, 11, 2.4, 5);
   }
 
-  // Chassis. The bright rim is what actually separates the bot from the floor at low zoom.
   ctx.fillStyle = hull;
   roundRect(ctx, -16, -13, 33, 26, 5);
   ctx.fill();
@@ -402,7 +331,6 @@ export function drawBot(
   ctx.lineWidth = 1.8;
   ctx.stroke();
 
-  // Top plate.
   ctx.fillStyle = hullLight;
   roundRect(ctx, -11, -9, 21, 18, 3);
   ctx.fill();
@@ -410,8 +338,6 @@ export function drawBot(
   ctx.lineWidth = 1;
   ctx.stroke();
 
-  // Accent trim: a forward chevron plus two shoulder lamps. Kept small and shaped rather than a
-  // slab of colour — the accent is an identifier (DESIGN.md §8), not the paint job.
   ctx.globalAlpha = dead ? 0.3 : 1;
   ctx.fillStyle = dead ? '#4a5765' : accent;
   ctx.beginPath();
@@ -428,7 +354,6 @@ export function drawBot(
   ctx.fillRect(-14, 9, 5, 2.5);
   ctx.globalAlpha = 1;
 
-  // Sensor dome.
   ctx.fillStyle = '#1c242e';
   ctx.beginPath();
   ctx.arc(12, 0, 5.6, 0, Math.PI * 2);
@@ -452,10 +377,7 @@ export function drawBot(
     ctx.fill();
   }
 
-  // Antenna: a short mast off the back that bobs, whipping harder while the bot is moving.
   if (!dead) {
-    // The mast lags whatever the chassis is doing: it hangs forward through the wind-up, whips
-    // back on the launch, and rattles for a moment after a bump.
     const bob =
       Math.sin(options.time * 3.4 + pose.id * 1.7) * 2.2 +
       pose.travel * -3.4 +
@@ -474,7 +396,6 @@ export function drawBot(
     ctx.fill();
   }
 
-  // Cargo pip. It is not bolted down, and a loaded bot in transit says so.
   if (options.carrying > 0 && !dead) {
     ctx.save();
     ctx.translate(0, wobble * 2.6);
@@ -490,7 +411,6 @@ export function drawBot(
     ctx.restore();
   }
 
-  // Action tell: the manipulator arm extends toward the target cell while acting.
   if (pose.action > 0 && !dead) {
     const reach = Math.sin(Math.PI * pose.action) * 9;
     ctx.strokeStyle = alpha(accent, 0.85);
@@ -507,21 +427,14 @@ export function drawBot(
 
   ctx.restore();
 
-  // Blocked tell, drawn unrotated so it reads the same whichever way the bot faces.
   if (pose.blocked > 0.02 || pose.recoil > 0.04) {
-    // The id badge lives directly above the chassis in multi-bot levels, so the bang has to clear
-    // it or the two stack into an unreadable smudge exactly when legibility matters most.
     drawBlockedTell(ctx, pose, tilePx, cx, cy, reduced, options.showLabel ? 15 : 0);
   }
 
-  // Idle tell. `sync` emits one event per bot that actually idled, so a bot parked at a barrier
-  // has a real span to animate over and reads as waiting rather than as a dropped frame.
   if (pose.idle > 0 && pose.alive) {
     drawIdleTell(ctx, cx, cy, tilePx, options.time, accent);
   }
 
-  // Failed non-move action (a `send` to a dead bot, an empty `harvest`). Same language as a
-  // blocked move, one notch quieter.
   if (pose.failed && pose.blocked <= 0.02 && pose.alive) {
     drawFailTell(ctx, cx, cy, tilePx, Math.sin(Math.PI * Math.max(pose.action, 0.001)));
   }
@@ -547,11 +460,6 @@ export function drawBot(
   }
 }
 
-/**
- * DESIGN.md §8: "a blocked move must look obviously different from a successful one".
- * A recoil alone is too subtle at low zoom, so it is backed by a red rim, an impact chevron on
- * the face the bot hit, and a hard `!` above the chassis.
- */
 function drawBlockedTell(
   ctx: CanvasRenderingContext2D,
   pose: BotPose,
@@ -587,8 +495,6 @@ function drawBlockedTell(
     ctx.stroke();
   }
 
-  // The bang outlasts the impact by a beat and hops while the bot collects itself. A wall is
-  // funnier than an error dialog, and this is the part that makes it one.
   const bang = Math.max(k, pose.recoil * 0.85);
   const hop = reduced ? 0 : Math.abs(Math.sin(pose.recoil * 9)) * pose.recoil * 4 * s;
   const by = (-30 - lift) * s - bang * 3 * s - hop;
@@ -601,7 +507,6 @@ function drawBlockedTell(
   ctx.restore();
 }
 
-/** Three ticking dots over a waiting bot, on a slow cycle so a whole row of them is not a strobe. */
 function drawIdleTell(
   ctx: CanvasRenderingContext2D,
   cx: number,
@@ -675,7 +580,6 @@ function drawFuelRing(
   ctx.restore();
 }
 
-/** A ground item stack: the sprite plus a count badge once there is more than one. */
 export function drawGroundStack(
   ctx: CanvasRenderingContext2D,
   tiles: TileSet,
@@ -723,14 +627,6 @@ export function drawGroundStack(
   }
 }
 
-/**
- * The far-zoom machine, mirroring `drawBotChip`.
- *
- * At this size the sprite is a smudge of the same value as the floor, the soft ground shadow only
- * muddies it further, and the powered glow is a blob wider than the tile. So: a dark plate to lift
- * the machine off the ground plane, the sprite on top of it, and — if it is running — one hard
- * amber pip with a floor in screen pixels. Landmark, state, no bloom.
- */
 function drawMachineChip(
   ctx: CanvasRenderingContext2D,
   tiles: TileSet,
@@ -767,10 +663,6 @@ function drawMachineChip(
   ctx.restore();
 }
 
-/**
- * A machine. The Kenney structure sprites are 3/4 view, so they anchor
- * bottom-centre and are allowed to overhang the cell upward.
- */
 export function drawMachine(
   ctx: CanvasRenderingContext2D,
   tiles: TileSet,
@@ -812,7 +704,6 @@ export function drawMachine(
   ctx.restore();
 }
 
-/** Rounded rect that does not depend on `CanvasRenderingContext2D.roundRect` support. */
 export function roundRect(
   ctx: CanvasRenderingContext2D,
   x: number,

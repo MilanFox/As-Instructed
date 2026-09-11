@@ -1,4 +1,3 @@
-/** 16px line icons, drawn to match the 1px chrome. `currentColor` throughout. */
 const BASE = {
   width: 16,
   height: 16,
@@ -76,7 +75,6 @@ export function IconBook(): React.JSX.Element {
     </svg>
   );
 }
-
 
 export function IconClose(): React.JSX.Element {
   return (

@@ -29,11 +29,6 @@ export interface Detail {
   blobs: number;
 }
 
-/**
- * Seed 1 is the teaching instance: one scout, four workers, a field with little in it. Seeds 3
- * and 4 field two scouts, so anything that assumes a single producer on the channel breaks
- * there. Seed 5 is the same site count as seed 4 against half the fleet.
- */
 const DETAILS: Readonly<Record<number, Detail>> = Object.freeze({
   1: { scouts: 1, workers: 4, sites: 6, blobs: 12 },
   2: { scouts: 1, workers: 6, sites: 7, blobs: 18 },
@@ -52,7 +47,6 @@ function walkable(world: World, at: Vec): boolean {
   return tileAt(world, at)?.terrain === Terrain.Floor;
 }
 
-/** Floor tiles reachable from `from`, as a set of keys. Used to seal pockets and to place sites. */
 function reachable(world: World, from: Vec): Map<string, number> {
   const cost = new Map<string, number>([[key(from), 0]]);
   const queue: Vec[] = [from];
@@ -79,7 +73,6 @@ const siteMachines = (world: World): Machine[] =>
 const litCount = (world: World): number =>
   siteMachines(world).filter((machine) => machine.state === 'on').length;
 
-/** Ids the brief calls workers: everything after the scouts, in ascending order. */
 export function workerIds(world: World): number[] {
   const scouts = world.vars.scouts ?? 1;
   return world.bots.map((bot) => bot.id).filter((id) => id >= scouts);
@@ -88,18 +81,9 @@ export function workerIds(world: World): number[] {
 interface Orders {
   ordered: number;
   switched: number;
-  /** The first site switched on by a bot with no order it had read by its own clock. */
   jumped?: { botId: number; t: number; told: number | undefined };
 }
 
-/**
- * Every site that came up, came up under orders.
- *
- * Counted off the trace rather than the final world, because the final world cannot tell the
- * difference between a fleet that was dispatched and a fleet that all went looking. A bot may
- * switch a site on only if, by its own clock, it had already read a message somebody else sent
- * it — which is the whole content of the level.
- */
 function readOrders(ctx: ObjectiveContext): Orders {
   const briefed = new Map<number, number>();
   const sites = new Set(siteMachines(ctx.initialWorld).map((machine) => key(machine.at)));
@@ -126,10 +110,6 @@ function underOrders(ctx: ObjectiveContext): [number, number] {
   return [orders.ordered, Math.max(orders.switched, siteMachines(ctx.initialWorld).length)];
 }
 
-/**
- * How near the fleet ever got to one site: never came, stood on it and left it alone, or switched
- * it on and switched it straight back off again.
- */
 function reach(ctx: ObjectiveContext, siteId: string, at: Vec): string {
   let stood = false;
   for (const event of ctx.trace.events) {
@@ -143,14 +123,6 @@ function reach(ctx: ObjectiveContext, siteId: string, at: Vec): string {
   return stood ? 'reached but not switched on' : 'never reached';
 }
 
-/**
- * The first site still cold, and how close the fleet ever got to it.
- *
- * The tile is deliberately absent. The sites are on no plan and `probe()` with no argument is the
- * only thing on this level that finds one, so a coordinate would not be a diff — it would be the
- * search. What the report gives instead is the one thing the program could not observe: whether
- * anybody ever stood there.
- */
 function coldSite(ctx: ObjectiveContext): Divergence | undefined {
   const sites = siteMachines(ctx.initialWorld);
   if (sites.length === 0) {
@@ -167,12 +139,6 @@ function coldSite(ctx: ObjectiveContext): Divergence | undefined {
   return undefined;
 }
 
-/**
- * The first site switched on by a bot that had not read an order yet, with both ticks.
- *
- * A run that simply never reached every site has no such moment, so it gets the count instead:
- * the question of who was told what does not arise until the sites are up.
- */
 function firstUnordered(ctx: ObjectiveContext): Divergence {
   const orders = readOrders(ctx);
   const jumped = orders.jumped;
@@ -194,13 +160,6 @@ function firstUnordered(ctx: ObjectiveContext): Divergence {
   };
 }
 
-/**
- * How long the workers stood about, and which one stood about longest.
- *
- * Waiting is the cost this bonus is named for and it is invisible from inside the program: a bot
- * blocked on `sync` looks the same as a bot walking. The fleet total is what the objective grades,
- * and the worst single bot is where a fix would start.
- */
 function idleWorkers(ctx: ObjectiveContext): Divergence {
   const ids = workerIds(ctx.initialWorld);
   const span = ctx.trace.endTick * ids.length;
@@ -231,12 +190,6 @@ function progress(ctx: ObjectiveContext): [number, number] {
   return [litCount(ctx.world), siteMachines(ctx.initialWorld).length];
 }
 
-/**
- * Par: measured from the reference, which keeps every bot looking at something until an order
- * arrives and routes over the shared picture the fleet has built. That lands between 67 and 100
- * ticks across the five seeds, and par is the worst of them because every seed has to clear it.
- * A fleet that finishes exploring before it starts working takes roughly twice as long.
- */
 export const w7_05: LevelDef = {
   id: 'w7-05',
   world: 7,
@@ -254,20 +207,6 @@ export const w7_05: LevelDef = {
     '',
     'Bring every relay site up. No bot may bring up a site it was not sent to.',
   ].join('\n'),
-  /**
-   * DESIGN.md §11.10, on an order that hides where the sites are.
-   *
-   * The hiding is legitimate and stated — the sites are on no plan, the brief says so, and
-   * `probe()` with no argument is the only thing that finds one — so this sheet does not name a
-   * tile. What it does name is the geometry the generator guarantees around them, because a
-   * search that cannot rule anything out is a different program from one that can: nothing is
-   * sealed behind rock (`build` fills in every pocket the muster cannot reach), no site stands
-   * near the muster, and no two stand near each other. §11.8 asks a withheld thing to be drawn as
-   * a known unknown; the honest sheet version of that is to say which unknown it is.
-   *
-   * The scout count is the anti-hardcode axis. Two scouts is not one scout twice, and whatever
-   * collects the findings has to survive both of them reporting the same site.
-   */
   board: {
     fixed: [
       'the workings are 34 by 26 inside the wall, with standing rock scattered through them',
@@ -338,8 +277,6 @@ export const w7_05: LevelDef = {
       setTerrain(world, vec(x, HEIGHT - 1), Terrain.Wall);
     }
 
-    // Blobs of standing rock in an otherwise open field. They are what makes a `look` ray stop,
-    // and so what makes standing somewhere worth anything.
     for (let i = 0; i < detail.blobs; i++) {
       const w = rng.int(2, 5);
       const h = rng.int(2, 4);
@@ -454,7 +391,7 @@ export const w7_05: LevelDef = {
   hints: [
     'A bot that has walked somewhere knows something. Nothing about that knowledge reaches another bot on its own.',
     'The scouts do not need to finish before the workers start. The first thing a scout finds is worth telling somebody about immediately.',
-    'A message is stamped with the sender\'s clock, and a bot that is behind in time has not been handed it yet. The order in which you sync matters more than the order in which you send.',
+    "A message is stamped with the sender's clock, and a bot that is behind in time has not been handed it yet. The order in which you sync matters more than the order in which you send.",
     'Two scouts is not one scout twice. Whatever collects the findings has to survive two of them reporting the same thing.',
     'A worker with nothing to do is the expensive part of this level, not a worker walking a long way.',
   ],

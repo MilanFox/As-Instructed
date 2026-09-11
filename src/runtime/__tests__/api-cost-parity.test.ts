@@ -3,22 +3,6 @@ import { describe, expect, test } from 'vitest';
 import { DEFAULT_COSTS } from '../../engine/index.ts';
 import { PLAYER_API } from '../api-spec.ts';
 
-/**
- * What the player is *told* against what the player is *charged*.
- *
- * `api-spec.ts` carries a `cost` per function, which the docs panel renders as "2 ticks"; the sim
- * charges `DEFAULT_COSTS`. They are two hand-maintained tables holding the same fourteen numbers,
- * and nothing has ever forced them to agree. A balance pass that edits `DEFAULT_COSTS.use` from 2
- * to 3 leaves the docs panel quoting 2, and every player budgets a level's par against a price
- * that is no longer real.
- *
- * Three `CostTable` keys deliberately have no number to compare, and they are named rather than
- * skipped: `wait` is priced `'n'` in the spec because `wait(n)` costs `n` times the table entry
- * and a flat number would be a lie, while `turn` and `moveBlocked` are not player-callable
- * functions at all — turning is folded into `move`, and `moveBlocked` is what a refused move
- * charges. Asserting that the unmatched set is exactly those three is the point: a fourth key
- * falling out of the comparison is a drift, not a convention, and must fail here.
- */
 const COSTS_WITHOUT_A_SPEC_NUMBER = ['moveBlocked', 'turn', 'wait'];
 const COMPARED_PAIRS = 14;
 

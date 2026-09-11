@@ -7,7 +7,6 @@ const FIELD = 5;
 const MAX_GROWTH = 8;
 const SEED_LOAD = 30;
 
-/** The silo moves between quarters and the mule parks beside it, so the sweep starts anywhere. */
 const CORNERS: readonly Vec[] = [vec(1, 1), vec(FIELD, 1), vec(1, FIELD), vec(FIELD, FIELD)];
 
 function sowField(world: World): void {
@@ -56,23 +55,6 @@ export const w2_02: LevelDef = {
     '',
     'Work every tile of the field.',
   ].join('\n'),
-  /**
-   * DESIGN.md §11.10, and the one thing about this field nothing else on the sheet says.
-   *
-   * `sowField` writes `growth` straight onto the tile and never sets `meta.plantedAt`, and
-   * `maturity` in `src/engine/sim.ts` returns a stored `growth` unchanged when there is no planting
-   * tick to count from. So the half-grown tiles on this field are frozen: a crop at 3 of 8 is at
-   * 3 of 8 when the shift ends, however long anybody stands on it. The facts table says "leave it
-   * standing" and means it, but "leave it standing" reads as advice, and a player who has met
-   * ripening anywhere else will read it as advice they can beat by waiting. They cannot, and the
-   * only feedback for trying is a run that burns its ticks and files the same figure. The
-   * `harvested-ripe` objective grades what was ready at the *start* precisely because that set
-   * never grows; that has to be visible before the program is written, not inferred from it.
-   *
-   * The corner is the level's declared anti-hardcode axis — `CORNERS` says so above `sowField` —
-   * and a corner is the one thing on this board a player can see and still get wrong, because all
-   * four look like the north-west one until `canMove` disagrees.
-   */
   board: {
     fixed: [
       'the field is 5 by 5 of soil inside its wall — 25 tiles, nothing else on them',

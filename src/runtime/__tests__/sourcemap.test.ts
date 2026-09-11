@@ -4,15 +4,6 @@ import { locatePlayerFrame, topFrameLine } from '../errors.ts';
 import { decodeLineMap, toSourceLine } from '../sourcemap.ts';
 import { createProgram, measureWrapperOffset } from '../wrapper.ts';
 
-/**
- * The other half of the line-number problem.
- *
- * Subtracting the wrapper offset gets you the line in the *emitted* JavaScript, which is not the
- * line the player wrote: the TypeScript emitter deletes `interface` and `type` declarations
- * outright, so every line below one of them has moved. These tests transpile with the same
- * compiler Monaco uses and then really throw, so the assertion is the player's own line number.
- */
-
 const offset = measureWrapperOffset(topFrameLine);
 
 const OPTIONS: ts.CompilerOptions = {

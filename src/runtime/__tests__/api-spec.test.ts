@@ -3,10 +3,6 @@ import { LEVELS } from '../../levels/index.ts';
 import { PLAYER_API, apiForWorld, apiFunction, apiUnlockedAt, apiUnlockedBy } from '../api-spec.ts';
 import { hardwareNote } from '../../ui/copy.ts';
 
-/**
- * The API spec is the contract three agents depend on. These tests guard the properties they will
- * assume: unique names, complete metadata, and agreement with `LevelDef.hardware`.
- */
 describe('PLAYER_API', () => {
   test('function names are unique', () => {
     const names = PLAYER_API.functions.map((f) => f.name);
@@ -104,13 +100,6 @@ describe('agreement with the level registry', () => {
   });
 });
 
-/**
- * The requisition card is the last thing a player reads before writing the line, and it is written
- * by hand in `src/ui/copy.ts` rather than generated, so it can drift from the signature it
- * describes. It once promised a `number` from `mark`, which the compiler refused. These tests do
- * not police the wording: they only refuse a card that names a type the signature does not have,
- * or a price the spec does not charge.
- */
 describe('the requisition card agrees with the spec', () => {
   const TYPE_WORDS = ['string', 'number', 'boolean', 'undefined', 'null'];
 
@@ -142,20 +131,6 @@ describe('the requisition card agrees with the spec', () => {
   });
 });
 
-/**
- * A reference entry may name only the calls its own reader already has.
- *
- * `pickup` told the player to check a full bot with "`inventory()` against `capacity()`", and
- * `capacity()` is not player hardware on any level — `Sim` has it, the API does not. A playtester
- * on `w8-01` read the entry, wrote the call, and got `Cannot find name 'capacity'`. Three more
- * entries named a command fitted a level or two after their own.
- *
- * The check is mechanical because the file already sorts: `functions` is stored in unlock order
- * and level ids sort lexicographically in that same order, which is the comparison `apiUnlockedBy`
- * itself makes. Prose is held to both halves — the call must exist and must be installed by then.
- * An example is held only to the second: `if (`, `for (` and a program's own locals are not
- * hardware, and a list of keywords to forgive is a list that rots.
- */
 describe('the reference names only calls its reader has', () => {
   const unlock = new Map(PLAYER_API.functions.map((fn) => [fn.name, fn.unlockedBy]));
 

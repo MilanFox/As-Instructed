@@ -22,8 +22,6 @@ export default tseslint.config(
     },
   },
   {
-    // `use()` is the player-API verb that operates a machine, not a React hook, and there is no
-    // React in src/levels — every World 5 level and solution calling it would otherwise be an error.
     files: ['src/levels/**/*.ts'],
     rules: {
       'react-hooks/rules-of-hooks': 'off',
@@ -34,9 +32,9 @@ export default tseslint.config(
     rules: {
       'no-restricted-globals': [
         'error',
-        { name: 'window', message: 'src/engine must stay browser-free (DESIGN.md §4).' },
-        { name: 'document', message: 'src/engine must stay browser-free (DESIGN.md §4).' },
-        { name: 'self', message: 'src/engine must stay browser-free (DESIGN.md §4).' },
+        { name: 'window', message: 'src/engine must stay browser-free.' },
+        { name: 'document', message: 'src/engine must stay browser-free.' },
+        { name: 'self', message: 'src/engine must stay browser-free.' },
       ],
     },
   },

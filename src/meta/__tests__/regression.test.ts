@@ -17,13 +17,6 @@ import {
 import { emptyLibrary, MAX_CACHE_ENTRIES } from '../save.ts';
 import type { CachedRun, LibrarySave } from '../types.ts';
 
-/**
- * The regression suite is the part of the feature that can hurt a player, so these tests are about
- * the two guarantees rather than about the plumbing: an edit that breaks something is *reported*,
- * and a worse result never moves a medal on its own.
- */
-
-/** A runner with an answer per work order, which also counts how often it was asked. */
 function fakeRunner(
   answers: Record<string, MetaRunOutcome>,
 ): MetaRunner & { calls: MetaRunRequest[] } {

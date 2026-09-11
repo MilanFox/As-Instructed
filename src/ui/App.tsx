@@ -4,8 +4,6 @@ import { currentLevel, useGame } from '../game/store.ts';
 import { CanvasRenderer, RuntimeRunner } from './adapters.ts';
 import { exportSave } from '../game/save.ts';
 import { worldMeta } from '../levels/index.ts';
-// Deep import on purpose: `src/meta/ui/index.ts` also re-exports `LibraryPanel`, which pulls
-// Monaco back into the entry chunk and undoes the split inside the terminal.
 import { PublishDialog } from '../meta/ui/PublishDialog.tsx';
 import { useLibrary } from '../meta/store.ts';
 import { mountAudio } from './audio.ts';
@@ -17,7 +15,6 @@ import { usePaperwork } from './desk/paper/usePaperwork.ts';
 import { useKeyboard } from './hooks/useKeyboard.ts';
 import { AudioSettings } from './screens/AudioSettings.tsx';
 import { LevelSelect } from './screens/LevelSelect.tsx';
-// Side effect: sets `data-art` and the palette custom properties before the first render.
 import './art.ts';
 import './styles/fonts.css';
 import './styles/app.css';
@@ -46,7 +43,6 @@ export function App(): React.JSX.Element {
 
   return (
     <div className="app">
-      {/* The desk has no top bar. Every control it carried is an object on the desk instead. */}
       {screen === 'levels' ? <TopBar /> : null}
       {screen === 'workspace' ? <Desk /> : null}
       {screen === 'levels' ? (
@@ -54,19 +50,6 @@ export function App(): React.JSX.Element {
           <LevelSelect />
         </div>
       ) : null}
-      {/*
-        Four of the five ceremonies that used to live here are paper now. `Results`, the hardware
-        requisition, the Repository note and the performance memo arrive on the desk and stay
-        there until they are filed — see `src/ui/desk/paper/usePaperwork.ts`. A modal that
-        destroys itself is the defect the desk exists to remove, and re-adding one here would
-        undo it.
-
-        The publish offer is the exception and it is not ours: it belongs to `src/meta/ui`. It
-        keeps its boundary for the reason the original comment gives — a throw in a dialog the
-        player did not open used to unmount the site map, the editor and their unsaved program
-        with it — and it keeps its own close, because a modal the store still thinks is open is
-        a modal the next run raises again.
-      */}
       <div className="modal-layer">
         <ModalBoundary
           label="The publish offer"
@@ -137,11 +120,6 @@ function TopBar(): React.JSX.Element {
 
       {screen === 'workspace' && level ? (
         <div className="topbar__stats">
-          {/*
-            Par is not a target on an ungraded work order (DESIGN.md §7), so the top bar
-            reports the clock and stops there — no denominator to fall short of, and no amber for
-            falling short of it. The objective rail draws the same distinction for the same reason.
-          */}
           <span className="stat">
             <span className="stat__label">ticks</span>
             <span
@@ -155,12 +133,6 @@ function TopBar(): React.JSX.Element {
       ) : null}
 
       <div className="topbar__actions">
-        {/*
-          The way back to the station. The desk carries the site plan as an object, and this is the
-          same door in the other direction — a player who came here from a work order they were
-          half way through must not have to find that order again on the map to get back to it.
-          `currentLevelId` is still set, so it is one move.
-        */}
         {level ? (
           <button
             type="button"

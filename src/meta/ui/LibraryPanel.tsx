@@ -10,14 +10,6 @@ import { RegressionReport } from './RegressionReport.tsx';
 import { StructureScreen } from './StructureScreen.tsx';
 import './library.css';
 
-/**
- * The Repository, as one tabbed panel.
- *
- * The whole metagame mounts here so the workspace only has to make room for one thing. Before the
- * unlock this component renders nothing at all — no tab, no badge, no hint that anything is
- * missing — which is what keeps the first three worlds a one-file game.
- */
-
 const TABS: { id: MetaPanel; label: string }[] = [
   { id: 'library', label: 'lib.ts' },
   { id: 'refactor', label: 'Cost' },
@@ -26,7 +18,6 @@ const TABS: { id: MetaPanel; label: string }[] = [
   { id: 'discrepancies', label: 'Discrepancies' },
 ];
 
-/** Delivered once. The player reads it, and it never appears again. */
 export function UnlockMemo(): React.JSX.Element {
   const markBriefed = useLibrary((state) => state.markBriefed);
   return (
@@ -111,7 +102,6 @@ export function LibraryPanel(): React.JSX.Element | null {
   );
 }
 
-/** One line for the workspace status bar: what the Repository is doing right now, if anything. */
 export function libraryStatusLine(state: {
   busy: boolean;
   suiteProgress: { done: number; total: number } | null;

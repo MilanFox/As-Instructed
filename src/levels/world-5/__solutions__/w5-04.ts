@@ -2,14 +2,6 @@ import type { MachineView, Sim } from '../../../engine/index.ts';
 import type { ReferenceSolution } from '../../types.ts';
 import { playerApi } from './_api.ts';
 
-/**
- * TEST FIXTURE. Never imported from src/main.tsx — vite.config.ts fails the build if it is.
- *
- * Read the whole yard for nothing, then place the heaviest consumer first into the first feeder
- * that still has room for it. Considering the awkward draws while every feeder is still empty is
- * what makes the reduced set fit; the intended heuristic, not an optimal packer (CURRICULUM.md
- * §2 rule 4). The highest-capacity feeder is held back so the bonus falls out of the same pass.
- */
 export const solution: ReferenceSolution = {
   levelId: 'w5-04',
   run(sim: Sim, botId: number): void {
@@ -38,9 +30,7 @@ export const solution: ReferenceSolution = {
       .map((feeder) => ({ id: feeder.id, room: feeder.vars['capacity'] ?? 0 }));
     bins.push({ id: spare.id, room: spare.vars['capacity'] ?? 0 });
 
-    const order = consumers
-      .slice()
-      .sort((a, b) => (b.vars['draw'] ?? 0) - (a.vars['draw'] ?? 0));
+    const order = consumers.slice().sort((a, b) => (b.vars['draw'] ?? 0) - (a.vars['draw'] ?? 0));
 
     for (const consumer of order) {
       const draw = consumer.vars['draw'] ?? 0;

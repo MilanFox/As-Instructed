@@ -8,14 +8,6 @@ import {
 import { LIBRARY_EMPTY_STARTER } from '../copy.ts';
 import { planPublication, publishableDeclarations } from '../publish.ts';
 
-/**
- * The whole loop in one place: solve, publish, import, run, and be told the truth when it breaks.
- *
- * The sources here are deliberately plain JavaScript so the emitter can be left out — `publish.ts`
- * rewrites the player's text and `linkProgram` runs it, and this test is about those two agreeing
- * with each other rather than about Monaco.
- */
-
 const SOLVED = `function walk(n) {
   for (let i = 0; i < n; i++) move();
 }
@@ -71,8 +63,6 @@ describe('publish, import, run', () => {
     const source = 'function boom() {\n  throw new Error("published");\n}\n\nboom();\n';
     const { library, level } = publish(source, 'boom');
 
-    /* `export ` is prepended to the declaration, so `throw` sits one line below where the level
-       had it. That is exactly the shift the reported line has to survive. */
     const libraryLine = library.split('\n').findIndex((line) => line.includes('throw new')) + 1;
 
     const linked = linkProgram({

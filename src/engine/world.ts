@@ -14,10 +14,6 @@ import type {
 } from './types.ts';
 import { ALL_DIRS, Dir, Terrain as T } from './types.ts';
 
-// ---------------------------------------------------------------------------
-// Geometry
-// ---------------------------------------------------------------------------
-
 const DELTAS: Readonly<Record<Dir, Vec>> = Object.freeze({
   [Dir.North]: { x: 0, y: -1 },
   [Dir.East]: { x: 1, y: 0 },
@@ -32,7 +28,6 @@ const DIR_NAMES: Readonly<Record<Dir, string>> = Object.freeze({
   [Dir.West]: 'West',
 });
 
-/** Unit step for a direction. The returned object is a fresh copy; mutate it freely. */
 export function dirDelta(dir: Dir): Vec {
   const d = DELTAS[dir];
   return { x: d.x, y: d.y };
@@ -63,17 +58,12 @@ export function manhattan(a: Vec, b: Vec): number {
   return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 }
 
-/** The direction you would step to get from `a` to an orthogonally adjacent `b`, else null. */
 export function dirBetween(a: Vec, b: Vec): Dir | null {
   for (const dir of ALL_DIRS) {
     if (eq(step(a, dir), b)) return dir;
   }
   return null;
 }
-
-// ---------------------------------------------------------------------------
-// Terrain
-// ---------------------------------------------------------------------------
 
 function props(p: Partial<TerrainProps>): TerrainProps {
   return {
@@ -108,10 +98,6 @@ export const TERRAIN_PROPS: Readonly<Record<Terrain, TerrainProps>> = Object.fre
 export function terrainProps(terrain: Terrain): TerrainProps {
   return TERRAIN_PROPS[terrain] ?? TERRAIN_PROPS[T.Void];
 }
-
-// ---------------------------------------------------------------------------
-// Construction
-// ---------------------------------------------------------------------------
 
 export interface CreateWorldOptions {
   w: number;
@@ -149,13 +135,10 @@ export interface CreateBotOptions {
   capacity?: number;
   inventory?: ItemStack[];
   vars?: Record<string, number>;
-  /** Defaults to `Infinity` — opt in per level. DESIGN.md §4.4. */
   fuel?: number;
-  /** Defaults to `fuel`. */
   fuelMax?: number;
 }
 
-/** Adds a bot to the world, wires up tile occupancy, and returns it. */
 export function addBot(world: World, options: CreateBotOptions): Bot {
   const id = options.id ?? world.bots.length;
   if (world.bots.some((b) => b.id === id)) throw new Error(`addBot: duplicate bot id ${id}`);
@@ -187,10 +170,6 @@ export function addMachine(world: World, machine: Machine): Machine {
   return machine;
 }
 
-/**
- * Builds terrain from an ASCII map. Rows must all be the same length.
- * `legend` maps one character to a terrain (or to a full tile factory).
- */
 export function paintAscii(
   world: World,
   rows: readonly string[],
@@ -207,10 +186,6 @@ export function paintAscii(
   });
 }
 
-// ---------------------------------------------------------------------------
-// Access
-// ---------------------------------------------------------------------------
-
 export function inBounds(world: World, pos: Vec): boolean {
   return pos.x >= 0 && pos.y >= 0 && pos.x < world.w && pos.y < world.h;
 }
@@ -219,13 +194,11 @@ export function indexOf(world: World, pos: Vec): number {
   return pos.y * world.w + pos.x;
 }
 
-/** The tile at `pos`, or `undefined` when out of bounds. */
 export function tileAt(world: World, pos: Vec): Tile | undefined {
   if (!inBounds(world, pos)) return undefined;
   return world.tiles[indexOf(world, pos)];
 }
 
-/** Replaces the tile at `pos`. Preserves the current occupant unless `next` names one. */
 export function setTile(world: World, pos: Vec, next: Tile): void {
   if (!inBounds(world, pos)) throw new Error(`setTile: ${pos.x},${pos.y} is out of bounds`);
   const i = indexOf(world, pos);
@@ -268,7 +241,6 @@ export function countItemsAt(world: World, pos: Vec, kind?: ItemKind): number {
   );
 }
 
-/** Drops `count` items of `kind` on the ground, merging with any existing stack. */
 export function addGroundItems(world: World, pos: Vec, kind: ItemKind, count: number): void {
   if (count <= 0) return;
   const existing = world.items.find((s) => s.kind === kind && s.at.x === pos.x && s.at.y === pos.y);
@@ -279,7 +251,6 @@ export function addGroundItems(world: World, pos: Vec, kind: ItemKind, count: nu
   world.items.push({ kind, count, at: { x: pos.x, y: pos.y } });
 }
 
-/** Removes up to `count` items of `kind` from the ground. Returns how many were actually removed. */
 export function removeGroundItems(world: World, pos: Vec, kind: ItemKind, count: number): number {
   let remaining = count;
   for (const stack of world.items) {
@@ -300,13 +271,6 @@ export function inventoryCount(holder: { inventory: ItemStack[] }, kind?: ItemKi
   );
 }
 
-/**
- * Queues a message in send-time order, ties broken by sender id.
- *
- * A live run appends in the order the player issued the calls; a replay appends in `t` order.
- * Sorting on insert is what makes those two produce the same inbox, which matters as soon as one
- * bot sends from far ahead on its own clock and another sends from far behind.
- */
 export function enqueueMessage(bot: { inbox: Message[] }, message: Message): void {
   const at = bot.inbox.findIndex(
     (queued) => queued.t > message.t || (queued.t === message.t && queued.from > message.from),
@@ -326,7 +290,6 @@ export function addToInventory(
   else holder.inventory.push({ kind, count });
 }
 
-/** Removes up to `count`. Returns how many were actually removed. */
 export function removeFromInventory(
   holder: { inventory: ItemStack[] },
   kind: ItemKind,
@@ -350,7 +313,6 @@ export function machineAt(world: World, pos: Vec): Machine | undefined {
   return world.machines.find((m) => m.at.x === pos.x && m.at.y === pos.y);
 }
 
-/** The four orthogonal in-bounds neighbours of `pos`, in Dir order (N, E, S, W). */
 export function neighbors(world: World, pos: Vec): { dir: Dir; pos: Vec }[] {
   const out: { dir: Dir; pos: Vec }[] = [];
   for (const dir of ALL_DIRS) {
@@ -360,13 +322,11 @@ export function neighbors(world: World, pos: Vec): { dir: Dir; pos: Vec }[] {
   return out;
 }
 
-/** In bounds, walkable terrain. Does NOT consider bots — the Sim handles those separately. */
 export function isPassable(world: World, pos: Vec): boolean {
   const tile = tileAt(world, pos);
   return tile !== undefined && terrainProps(tile.terrain).walkable;
 }
 
-/** Recomputes every `tile.occupant` from `world.bots`. Call after hand-building a world. */
 export function rebuildOccupancy(world: World): void {
   for (const tile of world.tiles) {
     if (tile.occupant !== undefined) delete tile.occupant;
@@ -378,16 +338,11 @@ export function rebuildOccupancy(world: World): void {
   }
 }
 
-/** `max(bot.clock)` over living bots, which is both `world.tick` and the level's tick score. */
 export function makespan(world: World): number {
   let max = 0;
   for (const bot of world.bots) if (bot.clock > max) max = bot.clock;
   return max;
 }
-
-// ---------------------------------------------------------------------------
-// Cloning
-// ---------------------------------------------------------------------------
 
 export function cloneTile(tile: Tile): Tile {
   const copy: Tile = { terrain: tile.terrain };
@@ -441,21 +396,11 @@ export function cloneMachine(machine: Machine): Machine {
   return copy;
 }
 
-/**
- * Restores class prototypes on a World that arrived over `postMessage`. structuredClone turns
- * `world.rng` into a plain `{ state }`, which would then be missing every method. `cloneWorld`
- * heals this on its own, but call this when you intend to use a transferred World directly.
- */
 export function reviveWorld(world: World): World {
   world.rng = Rng.of(world.rng);
   return world;
 }
 
-/**
- * Deep copy of a World. Written by hand rather than via `structuredClone` because the Rng is a
- * class instance (structuredClone would strip its prototype) and because this runs once per
- * keyframe, so the hot path matters.
- */
 export function cloneWorld(world: World): World {
   const tiles: Tile[] = new Array<Tile>(world.tiles.length);
   for (let i = 0; i < world.tiles.length; i++) tiles[i] = cloneTile(world.tiles[i] as Tile);

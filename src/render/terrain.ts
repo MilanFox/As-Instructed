@@ -1,17 +1,3 @@
-/**
- * The cached static terrain layer.
- *
- * Floors, walls and static props do not change between `tileChange` events, so they are composited
- * once into an offscreen canvas and blitted as a single `drawImage` per frame. The cache is keyed
- * on (grid size, biome, terrain revision, cache resolution) and rebuilt only when one of those
- * moves — in particular, when the current tick crosses a `tileChange`.
- *
- * Resolution policy: the cache is built at the *device* tile size, capped at the atlas's native
- * 48 px and at a total canvas area a GPU will actually keep resident. Below the cap the per-frame
- * blit is 1:1 and pixel-exact; above it, the blit is an integer upscale with smoothing off, which
- * is the correct look for pixel art anyway.
- */
-
 import { Terrain, tileAt } from '../engine/index.ts';
 import type { Tile, World } from '../engine/index.ts';
 import { snapTilePx } from './camera.ts';
@@ -20,7 +6,6 @@ import type { ArtId } from './art/types.ts';
 import type { Biome, TileSet } from './tiles.ts';
 import { TILE_PX, biomeArt, terrainArt } from './tiles.ts';
 
-/** Largest offscreen canvas edge we are willing to allocate. */
 const MAX_CACHE_EDGE = 4096;
 
 export interface TerrainKey {
@@ -29,13 +14,6 @@ export interface TerrainKey {
   biome: Biome;
   revision: number;
   cacheTilePx: number;
-  /**
-   * The art direction the cache was painted with.
-   *
-   * Without this a direction change leaves the previous look baked into the offscreen canvas
-   * until something else happens to invalidate it — a tile change or a zoom step — which on a
-   * static board is never. Keying on it makes the switch self-healing.
-   */
   art: ArtId;
 }
 
@@ -61,7 +39,6 @@ export class TerrainLayer {
   readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
   private key: TerrainKey | null = null;
-  /** Incremented on every rebuild; the dev harness and tests read it. */
   rebuilds = 0;
 
   constructor() {
@@ -81,7 +58,6 @@ export class TerrainLayer {
     this.key = null;
   }
 
-  /** Rebuilds only when the key changed. Returns true when a rebuild happened. */
   sync(
     world: World,
     tiles: TileSet,
@@ -118,12 +94,6 @@ export class TerrainLayer {
     ctx.imageSmoothingEnabled = tilePx < TILE_PX;
     ctx.imageSmoothingQuality = 'high';
 
-    /*
-     * A direction that paints its own terrain takes the whole layer and none of what follows —
-     * the atlas blit, the solid tint, the pit holes, the wall shadows and the biome dim are the
-     * *standard* direction's material language, not a shared substrate. Anything that wants a lit
-     * bevel or a hatched fill has to own the compositing to get it.
-     */
     const art = artDirection();
     if (art.paintTerrain) {
       art.paintTerrain({ ctx, world, tilePx, biome, tiles, width, height });
@@ -160,19 +130,9 @@ export class TerrainLayer {
     }
   }
 
-  /**
-   * Knocks solid tiles down toward the void colour.
-   *
-   * Several of the source wall tiles are *lighter* than their floor (`wall.metal` on
-   * `floor.metal` is the worst case), which inverts the "solid things are heavy" read and makes a
-   * level look like a bright frame around a hole. A uniform tint costs one fill per wall in the
-   * cached layer and fixes it for every biome at once.
-   */
   private tintSolids(world: World, ctx: CanvasRenderingContext2D, tilePx: number): void {
     ctx.save();
     const wall = alpha(palette.bgVoid, 0.42);
-    // Rock and ore keep the biome floor under a prop, so they only need a hint of weight; a wall
-    // is a whole tile of structure and can take the full knock-down.
     const obstacle = alpha(palette.bgVoid, 0.22);
     for (let y = 0; y < world.h; y++) {
       for (let x = 0; x < world.w; x++) {
@@ -186,18 +146,6 @@ export class TerrainLayer {
     ctx.restore();
   }
 
-  /**
-   * Turns pit tiles into holes.
-   *
-   * A pit is `walkable: true, lethal: true` — the one terrain that kills a bot for driving onto
-   * it — and `feature.pit` is a thin dark ring on a floor that is already dark, so at 13 px it is
-   * indistinguishable from a rubble smudge. That is the worst legibility failure in the set,
-   * because the consequence is fatal and the player is expected to route around it.
-   *
-   * The fix stays inside the art direction rather than adding a warning colour: a hole is drawn
-   * as a hole. Near-void fill, and a single lit arc on the far rim, which is the one cue that
-   * separates "depression" from "dark patch" at any size. Baked into the cache, so it is free.
-   */
   private renderPits(world: World, ctx: CanvasRenderingContext2D, tilePx: number): void {
     const r = tilePx * 0.36;
     ctx.save();
@@ -220,10 +168,6 @@ export class TerrainLayer {
     ctx.restore();
   }
 
-  /**
-   * A short gradient under every south-facing solid edge. Cheap, baked into the cache, and it is
-   * what stops a flat top-down grid from reading as wallpaper.
-   */
   private renderWallShadows(world: World, ctx: CanvasRenderingContext2D, tilePx: number): void {
     const depth = Math.max(2, Math.round(tilePx * 0.28));
     const gradient = ctx.createLinearGradient(0, 0, 0, depth);

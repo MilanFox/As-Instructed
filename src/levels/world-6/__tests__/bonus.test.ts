@@ -1,16 +1,3 @@
-/**
- * World 6's bonus stars, from both sides.
- *
- * This world had no `bonus.test.ts` at all, and that is why all four of its stars sat on the list
- * of bonuses nothing proved could be taken: `divergence.test.ts` pins what each one says when it
- * is *missed*, and nothing anywhere asserted that any program takes one. All four turn out to be
- * earned by the shipped reference on every declared seed, inside par — the gap was in the suite,
- * not in the levels. `TODO.md`'s "Assumed working, never verified" list carries the write-up and
- * the ten that are still only assumed.
- *
- * `name-the-fault` is first because every other bonus in the game is held to its standard.
- * A standard-setter nothing proves is reachable is not a standard.
- */
 import { describe, expect, test } from 'vitest';
 import type { Sim } from '../../../engine/index.ts';
 import { evaluateObjectives } from '../../../engine/index.ts';
@@ -36,7 +23,6 @@ function starOf(level: LevelDef, id: string, result: ReturnType<typeof runLevel>
   ).met;
 }
 
-/** The shipped reference takes the star on every declared seed, and stays inside par doing it. */
 function referenceEarns(level: LevelDef, id: string): void {
   const solution = SOLUTIONS[level.id] as ReferenceSolution;
   for (const seed of level.seeds) {
@@ -47,7 +33,6 @@ function referenceEarns(level: LevelDef, id: string): void {
   }
 }
 
-/** A program that plays no level at all. */
 const idle = (sim: Sim, botId: number): void => {
   sim.print(botId, '.');
 };
@@ -57,18 +42,6 @@ describe('w6-02 name-the-fault', () => {
     referenceEarns(w6_02, 'name-the-fault');
   });
 
-  /**
-   * The same relay, packet for packet and tick for tick, with only its `bad` lines dropped from
-   * the trace. Filing the report is free — `print` costs no tick — so this isolates the one
-   * variable the star grades and shows the star cannot be a tax on the medal.
-   *
-   * Seed 2 is the exception and it is deliberate: `build` sets the corruption rate to zero there,
-   * so the band is clean, there is nothing to report, and the predicate is vacuously true. That
-   * is a do-nothing hole, sitting in the one bonus every other bonus in the game is held
-   * against. It is harmless in play — a run that files nothing
-   * still has to relay all thirty-seven packets to pass, and a failed run banks no star — and it
-   * is pinned here rather than left to be rediscovered.
-   */
   test('the same run without its fault lines is refused wherever there is a fault to name', () => {
     const solution = SOLUTIONS[w6_02.id] as ReferenceSolution;
     const met: Record<number, boolean> = {};

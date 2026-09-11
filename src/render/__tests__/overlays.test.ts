@@ -2,11 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { BRACKET_CLOSED_PX, BRACKET_TIGHTEN_PX, bracketCloseness } from '../overlays.ts';
 
-/**
- * The highlight's whole legibility contract is that its thresholds are in *screen* pixels. A
- * regression here is invisible on a 1x display and makes the goal markers vanish on a 2x one,
- * which is the failure mode that shipped, so it is pinned rather than eyeballed.
- */
 describe('bracketCloseness', () => {
   it('leaves the corner brackets alone at comfortable tile sizes', () => {
     expect(bracketCloseness(48)).toBe(0);

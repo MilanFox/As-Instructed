@@ -1,43 +1,13 @@
-/**
- * The mixer and the voice pool.
- *
- * Graph, once per context:
- *
- * ```
- *   sfx ------\
- *   ui -------+--> master --> limiter --> destination
- *   ambience -/        ^
- *   space taps --------/
- * ```
- *
- * Voices are the interesting part. A trace played at 64x delivers thousands of events per second
- * (DESIGN.md §3), and WebAudio will happily accept every one of them until the audio thread
- * starves. `voice()` is therefore the single door every sound goes through, it refuses to open
- * past `MAX_VOICES`, and it hands back `null` rather than throwing — a dropped sound is a
- * non-event, a stalled audio thread is a bug report.
- *
- * The pool is swept lazily. There are no timers anywhere in this file: a voice is reclaimed the
- * next time anybody asks for one, which means an idle game does exactly nothing.
- */
-
 import { busGain, masterGain } from './settings.ts';
 import type { AudioSettings, Bus } from './settings.ts';
 import { filterNode, gainNode } from './synth.ts';
 
-/** Hard ceiling on simultaneous sounds. Reached only during a high-speed event storm. */
 export const MAX_VOICES = 16;
 
-/** How long a stolen or seek-cancelled voice takes to reach zero. Short enough to read as a cut. */
 export const CUT_SECONDS = 0.008;
 
-/**
- * How long the space network stays muted after a seek. Long enough to outrun the longest tap
- * (`SPACE_TAPS`), which is the only part of the graph that can still be ringing once its source
- * nodes have been stopped.
- */
 export const SPACE_FLUSH_SECONDS = 0.2;
 
-/** Feed-forward taps, in seconds. No feedback path: the tail is finite and always dies. */
 const SPACE_TAPS: readonly { delay: number; gain: number }[] = [
   { delay: 0.017, gain: 0.5 },
   { delay: 0.029, gain: 0.38 },
@@ -49,20 +19,12 @@ const SPACE_TAPS: readonly { delay: number; gain: number }[] = [
 
 export interface VoiceRequest {
   bus: Bus;
-  /** Ties are broken in favour of the voice already playing. */
   priority: number;
-  /** Context time the voice starts. */
   at: number;
-  /** Seconds until it is genuinely silent. Pool bookkeeping only; it schedules nothing. */
   duration: number;
-  /** Voice level, before bus and master. */
   gain: number;
 }
 
-/**
- * One sound in flight. The sound function writes into `out` and registers its sources with
- * `own`, which is what lets a seek stop everything mid-flight.
- */
 export class Voice {
   readonly out: GainNode;
   readonly at: number;
@@ -83,18 +45,15 @@ export class Voice {
     this.out.connect(bus);
   }
 
-  /** Registers a source so `cut` can stop it. Sources are expected to be started already. */
   own(source: AudioScheduledSourceNode): void {
     this.sources.push(source);
   }
 
-  /** Sends a copy into the shared space network. Stingers only. */
   sendTo(space: AudioNode, amount: number): void {
     this.space = gainNode(this.ctx, amount);
     this.out.connect(this.space).connect(space);
   }
 
-  /** Silences the voice immediately, whatever it had scheduled. Idempotent. */
   cut(when: number): void {
     if (this.dead) return;
     this.dead = true;
@@ -126,7 +85,6 @@ export class Voice {
 export class AudioEngine {
   readonly ctx: BaseAudioContext;
   readonly buses: Readonly<Record<Bus, GainNode>>;
-  /** Input to the feed-forward tap network. Voices send into it; nothing reads from it. */
   readonly space: GainNode;
 
   private readonly master: GainNode;
@@ -173,11 +131,6 @@ export class AudioEngine {
     return this.ctx.currentTime;
   }
 
-  /**
-   * False while autoplay policy still holds the context. A suspended context's `currentTime` does
-   * not advance, so every clock the conductor keeps would be frozen and its event-rate estimate
-   * meaningless. Callers skip their work instead of computing nonsense nobody can hear.
-   */
   get audible(): boolean {
     const state = (this.ctx as { state?: string }).state;
     return state === undefined || state === 'running';
@@ -187,7 +140,6 @@ export class AudioEngine {
     return this.voices.length;
   }
 
-  /** Diagnostics for the dev harness and the rate-limiter tests. */
   get stats(): { active: number; created: number; stolen: number; dropped: number } {
     return {
       active: this.voices.length,
@@ -199,17 +151,12 @@ export class AudioEngine {
 
   applySettings(settings: AudioSettings): void {
     const at = this.now();
-    // Ramped, not stepped: a slider drag that steps a gain param clicks on every frame.
     rampTo(this.master.gain, masterGain(settings), at);
     for (const bus of ['sfx', 'ui', 'ambience'] as const) {
       rampTo(this.buses[bus].gain, busGain(settings, bus), at);
     }
   }
 
-  /**
-   * Allocates a voice, or returns `null` when the pool is full and nothing cheaper is playing.
-   * Callers must handle `null`; that is the mechanism that keeps 64x from melting.
-   */
   voice(request: VoiceRequest): Voice | null {
     this.reap();
     if (this.voices.length >= MAX_VOICES) {
@@ -229,10 +176,6 @@ export class AudioEngine {
     return voice;
   }
 
-  /**
-   * Stops every voice now. Called on every seek: a scrub must never leave a note ringing, and the
-   * space taps are muted alongside because they outlive their sources by up to 127ms.
-   */
   releaseAll(): void {
     const at = this.now();
     for (const voice of this.voices) {
@@ -248,7 +191,6 @@ export class AudioEngine {
     level.linearRampToValueAtTime(0.5, at + SPACE_FLUSH_SECONDS + 0.02);
   }
 
-  /** Drops voices that have finished. Cheap, allocation-free, and safe to call every frame. */
   reap(): void {
     const now = this.now();
     for (let i = this.voices.length - 1; i >= 0; i--) {
@@ -271,7 +213,6 @@ export class AudioEngine {
     }
   }
 
-  /** Lowest priority, then oldest. The voice whose loss the player is least likely to notice. */
   private weakest(): Voice | null {
     let worst: Voice | null = null;
     for (const voice of this.voices) {

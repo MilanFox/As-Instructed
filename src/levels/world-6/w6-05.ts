@@ -26,7 +26,6 @@ import {
 } from './signal.ts';
 
 const FIELD = 30;
-/** Every seed's route is exactly this long, so par means the same thing on all five. */
 const ROUTE_MOVES = 60;
 const CORRUPT_BLOCKS = 3;
 const LETTERS = 'NESW';
@@ -34,18 +33,12 @@ const LETTERS = 'NESW';
 const dirOf = (letter: string): Dir =>
   letter === 'N' ? Dir.North : letter === 'E' ? Dir.East : letter === 'S' ? Dir.South : Dir.West;
 
-/**
- * Nesting depth per seed. Seed 1 nests once, so a flat reader that ignores calls walks a truncated
- * route on the first shift a player runs rather than passing it and failing the second
- * (DESIGN.md §11.5). Seed 2 is the depth-1 case CURRICULUM.md §8 asks for — `main` holds nothing
- * but move groups, which is the reader's base case and reads as a confirmation once the recursion
- * is written. Seeds 3 and 5 go to four.
- */
 const DEPTHS: Readonly<Record<number, number>> = Object.freeze({ 1: 2, 2: 1, 3: 4, 4: 3, 5: 4 });
 
 const depthFor = (seed: number): number => DEPTHS[seed] ?? 3;
 
-type Token = { kind: 'run'; count: number; letter: string } | { kind: 'call'; name: string; times: number };
+type Token =
+  { kind: 'run'; count: number; letter: string } | { kind: 'call'; name: string; times: number };
 
 interface Block {
   name: string;
@@ -78,7 +71,13 @@ function expand(blocks: readonly Block[], name: string, depth = 0): string[] {
   return out;
 }
 
-function walkExtent(moves: readonly string[]): { minX: number; minY: number; maxX: number; maxY: number; end: Vec } {
+function walkExtent(moves: readonly string[]): {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+  end: Vec;
+} {
   let at = vec(0, 0);
   let minX = 0;
   let minY = 0;
@@ -94,13 +93,11 @@ function walkExtent(moves: readonly string[]): { minX: number; minY: number; max
   return { minX, minY, maxX, maxY, end: at };
 }
 
-/** One draw of the grammar. Returns null when the shape does not fit the field. */
 function drawBlocks(rng: Rng, depth: number): Block[] | null {
   const blocks: Block[] = [];
   for (let level = depth; level >= 1; level--) {
     const name = level === 1 ? 'main' : `g${String(level - 1)}`;
     const body: Token[] = [];
-    // A depth-1 stream has no calls to carry the length, so `main` carries all of it itself.
     const runs = depth === 1 ? rng.int(12, 20) : rng.int(1, 6);
     for (let i = 0; i < runs; i++) {
       body.push({ kind: 'run', count: rng.int(1, 4), letter: LETTERS[rng.int(0, 3)] as string });
@@ -145,7 +142,6 @@ function blocksFor(seed: number): Block[] {
 interface Packet {
   text: string;
   corrupt: boolean;
-  /** The plain text as sent, for the repair bonus. */
   plain: string;
 }
 
@@ -157,18 +153,15 @@ function seal(plain: string, salt: number): string {
 function verifies(text: string, salt: number): boolean {
   const star = text.lastIndexOf('*');
   if (star < 0) return false;
-  const claimed = text.slice(star + 1).split(',').map(Number);
+  const claimed = text
+    .slice(star + 1)
+    .split(',')
+    .map(Number);
   if (claimed.length !== 2) return false;
   const codes = charCodes(text.slice(0, star));
   return additive(codes, salt) === claimed[0] && weighted(codes, salt) === claimed[1];
 }
 
-/**
- * Flips one character of the `name|body` half to another printable one an odd distance away.
- * Odd makes the difference invertible mod 256, which is what makes the position — and so the
- * original character — recoverable rather than merely detectable. The check values themselves
- * are never touched, so a repair always has something true to work back from.
- */
 function spoil(rng: Rng, text: string, salt: number): string | null {
   const at = rng.int(0, text.lastIndexOf('*') - 1);
   const code = text.charCodeAt(at);
@@ -204,7 +197,6 @@ export function telemetryFor(seed: number): Telemetry {
   const salt = rng.int(0, 255);
   const clean = blocks.map((block) => ({ name: block.name, sealed: seal(plainOf(block), salt) }));
 
-  // One clean block goes out shifted. Its checksum is what tells a program it found the shift.
   const shifted = rng.int(0, clean.length - 1);
   const cipherKey = rng.int(1, 94);
 
@@ -228,12 +220,10 @@ export function telemetryFor(seed: number): Telemetry {
 }
 
 interface RepairTarget {
-  /** Where the corrupt block sat on the band, counting from 0. */
   index: number;
   line: string;
 }
 
-/** The repair lines the bonus wants, each tagged with the band slot it answers. */
 function repairTargets(world: World): RepairTarget[] {
   const seed = world.vars.seed ?? 1;
   const out: RepairTarget[] = [];
@@ -244,7 +234,6 @@ function repairTargets(world: World): RepairTarget[] {
   return out;
 }
 
-/** Every `fix ...` line the run printed, in the order it printed them. */
 function printedFixes(ctx: ObjectiveContext): string[] {
   return ctx.trace.events
     .filter((event) => event.kind === 'print')
@@ -252,7 +241,6 @@ function printedFixes(ctx: ObjectiveContext): string[] {
     .filter((line) => line.startsWith('fix '));
 }
 
-/** The pad against where the run left the bot. Both tiles are painted on the map already. */
 function parked(ctx: ObjectiveContext): Divergence | undefined {
   const pad = telemetryFor(ctx.initialWorld.vars.seed ?? 1).pad;
   const bot = botById(ctx.world, 0);
@@ -266,14 +254,6 @@ function parked(ctx: ObjectiveContext): Divergence | undefined {
   };
 }
 
-/**
- * Which corrupt block the repair report first disagrees about — never what the repair should say.
- *
- * Where the altered character sits is the arithmetic the bonus exists for, and the character
- * itself falls straight out of the position, so neither appears. The block is named by the slot
- * it arrived in, which is the player's own copy of the band, and the run's own line comes back
- * unchanged beside it.
- */
 function firstRepair(ctx: ObjectiveContext): Divergence | undefined {
   const targets = repairTargets(ctx.initialWorld);
   const said = printedFixes(ctx);
@@ -299,10 +279,6 @@ function firstRepair(ctx: ObjectiveContext): Divergence | undefined {
   };
 }
 
-/**
- * Par: the route is exactly 60 moves on every seed and nothing else costs a tick — parsing,
- * checking, key search and the repair report are all free. There is nothing to shave.
- */
 export const w6_05: LevelDef = {
   id: 'w6-05',
   world: 6,
@@ -321,25 +297,6 @@ export const w6_05: LevelDef = {
     'The blocks on the band spell out a route from the tile you are standing on to the landing',
     'pad. Read them all, start from `main`, and drive the route.',
   ].join('\n'),
-  /**
-   * DESIGN.md §11.10.
-   *
-   * The band here is three kinds of traffic at once — intact, shifted, corrupt — and the counts of
-   * each are what a run has to be structured around. `CORRUPT_BLOCKS` is 3 on every shift and the
-   * shifted block is exactly one, so the sheet says both. Neither is the answer to anything: the
-   * bonus grades the repaired text, and knowing that three copies are lying does not say which
-   * character in them lies. What it does say is that a band of five packets holding two real blocks
-   * is a normal band, which is otherwise indistinguishable from a shift that has gone wrong.
-   *
-   * The nesting depth is the axis (`DEPTHS`), and it is on the sheet because one of the five shifts
-   * has no calls in it at all. A reader written for that shift is a flat reader, and it walks a
-   * truncated route on every other one; a player who was never told the depth moves has no reason
-   * to write the recursion the order exists to teach until it has already cost them a shift.
-   *
-   * Where the route starts is redrawn, which is unusual enough to state: `telemetryFor` places the
-   * start from the extent of the walk, so the antenna and the pad move between shifts. The route's
-   * length does not — 60 moves on all five — so par means the same thing on each.
-   */
   board: {
     fixed: [
       'the field is 30 by 30 and every tile off the route is a pit',

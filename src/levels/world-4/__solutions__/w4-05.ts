@@ -2,20 +2,6 @@ import type { Sim, Vec } from '../../../engine/index.ts';
 import { ALL_DIRS, ItemKind, Terrain, dirBetween, manhattan, step } from '../../../engine/index.ts';
 import type { ReferenceSolution } from '../../types.ts';
 
-/**
- * TEST FIXTURE. Never imported from src/main.tsx — vite.config.ts fails the build if it is.
- *
- * Explore and exploit out of one tank. Every stop casts four free rays, which is enough to see a
- * vein at the far end of a corridor the bot never enters. The map the rays build is what makes
- * the route home computable, so before each errand the bot prices the trip *and* the trip back
- * and refuses anything it cannot pay for. Not an optimal tour — deliberately: the level is
- * priced against reserving a route home, not against the best survey.
- *
- * The last leg is costed out of that same map and filed before the wheels turn. The star asks for
- * the price of the trip home *in advance*, and a program that already refuses errands it cannot
- * pay for is a program that has the number.
- */
-
 const RANGE = 14;
 const key = (at: Vec): string => `${String(at.x)},${String(at.y)}`;
 
@@ -31,8 +17,10 @@ function record(survey: Survey, at: Vec, terrain: Terrain, walkable: boolean): v
   else if (terrain === Terrain.Ore) survey.veins.set(key(at), at);
 }
 
-/** Steps out of `from` over surveyed open ground. Returns the cost map and the way back. */
-function reachable(survey: Survey, from: Vec): { cost: Map<string, number>; via: Map<string, Vec> } {
+function reachable(
+  survey: Survey,
+  from: Vec,
+): { cost: Map<string, number>; via: Map<string, Vec> } {
   const cost = new Map<string, number>([[key(from), 0]]);
   const via = new Map<string, Vec>();
   const queue: Vec[] = [from];
@@ -66,7 +54,11 @@ export const solution: ReferenceSolution = {
   levelId: 'w4-05',
   run(sim: Sim, botId: number): void {
     const home = sim.pos(botId);
-    const survey: Survey = { open: new Map([[key(home), home]]), seen: new Set([key(home)]), veins: new Map() };
+    const survey: Survey = {
+      open: new Map([[key(home), home]]),
+      seen: new Set([key(home)]),
+      veins: new Map(),
+    };
     const cut = new Set<string>();
 
     const observe = (): void => {
@@ -100,7 +92,6 @@ export const solution: ReferenceSolution = {
       const homeward = reachable(survey, home).cost;
       const budget = sim.fuel(botId);
 
-      // A vein first: it is the only thing that finishes the job.
       let bestVein: { stand: Vec; face: Vec; price: number } | null = null;
       for (const [id, face] of survey.veins) {
         if (cut.has(id)) continue;
@@ -123,7 +114,6 @@ export const solution: ReferenceSolution = {
         continue;
       }
 
-      // Otherwise buy information, but never more of it than the way home costs.
       const reserve = (5 - have) * 2 + 2;
       let frontier: Vec | null = null;
       let cheapest = Number.POSITIVE_INFINITY;
@@ -144,9 +134,6 @@ export const solution: ReferenceSolution = {
       walk(pathTo(via, at, frontier));
     }
 
-    // The map is already good enough to price the way back, so the price is filed before a wheel
-    // turns. Costing the route and then driving it is one order of operations; driving it and
-    // then reporting what it took is another, and only the first one is a reservation.
     const at = sim.pos(botId);
     const route = key(at) === key(home) ? [] : pathTo(reachable(survey, at).via, at, home);
     sim.print(botId, `home ${String(route.length)}`);

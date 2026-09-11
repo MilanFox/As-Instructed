@@ -38,7 +38,6 @@ const LEGEND = {
 
 const MAST_AT = vec(6, 3);
 
-/** The four bytes every packet on this band opens with. Stated in the brief, deliberately. */
 export const MAGIC = 'KD//';
 
 interface Shift {
@@ -47,11 +46,6 @@ interface Shift {
   packets: number;
 }
 
-/**
- * Seed 3 carries key 0 — the traffic is already plain and the header is sitting there in the
- * clear. Any program that assumes the answer has to be an interesting number stops there
- * (CURRICULUM.md §8). Seed 4 carries 94, the far end of the space.
- */
 const SHIFTS: Readonly<Record<number, Shift>> = Object.freeze({
   1: { key: 37, tailKey: 62, packets: 8 },
   2: { key: 71, tailKey: 19, packets: 11 },
@@ -88,11 +82,6 @@ const PLACES = [
   'the lower aisle',
 ];
 
-/**
- * Payloads are 40 to 200 printable bytes, assembled from a word bank so that the plain text is
- * recognisable English once a program has the shift, and so nothing about the *contents* is
- * stable across seeds.
- */
 function payload(rng: Rng): string {
   let line = `${MAGIC}${rng.pick(SUBJECTS)} ${String(rng.int(100, 999))}: ${rng.pick(VERBS)} at ${rng.pick(PLACES)}`;
   while (line.length < rng.int(48, 150)) {
@@ -101,7 +90,6 @@ function payload(rng: Rng): string {
   return `${line}.`;
 }
 
-/** The unheaded straggler at the end of the band. Lowercase and spaced, so scoring finds it. */
 function straggler(rng: Rng): string {
   return (
     `repeater ${String(rng.int(2, 9))} relayed this without a header again, ` +
@@ -128,14 +116,6 @@ const tailPlain = (world: World): string => bandFor(world.vars.seed ?? 1).tail;
 
 const relayed = (ctx: ObjectiveContext): string[] => transmitted(ctx.world);
 
-/**
- * The first packet on the wire that is not the plain text of the headed packet it stands for.
- *
- * The header is the level's own test and the facts publish it, so a report that says the line did
- * not open with it gives nothing away that the fact table has not already given. When the header
- * did survive and the rest did not, the point narrows to the one character where the two texts
- * part, which is the smallest thing there is to say.
- */
 function firstRelayed(ctx: ObjectiveContext): Divergence | undefined {
   const expected = wanted(ctx.initialWorld);
   const sent = relayed(ctx);
@@ -159,13 +139,6 @@ function firstRelayed(ctx: ObjectiveContext): Divergence | undefined {
   };
 }
 
-/**
- * The straggler's plain text is the entire bonus, so the report never contains a character of it.
- *
- * What it can give back is the shift the run actually used, recovered from what went on the wire.
- * One of the ninety-five is ruled out, the run's own number is the thing being ruled out, and the
- * other ninety-four are still there to be sifted by whatever test the player comes up with.
- */
 function firstStraggler(ctx: ObjectiveContext): Divergence | undefined {
   const expected = wanted(ctx.initialWorld);
   const sent = relayed(ctx);
@@ -201,11 +174,6 @@ function firstStraggler(ctx: ObjectiveContext): Divergence | undefined {
   };
 }
 
-/**
- * Par: the reference sends one line per headed packet plus the straggler, and a packet cannot be
- * relayed for less than one transmit. Thirteen headed packets on seed 4 plus the straggler is 14,
- * which is par exactly — the search itself is free.
- */
 export const w6_04: LevelDef = {
   id: 'w6-04',
   world: 6,
@@ -222,26 +190,6 @@ export const w6_04: LevelDef = {
     'Transmit the plain text of every headed packet, whole and in order. Transmit nothing else',
     'before them.',
   ].join('\n'),
-  /**
-   * DESIGN.md §11.10.
-   *
-   * This order is on the Frustration Watch (CURRICULUM.md §11) for stating the keyspace and the
-   * header outright, and the sheet is where that statement belongs rather than a place it leaks
-   * from: a search is only a plan if the player knows the space is small enough to walk and knows
-   * what a hit looks like. Both are already on the fact cards. The sheet adds that they are the
-   * same on every shift — one shift for all the headed traffic, its own for the straggler, and the
-   * straggler always last on the band — so a run can sort the traffic by position and be right.
-   *
-   * The shift being drawn from the whole space, zero included, is the line the level cannot do
-   * without. `SHIFTS` gives seed 3 key 0 on purpose, and a program that treats "already plain" as
-   * a special case rather than as a shift passes three shifts and fails the fourth. Hint 3 says so
-   * today, which is one place too few for something the objective grades (DESIGN.md §11.3).
-   *
-   * The absence of a key anywhere readable is the other half. `build` puts it on the world rather
-   * than the antenna deliberately, so a player who spends the shift probing for it is not being
-   * lazy, they are being told nothing. The memo says there is no key on site; this says the same
-   * thing in the one place a player checks before writing the search.
-   */
   board: {
     fixed: [
       'the post is a 12 by 6 shack; RIG-06 stays on the antenna',
@@ -289,7 +237,6 @@ export const w6_04: LevelDef = {
       h: 6,
       seed,
       fill: Terrain.Floor,
-      // The key lives on the world, not the antenna: `probe` must not be able to hand it over.
       vars: { seed, key, tailKey },
     });
     paintAscii(world, SHACK, LEGEND);

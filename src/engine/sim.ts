@@ -36,10 +36,8 @@ import {
 
 export const DEFAULT_MAX_TICKS = 20_000;
 export const DEFAULT_MAX_OPS = 2_000_000;
-/** Default ticks a freshly planted crop needs before `harvest` succeeds. */
 export const DEFAULT_GROW_TIME = 8;
 
-/** DESIGN.md §4.6: how many all-bots-blocked rounds count as a livelock. */
 export const DEFAULT_LIVELOCK_ROUNDS = 8;
 
 export interface SimOptions {
@@ -48,49 +46,17 @@ export interface SimOptions {
   costs?: CostOverrides;
   keyframeInterval?: number;
   livelockRounds?: number;
-  /** How many individual sensing reads the trace keeps before it starts aggregating them. */
   maxSenseEvents?: number;
 }
 
-/** What a bot perceives about one tile. All sensing is free (0 ticks). */
 export interface TileView {
   at: Vec;
   inBounds: boolean;
   terrain: Terrain;
   walkable: boolean;
-  /**
-   * Whether ending a move on this tile kills the bot — `TerrainProps.lethal` (`types.ts:64`),
-   * which is `true` on `Terrain.Pit` and on nothing else in the game.
-   *
-   * `walkable` is not the answer to "is it safe to step here?", and on exactly one terrain it is
-   * the opposite of the answer. A pit is `walkable: true` deliberately: `move` onto one
-   * *succeeds*, the bot arrives, and then it dies (`sim.ts:438`). That is the mechanic. Making
-   * the pit unwalkable so the free read would come out honest would turn it into a wall and
-   * delete the mechanic, so the dishonesty had to be fixed on the reading side instead.
-   *
-   * This is DESIGN.md §11.7's third leg, the leg `MachineView.links` below was also added for.
-   * The pit had the other two — a thing in the fiction with a name, and a hole drawn on the board
-   * — and no way to reach it in code. A defensive program that asked the only free question the
-   * API offered about the tile it was about to enter got back `walkable: true` and drove into the
-   * hole. The single route to the fact that decided the run was to make the move and read the
-   * verdict, which is `w2-04`'s `0/8` with the price raised: state reachable only by paying for
-   * the action you were trying to decide on, except the payment here is the bot.
-   *
-   * **A field on the view, not a call.** `scan` and `look` already hand back this snapshot for
-   * nothing, so caution stays free, no entry is added to `DEFAULT_COSTS`, and `w6-03` — where pit
-   * is introduced — requisitions no new hardware to read it. A priced "is this safe" call would
-   * have taxed the careful program and pushed it back to finding out by driving.
-   *
-   * **Out of bounds reads `false`.** `Terrain.Void` carries no `lethal` (`world.ts:92`), and more
-   * to the point a bot cannot end a move off the edge at all — that `move` fails, costs its tick
-   * and leaves the bot where it stood. `walkable: false` is the whole story out there; a `true`
-   * here would name a death that has no way of happening.
-   */
   lethal: boolean;
-  /** Current maturity of a crop on this tile, relative to the observing bot's clock. */
   growth: number;
   maxGrowth: number;
-  /** Ticks remaining before this crop's growth clock starts; 0 once growing or if there's no crop. */
   sproutsIn: number;
   crop: ItemKind | null;
   items: ItemStack[];
@@ -106,67 +72,17 @@ export interface MachineView {
   state: string;
   vars: Record<string, number>;
   inventory: ItemStack[];
-  /**
-   * The cells this machine's own state moves — `Machine.links`, the tiles whose terrain flips when
-   * it opens (`types.ts:167`). Empty on every machine that moves nothing, which is all but one.
-   *
-   * This is DESIGN.md §11.7's third leg, and it was the leg missing. `w8-05`'s airlock walls off
-   * two gate tiles and they are the only way into the chamber the level grades reaching. The board
-   * now says so — `drawTether` runs a hairline from the machine to each cell, dashed while the gate
-   * is shut — but until this field existed a program could not ask which two tiles those were. The
-   * only route was to crank the door through its nine stages and look at what changed, which is
-   * `w2-04`'s `0/8` with a wall in front of it: state that matters, reachable only by paying for
-   * the action you were trying to decide on.
-   *
-   * **A field on `probe`, not a command of its own.** `w8-05` is the only work order in the game
-   * carrying a machine with `links`, and CURRICULUM.md §10 says World 8 unlocks no new hardware —
-   * so a dedicated call would have had to be requisitioned on the finale, against that rule, or
-   * three worlds early where it would return `[]` until the last level of the campaign. Riding the
-   * snapshot `probe` already returns gates it exactly as hard as machines themselves are gated:
-   * `MachineView` reaches the player's editor when `probe` does and not before (`w5-01`).
-   *
-   * **Cells, not the machine graph.** The other two things `drawTether` draws — `link:<id>` and
-   * `fed:<id>` — already ride in `vars`, and `use`'s own API doc teaches reading them, so ids here
-   * would be a second copy of a fact the player can already reach. The cells had no route at all.
-   *
-   * **Coordinates, not what the tiles become.** These are authored at build time and never move,
-   * so publishing them says *which* walls open and never *when* or how — the nine `use()` calls and
-   * the feeder's whole ancestry are still the level. A field saying what the terrain will be once
-   * the door opens would answer "is it open yet" from across the site, and that question belongs to
-   * the board and to `scan`.
-   *
-   * **Free, and not by inheritance.** `probe` costs nothing, and the encoding the audit offered as
-   * the alternative — the level writing `gate:<x>,<y>: 1` keys into `vars` the way `fed:` writes an
-   * id — would have been free through `probe` too. Any price attached to a dedicated call would
-   * therefore have been a tax on the encoding rather than on the information, and would push a
-   * program straight back to opening the door to find out. Nothing is added to `DEFAULT_COSTS`,
-   * which is what keeps `api-cost-parity.test.ts` at its fourteen compared pairs.
-   */
   links: Vec[];
 }
 
 const OUT_OF_BOUNDS_TERRAIN = Terrain.Void;
 
-/** One bot's residence on one tile, over the half-open clock interval `[from, to)`. */
 interface Occupancy {
   botId: number;
-  /** The bot's own clock at the moment it took the tile, i.e. when its arriving move completed. */
   from: number;
-  /** Exclusive. `Infinity` while the bot is still standing there. */
   to: number;
 }
 
-/**
- * Maturity of a crop tile as observed at tick `t`.
- *
- * Nothing in this engine ticks on its own — there is no global update loop — so growth is derived
- * from when the crop was planted rather than advanced by a scheduler. Tiles authored with a
- * `growth` value and no `meta.plantedAt` are simply always at that maturity.
- *
- * `meta.plantedAt` is the tick the seed reached the soil, i.e. the moment `plant` *finished*.
- * A crop therefore reads 0/max to the bot that just planted it, rather than having quietly grown
- * during the two ticks that bot spent kneeling over it.
- */
 export function maturity(tile: Tile, t: number): number {
   const max = tile.maxGrowth ?? 0;
   const plantedAt = tile.meta?.['plantedAt'];
@@ -176,25 +92,14 @@ export function maturity(tile: Tile, t: number): number {
   return tile.growth ?? 0;
 }
 
-/** Ticks until a crop's growth clock starts, i.e. until `meta.plantedAt` is reached. 0 once growing. */
 export function sproutsIn(tile: Tile, t: number): number {
   const plantedAt = tile.meta?.['plantedAt'];
   if (typeof plantedAt !== 'number') return 0;
   return Math.max(0, plantedAt - t);
 }
 
-/** What a seed turns into when harvested. */
 const PLANT_YIELD: Partial<Record<ItemKind, ItemKind>> = { seed: 'crop' };
 
-/**
- * The deterministic simulation. The runtime worker binds one method per player API call to this.
- *
- * Every acting method: validates, mutates the world, advances the acting bot's own clock by the
- * action cost, appends a timestamped TraceEvent, checks budgets, returns the player-visible value.
- *
- * The Sim never consumes `world.rng`. Randomness belongs to `LevelDef.build(seed)` only, which is
- * what lets a Trace replay identically without re-running any sim logic.
- */
 export class Sim {
   readonly world: World;
   readonly costs: CostTable;
@@ -229,45 +134,26 @@ export class Sim {
     world.tick = this.peakClock;
   }
 
-  // -------------------------------------------------------------------------
-  // Introspection
-  // -------------------------------------------------------------------------
-
   get ops(): number {
     return this.opCount;
   }
 
-  /** `max(bot.clock)` — the makespan, and the level's tick score. */
   get ticks(): number {
     return this.peakClock;
   }
 
-  /** Live bot ids, ascending. Free. */
   botIds(): number[] {
     this.op();
     return this.world.bots.filter((b) => b.alive).map((b) => b.id);
   }
 
-  /** Finalizes the trace. Call once, after the player's program returns or throws. */
   finish(): Trace {
     return this.builder.build(this.peakClock, this.keyframeInterval);
   }
 
-  /** Records an objective transition into the trace so the renderer can flash it at the right tick. */
   noteObjective(id: string, state: 'met' | 'lost'): void {
     this.builder.push({ t: this.peakClock, kind: 'objective', id, state });
   }
-
-  // -------------------------------------------------------------------------
-  // Sensing (0 ticks, but counted)
-  // -------------------------------------------------------------------------
-  //
-  // Sensing stays free in ticks (DESIGN.md §4.4) and is *observable*: one op against `maxOps`,
-  // one `sense` trace event, one tally in `senseTotals()`. That is what lets a level budget
-  // information — "find the break in ten probes" — the way it already budgets time.
-  //
-  // `recv` is excluded on purpose: it consumes a message rather than reading the world, and it
-  // has carried its own event since World 7. So is `botIds`, which reads the roster, not the site.
 
   pos(botId: number): Vec {
     const bot = this.requireBot(botId);
@@ -294,7 +180,6 @@ export class Sim {
     return free;
   }
 
-  /** The bot's own tile when `dir` is omitted, otherwise the adjacent tile in `dir`. */
   scan(botId: number, dir?: Dir): TileView {
     const bot = this.requireBot(botId);
     const at = dir === undefined ? bot.at : step(bot.at, dir);
@@ -303,15 +188,6 @@ export class Sim {
     return view;
   }
 
-  /**
-   * Ray-cast from the bot in `dir`, nearest first, excluding the bot's own tile. World 4's
-   * map-discovery primitive.
-   *
-   * `range` caps the number of views returned, and the tile that stops the cast — the first
-   * opaque one, or the first out-of-bounds one — is included and counts against that cap. A ray
-   * that runs off the edge therefore ends in a view with `inBounds: false`, which is how a player
-   * tells "the tunnel continues past my sensor" from "the site ends here".
-   */
   look(botId: number, dir: Dir, range = 8): TileView[] {
     const bot = this.requireBot(botId);
     const out: TileView[] = [];
@@ -335,7 +211,6 @@ export class Sim {
     return held;
   }
 
-  /** Distinct item kinds the bot is holding, in pickup order. */
   carrying(botId: number): ItemKind[] {
     const bot = this.requireBot(botId);
     const kinds = bot.inventory.filter((s) => s.count > 0).map((s) => s.kind);
@@ -361,15 +236,10 @@ export class Sim {
     return bot.fuelMax;
   }
 
-  /** Resource totals for `Verdict.stats.spend`. DESIGN.md §4.6. */
   spendTotals(): Record<string, number> {
     return Object.fromEntries(this.spendLedger);
   }
 
-  /**
-   * How many times each sensing command ran, keyed by command name. Feeds `Verdict.stats.senses`,
-   * and is exact regardless of how much detail the trace folded away.
-   */
   senseTotals(): Record<string, number> {
     return Object.fromEntries(this.senseLedger);
   }
@@ -398,15 +268,6 @@ export class Sim {
     };
   }
 
-  // -------------------------------------------------------------------------
-  // Acting
-  // -------------------------------------------------------------------------
-
-  /**
-   * Steps one tile in `dir`. Returns false (and still burns `moveBlocked` ticks) when the target
-   * is out of bounds, not walkable terrain, or occupied by another bot over an overlapping time
-   * interval. Facing always updates, even on a failed move.
-   */
   move(botId: number, dir: Dir): boolean {
     const bot = this.requireActiveBot(botId);
     const t = bot.clock;
@@ -441,7 +302,6 @@ export class Sim {
     return true;
   }
 
-  /** Rotates in place. Free by default; still traced so the renderer can animate it. */
   turn(botId: number, dir: Dir): void {
     const bot = this.requireActiveBot(botId);
     const t = bot.clock;
@@ -452,7 +312,6 @@ export class Sim {
     this.charge(bot, dt);
   }
 
-  /** Burns `n * costs.wait` ticks doing nothing. */
   wait(botId: number, n = 1): void {
     const bot = this.requireActiveBot(botId);
     if (!Number.isFinite(n) || n < 0) {
@@ -470,10 +329,6 @@ export class Sim {
     this.chargeIdle(bot, dt);
   }
 
-  /**
-   * Harvests a mature crop from the tile the bot stands on. Returns the item kind gathered, or
-   * null when there is nothing ready (which still costs the full `harvest` price).
-   */
   harvest(botId: number): ItemKind | null {
     const bot = this.requireActiveBot(botId);
     const t = bot.clock;
@@ -521,16 +376,6 @@ export class Sim {
     return item;
   }
 
-  /**
-   * Plants one `kind` from the inventory into plantable ground under the bot.
-   *
-   * A refusal returns false, charges the full price, and records *which* of the three causes it
-   * was as `reason` on the event, the way a blocked `move` already does. There is deliberately no
-   * `canPlant()` to go with it: `move` needs `canMove` because its block reason includes tile
-   * reservations the player cannot see, whereas every input to this decision is already free and
-   * exact — `scan().terrain`, `scan().crop` and `inventory(kind)` — so the three checks that tell
-   * the causes apart are three the player can already make, before the call or after it.
-   */
   plant(botId: number, kind: ItemKind = 'seed', growTime = DEFAULT_GROW_TIME): boolean {
     const bot = this.requireActiveBot(botId);
     const t = bot.clock;
@@ -561,7 +406,6 @@ export class Sim {
     return true;
   }
 
-  /** Mines the adjacent tile in `dir`, or the bot's own tile when `dir` is omitted. */
   mine(botId: number, dir?: Dir): ItemKind | null {
     const bot = this.requireActiveBot(botId);
     const t = bot.clock;
@@ -590,15 +434,6 @@ export class Sim {
     return item;
   }
 
-  /**
-   * Picks loose items up off the bot's own tile. Omit `kind` to take whatever is there.
-   * Returns how many were actually picked up, clamped by inventory capacity.
-   *
-   * A `0` is the same "the world says no" a `false` is, and stays one: every cause is transient.
-   * Which cause it was rides on the event as `reason`, because `0` alone folds together an empty
-   * tile, a tile with none of the kind asked for, a full inventory and a `count` of zero. The
-   * player recovers the same answer from `scan().items`, `inventory()` and `capacity()`, all free.
-   */
   pickup(botId: number, kind?: ItemKind, count = 1): number {
     const bot = this.requireActiveBot(botId);
     if (!Number.isFinite(count) || count < 0) {
@@ -642,13 +477,6 @@ export class Sim {
     return taken;
   }
 
-  /**
-   * Drops items onto the bot's own tile. Returns how many were actually dropped.
-   *
-   * Same shape as `pickup`, one notch milder because the player already knows what they are
-   * carrying: a `0` means the bot holds nothing at all, holds none of the kind named, or was asked
-   * for zero. `reason` says which, and `carrying()` / `inventory(kind)` answer it for free.
-   */
   drop(botId: number, kind?: ItemKind, count = 1): number {
     const bot = this.requireActiveBot(botId);
     if (!Number.isFinite(count) || count < 0) {
@@ -688,27 +516,6 @@ export class Sim {
     return given;
   }
 
-  /**
-   * Operates the machine on the bot's tile, or the adjacent one in `dir`. Advances the machine
-   * through its `cycle`; a Door with `links` flips those tiles between Floor and Wall.
-   *
-   * Returns false when the tile carries no machine, and — since this change — when it carries one
-   * with no `cycle` to advance. That second case used to return **true** and do nothing, which is
-   * worse than a mute failure: a mute `false` is at least a value the program can branch on, while
-   * a mute success asserts the machine was operated when it was not, and leaves the player
-   * debugging the objective instead of the call.
-   *
-   * It is a `false` rather than a throw because `use` is the one verb that never names its target.
-   * `power("sub-3")` is permanently wrong for as long as that id is manual, but `use(dir)` names a
-   * *direction*: the same call one tile over works, so by the succeed-later test (docs/ENGINE.md
-   * §2) it is transient. A cycle-less machine belongs in the bucket `use` already had for a tile
-   * with nothing on it — there is nothing here that `use` can work — and it is reached by standing
-   * somewhere, which is the most transient state in the game.
-   *
-   * The third refusal, a machine whose `vars` names a feeder that is not `on` yet, is in the same
-   * bucket for the same reason and is the more obviously transient of the three: energising the
-   * feeder makes the identical call work.
-   */
   use(botId: number, dir?: Dir): boolean {
     const bot = this.requireActiveBot(botId);
     const t = bot.clock;
@@ -742,13 +549,6 @@ export class Sim {
     return true;
   }
 
-  /**
-   * True while any machine this one publishes a `fed:<id>` key for is not `on`.
-   *
-   * A feeder that has been removed from the world counts as unfed rather than as absent: the only
-   * way to write one of these keys is `build`, so a missing id is a level bug and answering "yes,
-   * powered" to it would hide the bug behind a door that opens.
-   */
   private unfed(machine: Machine): boolean {
     for (const [name, value] of Object.entries(machine.vars)) {
       if (value !== 1 || !name.startsWith(FED_BY)) continue;
@@ -757,24 +557,6 @@ export class Sim {
     return false;
   }
 
-  /**
-   * Directly sets a machine's state (World 5's `power`). Throws `IllegalActionError` for an id
-   * that names no machine, and for a machine whose `vars.manual` is `1` — those are hand-operated
-   * and only a `use()` at the tile moves them.
-   *
-   * The manual flag exists because `power` reaches any id anywhere on the map for a flat cost, so
-   * a level whose whole subject is *getting a fleet to the machines* is defeated by a loop over
-   * ids. Levels that want the travel back mark the machines rather than the command, so World 5,
-   * where operating the grid from the desk is the point, is untouched.
-   *
-   * Both refusals are permanent, which is what puts them on the throwing side of docs/ENGINE.md
-   * §2: nothing in the API clears `vars.manual` and nothing in it creates a machine, so each call
-   * is wrong for the whole run rather than wrong now, and a `false` the player could branch on
-   * would be a branch that can never flip. The unknown id kept that `false` for one release, on
-   * the reasoning that it was a state of the world; it is not one, and the free `probe(id)` that
-   * returns `null` is the pre-check that makes the throw fair. Both speak the way `LivelockError`
-   * does — at the moment they bite, naming what was asked for.
-   */
   power(botId: number, machineId: string, state: string): boolean {
     const bot = this.requireActiveBot(botId);
     const t = bot.clock;
@@ -828,10 +610,6 @@ export class Sim {
     return true;
   }
 
-  /**
-   * Restores the bot to `fuelMax`. Only succeeds while parked on a depot tile; it costs the same
-   * either way, and refuelling itself burns no fuel. DESIGN.md §4.4.
-   */
   refuel(botId: number): boolean {
     const bot = this.requireActiveBot(botId);
     const t = bot.clock;
@@ -845,10 +623,6 @@ export class Sim {
     return ok;
   }
 
-  /**
-   * Records consumption of a level-defined resource. The engine never interprets `resource`; it
-   * only totals it into `Verdict.stats.spend` so a level can report "cable used: 34".
-   */
   spend(resource: string, amount: number, botId?: number): void {
     this.op();
     if (!Number.isFinite(amount)) {
@@ -866,7 +640,6 @@ export class Sim {
     );
   }
 
-  /** Writes a breadcrumb on the bot's own tile. Pass null to erase. */
   mark(botId: number, text: string | null): void {
     const bot = this.requireActiveBot(botId);
     const t = bot.clock;
@@ -882,24 +655,12 @@ export class Sim {
     this.charge(bot, dt);
   }
 
-  /** Free. Appears in the console panel and drives the `printedSequence` objective. */
   print(botId: number, text: string, line?: number): void {
     const bot = this.requireBot(botId);
     const event = { t: bot.clock, kind: 'print' as const, text, botId };
     this.builder.push(line === undefined ? event : { ...event, line });
   }
 
-  /**
-   * Queues a message in another bot's inbox. World 7.
-   *
-   * Throws `IllegalActionError` when `to` names no bot, or a dead one. Both are permanent — no
-   * call in the API brings bot #99 into being, and nothing revives a bot once `kill` has run — so
-   * a `false` the player could branch on would be a branch that can never flip (docs/ENGINE.md
-   * §2). It is the same state every other verb already refuses through `requireActiveBot`, which
-   * is what made the old `false` an inconsistency rather than a choice: `move(99, …)` threw while
-   * `send(0, 99, "x")` shrugged. The refused send is logged and charged first, so the trace and
-   * the live world stay in step.
-   */
   send(botId: number, to: number, body: string | number): boolean {
     const bot = this.requireActiveBot(botId);
     const t = bot.clock;
@@ -928,15 +689,6 @@ export class Sim {
     return true;
   }
 
-  /**
-   * Pops the oldest message this bot has actually received by now. Free.
-   *
-   * A message is still in flight until the receiver's own clock reaches the sender's clock at
-   * `send`: a bot lagging at t = 300 has not yet heard what another bot said at t = 1300, however
-   * early the player's program happened to issue the call. Without that rule a live run and its
-   * replay disagree, because a replay only knows about the sends it has already applied. It is
-   * also why the World 7 idiom is `send`, then `sync`, then `recv`.
-   */
   recv(botId: number): Message | null {
     const bot = this.requireBot(botId);
     const head = bot.inbox[0];
@@ -953,17 +705,6 @@ export class Sim {
     return message;
   }
 
-  /**
-   * Creates a new bot on the adjacent tile in `dir`. Returns its id, or -1 when the tile refuses.
-   *
-   * The refusal is `move`'s, decided by the same `blockReason`, and the answer now rides on the
-   * event as `detail` instead of being computed and dropped. It stays a `-1` rather than a throw
-   * because the tile is transient: the neighbour walks off and the identical call succeeds.
-   *
-   * `blockReason` is asked about arrival at `t + costs.spawn`, not `t + costs.move`, so `canMove`
-   * is the nearest free test but not an exact one — where the two prices differ, a tile another
-   * bot is still vacating can pass `canMove` and refuse the spawn.
-   */
   spawn(botId: number, dir: Dir, options: { name?: string; capacity?: number } = {}): number {
     const parent = this.requireActiveBot(botId);
     const t = parent.clock;
@@ -1014,17 +755,6 @@ export class Sim {
     return id;
   }
 
-  /**
-   * Advances every living bot's clock to `max(clock)`. The World 7 rendezvous primitive.
-   *
-   * Emits one `sync` event per bot that actually idled, stamped at that bot's own clock and
-   * carrying the idle span as `dt`, so the renderer can show exactly who waited and for how long.
-   * A bot already at the makespan produces nothing.
-   *
-   * Idling burns no fuel, but it does spend the level's tick budget: `maxTicks` is enforced here
-   * exactly as it is on every acting command, or a level could blow its whole allowance through
-   * `sync()` alone and never be stopped.
-   */
   sync(): number {
     this.op();
     let target = this.peakClock;
@@ -1049,20 +779,6 @@ export class Sim {
     return target;
   }
 
-  // -------------------------------------------------------------------------
-  // Extension points
-  // -------------------------------------------------------------------------
-
-  /**
-   * Bills and logs a machine action that never reached a machine, so the verb that refused it can
-   * report the refusal in its own words. Charges `cost` ticks and emits the same `ok: false` act
-   * event a failed change emits.
-   *
-   * It exists because `applyMachineChange` used to be the only way to pay for a refusal: a caller
-   * that had already decided to refuse passed an id it knew was wrong and read the `false` back.
-   * That made a level verb's deliberate refusal and a genuinely broken id arrive at the engine as
-   * the same call, so neither the engine nor the player could tell them apart.
-   */
   refuseMachineAct(botId: number, detail: string, cost: number): void {
     const bot = this.requireActiveBot(botId);
     const t = bot.clock;
@@ -1071,15 +787,6 @@ export class Sim {
     this.charge(bot, cost);
   }
 
-  /**
-   * Escape hatch for world-specific machine logic (World 5/6). Applies `mutate` to the machine and
-   * emits the matching `machineChange` event so replay stays faithful. Charges `cost` ticks.
-   *
-   * An id that names no machine throws. Nothing in the API creates one, so the identical call
-   * cannot succeed later in the run (docs/ENGINE.md §2), and with `refuseMachineAct` carrying the
-   * refusals level verbs make on purpose, the only way to arrive here with an unknown id is a verb
-   * that computed one. The refusal is still logged and charged first, so a replay stays in step.
-   */
   applyMachineChange(
     botId: number,
     machineId: string,
@@ -1112,11 +819,6 @@ export class Sim {
     this.charge(bot, cost);
   }
 
-  /**
-   * Escape hatch for world-specific tile logic. Emits a `tileChange` event. Charges 0 ticks, but
-   * still counts against `maxOps` — a world command built on this would otherwise let a player
-   * loop grow the trace forever without ever tripping a budget.
-   */
   applyTileChange(at: Vec, mutate: (tile: Tile) => void): void {
     this.op();
     const tile = tileAt(this.world, at);
@@ -1135,10 +837,6 @@ export class Sim {
   snapshot(): World {
     return cloneWorld(this.world);
   }
-
-  // -------------------------------------------------------------------------
-  // Internals
-  // -------------------------------------------------------------------------
 
   private view(at: Vec, t: number): TileView {
     const tile = tileAt(this.world, at);
@@ -1196,7 +894,6 @@ export class Sim {
     this.applyMachineLinks(machine, t);
   }
 
-  /** A Door's `links` tiles follow its state: 'open' -> Floor, anything else -> Wall. */
   private applyMachineLinks(machine: Machine, t: number): void {
     if (machine.kind !== 'door' || !machine.links) return;
     const next = machine.state === 'open' ? Terrain.Floor : Terrain.Wall;
@@ -1209,18 +906,6 @@ export class Sim {
     }
   }
 
-  /**
-   * null when the move is legal, otherwise the reason.
-   *
-   * A bot holds a tile over the half-open interval `[the clock it arrived, the clock it left)`,
-   * and `arriveAt` is when the caller would take possession — the tick its action *completes*,
-   * not the tick it was issued. The tile is free when no other bot's residence extends past that
-   * instant. Two consequences, both intended by DESIGN.md §4.3:
-   *
-   * - a convoy works, because the leader's residence ends exactly when the follower's begins;
-   * - a bot running behind on its own clock still cannot walk through a tile someone else held
-   *   at that time, even though the tile looks empty in the live world.
-   */
   private blockReason(bot: Bot, to: Vec, arriveAt: number): string | null {
     if (!bot.alive) return 'dead';
     if (!inBounds(this.world, to)) return 'bounds';
@@ -1276,25 +961,16 @@ export class Sim {
     this.builder.push({ t: bot.clock, kind: 'fx', at, fx: 'die', botId: bot.id });
   }
 
-  /**
-   * Throws before anything is mutated, so a run that dies of thirst leaves a coherent world.
-   * A no-cost action can never fail this check.
-   */
   private requireFuel(bot: Bot, dt: number, action: string): void {
     if (dt <= 0 || bot.fuel >= dt) return;
     throw new OutOfFuelError(bot.id, bot.name, action, dt, bot.fuel);
   }
 
-  /**
-   * Advances the clock and burns `dt` fuel. `FUEL_BURNING` in trace.ts mirrors this: it lists the
-   * event kinds this is called for, so a replay burns exactly what the live run burned.
-   */
   private charge(bot: Bot, dt: number): void {
     bot.fuel -= dt;
     this.advance(bot, dt);
   }
 
-  /** Advances the clock without burning fuel: waiting, syncing and refuelling are free. */
   private chargeIdle(bot: Bot, dt: number): void {
     this.advance(bot, dt);
   }
@@ -1306,11 +982,6 @@ export class Sim {
     if (bot.clock > this.maxTicks) throw new HaltError(this.maxTicks, bot.id);
   }
 
-  /**
-   * DESIGN.md §4.6. A streak of blocked moves that covers every living bot, with not one
-   * successful move in between, is a livelock. Single-bot levels can never trip it — a lone bot
-   * bumping a wall is an ordinary bug, not a deadlock.
-   */
   private noteMoveOutcome(bot: Bot, blocked: boolean): void {
     if (!blocked) {
       this.blockedStreak = 0;
@@ -1330,10 +1001,6 @@ export class Sim {
     );
   }
 
-  /**
-   * Tallies one sensing read and records it. Free in ticks, so `bot.clock` is untouched and the
-   * event carries `dt: 0` — replay applies it as a no-op.
-   */
   private sense(bot: Bot, name: string, ok: boolean, detail?: string | number): void {
     this.senseLedger.set(name, (this.senseLedger.get(name) ?? 0) + 1);
     const event: SenseEvent = {
@@ -1378,12 +1045,6 @@ export class Sim {
   }
 }
 
-/**
- * Which of `plant`'s three refusals applies, or null when the seed would go in.
- *
- * Ordered ground, then crop, then inventory — the same order the player checks them in, and the
- * order that keeps the answer stable when two causes hold at once.
- */
 function plantBlockReason(tile: Tile | undefined, seeds: number): string | null {
   if (!tile || !terrainProps(tile.terrain).plantable) return 'terrain';
   if (tile.crop !== undefined) return 'occupied';
@@ -1391,13 +1052,6 @@ function plantBlockReason(tile: Tile | undefined, seeds: number): string | null 
   return null;
 }
 
-/**
- * Why a `pickup` came back with nothing.
- *
- * Ordered by what the player can act on soonest: their own argument, then the tile, then what is
- * on it, then the inventory. Every one of these is readable for free — `scan().items` and
- * `inventory()` / `capacity()` — which is what keeps `pickup` a `0` rather than a throw.
- */
 function pickupBlockReason(requested: number, anyOnGround: boolean, onGround: number): string {
   if (requested <= 0) return 'count';
   if (!anyOnGround) return 'empty';
@@ -1405,14 +1059,12 @@ function pickupBlockReason(requested: number, anyOnGround: boolean, onGround: nu
   return 'full';
 }
 
-/** Why a `drop` came back with nothing. `carrying` is the bot's total across every kind. */
 function dropBlockReason(requested: number, carrying: number): string {
   if (requested <= 0) return 'count';
   if (carrying <= 0) return 'empty';
   return 'kind';
 }
 
-/** Human-readable rendering of a move failure, for hint text and failure messages. */
 export function describeBlock(reason: string, dir: Dir): string {
   switch (reason) {
     case 'bounds':
@@ -1426,12 +1078,10 @@ export function describeBlock(reason: string, dir: Dir): string {
   }
 }
 
-/** `Infinity` does not survive a `postMessage` round trip, so an unlimited reading has no detail. */
 function finiteDetail(value: number): number | undefined {
   return Number.isFinite(value) ? value : undefined;
 }
 
-/** Marks are player-written and can be long. A trace only needs enough to recognise one. */
 function clip(text: string): string {
   return text.length <= 48 ? text : `${text.slice(0, 48)}…`;
 }

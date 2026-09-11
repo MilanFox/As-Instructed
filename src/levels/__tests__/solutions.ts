@@ -34,11 +34,6 @@ import { solution as w8_03 } from '../world-8/__solutions__/w8-03.ts';
 import { solution as w8_04 } from '../world-8/__solutions__/w8-04.ts';
 import { solution as w8_05 } from '../world-8/__solutions__/w8-05.ts';
 
-/**
- * Every level ships a reference solution (DESIGN.md §5). Registered here so that the level
- * suite and the par suite drive the same 33 programs; the par table is only evidence if the
- * thing it measures is the thing the campaign is proved solvable with.
- */
 export const SOLUTIONS: Record<string, ReferenceSolution> = {
   'w1-01': w1_01,
   'w1-03': w1_03,

@@ -13,20 +13,6 @@ interface Leg {
   cost: number;
 }
 
-/**
- * TEST FIXTURE. Never imported from src/main.tsx — vite.config.ts fails the build if it is.
- *
- * One loop, three moves it can make, and the whole level is the order it picks them in:
- *
- * 1. carrying something whose bay is known, and that bay is no further than the next thing
- *    worth walking to (or the arms are full) — go and drop it;
- * 2. otherwise walk to the nearest crate that has been seen and not yet lifted;
- * 3. otherwise walk to the nearest edge of what has been seen.
- *
- * The map is a `KnownMap` fed only by `scan` and `look` from tiles the bot has actually stood on,
- * so nothing here can path through a wall the player would not have seen either. Not an optimal
- * router: it is the intended heuristic, and par is derived from it.
- */
 export const solution: ReferenceSolution = {
   levelId: 'w8-02',
   run(sim: Sim, botId: number): void {
@@ -69,9 +55,6 @@ export const solution: ReferenceSolution = {
     };
 
     observe();
-    /* No `capacity()` in the player's hardware, so the arms report their own limit: a pickup that
-       takes less than it was offered is the only way to learn the number, and it costs one tick,
-       once. `load` below and the `source` do exactly the same thing. */
     let capacity = Number.POSITIVE_INFINITY;
     const guardLimit = DEPOT_W * DEPOT_H;
 

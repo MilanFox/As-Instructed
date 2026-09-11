@@ -2,13 +2,6 @@ import type { ItemKind, Sim, Vec } from '../../../engine/index.ts';
 import type { ReferenceSolution } from '../../types.ts';
 import { goTo, key, surveyYard } from './driver.ts';
 
-/**
- * TEST FIXTURE. Never imported from src/main.tsx.
- *
- * Survey the whole yard once, building a class -> depot table out of the stencils, then run the
- * crates in the order they were found. Ordering the round by proximity instead is what the bonus
- * is for; this reference deliberately does not, so par leaves that improvement on the table.
- */
 export const solution: ReferenceSolution = {
   levelId: 'w3-02',
   run(sim: Sim, botId: number): void {

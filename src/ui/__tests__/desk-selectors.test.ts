@@ -1,15 +1,3 @@
-/**
- * A desk selector must hand back the same array until the paper actually changes.
- *
- * `looseDocs` and `filedDocs` are read through zustand, i.e. through `useSyncExternalStore`, which
- * compares with `Object.is`. A selector that filters or sorts into a fresh array fails that check
- * on every single read, so the component re-renders forever. `PaperLayer` died on exactly this with
- * `Maximum update depth exceeded` and the desk lost all of its paperwork — the failure looks like a
- * crash in the component rather than like a bug in the selector, which is why it is worth a test
- * rather than a comment.
- *
- * `src/meta/store.ts` hit the same thing first, in `reports()` and `structure()`.
- */
 import { describe, expect, it } from 'vitest';
 
 import { DOC_HOME, filedDocs, looseDocs, usePapers } from '../desk/paper/papers.ts';
@@ -50,7 +38,6 @@ describe('the desk selectors are stable', () => {
 
     expect(after).not.toBe(before);
     expect(after).toHaveLength(0);
-    // Filed is not deleted. That is the whole ruling.
     expect(filedDocs(usePapers.getState())).toHaveLength(1);
   });
 });

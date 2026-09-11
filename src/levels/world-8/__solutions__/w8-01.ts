@@ -2,14 +2,6 @@ import type { Sim, Vec } from '../../../engine/index.ts';
 import { Dir, ItemKind } from '../../../engine/index.ts';
 import type { ReferenceSolution } from '../../types.ts';
 
-/**
- * TEST FIXTURE. Never imported from src/main.tsx — vite.config.ts fails the build if it is.
- *
- * One free pass down the silo's own column, casting a ray across each row, gives every ripe tile
- * without walking the field. After that it is capacity-sized batches, nearest tile first, back to
- * the silo when the arms are full. Not optimal routing — deliberately, since the level is priced
- * against a full sweep and against the length of this program, not against the best tour.
- */
 export const solution: ReferenceSolution = {
   levelId: 'w8-01',
   run(sim: Sim, botId: number): void {
@@ -23,8 +15,6 @@ export const solution: ReferenceSolution = {
       }
     } while (sim.canMove(botId, along) && sim.move(botId, along));
 
-    // Filed here rather than at the end: the field stops being able to answer this the moment
-    // the first crop comes out of it.
     const perRow = new Map<number, number>();
     for (const at of ripe) perRow.set(at.y, (perRow.get(at.y) ?? 0) + 1);
     let bestRow = 0;

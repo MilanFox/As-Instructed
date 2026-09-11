@@ -1,25 +1,3 @@
-/**
- * A control the player can see must be the thing their pointer lands on.
- *
- * The in-tray advertised a count, said `3 documents waiting` to a screen reader, and could not be
- * clicked at all: `document.elementFromPoint` at the centre of its own button returned the copy
- * stand, whose box reaches 38 units past everything it draws. The tray was the only route back to
- * a document the player had put away, so the button nobody could hit was also the door out of a
- * one-way `put it away`. **That is the class of defect, not the instance** — anything placed on
- * this desk can be painted over by anything placed after it, and the failure is silent: the
- * control renders, reads correctly in the accessibility tree, and does nothing.
- *
- * So the geometry is checked rather than the pixels. The suite runs in node with no layout engine,
- * which is the same constraint `desk-frame.test.ts`, `paper-clearance.test.ts` and
- * `monitor-margin.test.ts` work under, and the same answer applies: **recompute the boxes from the
- * stylesheets.** A control's box is resolved against its housing, every object that paints above it
- * is resolved the same way, and an overlap is a failure. The only literals here are the policy —
- * which classes are desk controls, what they stand on, and how high they reach.
- *
- * An object that paints nothing over the control still catches the pointer if its box is there, so
- * `pointer-events: none` is read as well: an object that has given its dead space back is measured
- * by the parts that took it, not by its box.
- */
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -41,13 +19,6 @@ interface Box {
   y2: number;
 }
 
-/**
- * Every desk control that is drawn on the desk floor and taken out of its housing's flow.
- *
- * `z` is how high the control reaches once it is on screen, which for a child is its housing's
- * stacking level — or the level the housing is promoted to while the control is open, which is how
- * a panel is allowed to cover the furniture it opens over.
- */
 const CONTROLS: Record<string, { in: string; z: number; why: string }> = {
   'tray-tab': {
     in: 'tray',
@@ -61,22 +32,12 @@ const CONTROLS: Record<string, { in: string; z: number; why: string }> = {
   },
 };
 
-/**
- * Absolutely positioned controls that are *not* on the desk floor, with the reason each one is
- * somebody else's problem. A new entry here is a decision; the point of the roll-call is that a
- * new control cannot be added without making one.
- */
 const NOT_ON_THE_DESK: Record<string, string> = {
   'fc-mark': 'an act marker on the transport track, positioned per tick. inside the feed housing',
   'cs-unpin': 'inside the copy stand board, on the page it unpins',
   'mo-close': 'on the manual, which is a full-bleed spread while it is open',
 };
 
-/**
- * Full-bleed layers, which have no centred box and cannot be measured as furniture. Paper is
- * draggable anywhere on purpose (`Sheet.tsx`), so a sheet resting over a control is a sheet, and
- * the player can move it.
- */
 const LAYERS = new Set(['paper-layer', 'binder-open', 'room', 'desk']);
 
 function readDeskCss(): Rule[] {
@@ -85,9 +46,6 @@ function readDeskCss(): Rule[] {
     .filter((name) => name.endsWith('.css') && name !== 'director.css')
     .map((name) => readFileSync(join(STYLE_DIR, name), 'utf8'))
     .join('\n')
-    /* Comments carry colons and semicolons of their own, and a declaration sitting under one is a
-       declaration this file cannot see. That is not hypothetical: it read the copy stand as still
-       catching pointers because the note above the line was in the way. */
     .replace(/\/\*[\s\S]*?\*\//g, '');
   const pattern = /\.desk([^{}]*)\{([^}]*)\}/g;
   let rule: RegExpExecArray | null;
@@ -99,7 +57,6 @@ function readDeskCss(): Rule[] {
 
 const rules = readDeskCss();
 
-/** The rules that style exactly one class and qualify it no further. A state is not a box. */
 function rulesFor(name: string): Rule[] {
   return rules.filter((rule) => {
     if (/[[:]/.test(rule.selector)) return false;
@@ -116,7 +73,6 @@ function declaration(name: string, property: string): string | undefined {
   return undefined;
 }
 
-/** `calc(306 * var(--u))` -> 306, `50%` -> half of `span`, `0` -> 0. */
 function length(value: string | undefined, span: number): number | undefined {
   if (value === undefined) return undefined;
   const units = /^calc\(\s*(-?[\d.]+)\s*\*\s*var\(--u\)\s*\)$/.exec(value);
@@ -127,7 +83,6 @@ function length(value: string | undefined, span: number): number | undefined {
   return undefined;
 }
 
-/** `calc(50% + 486 * var(--u))` -> 486. How the desk places a piece of furniture. */
 function centred(value: string | undefined): number | undefined {
   if (value === undefined) return undefined;
   const found = /calc\(\s*50%\s*([-+])\s*([\d.]+)\s*\*\s*var\(--u\)\s*\)/.exec(value);
@@ -135,7 +90,6 @@ function centred(value: string | undefined): number | undefined {
   return Number(found[2]) * (found[1] === '-' ? -1 : 1);
 }
 
-/** `inset: 0 0 calc(58 * var(--u)) 0` -> the four sides, CSS order. */
 function inset(name: string): (string | undefined)[] | undefined {
   const value = declaration(name, 'inset');
   if (value === undefined) return undefined;
@@ -147,11 +101,9 @@ function inset(name: string): (string | undefined)[] | undefined {
 
 interface Furniture extends Box {
   z: number;
-  /** True where the object has declared its own box transparent to the pointer. */
   dead: boolean;
 }
 
-/** Every piece of furniture the desk places against the centre of the frame, with its box. */
 function furniture(): Map<string, Furniture> {
   const found = new Map<string, Furniture>();
   for (const rule of rules) {
@@ -177,7 +129,6 @@ function furniture(): Map<string, Furniture> {
   return found;
 }
 
-/** A child's box, resolved against the box it is positioned inside. */
 function childBox(name: string, parent: Box): Box | undefined {
   const width = parent.x2 - parent.x1;
   const height = parent.y2 - parent.y1;
@@ -187,8 +138,6 @@ function childBox(name: string, parent: Box): Box | undefined {
   const top = length(sides?.[0] ?? declaration(name, 'top'), height);
   const bottom = length(sides?.[2] ?? declaration(name, 'bottom'), height);
   const own = length(declaration(name, 'width'), width);
-  /* A panel states how tall it is allowed to grow rather than how tall it is. The cap is the box
-     to check, because the cap is what has to fit. */
   const tall =
     length(declaration(name, 'height'), height) ?? length(declaration(name, 'max-height'), height);
   const shifted = /translateX?\(\s*-50%/.test(declaration(name, 'transform') ?? '');
@@ -197,7 +146,8 @@ function childBox(name: string, parent: Box): Box | undefined {
   let x2: number | undefined;
   if (left !== undefined && own !== undefined) [x1, x2] = [left, left + own];
   else if (left !== undefined && right !== undefined) [x1, x2] = [left, width - right];
-  else if (right !== undefined && own !== undefined) [x1, x2] = [width - right - own, width - right];
+  else if (right !== undefined && own !== undefined)
+    [x1, x2] = [width - right - own, width - right];
   if (x1 === undefined || x2 === undefined) return undefined;
   if (shifted) {
     const half = (x2 - x1) / 2;
@@ -220,12 +170,6 @@ function overlaps(a: Box, b: Box): boolean {
   return a.x1 < b.x2 && b.x1 < a.x2 && a.y1 < b.y2 && b.y1 < a.y2;
 }
 
-/**
- * The parts each object gave the pointer back to, after declaring its own box dead.
- *
- * Scoped by source order, which is how the rule is written: an object states `pointer-events: none`
- * and the rule underneath it names the parts that take their clicks back.
- */
 function livingParts(): Map<string, string[]> {
   const parts = new Map<string, string[]>();
   let dead: string | null = null;
@@ -260,7 +204,9 @@ describe('every desk control is the thing the pointer lands on', () => {
         else if (entry.name.endsWith('.tsx')) {
           const source = readFileSync(path, 'utf8');
           for (const tag of source.match(/<button\b[\s\S]*?>/g) ?? []) {
-            for (const found of tag.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\}|\{([^}]*)\})/g)) {
+            for (const found of tag.matchAll(
+              /className=(?:"([^"]*)"|\{`([^`]*)`\}|\{([^}]*)\})/g,
+            )) {
               const text = found[1] ?? found[2] ?? found[3] ?? '';
               for (const word of text.match(/[\w-]+/g) ?? []) buttons.add(word);
             }

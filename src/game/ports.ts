@@ -1,11 +1,3 @@
-/**
- * Adapter seam between the UI and the two subsystems it does not own.
- *
- * The shell is built and tested against these interfaces only. `src/runtime` and `src/render` ship
- * their own classes (`Runner`, `Renderer`); `src/ui/adapters.ts` wraps them to fit, and the fakes
- * below stand in wherever a browser is not available — tests, and any point at which either
- * subsystem is missing.
- */
 import type { Trace, Vec, Verdict } from '../engine/index.ts';
 import {
   FailureCode,
@@ -19,26 +11,12 @@ import {
 import type { RunResponse } from '../runtime/protocol.ts';
 import { getLevel } from '../levels/index.ts';
 
-/** What the shell knows at Run time. Transpiling to JS is the adapter's job, not the shell's. */
 export interface RunSubmission {
-  /** The player's TypeScript, exactly as typed. */
   code: string;
   levelId: string;
   seeds: number[];
 }
 
-/**
- * Compiles and runs player source, and answers with a trace and a verdict.
- *
- * Contract the UI relies on:
- *  - `run` resolves with a `RunResponse` for success and failure alike; it rejects only when the
- *    host itself broke.
- *  - `cancel` is always safe, is idempotent, and may be called when nothing is running. The shell
- *    never waits for it: after cancelling it drops the in-flight request by token, so a wedged
- *    worker cannot soft-lock anything (DESIGN.md §10.6).
- *  - `prepare` is called on every level change and installs exactly the hardware unlocked at that
- *    level into the editor's language service.
- */
 export interface RunnerPort {
   prepare(levelId: string): void;
   run(submission: RunSubmission): Promise<RunResponse>;
@@ -46,76 +24,34 @@ export interface RunnerPort {
   dispose(): void;
 }
 
-/**
- * The verdict, as a flourish. Mirrors `CelebrationKind` in `src/render/renderer.ts`; it is spelled
- * out here rather than imported so the shell still compiles against the ports alone.
- */
 export type CelebrationKind = 'gold' | 'silver' | 'bronze' | 'pass' | 'fail';
 
-/**
- * Draws a trace into a canvas and owns the playback clock.
- *
- * The renderer runs the frame loop, because it is the thing that has to interpolate; the shell
- * follows the position through `onTick` and pushes the player's intent back down through
- * `seek`/`play`/`pause`. Speeds are in engine ticks per wall-clock second.
- */
 export interface RendererPort {
   mount(canvas: HTMLCanvasElement): void | Promise<void>;
   setTrace(trace: Trace | null): void;
-  /** Selects the world's biome and palette. */
   setWorld(world: number): void;
   seek(tick: number): void;
   play(ticksPerSecond: number): void;
   pause(): void;
-  /** Subscribes to playback position. Returns an unsubscribe. */
   onTick(listener: (tick: number, playing: boolean) => void): () => void;
 
-  /**
-   * Cells the objective in progress is about, bracketed under the bots.
-   *
-   * The shell recomputes this as the playhead moves (`src/game/playback.ts`), which is what turns
-   * a replay into something with a shape: the eye is told where the work is happening now.
-   */
   setHighlights(cells: readonly Vec[], met?: boolean): void;
 
-  /**
-   * The end-of-run flourish, and the per-row beat a staged report needs.
-   *
-   * `<Results/>` owns the timing of both, because the sounds and the rings have to land on the
-   * same instants — `MEDAL_BEAT` is the number the two sides agree on.
-   */
   celebrate(kind: CelebrationKind): void;
   pulse(kind?: 'objective' | 'commend'): void;
-  /** Set from `save.settings.celebrations`. Off means no-op, not quieter. */
   setCelebrationsEnabled(enabled: boolean): void;
-  /** Cuts a flourish dead, for the click or key that finishes the reveal early. */
   skipCelebration(): void;
 
   dispose(): void;
 }
 
-// ---------------------------------------------------------------------------
-// Fakes
-// ---------------------------------------------------------------------------
-
 const HANG_MARKER = '@hang';
 
 export interface FakeRunnerOptions {
-  /** Simulated worker latency, in ms. */
   latencyMs?: number;
-  /** Never settle any run, whatever the source says. Proves the shell survives a wedged worker. */
   neverReturns?: boolean;
 }
 
-/**
- * Stand-in for `src/runtime`. It binds a small subset of the player API straight onto a `Sim` and
- * evaluates the source with `new Function`, which is enough to exercise the whole shell: real
- * worlds, real traces, real verdicts.
- *
- * It is emphatically not the runtime. There is no worker, no TypeScript transpile and no
- * watchdog, so it runs on the calling thread. Source containing `@hang` returns a promise that
- * never settles, which is how the cancel path is tested.
- */
 export class FakeRunner implements RunnerPort {
   private cancelled = false;
   private readonly latencyMs: number;
@@ -186,9 +122,6 @@ export class FakeRunner implements RunnerPort {
       ...(failure ? { failure } : {}),
     });
 
-    /* The real runtime grades bonuses on every seed and reports the worst (`aggregate.ts`). This
-       one has only ever run a single seed, so it can do no better than report that seed for all of
-       them — the same fiction it already tells about `results`. */
     const bonus = evaluateObjectives(level.bonus ?? [], {
       world: sim.world,
       trace,
@@ -216,7 +149,6 @@ export class FakeRunner implements RunnerPort {
   }
 }
 
-/** Binds the API names onto a `Sim` and evaluates the source. Development only. */
 function evaluatePlayerSource(code: string, sim: Sim, botId: number): void {
   const api: Record<string, unknown> = {
     Dir: { North: 0, East: 1, South: 2, West: 3 },
@@ -233,10 +165,6 @@ function evaluatePlayerSource(code: string, sim: Sim, botId: number): void {
   fn(...names.map((name) => api[name]));
 }
 
-/**
- * Stand-in for `src/render`. Draws the trace's world as flat tiles plus the bots at the current
- * tick — enough to lay the viewport out honestly, and no more.
- */
 export class FakeRenderer implements RendererPort {
   private canvas: HTMLCanvasElement | null = null;
   private trace: Trace | null = null;

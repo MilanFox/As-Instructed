@@ -1,20 +1,3 @@
-/**
- * The ending must not be lose-able by ordinary play.
- *
- * A playtester who closed all 33 work orders never read the Performance Review. `DESK_CAPACITY`
- * files the oldest unfiled sheet when a new one arrives, five failed dispatches on `w8-01` put
- * five HALT NOTICEs in the tray, and the memo went under. Eviction does not delete the document —
- * it sets `filed` — but no surface on this desk draws filed paper: `looseDocs` and `trayDocs` both
- * exclude it and the commendation book reads filed *certificates* only, for one `ENTERED` flag. So
- * the memo was on the record and unreachable, and `issueOnce` in `usePaperwork.ts` never hands out
- * an id it has already issued, so it could not come back. The only route to it was clearing
- * `bootstrap.desk` by hand.
- *
- * Reachable, here, means exactly what the player can get at: out on the desk, or in the in-tray
- * where `Tray` lists it and `takeOut` puts it back on the desk. Everything the company issues once
- * is in the same class as the memo — the certificate, the requisition, the Repository note, the
- * standing sheet and the brief for the level that is open — so the guard covers the class.
- */
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { useGame } from '../../../../game/store.ts';
@@ -58,7 +41,6 @@ function report(levelId: string): ReportSnapshot {
   };
 }
 
-/** Issued the way the company issues it: into the in-tray, unread. */
 function issue(id: string, payload: DocPayload): void {
   usePapers.getState().issue({
     id,
@@ -69,7 +51,6 @@ function issue(id: string, payload: DocPayload): void {
   });
 }
 
-/** The player takes a sheet out, holds it up to the lamp, and puts it away again. */
 function readIt(id: string): void {
   usePapers.getState().takeOut(id);
   usePapers.getState().lift(id);
@@ -77,7 +58,6 @@ function readIt(id: string): void {
   usePapers.getState().stow(id);
 }
 
-/** Enough read paper to push anything else past capacity several times over. */
 function fillTheDesk(count: number): void {
   for (let n = 0; n < count; n += 1) {
     const id = `filler:${String(n)}`;
@@ -110,13 +90,6 @@ const ISSUED_ONCE: readonly { what: string; id: string; payload: DocPayload }[] 
 describe('paper the player has not read is never filed for them', () => {
   beforeEach(reset);
 
-  /*
-   * The tester blamed the five failed dispatches, and five of anything cannot on its own reach a
-   * sheet that is newer than five other sheets — the memo is lost because it arrives at a rank
-   * tier partway through the campaign and then everything else in the campaign arrives on top of
-   * it. This is that, at the size it actually happens: a memo in the tray, and an ordinary evening
-   * of work landing on it.
-   */
   it('keeps the Performance Review while the campaign goes on around it', () => {
     issue('memo:4', { kind: 'memo', rank: 4 });
     issue('standing', { kind: 'standing' });

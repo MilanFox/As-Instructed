@@ -12,7 +12,6 @@ export type { LevelDef, LevelFact, ReferenceSolution, WorldMeta } from './types.
 export type { LevelRunResult } from './harness.ts';
 export { runLevel, runReference } from './harness.ts';
 
-/** DESIGN.md §6. Accents are drawn from the tokens.css palette family. */
 export const WORLDS: readonly WorldMeta[] = [
   {
     id: 1,
@@ -76,10 +75,6 @@ export const WORLDS: readonly WorldMeta[] = [
   },
 ];
 
-/**
- * The campaign, in play order. CONTENT owns this list; append level modules here as they land.
- * Order within a world follows `LevelDef.index`, not array position.
- */
 export const LEVELS: LevelDef[] = [
   ...WORLD_1_LEVELS,
   ...WORLD_2_LEVELS,
@@ -97,12 +92,6 @@ export function getLevel(id: string): LevelDef | undefined {
   return byId.get(id);
 }
 
-/**
- * Whether the work order with this id carries a medal. DESIGN.md §7.
- *
- * An id this build has never heard of grades, deliberately: a save written against a level that
- * has since been retired keeps the medal it recorded rather than losing it to a lookup miss.
- */
 export function levelIsGraded(id: string): boolean {
   return byId.get(id)?.graded !== false;
 }
@@ -116,7 +105,6 @@ export interface WorldSection {
   levels: LevelDef[];
 }
 
-/** Every world with its levels sorted by `index`. Worlds with no levels yet are still listed. */
 export function levelsByWorld(): WorldSection[] {
   return WORLDS.map((world) => ({
     world,
@@ -124,12 +112,10 @@ export function levelsByWorld(): WorldSection[] {
   }));
 }
 
-/** The flat play order across the whole campaign. */
 export function campaignOrder(): LevelDef[] {
   return LEVELS.slice().sort((a, b) => a.world - b.world || a.index - b.index);
 }
 
-/** API names available to the player at `levelId`, cumulative and in unlock order. */
 export function hardwareUnlockedBy(levelId: string): string[] {
   const unlocked: string[] = [];
   for (const level of campaignOrder()) {

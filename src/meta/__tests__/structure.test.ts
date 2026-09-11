@@ -4,13 +4,6 @@ import { emptyLibrary } from '../save.ts';
 import { buildStructure } from '../structure.ts';
 import type { LevelProfile, LibrarySave } from '../types.ts';
 
-/**
- * The structure view is the one screen that claims the player built something rather than merely
- * saved something, so the edges have to come from their own text and the numbers from their own
- * runs. These tests are about the seam between those two: a subroutine the source knows about and
- * no run has touched must still appear, and it must appear without a number.
- */
-
 const COMPOSED = [
   '// The one opening that is not the way we came from.',
   'export function step(back: number): number {',

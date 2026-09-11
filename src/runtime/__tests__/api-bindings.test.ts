@@ -14,16 +14,6 @@ import {
 import { PLAYER_API } from '../api-spec.ts';
 import { assertApiComplete, buildPlayerScope, implementedApiNames } from '../api-bindings.ts';
 
-/**
- * The five commands `Sim` deliberately leaves open — `link`, `receive`, `buffered`, `transmit`,
- * `decode`.
- *
- * `api-spec.ts` hands World 5 and 6 semantics to RUNTIME to define on top of the engine's
- * extension points, so these tests are the contract CONTENT authors levels against. Everything
- * they touch goes through `applyMachineChange` / `applyTileChange`, which is what keeps a run and
- * its replay in agreement.
- */
-
 const ANTENNA = vec(3, 1);
 
 function listeningPost(packets: string[] = [], state = 'on'): { sim: Sim; world: World } {
@@ -99,12 +89,6 @@ describe('receive', () => {
   });
 });
 
-/**
- * `receive` used to be the only way to learn anything about the band, and it learns by consuming:
- * a program could not tell an empty buffer from a full one without emptying it (DESIGN.md §11.7).
- * These tests hold `buffered` to the one property that closes that gap — asking never costs a
- * packet — as well as to the count itself.
- */
 describe('buffered', () => {
   test('counts the unread packets without taking any of them', () => {
     const { sim } = listeningPost(['alpha', 'beta', 'gamma']);
@@ -147,19 +131,6 @@ describe('buffered', () => {
     expect(tileAt(sim.world, ANTENNA)?.meta?.['rxNext']).toBeUndefined();
   });
 
-  /**
-   * Free in ticks is not free in information. Both band reads bind to the antenna through
-   * `sim.probe`, so each one lands in `senseTotals` under `probe` and spends against a
-   * `withinSenses('probe', n)` budget — and each one spends *two*, not one: `antennaFor` probes the
-   * tile the bot is on to see whether it is the post, then the read probes the post it settled on
-   * by id. Both are real reads and the count is the same however the bot is standing.
-   *
-   * `w8-03` is the only work order where the overlap is reachable — its desk is a `Router`, which
-   * `ANTENNA_KINDS` matches, and it budgets twenty-six probes — so two `receive()` calls there take
-   * four. A budget that charges for a command it does not name is DESIGN.md §11.9, and the API docs
-   * for `receive` and `buffered` now name it. This pins the number they quote so the sentence
-   * cannot go stale.
-   */
   test('a band read is two probes against a sensing budget', () => {
     const { sim } = listeningPost(['alpha', 'beta']);
     const { buffered, receive } = api(sim, ['buffered', 'receive']);
@@ -255,7 +226,7 @@ describe('link', () => {
     return { sim: new Sim(world), world };
   }
 
-  test('records the connection and reports the cable spent (DESIGN.md §4.6)', () => {
+  test('records the connection and reports the cable spent', () => {
     const { sim, world } = grid();
     expect(api(sim, ['link']).link?.('node-1', 'node-2')).toBe(true);
     expect(world.machines[0]?.vars['link:node-2']).toBe(1);

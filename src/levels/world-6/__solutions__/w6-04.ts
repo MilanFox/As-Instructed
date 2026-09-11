@@ -2,14 +2,6 @@ import type { Sim } from '../../../engine/index.ts';
 import type { ReferenceSolution } from '../../types.ts';
 import { playerApi } from './_api.ts';
 
-/**
- * TEST FIXTURE. Never imported from src/main.tsx — vite.config.ts fails the build if it is.
- *
- * Ninety-five candidates, one test. Take the first packet, try every shift, and keep the one
- * that puts the promised header at position 0; the rest of the band follows for free. The
- * straggler carries no header, so it is scored instead: of ninety-five readings, English is the
- * one that is mostly lowercase letters and spaces.
- */
 const MAGIC = 'KD//';
 const SPACE = 95;
 

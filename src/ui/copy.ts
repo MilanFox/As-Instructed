@@ -1,14 +1,6 @@
-/**
- * Stock player-facing lines, from NARRATIVE.md §5 and §6.
- *
- * These are read hundreds of times, so they are picked deterministically from the result rather
- * than at random: the same run always says the same thing, and a line never surprises anyone
- * twice. Do not add jokes outside this file's registers, and never inside the docs panel.
- */
 import { FailureCode, Medal } from '../engine/index.ts';
 import type { RuntimeFailure } from '../runtime/index.ts';
 
-/** Stable pick, so re-opening a result never reshuffles the wording. */
 function pick(lines: readonly string[], salt: number): string {
   return lines[Math.abs(salt) % lines.length] ?? lines[0] ?? '';
 }
@@ -31,12 +23,6 @@ const GOLD = [
   'Par met. Facilities asked whether the meter is broken. It is not.',
 ];
 
-/**
- * Closing an ungraded level (DESIGN.md §7). Not a fourth rung — these levels admit one route,
- * so there is no budget to have met and nothing to compare against. The level is worth the same
- * three points a gold is, so none of these may read as a consolation, and none of them mentions
- * par, a time, or a grade.
- */
 const CLOSED = [
   'Work order closed. Kessler & Daughters has no notes.',
   'Closed. The job had one shape, and you found it.',
@@ -46,7 +32,6 @@ const CLOSED = [
 export const UNDER_PAR = 'Under par. Par has been adjusted. This is how it has always worked.';
 export const BONUS_MET = 'Bonus met. There is no bonus. There is a star.';
 
-/** `null` is an ungraded level: it passed, it closed, and it was never going to be graded. */
 export function successLine(medal: Medal | null, ticks: number, parTicks: number): string {
   if (medal === null) return pick(CLOSED, ticks);
   if (medal === Medal.Gold && ticks < parTicks) return UNDER_PAR;
@@ -55,27 +40,15 @@ export function successLine(medal: Medal | null, ticks: number, parTicks: number
   return pick(BRONZE, ticks);
 }
 
-/** Beating your own recorded time. Shown once, loudly, next to the two numbers. */
 export function personalBestLine(previous: number, now: number): string {
   return `Your own record, lowered by ${previous - now}. The old figure has been retained.`;
 }
 
-/**
- * What the Repository did on this run, as a fact rather than as a score.
- *
- * `LibraryUsage` is measured on every run that links `lib.ts` and was thrown away unread. Nothing
- * here adds a point to anything, which is the point: the veteran playtester used the Repository
- * heavily for no extrinsic reward at all, and the honest number was already being computed.
- */
 export function libraryUsageLine(routines: number, ticks: number): string {
   const called = `${routines} routine${routines === 1 ? '' : 's'} from the Repository`;
   return `${called}, ${ticks} tick${ticks === 1 ? '' : 's'} inside ${routines === 1 ? 'it' : 'them'}.`;
 }
 
-/**
- * A failed run costs the player nothing but the time it took, and the report says so in as many
- * words. There is no penalty anywhere in this game and the player should never have to wonder.
- */
 export const NO_PENALTY = 'Nothing was billed. Attempts are not recorded against you.';
 
 const HALT = [
@@ -117,24 +90,11 @@ export function failureLine(code: FailureCode | undefined, salt: number): string
   return pick(lines ?? UNMET, salt);
 }
 
-/**
- * The failure line for the `cursor`-th failure of the session.
- *
- * Failure copy is read dozens of times in a row while somebody debugs a loop, and the same line
- * twice running is the moment it stops being funny and starts being wallpaper. Rotation fixes
- * that, but it must not be *random*: the store owns the cursor and only advances it when a run
- * actually fails, so re-rendering the report cannot reshuffle the wording under a player who is
- * still reading it.
- */
 export function failureLineAt(code: FailureCode | undefined, cursor: number): string {
   const lines = (code ? BY_CODE[code] : undefined) ?? UNMET;
   return lines[Math.abs(Math.trunc(cursor)) % lines.length] ?? (lines[0] as string);
 }
 
-/**
- * A run that never reached the simulator has no `Verdict`, only a `RuntimeFailure.kind`. Map it
- * onto the engine's codes so a halt still reads as a halt rather than as an unmet objective.
- */
 export function codeForKind(kind: RuntimeFailure['kind'] | undefined): FailureCode | undefined {
   switch (kind) {
     case 'timeout':
@@ -151,7 +111,6 @@ export function codeForKind(kind: RuntimeFailure['kind'] | undefined): FailureCo
   }
 }
 
-/** Generalization failure is the category that matters most. NARRATIVE.md §5. */
 export function seedFailureLine(passedSeed: number, failedSeed: number): string {
   return `Passed on seed ${passedSeed}. Failed on seed ${failedSeed}. The field is not always the same field.`;
 }
@@ -159,18 +118,6 @@ export function seedFailureLine(passedSeed: number, failedSeed: number): string 
 export const VERDICT_PASS = 'work order closed';
 export const VERDICT_FAIL = 'work order open';
 
-// ---------------------------------------------------------------------------
-// Hardware requisitions
-// ---------------------------------------------------------------------------
-
-/**
- * What a piece of hardware is, and what having it changes.
- *
- * `spec` is documentation and obeys NARRATIVE.md §0: clean, factual, no personality. It is read by
- * somebody who has just been handed a new command and wants to know what it does. `opens` is the
- * delivery note's own sentence and lives in the brief's register — that is where the flavour is
- * allowed to be.
- */
 export interface HardwareNote {
   spec: string;
   opens: string;
@@ -325,7 +272,6 @@ export function hardwareNote(name: string): HardwareNote {
 export const REQUISITION_TITLE = 'HARDWARE REQUISITION — NEW TOOLS DELIVERED';
 export const REQUISITION_FROM = 'Procurement, via Dep. Coordinator M. Vance';
 
-/** One dry line under the header. Rotated by the number of items in the delivery. */
 const REQUISITION_INTROS = [
   'The requisition has cleared. This is unusual and we would rather not examine it.',
   'Fitted to the bot before the paperwork cleared, which is the approved order of operations.',
@@ -337,7 +283,6 @@ export function requisitionIntro(salt: number): string {
   return pick(REQUISITION_INTROS, salt);
 }
 
-/** Dot, under the memo, as always. */
 const REQUISITION_DOT = [
   'it works. it has always worked. nobody wrote down that it works',
   "read the reference before you trust it. i didn't, once",
@@ -349,7 +294,6 @@ export function requisitionDot(salt: number): string {
   return pick(REQUISITION_DOT, salt);
 }
 
-/** The Performance Review memo, delivered on the site map. NARRATIVE.md §7. */
 export const REVIEW = {
   from: 'Personnel & Scheduling — for information only, pending review',
   title: 'PERFORMANCE REVIEW — CONTRACTOR #4471',

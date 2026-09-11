@@ -1,10 +1,3 @@
-/**
- * World 3's bonus stars, from both sides: a run that earns one and a run that does not.
- *
- * A bonus every passing run collects is confetti, so each star here is pinned by a pair — the
- * shipped reference earns it on every declared seed, and a *correct* program that did not have
- * the second idea passes the level and is refused.
- */
 import { describe, expect, test } from 'vitest';
 import type { ObjectiveContext, Sim, TileView, Vec, World } from '../../../engine/index.ts';
 import { Dir, countItemsAt, evaluateObjectives, vec } from '../../../engine/index.ts';
@@ -36,18 +29,19 @@ function scored(level: LevelDef, seed: number, drive: (sim: Sim, bot: number) =>
   return {
     passed: result.verdict.passed,
     ticks: result.trace.endTick,
-    met: (id: string) => must(stars.find((star) => star.id === id), id).met,
-    spent: (id: string) => must(stars.find((star) => star.id === id), id).progress?.[0],
+    met: (id: string) =>
+      must(
+        stars.find((star) => star.id === id),
+        id,
+      ).met,
+    spent: (id: string) =>
+      must(
+        stars.find((star) => star.id === id),
+        id,
+      ).progress?.[0],
   };
 }
 
-/**
- * The shipped reference run with its own report line rewritten or dropped.
- *
- * Every correct program for this shed surveys and then carries, so the honest missability test is
- * not "a different route" — it is *this* route, tick for tick, with only the sentence it files
- * about the shift changed. That isolates the one variable the star grades.
- */
 function reportedAs(level: LevelDef, seed: number, rewrite: (line: string) => string | null) {
   const solution = SOLUTIONS[level.id] as ReferenceSolution;
   const result = runReference(level, seed, solution);
@@ -86,7 +80,6 @@ describe('w3-01 straight-runs', () => {
     }
   });
 
-  /** Filing the report is free — `print` costs no tick — so the star can never tax the medal. */
   test('the same run without its report line loads every pad and is refused', () => {
     for (const seed of w3_01.seeds) {
       const run = reportedAs(w3_01, seed, () => null);
@@ -96,12 +89,6 @@ describe('w3-01 straight-runs', () => {
     }
   });
 
-  /**
-   * `build` redraws the pads until the two sidings disagree by row, so no shift ever answers its
-   * own bonus with the crate count. That is the rule the level exists to teach, and a board that
-   * let `straight <crates>` through would teach the opposite — so every seed refuses every fixed
-   * figure, including the count of crates in front of the bot.
-   */
   test('no memorised figure is right on any seed', () => {
     for (const seed of w3_01.seeds) {
       for (let figure = 0; figure <= 6; figure++) {
@@ -109,15 +96,19 @@ describe('w3-01 straight-runs', () => {
           sim.print(botId, `straight ${String(figure)}`);
         };
         const met = scored(w3_01, seed, guess).met('straight-runs');
-        const answers = w3_01.seeds.filter((other) => scored(w3_01, other, guess).met('straight-runs'));
+        const answers = w3_01.seeds.filter((other) =>
+          scored(w3_01, other, guess).met('straight-runs'),
+        );
         if (met) {
-          expect(answers, `figure ${String(figure)} answers more than seed ${String(seed)}`).toEqual([seed]);
+          expect(
+            answers,
+            `figure ${String(figure)} answers more than seed ${String(seed)}`,
+          ).toEqual([seed]);
         }
       }
     }
   });
 
-  /** The crate count is the figure a run reaches for first, and no shift accepts it. */
   test('the crate count is never the answer', () => {
     for (const seed of w3_01.seeds) {
       const crates = countCrates(w3_01.build(seed));
@@ -128,7 +119,6 @@ describe('w3-01 straight-runs', () => {
     }
   });
 
-  /** A do-nothing program files nothing, so the star is refused before the level even is. */
   test('an idle program is refused on every seed', () => {
     for (const seed of w3_01.seeds) {
       const run = scored(w3_01, seed, (sim, botId) => {
@@ -140,15 +130,6 @@ describe('w3-01 straight-runs', () => {
   });
 });
 
-/**
- * A round that keeps out of the empty rack slots.
- *
- * Two readings of the yard do the work, and both are available to a player. The racks are rows 2,
- * 3, 6 and 7 on every seed and no crate is ever laid out anywhere else, so the aisles are 1, 4, 5
- * and 8 — and walking all four of them reads every rack row from the side. And a slot's charge is
- * settled when the shift opens, so the survey's *first* sighting of a tile is the one that counts:
- * a slot this round has since emptied is still free to cross, which is most of the route home.
- */
 function aisleDisciplined(sim: Sim, botId: number): void {
   const DETOUR = 10;
   const racks = new Set([2, 3, 6, 7]);
@@ -168,7 +149,6 @@ function aisleDisciplined(sim: Sim, botId: number): void {
     return slot?.items.some((stack) => stack.kind === 'crate') === true ? 1 : DETOUR;
   };
 
-  /** First step of a cheapest route to `target`, an empty slot priced at `DETOUR` paces. */
   const towards = (target: Vec): Dir | null => {
     const from = sim.pos(botId);
     const spent = new Map<string, number>([[key(from), 0]]);
@@ -240,21 +220,6 @@ function aisleDisciplined(sim: Sim, botId: number): void {
   }
 }
 
-/**
- * `aisle-discipline` was reported as a star nobody can earn, on the grounds that an empty rack
- * slot and an open aisle tile are identical in a `TileView`. The first half is true and the
- * conclusion does not follow: the rack rows are the same four rows on every seed and every crate
- * ever laid out stands in one, so which rows they are is a fact about the yard the player can read
- * off it. The floor was measured against the allowance of 18 rather than argued — a round with the
- * whole yard in hand pays 0, 0, 15 and 1 on the four seeds, so seed 3 is the seed that grades this
- * star and it grades it with three slots to spare.
- *
- * What the star costs is ticks: the survey has to walk four aisles instead of every third row, and
- * the carries have to thread the slots the shift opened full. `aisleDisciplined` runs 493 / 221 /
- * 393 / 92 against a par of 365, so on the two fifteen-crate seeds this star and the gold medal
- * cannot both be had. That is a real finding about the calibration and it is not a claim that the
- * star is unearnable.
- */
 describe('w3-04 aisle-discipline', () => {
   test('a round that stays in the aisles earns it on every seed', () => {
     const trodden = [2, 3, 15, 8];
@@ -266,11 +231,6 @@ describe('w3-04 aisle-discipline', () => {
     });
   });
 
-  /**
-   * The shipped reference walks every third row, so its survey runs the length of rack row 7 and
-   * its carries cross the racks wherever the shortest line falls. It takes gold on all four seeds
-   * and is refused the star on all four, which is the pair this file exists to hold.
-   */
   test('the reference sweeps the racks, takes gold and is refused on every seed', () => {
     const solution = SOLUTIONS[w3_04.id] as ReferenceSolution;
     for (const seed of w3_04.seeds) {

@@ -1,15 +1,3 @@
-/**
- * What World 8's objectives say when they are missed.
- *
- * Every test here drives a program that is wrong in one nameable way and asserts the point that
- * comes back. The finale's work orders are singled out because
- * they are the longest runs in the campaign: a shift that takes a thousand ticks to answer
- * `not met` is the most expensive guess a player can be asked to make.
- *
- * The two runs that already had programs written for them — `fieldSweep` and
- * `literalPlanFollower` in `src/levels/__tests__/naive.ts` — are reused rather than reinvented,
- * because a naive program is exactly the run whose failure has to be legible.
- */
 import { describe, expect, test } from 'vitest';
 import type { Objective, ObjectiveContext, Sim, Trace, Vec } from '../../../engine/index.ts';
 import {
@@ -44,7 +32,6 @@ function objectiveIn(level: LevelDef, id: string): Objective {
   );
 }
 
-/** Drives one program through one seed and asks one objective what it made of it. */
 function report(
   level: LevelDef,
   seed: number,
@@ -64,16 +51,11 @@ function report(
 
 const idle = (): void => undefined;
 
-/** Walks a bot to `to` over the real terrain. Tests may read `sim.world`; solutions may not. */
 function walkTo(sim: Sim, botId: number, to: Vec): void {
   const route = pathOn(sim.world, (at) => isPassable(sim.world, at), sim.pos(botId), to);
   if (route === null) return;
   for (const dir of route) sim.move(botId, dir);
 }
-
-// ---------------------------------------------------------------------------
-// w8-01 — the two budgets
-// ---------------------------------------------------------------------------
 
 describe('w8-01 separates a crop left in the ground from a crop left in the arms', () => {
   const seed = 1;
@@ -97,11 +79,6 @@ describe('w8-01 separates a crop left in the ground from a crop left in the arms
     });
   });
 
-  /**
-   * The other half of the same objective, built rather than driven: a field cleared of every ripe
-   * crop with the load still aboard is a hundred and sixty ticks of sweeping to reproduce, and the
-   * only thing under test is which of the two sentences the objective picks.
-   */
   test('a shift that harvested everything and delivered none of it is counted at the silo', () => {
     const initialWorld = w8_01.build(seed);
     const world = cloneWorld(initialWorld);
@@ -156,10 +133,6 @@ describe('w8-01 separates a crop left in the ground from a crop left in the arms
   });
 });
 
-// ---------------------------------------------------------------------------
-// w8-02 — the depot
-// ---------------------------------------------------------------------------
-
 describe('w8-02 names the class that came up short, and the bay that took the wrong crate', () => {
   const seed = 1;
 
@@ -209,7 +182,6 @@ describe('w8-02 names the class that came up short, and the bay that took the wr
     });
   });
 
-  /** Surveying first and carrying afterwards is the shape the bonus exists to price. */
   test('a survey run that shipped nothing on the way is priced at the last sighting', () => {
     const world = w8_02.build(seed);
     const stops = [...world.items.map((stack) => stack.at), ...world.machines.map((m) => m.at)];
@@ -226,13 +198,8 @@ describe('w8-02 names the class that came up short, and the bay that took the wr
   });
 });
 
-// ---------------------------------------------------------------------------
-// w8-03 — the shift clock
-// ---------------------------------------------------------------------------
-
 describe('w8-03 pins an overrun on the bot that was still going', () => {
   const seed = 1;
-  /** Long enough to miss both deadlines on every layout the seed table produces. */
   const LOITER = 600;
 
   test('within-shift names the last bot to stop and both ticks', () => {
@@ -248,16 +215,6 @@ describe('w8-03 pins an overrun on the bot that was still going', () => {
   });
 });
 
-/**
- * `within-shift` and the medal ladder read the same clock, and this
- * level is the only one in the campaign where one of them varies by seed and the other does not.
- * When they disagree the grade is a lie in one direction or the other: par used to be 128 while
- * seed 3's shift ended at 98, so the ladder promised gold up to 128 in a band the verdict had
- * already refused at 99 — and the bronze rung, which lives entirely above the silver cut, did not
- * exist at all on two of the five layouts.
- *
- * Asserted per seed rather than as one number, because the failure it caught was per seed.
- */
 describe('w8-03 grades and fails on one axis, so the ladder sits under the shift', () => {
   const silverCut = Math.max(w8_03.par.ticks + 1, Math.floor(w8_03.par.ticks * SILVER_FACTOR));
 
@@ -272,22 +229,12 @@ describe('w8-03 grades and fails on one axis, so the ladder sits under the shift
         }),
         'a progress pair',
       )[1];
-      /* Gold and silver have to be awardable, and bronze has to have somewhere to live. */
       expect([seed, silverCut < shift]).toEqual([seed, true]);
     }
   });
 });
 
-// ---------------------------------------------------------------------------
-// w8-04 — the filed plan
-// ---------------------------------------------------------------------------
-
 describe('w8-04 says whether the run reached the locker, and never says where it is', () => {
-  /**
-   * Two ways to end a shift without the form, and they are completely different bugs. Seed 5's
-   * drift throws the literal follower off before it ever gets there. The second run walks the
-   * whole way and never reaches for what it is standing on.
-   */
   const arrivedEmptyHanded = (sim: Sim, botId: number): void => {
     walkTo(sim, botId, surveyFor(5).locker);
   };
@@ -321,11 +268,6 @@ describe('w8-04 says whether the run reached the locker, and never says where it
     }
   });
 
-  /**
-   * Nothing on this level kills a bot, so the death is built rather than caused. What is under
-   * test is that the objective reads the `die` event's own tick, tile and reason instead of
-   * reporting the bit it already knows.
-   */
   test('bot-intact reads the tick, the tile and the reason off the die event', () => {
     const initialWorld = w8_04.build(1);
     const world = cloneWorld(initialWorld);
@@ -353,15 +295,9 @@ describe('w8-04 says whether the run reached the locker, and never says where it
   });
 });
 
-/**
- * The bonus holds a plan the player is meant to reconstruct, so the only tile it may name is one
- * the run put a bot on. These assertions are the guard on that: the point reported is a footprint,
- * and no leg of the filed route and no fallen stretch appears anywhere in the three fields.
- */
 describe('w8-04 charges the re-survey to the run’s own footprints', () => {
   const seed = 1;
 
-  /** Every tile the filed plan describes, recomputed the way the level computes it. */
   function planned(): Set<string> {
     const survey = surveyFor(seed);
     const tiles = new Set<string>();
@@ -376,7 +312,6 @@ describe('w8-04 charges the re-survey to the run’s own footprints', () => {
     return tiles;
   }
 
-  /** Walks the bot onto `count` tiles the plan says nothing about, nearest first. */
   function wander(count: number) {
     const world = w8_04.build(seed);
     const onPlan = planned();
@@ -404,10 +339,6 @@ describe('w8-04 charges the re-survey to the run’s own footprints', () => {
     });
   });
 
-  /**
-   * The two figures are the whole bonus, so neither may come back in the report. A wrong shift is
-   * priced as the shift that was claimed, and a wrong leg count says only that it was wrong.
-   */
   test('a wrong reading is told it is wrong and never told the right one', () => {
     const survey = surveyFor(seed);
     const wrongShift = report(w8_04, seed, 'read-the-plan', (sim, botId) => {
@@ -428,10 +359,6 @@ describe('w8-04 charges the re-survey to the run’s own footprints', () => {
     expect(`${legs.expected} ${legs.received}`).not.toMatch(/[NESW]/);
   });
 });
-
-// ---------------------------------------------------------------------------
-// w8-05 — the finale
-// ---------------------------------------------------------------------------
 
 describe('w8-05 reports the finale without driving the finale', () => {
   const seed = 1;
@@ -459,11 +386,6 @@ describe('w8-05 reports the finale without driving the finale', () => {
     expect(shift.expected).toMatch(/^tick \d+$/);
   });
 
-  /**
-   * The star that replaced two vacuous ones. A run that walked to the airlock and stopped has
-   * energised nothing, so there is no hold to name and the report says exactly that — and, when
-   * a station *is* named wrongly, prices it against itself rather than handing over the answer.
-   */
   test('name-the-hold says the note is missing, and never which station it wanted', () => {
     const airlock = must(machineById(w8_05.build(seed), 'airlock'), 'the airlock');
     const { met, divergence } = report(w8_05, seed, 'name-the-hold', (sim, botId) => {
@@ -491,17 +413,6 @@ describe('w8-05 reports the finale without driving the finale', () => {
     expect(shown.received).toBe('this run never started it');
   });
 
-  /**
-   * The gate note reads one bot's clock against another's, and `Sim.unfed` tests the shared world
-   * rather than the two clocks — so a carrier parked at the handle while the electrician waits out
-   * the grid turns it at a *lower* tick than the throw it was waiting for. That subtraction used
-   * to come out negative and `readClaim` used to accept the negative, which made `gate <feeder>
-   * -648` the graded-correct answer to "how long it stood powered and shut".
-   *
-   * There is no such interval on that shift, so the star is refused and the report says which two
-   * ticks it is refusing. The log is written directly: provoking the case for real means driving a
-   * whole two-bot shift to make one subtraction come out backwards.
-   */
   test('a gate opened before its substation was thrown has no interval to file', () => {
     const world = w8_05.build(seed);
     const airlock = must(machineById(world, 'airlock'), 'the airlock');
@@ -542,12 +453,6 @@ describe('w8-05 reports the finale without driving the finale', () => {
   });
 });
 
-/**
- * The campaign-wide guard in `src/levels/__tests__/legibility.test.ts` drives the empty program
- * through each level's *first* seed. World 8 randomises more per seed than any other world — the
- * silo's corner, the class-to-bay mapping, how much of the filed plan has come down — so the same
- * check runs here across every seed each level ships.
- */
 describe('the empty program is told where it fell short on every World 8 seed', () => {
   for (const level of [w8_01, w8_02, w8_03, w8_04, w8_05]) {
     test(`${level.id} names a point on all ${String(level.seeds.length)} seeds`, () => {

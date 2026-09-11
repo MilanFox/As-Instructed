@@ -1,8 +1,3 @@
-/*
- * Brief + reference panels, and the markdown renderer they share.
- * Palette comes from tokens.css (DESIGN.md §8); nothing here invents a colour.
- */
-
 .doc-pane {
   position: relative;
   height: 100%;
@@ -23,8 +18,6 @@
   border: 3px solid var(--bg-panel);
   border-radius: 6px;
 }
-
-/* --------------------------------------------------------------- markdown */
 
 .md {
   color: var(--ink);
@@ -134,8 +127,6 @@
   border-top: 1px solid var(--border);
 }
 
-/* ------------------------------------------------------------------ brief */
-
 .brief {
   padding: var(--space-5);
 }
@@ -223,8 +214,6 @@
   color: var(--ink-dim);
 }
 
-/* -------------------------------------------------------------- site data */
-
 .fact-list {
   margin: 0;
   display: grid;
@@ -276,8 +265,6 @@
     gap: 2px;
   }
 }
-
-/* --------------------------------------------------------------- hardware */
 
 .hw-group + .hw-group {
   margin-top: var(--space-3);
@@ -333,8 +320,6 @@
   color: var(--ink);
 }
 
-/* -------------------------------------------------------------- routines */
-
 .routine-list {
   margin: 0;
   padding: 0;
@@ -369,8 +354,6 @@
   font-size: 11px;
   color: color-mix(in srgb, var(--ink-dim) 80%, var(--accent));
 }
-
-/* ------------------------------------------------------------------ hints */
 
 .hint-from {
   display: flex;
@@ -446,8 +429,6 @@
   font-size: 11.5px;
   color: var(--ink-dim);
 }
-
-/* -------------------------------------------------------------- reference */
 
 .docs-head {
   position: sticky;
@@ -589,7 +570,6 @@
   color: var(--ink);
 }
 
-/* The Memory page. DESIGN.md §5 — always rendered, never behind a filter. */
 .docs-card--guide {
   padding: var(--space-4);
   margin-bottom: var(--space-4);

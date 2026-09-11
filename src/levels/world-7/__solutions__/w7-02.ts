@@ -6,7 +6,6 @@ import { spend, walkTo } from './fleet.ts';
 
 const WIDTH = 24;
 
-/** Crop columns, left to right, each with its own crop rows sorted top to bottom. */
 function columnsOf(crops: readonly Vec[]): Vec[][] {
   const byX = new Map<number, Vec[]>();
   for (const crop of crops) {
@@ -19,10 +18,6 @@ function columnsOf(crops: readonly Vec[]): Vec[][] {
     .map((x) => (byX.get(x) as Vec[]).slice().sort((a, b) => a.y - b.y));
 }
 
-/**
- * Hands each bot whole crop columns, taking columns left to right and moving on to the next bot
- * once the current one is holding its fair share of what is left. Equal counts, not equal width.
- */
 function shareOut(columns: Vec[][], fleet: number): Vec[][][] {
   const shares: Vec[][][] = Array.from({ length: fleet }, () => []);
   let remaining = columns.reduce((sum, column) => sum + column.length, 0);
@@ -45,13 +40,6 @@ function shareOut(columns: Vec[][], fleet: number): Vec[][][] {
   return shares;
 }
 
-/**
- * TEST FIXTURE. Never imported from src/main.tsx — vite.config.ts fails the build if it is.
- *
- * Reads the manifest, raises the fleet as a spawn chain down the apron, then splits the crop
- * columns by crop count. Every bot snakes its own columns, so no two bots ever want the same
- * tile and the makespan is set by the fair share rather than by whoever drew the dense band.
- */
 export const solution: ReferenceSolution = {
   levelId: 'w7-02',
   run(sim: Sim, botId: number): void {

@@ -2,16 +2,6 @@ import type { Sim, Vec } from '../../../engine/index.ts';
 import type { ReferenceSolution } from '../../types.ts';
 import { goTo, key, surveyYard } from './driver.ts';
 
-/**
- * TEST FIXTURE. Never imported from src/main.tsx — vite.config.ts fails the build if it is.
- *
- * Survey the shed once, then run one crate per trip. The clamp holds one item, so the trips
- * cannot be merged; the only thing worth getting right is not asking a full bot to pick up.
- *
- * The survey already knows which row every crate and every pad is in, so the flat-trip count is
- * arithmetic over two lists the run was keeping anyway — and filing it costs nothing, because
- * `print` is free.
- */
 export const solution: ReferenceSolution = {
   levelId: 'w3-01',
   run(sim: Sim, botId: number): void {

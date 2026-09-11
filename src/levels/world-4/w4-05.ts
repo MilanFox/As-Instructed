@@ -31,25 +31,13 @@ const CELLS = 19;
 const SIZE = 40;
 export const ORE_QUOTA = 5;
 
-/**
- * Cave walls are `Terrain.Wall`, which is opaque and cannot be cut. Only the veins are
- * `Terrain.Ore`. That is deliberate and it is the level's load-bearing constraint: `Terrain.Rock`
- * is mineable, so a rock-walled cave would let a player tunnel straight from the lift to a vein
- * and never explore anything. `world-4.test.ts` asserts no shipped seed contains a mineable wall.
- */
 const WALL = Terrain.Wall;
 
-/** A vein face, and the tile a bot has to stand on to cut it. */
 interface Vein {
   ore: Vec;
   stand: Vec;
 }
 
-/**
- * Veins sit straight ahead of a dead-end cell, so a `look` ray down that side passage terminates
- * on the ore and reports it. Finding a vein is therefore a matter of looking down corridors, not
- * of walking every one of them.
- */
 function veinSites(world: World, grid: CellGrid, exclude: Vec): Vein[] {
   const seen = new Set<string>();
   const out: Vein[] = [];
@@ -95,35 +83,19 @@ function build(seed: number): World {
     setTerrain(world, vein.ore, Terrain.Ore);
   }
 
-  // A full survey costs about two moves per floor tile. The tank holds a randomized slice of that,
-  // so no fixed "explore for N ticks and then turn back" constant survives across seeds.
   const surveyCost = 2 * caveFloorTiles(grid).length;
   const tank = Math.round(surveyCost * (0.5 + rng.int(0, 10) / 100));
   addBot(world, { at: lift, name: 'RIG-04', fuel: tank, fuelMax: tank });
   return world;
 }
 
-/** What the run said the way back would cost, what it actually cost, and whether it said it. */
 interface TripHome {
-  /** The line filed after the quota was complete and before the bot moved again. */
   filed?: string;
-  /** Moves spent after that line — or after the last cut, when nothing was filed. */
   paid: number;
-  /** The quota was never made, so there was no trip home to price. */
   short: boolean;
-  /** The bot drove away from the vein before saying what the trip would cost. */
   droveFirst: boolean;
 }
 
-/**
- * Reads the last leg of the shift out of the trace.
- *
- * The anchor is the cut that completes the quota, because that is the moment the run stops having
- * a choice: everything after it is the way back, and the fuel to pay for it either was reserved or
- * was not. A price filed *after* the first move home is a description of a trip already underway,
- * which is the one thing this star is not asking for, so that case is separated from filing
- * nothing at all.
- */
 function tripHome(ctx: ObjectiveContext): TripHome {
   const events = ctx.trace.events;
   let carried = 0;
@@ -163,14 +135,6 @@ function tripHome(ctx: ObjectiveContext): TripHome {
     : { filed, paid, short: false, droveFirst };
 }
 
-/**
- * Where the filed price and the trip parted company, without ever naming the number of moves.
- *
- * The figure is the whole star, so a wrong one comes back as the run's own line and the word
- * "different". The three ways of not answering — never cutting the quota, driving off first, and
- * saying nothing — are separated, because each one is a different mistake and "no star" says none
- * of them.
- */
 const unfiled = (ctx: ObjectiveContext): Divergence | undefined => {
   const trip = tripHome(ctx);
   if (trip.short) {
@@ -201,12 +165,6 @@ const unfiled = (ctx: ObjectiveContext): Divergence | undefined => {
   };
 };
 
-/**
- * The synthesis level. Fuel pays for both halves of the job — finding the veins and getting back
- * — so the only shape that survives is one that reserves a route home and computes it from the
- * map the program has been keeping. Exhaustive mapping runs dry; walking towards the nearest
- * unknown until the tank empties strands the bot at depth.
- */
 export const w4_05: LevelDef = {
   id: 'w4-05',
   world: 4,
@@ -219,26 +177,6 @@ export const w4_05: LevelDef = {
     '',
     `Bring back ${ORE_QUOTA} ore and end the run standing on the lift.`,
   ].join('\n'),
-  /**
-   * DESIGN.md §11.10.
-   *
-   * The tank row is the one that had to be on the fixed side. `build` draws it as a slice of what
-   * a full survey would cost, and the slice is always about half, so "map the cave, then go and
-   * mine it" is not a plan that runs short on an unlucky shift — it is a plan that cannot work on
-   * any shift. Stated, the player is being told what the level is about before the tank runs dry
-   * at depth; unstated, the only way to learn it is the run that strands the bot, and the trace of
-   * that run looks exactly like bad luck with a number.
-   *
-   * `veinSites` puts every ore face straight ahead of a dead end for a reason the player is owed:
-   * it is what makes hint 2 true. A ray down a side passage terminates on the ore and reports it,
-   * so finding veins is looking down corridors rather than walking them, and that is the whole
-   * difference between a shift that fits in the tank and one that does not. The row about the
-   * nearest six is the same argument from the other end — the quota is reachable without crossing
-   * the cave, so a program that turns back early is being careful rather than failing.
-   *
-   * What is deliberately absent: anything about how far the nearest faces actually are. That
-   * number is the arithmetic the star grades, and it is different on every shift.
-   */
   board: {
     fixed: [
       'the map is 40 tiles square; corridors are one tile wide, and a tile with an even `x` and an even `y` is always solid',
@@ -305,18 +243,6 @@ export const w4_05: LevelDef = {
     ),
   ],
   bonus: [
-    /*
-     * `fuel-reserve` — burn no more than four fifths of the tank — was measured met on all five
-     * seeds with 27% to 59% of the allowance still to spare, and it is not a second axis anyway:
-     * on this level fuel is spent tick for tick, so a fuel budget and the clock are the same
-     * number twice. It was also satisfied by a bot that never started; a fifth of the tank is
-     * trivially unused if none of it is used.
-     *
-     * The level's fourth hint is the question worth grading — *"before each step, ask what it
-     * would take to get home from where that step lands you"* — and nothing anywhere asked the
-     * program to say the answer out loud. Filing it is free (`print` costs no tick) and it cannot
-     * be produced by a bot that is driving home and hoping.
-     */
     Objectives.custom(
       'filed-return',
       'File what the trip home will cost before driving it',

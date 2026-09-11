@@ -1,20 +1,6 @@
 import { Component } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 
-/**
- * Keeps one dialog's failure inside that dialog.
- *
- * `PanelBoundary` is the same idea for a panel, and this behaves the way it does — one label, the
- * fault logged with its component stack, and the thing taken offline for the session rather than
- * retried into the same loop that killed it. What a modal needs on top is a way out: a panel that
- * reports itself broken sits in its own column and the player carries on around it, while a modal
- * is drawn over the whole game and a notice with nothing to press is a dead screen.
- *
- * So the fallback is itself a dialog with one button, and pressing it closes the modal underneath
- * through that modal's own action — the store has to agree the dialog is shut, or the next run
- * raises the same broken thing again. After that this renders nothing at all for the session,
- * which is what makes the way out guaranteed: nothing here ever remounts the child that threw.
- */
 export class ModalBoundary extends Component<
   { label: string; onDismiss: () => void; children: ReactNode },
   { failed: boolean; dismissed: boolean }

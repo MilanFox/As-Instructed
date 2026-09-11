@@ -11,14 +11,6 @@ import { assertApiComplete } from '../api-bindings.ts';
 import { decodeLineMap } from '../sourcemap.ts';
 import { runSeed } from '../run-level.ts';
 
-/**
- * The runtime against a real level, with real transpilation.
- *
- * `runSeed` must produce what `src/levels/harness.ts` produces (docs/ENGINE.md §2) — a level that
- * is provably solvable in a test but not through the worker would be the worst possible bug to
- * find late.
- */
-
 const LEVEL = getLevel('w1-01') as LevelDef;
 const HARDWARE = unlockedApiNames('w1-01');
 
@@ -159,7 +151,6 @@ describe('errors the player made', () => {
     const { result } = run('throw new Error("mine");');
     expect(result.failure?.stack).not.toContain('node_modules');
     expect(result.failure?.stack).not.toContain('src/engine');
-    /* The column is dropped whenever a line map is in play: an emitted column means nothing. */
     expect(result.failure?.stack).toBe('line 1');
   });
 });
@@ -180,7 +171,7 @@ describe('the sandbox', () => {
     expect(prints.map((event) => event.text)).toEqual(['hello 1']);
   });
 
-  test('ordinary JavaScript state persists for the whole run (DESIGN.md §5)', () => {
+  test('ordinary JavaScript state persists for the whole run', () => {
     const source = [
       'const log = new Map<number, string>();',
       'for (let i = 0; i < 3; i++) {',
@@ -198,12 +189,6 @@ describe('the sandbox', () => {
   });
 });
 
-/**
- * `power()` on a hand-operated machine used to charge the tick, return false and say nothing, so
- * the two levels built to teach *"this one has no grid
- * connection"* could not teach it by failure. These assert the whole path a player actually
- * reads: the sentence, the machine, its tile, and the line of their own code.
- */
 describe('power() on a hand-operated machine', () => {
   function firstManual(level: LevelDef, seed: number) {
     const machine = level.build(seed).machines.find((m) => m.vars[MANUAL_ONLY] === 1);

@@ -19,16 +19,11 @@ import { at, cableLegs } from './objectives.ts';
 
 const WIDTH = 30;
 const HEIGHT = 24;
-/** Fixed, and central, so a star topology is as cheap as it will ever be and still loses. */
 const REACTOR_AT = vec(14, 11);
 const LINK_PREFIX = 'link:';
 
 export type PointSet = 'uniform' | 'clustered' | 'mixed';
 
-/**
- * One point-set shape per seed. CURRICULUM.md §7 requires a clustered set and a near-uniform set;
- * the tree those two produce is a different shape, which is the point of running both.
- */
 const POINT_SETS: Readonly<Record<number, { kind: PointSet; count: number }>> = Object.freeze({
   1: { kind: 'uniform', count: 10 },
   2: { kind: 'clustered', count: 12 },
@@ -73,7 +68,6 @@ function scatter(rng: Rng, kind: PointSet, count: number): Vec[] {
   return stations;
 }
 
-/** Prim over the complete Manhattan graph. Ties do not matter: every spanning tree weighs this. */
 export function mstWeight(nodes: readonly Vec[]): number {
   if (nodes.length < 2) return 0;
   const inTree = new Array<boolean>(nodes.length).fill(false);
@@ -109,7 +103,6 @@ export function blackoutPlan(seed: number): BlackoutPlan {
 const substations = (world: World): Machine[] =>
   world.machines.filter((machine) => machine.id.startsWith('sub-'));
 
-/** `link` is directed in the world and undirected in the grid: a cable carries either way. */
 function neighbourhood(machines: readonly Machine[]): Map<string, Set<string>> {
   const graph = new Map<string, Set<string>>();
   const edge = (a: string, b: string): void => {
@@ -128,7 +121,6 @@ function neighbourhood(machines: readonly Machine[]): Map<string, Set<string>> {
   return graph;
 }
 
-/** Every machine the cable joins to the reactor, however many hops away. */
 function reachable(world: World): Set<string> {
   const graph = neighbourhood(world.machines);
   const seen = new Set<string>(['reactor']);
@@ -149,7 +141,6 @@ function connectedCount(world: World): number {
   return substations(world).filter((machine) => seen.has(machine.id)).length;
 }
 
-/** The first substation no run of cable reaches, and what the run did join it to instead. */
 const unreached = (ctx: ObjectiveContext): Divergence | undefined => {
   const seen = reachable(ctx.world);
   const stray = substations(ctx.world).find((machine) => !seen.has(machine.id));
@@ -162,14 +153,6 @@ const unreached = (ctx: ObjectiveContext): Divergence | undefined => {
   };
 };
 
-/**
- * How many substations go dark if `id` does — itself included.
- *
- * Stated as "remove the node and see what the reactor can still reach" rather than as a subtree
- * size, because the run's grid is whatever the run laid: a tree on the intended answer, but a
- * player is free to close a loop with the drum they have left, and a loop is exactly the thing
- * that makes a station *not* load-bearing. Cutting the node is the definition that survives both.
- */
 function darkWithout(world: World, id: string): number {
   const graph = neighbourhood(world.machines);
   const seen = new Set<string>(['reactor', id]);
@@ -185,7 +168,6 @@ function darkWithout(world: World, id: string): number {
   return substations(world).filter((machine) => machine.id === id || !seen.has(machine.id)).length;
 }
 
-/** Every station the district hangs off hardest, and how many go with it. */
 function weakestLinks(world: World): { ids: Set<string>; load: number } {
   const load = new Map<string, number>();
   for (const machine of substations(world)) load.set(machine.id, darkWithout(world, machine.id));
@@ -195,7 +177,6 @@ function weakestLinks(world: World): { ids: Set<string>; load: number } {
   return { ids, load: worst };
 }
 
-/** `weak sub-6 8` split into the claim it makes, or null when it is not that shape. */
 function readClaim(line: string): { id: string; load: number } | null {
   const parts = line.split(' ');
   if (parts.length !== 3) return null;
@@ -204,22 +185,12 @@ function readClaim(line: string): { id: string; load: number } | null {
   return { id: parts[1] as string, load };
 }
 
-/** Every outage line the run filed, in the order it filed them. */
 const outageReport = (ctx: ObjectiveContext): string[] =>
   ctx.trace.events
     .filter((event) => event.kind === 'print')
     .map((event) => (event.kind === 'print' ? event.text : ''))
     .filter((line) => line.startsWith('weak '));
 
-/**
- * Where the outage report and the district part company, without naming either half of the answer.
- *
- * A run that named a station gets told that the station is wrong and nothing about which one is
- * right; a run that named the right station and miscounted gets told only that the figure is wrong,
- * which is the same trade `w6-02`'s fault report makes — one fact back, the arithmetic still the
- * player's. A line that is not of the shape at all is told that, rather than being read as a claim
- * about the wrong station: the shape is in the facts and getting it wrong is not the puzzle.
- */
 const misread = (ctx: ObjectiveContext): Divergence | undefined => {
   const lines = outageReport(ctx);
   const said = lines[0];
@@ -264,14 +235,8 @@ export function cableSpent(ctx: ObjectiveContext): number {
   return total;
 }
 
-/**
- * Walks the trace once. `machineChange` events reveal each new cable as it is laid; `power` events
- * reveal each energisation by position. A station counts only when a cable already joined it to
- * the part of the grid that is already live.
- */
 interface LiveOrder {
   valid: Set<string>;
-  /** Every station switched on with no live cable already reaching it, in trace order. */
   early: { id: string; t: number }[];
 }
 
@@ -317,16 +282,6 @@ function liveOrder(ctx: ObjectiveContext): LiveOrder {
 
 const liveOrderCount = (ctx: ObjectiveContext): number => liveOrder(ctx).valid.size;
 
-/**
- * The first switch-on the cable could not carry, or — when every switch-on landed — the station
- * the run never came back for. The tree the player laid is their own; what the report adds is the
- * tick at which the order they switched it on in ran ahead of it.
- *
- * A station switched on early and then switched on again over live cable is not the fault and is
- * not named: `liveOrder` counts the second call, so the objective already forgave it, and pointing
- * the report at the first pass of a retry loop would name a tick the run was right to move on
- * from. Only a station left stranded by an early call is reported.
- */
 const notLive = (ctx: ObjectiveContext): Divergence | undefined => {
   const { valid, early } = liveOrder(ctx);
   const stranded = early.find((call) => !valid.has(call.id));
@@ -344,7 +299,6 @@ const notLive = (ctx: ObjectiveContext): Divergence | undefined => {
   return { where: `${missed.id} · ${at(missed.at)}`, expected: 'on', received: missed.state };
 };
 
-/** The cable that took the run past the drum, and what the drum held in the first place. */
 const overDrum = (ctx: ObjectiveContext): Divergence => {
   const budget = ctx.world.vars.cableBudget ?? 0;
   let spent = 0;
@@ -365,10 +319,6 @@ const overDrum = (ctx: ObjectiveContext): Divergence => {
   };
 };
 
-/**
- * Par: the reference lays one cable per substation and energises each once, so its clock is
- * 4 × stations — 56 ticks on the fourteen-station seed. Prim leaves nothing to shave.
- */
 export const w5_05: LevelDef = {
   id: 'w5-05',
   world: 5,
@@ -385,24 +335,6 @@ export const w5_05: LevelDef = {
     '',
     'Re-cable District 9, then bring every substation up.',
   ].join('\n'),
-  /**
-   * DESIGN.md §11.10.
-   *
-   * The drum is the hard part of this order and it is already stated twice — the memo and the
-   * `The drum` card both say it is the shortest run that joins the district plus eight per cent,
-   * which is the Frustration Watch entry (CURRICULUM.md §11) working exactly as intended: the
-   * margin is deliberate, and a player who did not know it was a margin would read a failure as
-   * the level being impossible. Repeating the figure on the sheet costs nothing and settles that
-   * it is the same eight per cent on every shift rather than a slack that varies with the draw.
-   *
-   * What is genuinely unstated is the floor. There are no walls anywhere in the district and the
-   * reactor never moves, so the whole cost of a network is arithmetic on positions a `probe`
-   * hands over for free, and no cable is ever obstructed or made longer by the terrain. A run that
-   * cannot rely on that has to survey, and surveying a 30 by 24 field of nothing is the one way to
-   * lose this order to travel rather than to cable. The point set is on the redrawn side because
-   * it is the axis: an evenly scattered district and a district in three clumps want the same
-   * program and produce very different trees, and only one of the two is in front of the player.
-   */
   board: {
     fixed: [
       'district 9 is 30 by 24 of open floor — nothing stands between two machines, and a cable costs the grid distance between its ends',
@@ -523,18 +455,6 @@ export const w5_05: LevelDef = {
     ),
   ],
   bonus: [
-    /*
-     * `tight` was the required `budget` with a smaller number on it — 102% of the minimum spanning
-     * weight instead of 108% — and the level's own third hint hands the player Prim, which lands
-     * on the exact minimum. So the reference met it on every seed and the star was the medal axis
-     * one notch in. It was also true of a bot that never laid a cable: nothing spent is inside any
-     * allowance.
-     *
-     * The shape of the tree is the thing the required objectives cannot see. `connected` asks
-     * whether every station is joined, `energised` asks whether the order held; neither asks what
-     * the grid would do if one station went down, and that is the question a district reconnecting
-     * after a blackout would actually be asked.
-     */
     Objectives.custom(
       'name-the-weak-link',
       'Report which substation the district most hangs off',

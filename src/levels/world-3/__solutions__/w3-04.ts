@@ -2,13 +2,6 @@ import type { Sim, Vec } from '../../../engine/index.ts';
 import type { ReferenceSolution } from '../../types.ts';
 import { goTo, key, surveyYard } from './driver.ts';
 
-/**
- * TEST FIXTURE. Never imported from src/main.tsx.
- *
- * Survey first, ship second. The survey records the stencilled arrival number of every occupied
- * slot; the shipping loop then walks the numbers in ascending order and ignores where the bot
- * happens to be standing, which is the only ordering the bay accepts.
- */
 export const solution: ReferenceSolution = {
   levelId: 'w3-04',
   run(sim: Sim, botId: number): void {

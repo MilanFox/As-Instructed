@@ -6,15 +6,6 @@ import { buildAmbientDts, unlockedApiNames } from '../ambient.ts';
 import { buildPlayerScope } from '../api-bindings.ts';
 import type { PlayerFunction } from '../api-bindings.ts';
 
-/**
- * `bot(id)` — the surface World 7 is written against.
- *
- * Everything here is about the two properties that make the handle worth having: a call on it is
- * charged to *that* bot's clock rather than the program's (DESIGN.md §4.3), and the handle offers
- * exactly the hardware the level has installed, no more. The causal `recv` rule gets its own
- * block because `send` → `sync` → `recv` is the idiom every World 7 brief teaches.
- */
-
 const SWARM = unlockedApiNames('w7-02');
 
 function site(bots = 3): { sim: Sim; world: World } {
@@ -37,7 +28,11 @@ describe('the handle carries the fleet-safe half of the API', () => {
     const api = scopeFor(sim);
     const members = Object.keys(handle(api, 0)).sort();
 
-    expect(members).toEqual(perBotApi(PLAYER_API.functions.filter((fn) => SWARM.includes(fn.name))).map((fn) => fn.name).sort());
+    expect(members).toEqual(
+      perBotApi(PLAYER_API.functions.filter((fn) => SWARM.includes(fn.name)))
+        .map((fn) => fn.name)
+        .sort(),
+    );
     for (const name of ['bot', 'bots', 'sync']) expect(members).not.toContain(name);
     for (const name of ['move', 'pos', 'wait', 'send', 'recv', 'scan', 'look', 'clock']) {
       expect(members, name).toContain(name);
@@ -71,7 +66,9 @@ describe('the handle carries the fleet-safe half of the API', () => {
       expect(bound, levelId).toEqual(declared);
       expect(buildAmbientDts(unlockedApiNames(levelId)), levelId).toContain(
         botHandleDeclaration(
-          perBotApi(PLAYER_API.functions.filter((fn) => unlockedApiNames(levelId).includes(fn.name))),
+          perBotApi(
+            PLAYER_API.functions.filter((fn) => unlockedApiNames(levelId).includes(fn.name)),
+          ),
         ).split('\n')[0] as string,
       );
     }

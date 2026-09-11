@@ -8,13 +8,6 @@ import {
   isSenseBudget,
 } from '../achievements.ts';
 
-/**
- * A run that earns nothing.
- *
- * Every default is the boring answer: it passed, on the third go, on a mid-campaign work order,
- * at par, with a program that moved a bit and did nothing remarkable. A test that earns something
- * says which fact earned it, and no test has to restate the other twenty-five.
- */
 function facts(patch: Partial<RunFacts> = {}): RunFacts {
   return {
     passed: true,
@@ -63,10 +56,6 @@ describe('the commendation list', () => {
     }
   });
 
-  /*
-   * Rule 5's one prohibition, and the only one a machine can check. A commendation that says
-   * "gold" is restating the certificate the player is already holding.
-   */
   it('never restates a medal', () => {
     const medals = /\b(gold|silver|bronze|medal)\b/i;
     for (const achievement of ACHIEVEMENTS) {
@@ -75,7 +64,6 @@ describe('the commendation list', () => {
     }
   });
 
-  /* NARRATIVE.md §1.2: the company is never excited. Personnel least of all. */
   it('never exclaims', () => {
     for (const achievement of ACHIEVEMENTS) {
       const line = `${achievement.title} ${achievement.requirement} ${achievement.note}`;
@@ -83,18 +71,12 @@ describe('the commendation list', () => {
     }
   });
 
-  /*
-   * An id cannot be live and retired at once: `save.ts` drops the retired set on read, so a
-   * commendation reissued under an id this build had already retired would be awarded on the run
-   * and gone again by the next load.
-   */
   it('offers no id that saves are told to drop', () => {
     for (const achievement of ACHIEVEMENTS) {
       expect(RETIRED_ACHIEVEMENTS.has(achievement.id), achievement.id).toBe(false);
     }
   });
 
-  /* Rule 2. A hidden one is unreachable from the shelf, so it must never be a thing to aim at. */
   it('keeps enough of the list on the shelf to be worth opening', () => {
     const listed = ACHIEVEMENTS.filter((achievement) => achievement.hidden !== true);
     expect(listed.length).toBeGreaterThan(ACHIEVEMENTS.length / 3);
@@ -104,9 +86,6 @@ describe('the commendation list', () => {
     for (const id of everythingEarned()) expect(getAchievement(id), id).toBeDefined();
   });
 
-  /* The list and the evaluator are two halves of one thing, and a line nothing can award is a
-     promise the game does not keep. `repository` is the exception: it is raised by the Repository
-     through `store.award`, because `src/game` may not see `src/meta`. */
   it('can award every commendation it prints', () => {
     const reachable = new Set(everythingEarned());
     const unreachable = ACHIEVEMENTS.map((achievement) => achievement.id).filter(
@@ -116,7 +95,6 @@ describe('the commendation list', () => {
   });
 });
 
-/** Every id any run can produce, gathered from the runs the suite below builds. */
 function everythingEarned(): string[] {
   const runs: Partial<RunFacts>[] = [
     { attempt: 10, senseBudgetMet: true, returnedForStar: true },
@@ -158,10 +136,6 @@ describe('earnedBy, on a closed work order', () => {
     expect(earnedBy(facts({ ticks: 399, parTicks: 40 }))).not.toContain('outside-the-estimate');
   });
 
-  /*
-   * DESIGN.md §7. A work order may carry no par at all, and the two entries that read one are
-   * the only place that could break on it. They read `null` and decline rather than dividing by it.
-   */
   it('reads no par at all on an ungraded work order', () => {
     const ungraded = earnedBy(facts({ ticks: 4000, parTicks: null }));
     expect(ungraded).not.toContain('outside-the-estimate');
@@ -219,16 +193,11 @@ describe('earnedBy, on a closed work order', () => {
     expect(earnedBy(facts({ ops: 1_000_000 }))).toContain('considerable-computation');
   });
 
-  /* The ordinary close earns nothing. Most closes are ordinary and that is the point. */
   it('awards nothing for closing a work order on the second run', () => {
     expect(earnedBy(facts({ attempt: 2 }))).toEqual([]);
   });
 });
 
-/*
- * Rule 4. A failed run is still a run, and the things a player does that are worth noticing are
- * mostly things the bot did not survive. Nothing below asks whether the order closed.
- */
 describe('earnedBy, on a run that did not close', () => {
   const failed = (patch: Partial<RunFacts> = {}): string[] =>
     earnedBy(facts({ passed: false, ...patch }));
@@ -275,7 +244,6 @@ describe('earnedBy, on a run that did not close', () => {
     expect(failed({ laterDay: false })).not.toContain('came-back');
   });
 
-  /* It costs nothing. It never has. */
   it('takes nothing that needs the order closed', () => {
     expect(failed({ attempt: 10, senseBudgetMet: true, ticks: 1, moves: 0 })).toEqual([]);
   });

@@ -1,22 +1,3 @@
-/*
- * The shell: the site map's top bar, the modals, and the read-outs the desk still shares with them.
- * Palette comes from tokens.css — never repeat a hex that already has a token.
- *
- * **Read this before adding a rule.** This sheet was written for a panel workspace that no longer
- * exists. The desk replaced it, the markup went, and the rules did not — so for a while every
- * selector left behind here was a landmine: `.crate` painted a dark background behind the
- * requisition's ink and hid all eight verb names, `.seed-row__outstanding` clipped every failure
- * reason on the halt notice mid-word, and neither was written for the surface it hit. The orphans
- * are gone now, but the mechanism is not: this file is loaded globally, its
- * rules are unscoped, and the desk renders `.objective*`, `.cause*`, `.seed-chip`, `.tag`,
- * `.medal*`, `.commend*`, `.screen` and `.sr-only` too. It reads several of them on purpose.
- *
- * So a class name here is a name the desk may already be using. The last block of
- * `src/ui/__tests__/monitor-margin.test.ts` enumerates every name the two sheets share and fails on
- * a new one — if it fails, the rule you just added is styling the desk as well, and you have to say
- * which surface you meant.
- */
-
 :root {
   --topbar-h: 46px;
 }
@@ -28,8 +9,6 @@
   overflow: hidden;
   background: var(--bg-void);
 }
-
-/* ---------------------------------------------------------------- top bar */
 
 .topbar {
   display: flex;
@@ -145,8 +124,6 @@
   border-left: 1px solid var(--border);
 }
 
-/* ---------------------------------------------------------------- buttons */
-
 .btn {
   display: inline-flex;
   gap: var(--space-2);
@@ -253,15 +230,6 @@
   color: var(--accent);
 }
 
-/*
- * Per-objective, per-seed state.
- *
- * A five-objective level on three layouts produces fifteen results, and folding them into one
- * pass/fail bit is what makes a change that trades one seed for another read as no change at
- * all. One chip per seed, on the objective's own row: green where it held, red where it did
- * not. Colour is never the only carrier — the strip ships an `sr-only` sentence naming the
- * seeds that are still open.
- */
 .objective__seeds {
   display: inline-flex;
   flex: none;
@@ -341,7 +309,6 @@
   color: var(--ink-dim);
 }
 
-/* The row the run is working towards right now. One at a time, and never after the run ends. */
 .objective--active .objective__mark {
   border-color: var(--accent);
   color: var(--accent);
@@ -386,10 +353,6 @@
   }
 }
 
-/*
- * The word that separates a limit from par. A budget denominated in ticks is the number that ends
- * the work order, and `targets` calls the other one par — neither is "ticks" any more.
- */
 .objective__gate {
   flex: none;
   padding: 0 4px;
@@ -410,22 +373,10 @@
   font-variant-numeric: tabular-nums;
 }
 
-/*
- * A budget reads as a gauge, not as a checkbox.
- *
- * The row wraps so the bar gets a line of its own under the label, and the mark loses its tick:
- * staying inside an allowance is not an achievement to tick off, it is a state to hold. The only
- * glyph a budget row ever shows is the `!` it earns by being overrun.
- */
 .objective--budget {
   flex-wrap: wrap;
 }
 
-/*
- * No box at all. An empty checkbox next to "Close the shift within 215 ticks" reads as work
- * outstanding, when what it actually means is an allowance still unspent — the opposite. The bar
- * carries the whole state, and the only glyph is the one an overrun earns.
- */
 .objective--budget .objective__mark {
   border: 0;
   background: transparent;
@@ -469,7 +420,6 @@
   background: color-mix(in srgb, var(--danger) 45%, var(--accent));
 }
 
-/* The overspend, drawn past the rating in the failure colour. This is the "by how much". */
 .budget-bar__over {
   position: absolute;
   top: 0;
@@ -478,7 +428,6 @@
   background: var(--danger);
 }
 
-/* Where the allowance ran out. At or under budget it sits on the right edge and reads as the end. */
 .budget-bar__limit {
   position: absolute;
   top: -1px;
@@ -494,10 +443,6 @@
   opacity: 1;
 }
 
-/*
- * What the failed report opens with. The player must be able to say what they will change next,
- * and they cannot say it from a red row with no number on it.
- */
 .cause {
   margin-bottom: var(--space-4);
   padding: var(--space-3);
@@ -554,11 +499,6 @@
   margin-left: 0;
 }
 
-/*
- * The one-point diff. Show, do not tell: a coordinate or a line number, then the two values under
- * each other so the eye finds the difference without reading a sentence about it. Green is what
- * was wanted and red is what arrived, which is the only convention this needs to borrow.
- */
 .cause__diff {
   flex: 1 0 100%;
   display: grid;
@@ -596,7 +536,6 @@
   color: var(--danger);
 }
 
-/* Seven words, drawn once, only where both numbers are on the screen. */
 .par-note {
   margin: var(--space-2) 0 var(--space-1);
   color: var(--ink-dim);
@@ -611,8 +550,6 @@
 .par-row__value--over {
   color: var(--accent-2);
 }
-
-/* ------------------------------------------------------------- fuel gauge */
 
 .fuel {
   display: flex;
@@ -649,8 +586,6 @@
   text-align: right;
 }
 
-/* ------------------------------------------------------------------ medal */
-
 .medal {
   display: inline-flex;
   align-items: center;
@@ -686,7 +621,6 @@
   color: var(--ink-dim);
 }
 
-/* An ungraded work order is closed, not un-medalled: the stamp reads as done (DESIGN.md §7). */
 .medal--closed {
   border-color: var(--ok);
   background: color-mix(in srgb, var(--ok) 16%, transparent);
@@ -700,8 +634,6 @@
   font-size: 16px;
 }
 
-/* ------------------------------------------------------------------ modal */
-
 .overlay {
   position: fixed;
   inset: 0;
@@ -713,15 +645,6 @@
   backdrop-filter: blur(2px);
 }
 
-/*
- * The head and the foot are pinned; the body is the part that scrolls.
- *
- * The dialog used to scroll as one block, which on an 800px window drew its own footer over its
- * last paragraph — the run report's `NOTHING WAS BILLED` line and the delivery note's last crate
- * both landed underneath the button meant to dismiss them, with no way to reach either. A flex
- * column with one scrolling child is what keeps the verdict at the top and the button at the
- * bottom whatever the body is holding.
- */
 .modal {
   display: flex;
   flex-direction: column;
@@ -827,8 +750,6 @@
   letter-spacing: 0.08em;
 }
 
-/* -------------------------------------------------------------- utilities */
-
 .screen {
   flex: 1;
   min-height: 0;
@@ -870,8 +791,6 @@
     opacity: 0.5;
   }
 }
-
-/* -------------------------------------------------------------- settings */
 
 .modal--narrow {
   width: min(520px, 100%);
@@ -940,21 +859,9 @@
   border-top: 1px solid var(--border);
 }
 
-/*
- * The layer is a hook for the modals, not a box around them: each one draws its own `.overlay`
- * fixed to the viewport, and a failed one draws a dialog in the same shape.
- */
 .modal-layer {
   flex: none;
 }
-
-/* ----------------------------------------------------------- the run report
- *
- * The escalation is CSS transitions on an `--in`/`--out` pair rather than keyframes, so the
- * global `prefers-reduced-motion` rule at the bottom of tokens.css collapses every one of them to
- * nothing without this file having to know. The reveal hook stops arming timers at the same time,
- * which is what makes the reduced-motion report genuinely instant rather than merely still.
- */
 
 .medal-land {
   display: inline-flex;
@@ -982,8 +889,6 @@
   opacity: 1;
   transform: none;
 }
-
-/* ------------------------------------------------------------ personal best */
 
 .record {
   display: flex;
@@ -1022,8 +927,6 @@
   color: var(--ink);
   font-size: 12px;
 }
-
-/* --------------------------------------------------------- commendations */
 
 .commend {
   display: flex;
@@ -1077,12 +980,9 @@
   font-size: 12px;
 }
 
-/* ------------------------------------------------------------ report footer */
-
 .failure-box__note {
   margin: var(--space-3) 0 0;
   color: var(--ink-dim);
   font-family: var(--font-mono);
   font-size: 11px;
 }
-

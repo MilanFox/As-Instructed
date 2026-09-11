@@ -91,11 +91,6 @@ describe('migrate', () => {
     expect(restored.levels['w1-01']?.bestTicks).toBe(12);
   });
 
-  /*
-   * `bestChars` was written by every build up to this one. A player who opens the game after
-   * updating must land on the medals, code and objectives they went to bed with — the retired
-   * field is dropped on read, and nothing beside it moves.
-   */
   it('loads a save written before the character count was removed', () => {
     const legacy = {
       version: SAVE_VERSION,
@@ -215,7 +210,6 @@ describe('migrate to the reward fields', () => {
     };
     const migrated = migrate(v1);
 
-    /* A medal and a clear date cannot prove which run closed it, or that a budget was met. */
     expect(migrated.achievements).toEqual({});
     expect(migrated.stats.passes).toBe(2);
     expect(migrated.stats.runs).toBe(4);
@@ -357,12 +351,6 @@ describe('importSave and the reward fields', () => {
   });
 });
 
-/**
- * Seven work orders were withdrawn — w1-02, w1-04, w2-01, w2-03, w3-03, w3-05, w4-03 — and their
- * ids will never be reissued.
- * A save written before the cut still names them, and the rule that player code is never lost has
- * no exception for a work order that no longer exists.
- */
 describe('a save that names a withdrawn work order', () => {
   const WITHDRAWN = ['w1-02', 'w1-04', 'w2-01', 'w2-03', 'w3-03', 'w3-05', 'w4-03'];
 
@@ -412,8 +400,6 @@ describe('a save that names a withdrawn work order', () => {
   it('does not gate the order that followed it', () => {
     const save = emptySave();
     save.levels['w1-01'] = { ...emptyProgress(), completed: true };
-    /* `w1-02` was withdrawn, so the order after `w1-01` is `w1-03`. The gate walks campaign order,
-       not the ids. Two open at a time reaches `w1-05`; `w2-02` is three along and still shut. */
     expect(isLevelUnlocked(save, 'w1-03')).toBe(true);
     expect(isLevelUnlocked(save, 'w1-05')).toBe(true);
     expect(isLevelUnlocked(save, 'w2-02')).toBe(false);
@@ -426,12 +412,6 @@ describe('a save that names a withdrawn work order', () => {
   });
 });
 
-/**
- * Ten of the fifteen commendations were retired. A save written by the
- * build that issued them is the ordinary case, not the edge case, so the drop has to be surgical:
- * the retired ids go, everything beside them stays, and an id this build simply does not recognise
- * is left alone because it belongs to a build that is not this one.
- */
 describe('a save written by a build that had fifteen commendations', () => {
   const beforeTheCut = JSON.stringify({
     version: SAVE_VERSION,
@@ -514,10 +494,6 @@ describe('a save written by a build that had fifteen commendations', () => {
   });
 });
 
-/**
- * The two fields the commendation layer added, and the reason neither needed a version step: both
- * are optional, and a save written by any earlier build already satisfies the shape.
- */
 describe('the fields that outlive a session', () => {
   it('loads a save that has never heard of either of them', () => {
     const save = parseSave(exportSave(emptySave()));
@@ -549,7 +525,6 @@ describe('the fields that outlive a session', () => {
     expect(save.routineOrders).toEqual({ pathTo: ['w4-01'] });
   });
 
-  /* Import can raise a total and can never lower one. For a start date that means the earlier. */
   it('merges on import, keeping the earlier start and the union of the orders', () => {
     const current: SaveFile = {
       ...emptySave(),

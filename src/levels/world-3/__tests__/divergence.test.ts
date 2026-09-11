@@ -1,11 +1,3 @@
-/**
- * What The Sorting Yards say when a shift comes up short.
- *
- * Every level in World 3 randomizes something the player's own source cannot show them — which
- * rows the pads are in, which class each stencil takes, which slot holds arrival 7 — so `not met`
- * on a yard that looks finished was the least legible report in the game. These are the assertions
- * that each objective now names a tile, an arrival number or a tick instead.
- */
 import { describe, expect, test } from 'vitest';
 import type { DropEvent, ItemKind, MoveEvent, Objective, Sim, Vec } from '../../../engine/index.ts';
 import { Terrain, vec } from '../../../engine/index.ts';
@@ -116,7 +108,6 @@ describe('w3-02 — the depot that ended short', () => {
       expected: `${owed === 1 ? '1 crate' : `${String(owed)} crates`} of its class`,
       received: '0 crates of its class',
     });
-    /* The stencil is the table the level exists to make the player build. */
     expect(shown.where).not.toContain(depot.kind);
   });
 
@@ -139,7 +130,6 @@ describe('w3-02 — the depot that ended short', () => {
       kind,
     });
 
-    /* Every depot worked once, and then one of them opened again. */
     const plan = [
       leg(repeated, 0),
       ...[...counts.keys()].filter((kind) => kind !== repeated).map((kind) => leg(kind, 0)),

@@ -2,21 +2,8 @@ import type { Sim } from '../../../engine/index.ts';
 import { Dir, ItemKind } from '../../../engine/index.ts';
 import type { ReferenceSolution } from '../../types.ts';
 
-/**
- * TEST FIXTURE. Never imported from src/main.tsx — vite.config.ts fails the build if it is.
- *
- * The tunnel is pointed one way at a time and everybody who is going that way goes in one
- * convoy, nose to tail. Each bot owns its own row, so the only shared ground is the two link
- * columns and the tunnel itself; giving each bot a departure tick two apart, offset by how far
- * down the column it has to come, keeps the convoy a fixed distance apart the whole way and no
- * bot ever issues a move it will lose. Turning the tunnel round costs one convoy length, which
- * is why the fleet crosses in batches rather than per crate.
- */
-
 const AISLE = 7;
-/** The silo bay: a crate counts as home anywhere in this column. */
 const SILO_X = 1;
-/** Where a bot idles between convoys — one tile short of the link column, out of the way. */
 const STAGING_X = 6;
 const LINK_X = 7;
 
@@ -48,7 +35,6 @@ export const solution: ReferenceSolution = {
       sim.wait(id, dt);
       fleet.clock[id] = t;
     };
-    /** East or west along the aisle until the far room's column comes up alongside. */
     const cross = (id: number, dir: Dir): void => {
       go(id, dir, 1);
       while (!sim.canMove(id, Dir.North)) go(id, dir, 1);
@@ -61,7 +47,6 @@ export const solution: ReferenceSolution = {
       const convoy = waiting.slice();
       const first = fleet.row[convoy[0] as number] ?? 0;
 
-      // ---- eastbound ------------------------------------------------------
       let depart = round === 0 ? 6 : clearAt + 2;
       convoy.forEach((id, k) => {
         const walk = STAGING_X - sim.pos(id).x;
@@ -93,7 +78,6 @@ export const solution: ReferenceSolution = {
         ready[id] = (fleet.clock[id] ?? 0) + offset;
       });
 
-      // ---- westbound ------------------------------------------------------
       const home = convoy.slice().reverse();
       const last = fleet.row[home[0] as number] ?? 0;
       let turn = 0;

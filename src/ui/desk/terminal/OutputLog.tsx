@@ -1,21 +1,7 @@
-/**
- * `OUTPUT` — the terminal's own log, under the code.
- *
- * `visibleConsole(all, filter, tick)` already filters print output to the
- * playhead, so a printed line and the frame it belongs to line up. The old UI then drew the console
- * in a sheet *over* the board, which made the loop it exists for — watch the number, watch the bot,
- * correlate — impossible to run. The tick alignment was never the defect; the geometry was. On the
- * desk the log is inside the terminal and the site is on the other monitor, so both are in one
- * glance and the alignment is finally worth having.
- *
- * Everything else is `src/ui/panels/ConsolePanel.tsx`'s: the render limit, the auto-scroll, the
- * filter and the `suppressed` count the store reports when a run out-printed its cap.
- */
 import { useEffect, useMemo, useRef } from 'react';
 import type { ConsoleKind } from '../../../game/store.ts';
 import { useGame, visibleConsole } from '../../../game/store.ts';
 
-/** Never render more than this many rows, whatever the filter says. */
 const RENDER_LIMIT = 500;
 
 const FILTERS = [
@@ -24,7 +10,6 @@ const FILTERS = [
   { id: 'system', label: 'system' },
 ] as const;
 
-/** The prototype's four log inks: dim stamp, error, warning, closure. Notices borrow warning's. */
 const INK: Record<ConsoleKind, string> = {
   print: '',
   system: 'w',
@@ -59,17 +44,14 @@ export function OutputLog(): React.JSX.Element {
   }, [lines.length]);
 
   const meta =
-    runState === 'running' ? 'on the wire' : verdict ? (verdict.passed ? 'closed' : 'halted') : 'idle';
+    runState === 'running'
+      ? 'on the wire'
+      : verdict
+        ? verdict.passed
+          ? 'closed'
+          : 'halted'
+        : 'idle';
 
-  /*
-   * Whether the log is holding anything, which is what lets FOCUS collapse it to its head bar and
-   * give the code the 128 units back. Read off `all` and never off `shown`: the rendered view is
-   * filtered and clipped to the playhead, so filtering to `print` with an error in the log, or
-   * scrubbing back to tick 0, empties the *view* while the log is full. An error collapsed out of
-   * sight is the one failure this attribute must not cause. A run in flight counts as content for
-   * the same reason in reverse — the body is open before the first line lands, rather than the
-   * code stepping down under the player's hands as it arrives.
-   */
   const holding = all.length > 0 || suppressed > 0 || runState === 'running';
 
   return (

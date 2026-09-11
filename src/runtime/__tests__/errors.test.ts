@@ -11,17 +11,6 @@ import {
   toRuntimeFailure,
 } from '../errors.ts';
 
-/**
- * The highest-value tests in the runtime.
- *
- * Every stack string below is a real one, copied from a browser or from Node. If line mapping
- * regresses, every runtime error in the game points at the wrong line and nobody notices for
- * weeks, because the message still looks plausible.
- *
- * The wrapper contributes `new Function`'s own offset (2) plus two preamble lines, so a frame
- * reported at `<anonymous>:N` is the player's line `N - 4`.
- */
-
 const V8_NODE_EVAL = [
   'Error: boom',
   '    at __player__ (eval at <anonymous> ([eval]:2:11), <anonymous>:7:9)',
@@ -146,7 +135,6 @@ describe('locatePlayerFrame', () => {
   });
 
   test('a line map moves the answer to the pre-transpilation line', () => {
-    /* Emitted line 2 came from source line 5: an interface was erased above it. */
     expect(locatePlayerFrame(V8_ENGINE_THREW, 2, [1, 5, 6])).toEqual({ line: 5 });
   });
 

@@ -1,11 +1,3 @@
-/**
- * World 5's bonus star, from both sides: a run that earns it and a run that does not.
- *
- * `w5-05` is the only World 5 star this pass
- * reworked; the rest are left alone. A bonus every passing run collects is
- * confetti, so this one is pinned by a pair — the shipped reference earns it on every declared
- * seed, and a *correct, gold-taking* program that did not have the second idea is refused.
- */
 import { describe, expect, test } from 'vitest';
 import type { ObjectiveContext, Sim } from '../../../engine/index.ts';
 import { evaluateObjectives } from '../../../engine/index.ts';
@@ -32,13 +24,6 @@ function scored(seed: number, drive: (sim: Sim, bot: number) => void) {
   };
 }
 
-/**
- * The shipped reference run with its own outage line rewritten or dropped.
- *
- * Every correct program for this district is Prim — the level's own third hint says so — so the
- * honest missability test is not "a different tree". It is *this* tree, cable for cable and tick
- * for tick, with only the sentence it files about itself changed.
- */
 function reportedAs(seed: number, rewrite: (line: string) => string | null) {
   const solution = SOLUTIONS[w5_05.id] as ReferenceSolution;
   const result = runReference(w5_05, seed, solution);
@@ -77,7 +62,6 @@ describe('w5-05 name-the-weak-link', () => {
     }
   });
 
-  /** Filing the report is free — `print` costs no tick — so the star can never tax the medal. */
   test('the same tree without its outage line lights the district and is refused', () => {
     for (const seed of w5_05.seeds) {
       const run = reportedAs(seed, () => null);
@@ -87,7 +71,6 @@ describe('w5-05 name-the-weak-link', () => {
     }
   });
 
-  /** Naming the right station and guessing the load is refused: both halves are the answer. */
   test('the right station under a wrong figure is refused on every seed', () => {
     for (const seed of w5_05.seeds) {
       const run = reportedAs(seed, (line) => {
@@ -98,7 +81,6 @@ describe('w5-05 name-the-weak-link', () => {
     }
   });
 
-  /** And the load alone is not enough: the station has to be the one that carries it. */
   test('the right figure under the wrong station is refused on every seed', () => {
     for (const seed of w5_05.seeds) {
       const run = reportedAs(seed, (line) => `weak sub-99 ${line.split(' ')[2] ?? ''}`);
@@ -106,10 +88,6 @@ describe('w5-05 name-the-weak-link', () => {
     }
   });
 
-  /**
-   * The cheapest tree is not the same question as the weakest link. A run that lights the whole
-   * district inside the drum but never asks what its own grid depends on is refused everywhere.
-   */
   test('a do-nothing program is refused on every seed', () => {
     for (const seed of w5_05.seeds) {
       const run = scored(seed, (sim, botId) => {

@@ -2,13 +2,6 @@ import type { MachineView, Sim, Vec } from '../../../engine/index.ts';
 import type { ReferenceSolution } from '../../types.ts';
 import { playerApi } from './_api.ts';
 
-/**
- * TEST FIXTURE. Never imported from src/main.tsx — vite.config.ts fails the build if it is.
- *
- * Cable every listed prerequisite first — the cable has no ordering rule — then energise by
- * repeatedly taking the nearest station whose upstream is already on. That second half is what
- * earns the travel bonus; ties go to the lower id, which is the rule the level's own budget uses.
- */
 export const solution: ReferenceSolution = {
   levelId: 'w5-03',
   run(sim: Sim, botId: number): void {

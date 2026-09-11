@@ -1,9 +1,3 @@
-/**
- * The site map's arithmetic on an ungraded work order (DESIGN.md §7).
- *
- * Every case here checks one of three defects: the points reduce paid nothing for a close, the
- * at-par reckoning could never count one, and the accessible name announced it as unfinished.
- */
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { Medal, isGraded } from '../../../game/score.ts';
@@ -115,7 +109,6 @@ describe('ALL AT PAR is attainable in a world holding an ungraded order', () => 
 });
 
 describe('the accessible name does not announce finished work as unfinished', () => {
-  /** The state the accessibility tree was pulled in: both ungraded orders closed, `w1-05` open. */
   function bootSectorInProgress(): SaveFile {
     return close(close(emptySave(), 'w1-01', Medal.None), 'w1-03', Medal.None);
   }
@@ -144,18 +137,6 @@ describe('the accessible name does not announce finished work as unfinished', ()
   });
 });
 
-/*
- * The header band and the work orders under it are one column, and the stylesheet may only say so
- * once.
- *
- * A player on a 1855px window photographed the split: the header took `--screen-gutter` alone
- * while the route was additionally capped at 1680px and centred, so above the cap plus two gutters
- * the header's right-hand group — the campaign bar and its caption — drifted 37px past the rows it
- * describes and ran at the window edge. The fix is not a matching padding on the header; it is one
- * inset both of them read, because a second hand-tuned number is the same bug again. These cases
- * hold the single source rather than the pixels: measured boxes belong in a browser, but "the
- * header does not carry a gutter of its own" is a property of the file.
- */
 const CSS = readFileSync(new URL('../../styles/screens.css', import.meta.url), 'utf8');
 const DEEPSITE = readFileSync(new URL('../../styles/art/deepsite.css', import.meta.url), 'utf8');
 const SIGNAL = readFileSync(new URL('../../styles/art/signal.css', import.meta.url), 'utf8');
@@ -191,9 +172,10 @@ describe('the site map header stays in the content column', () => {
         selector,
         true,
       ]);
-      expect([`${selector} has no gutter of its own`, rule(selector).includes('--screen-gutter')]).toEqual(
-        [`${selector} has no gutter of its own`, false],
-      );
+      expect([
+        `${selector} has no gutter of its own`,
+        rule(selector).includes('--screen-gutter'),
+      ]).toEqual([`${selector} has no gutter of its own`, false]);
     }
   });
 
@@ -204,17 +186,7 @@ describe('the site map header stays in the content column', () => {
   });
 });
 
-/*
- * A box that cannot hold its own text.
- *
- * `.world__num` was a flat 42px while the deepsite direction set the numeral at `clamp(28px, 3vw,
- * 46px)`. At 1920 that is 46px of JetBrains Mono, and two digits of it measure 57px, so `08` sat
- * 16px outside its own right-hand border and touched THE KESSLER CONTRACT beside it. The width of
- * two characters of a monospace face at a stated size is arithmetic, not taste, so the sheet does
- * the multiplication and this recomputes it against every size any direction hands the numeral.
- */
 describe('the world numeral fits inside its own plate', () => {
-  /** JetBrains Mono advances 0.6em a character. The numerals are always zero-padded to two. */
   const MONO_ADVANCE = 0.6;
   const DIGITS = 2;
 
@@ -227,7 +199,6 @@ describe('the world numeral fits inside its own plate', () => {
   const padRatio = scale('--num-pad');
   const floor = Number(/max\(\s*([\d.]+)px/.exec(value('--num-box', root))?.[1]);
 
-  /** Every type size the base sheet or an art direction hands the numeral, in px. */
   const sizes = (): number[] => {
     const found: number[] = [];
     for (const sheet of [CSS, DEEPSITE, SIGNAL]) {
@@ -278,21 +249,6 @@ describe('the world numeral fits inside its own plate', () => {
   });
 });
 
-/*
- * The spine means "these eight worlds are one run of track", and nothing that is not a stop on it
- * may sit inside what the spine measures.
- *
- * The rule used to hang off `.sitemap__route`, which was the commendation shelf's parent as well
- * as the worlds', so it spanned the route's whole height and ran down the side of a panel that is
- * not a world. The fix was the container, not a `bottom:` tuned to clear a shelf of that day's
- * length — so what this holds is the ownership rather than a measurement.
- *
- * The shelf itself has since left the site map for the commendation book, where its count sits
- * beside it (AUDIT-UI F14). That is why the third assertion below is now a *negative* one: the
- * shelf must not be anywhere in this file. It once read `expect(MARKUP).toContain(...)`, pinning
- * the shelf to the screen it was leaving, and a guard that outlives the arrangement it was
- * written for stops being a guard.
- */
 describe('the route spine ends with the last world', () => {
   const worlds = (): string => {
     const lines = MARKUP.split('\n');

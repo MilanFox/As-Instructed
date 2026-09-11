@@ -1,12 +1,3 @@
-/**
- * Player progress in localStorage, plus JSON export/import.
- *
- * Two rules govern everything here:
- *  1. Player code is never lost. Any read path that cannot understand the stored shape still
- *     rescues every string that looks like source before giving up.
- *  2. The shape is versioned from the first release and only ever moves forward through
- *     `MIGRATIONS`, one step per version, so a save written by any past build still loads.
- */
 import { Medal } from '../engine/index.ts';
 import { levelIsGraded } from '../levels/index.ts';
 import { RETIRED_ACHIEVEMENTS } from './achievements.ts';
@@ -15,58 +6,29 @@ export const SAVE_KEY = 'bootstrap.save';
 export const SAVE_VERSION = 2;
 
 export interface LevelProgress {
-  /** The player's source, exactly as last typed. Sacred. */
   code?: string;
   completed: boolean;
   medal: Medal;
-  /** Bonus objective ids ever met on this level. */
   stars: string[];
-  /**
-   * Required objective ids that have held on *every* seed at once, across all runs so far.
-   *
-   * A five-objective level scored as one bit tells a player who closed four of them nothing, and
-   * a change that trades one objective for another is invisible. This is the record that makes
-   * partial progress a thing the game remembers rather than a thing the last run happened to
-   * show. Nothing is gated on it and it never comes back off (DESIGN.md §7.1).
-   */
   objectives?: string[];
   bestTicks?: number;
   attempts: number;
-  /** Epoch ms of the first passing run. */
   clearedAt?: number;
-  /** How many hints this order has given up. Asking for one is not a penalty and never comes back off. */
   hintsRevealed?: number;
 }
 
 export interface Layout {
-  /** Editor column width as a fraction of the workspace. */
   editorFraction: number;
-  /** Viewport height as a fraction of the right-hand column. */
   viewportFraction: number;
 }
 
 export interface Settings {
   layout: Layout;
-  /** Last playback speed the player chose. */
   speed: number;
-  /** Console line cap. */
   consoleCap: number;
-  /**
-   * Whether the run report escalates or arrives all at once.
-   *
-   * Off is a first-class choice, not a degraded one: a player on their fortieth work order has
-   * seen the objectives tick off and does not need to see it again. `prefers-reduced-motion`
-   * forces the same behaviour without touching this flag, so the OS setting and the player's
-   * setting never fight over which one wins.
-   */
   celebrations: boolean;
 }
 
-/**
- * Campaign-wide counters. Nothing here is ever spent, deducted, or shown as a penalty — a failed
- * run costs the player time and nothing else (`fails` exists to celebrate persistence, not to
- * scold), which is the whole reason it is safe to count them.
- */
 export interface CampaignStats {
   runs: number;
   passes: number;
@@ -78,43 +40,13 @@ export interface SaveFile {
   updatedAt: number;
   levels: Record<string, LevelProgress>;
   settings: Settings;
-  /** Commendation id to the epoch ms it was earned. Append-only; nothing here is ever removed. */
   achievements: Record<string, number>;
   stats: CampaignStats;
-  /** Hardware names whose requisition note has already been signed for. */
   seenRequisitions: string[];
-  /**
-   * Review tiers whose memo has already been delivered, by rank.
-   *
-   * A memo is read once, like a requisition. The grade itself is recomputed from `levels` every
-   * time, so this records only what the player has been shown — a rank that no longer exists is
-   * inert, because delivery is keyed off the live tier list rather than off this array.
-   */
   reviewedRanks: number[];
-  /**
-   * Epoch ms of the first run this save ever recorded, and the only thing here that survives a
-   * session boundary.
-   *
-   * `updatedAt` cannot answer "did they come back another day" — it is rewritten on every
-   * keystroke, so it always says today. This is written once, never moved, and read by exactly one
-   * commendation.
-   */
   firstRunAt?: number;
-  /**
-   * Repository subroutine name to the work orders it has actually been called on.
-   *
-   * Call counts come from the run, not from the source: an `import` that no code path reaches is
-   * not use. Append-only per name, like `stars`, so no run can take an entry back.
-   */
   routineOrders?: Record<string, string[]>;
 }
-
-/*
- * The two fields above arrived without a `SAVE_VERSION` bump, which is the version rule holding
- * rather than bending. Both are optional and both mean "nothing recorded yet" when absent, so a
- * save written by any earlier build already satisfies the shape and there is no step for a
- * migration to perform. Version 2 added three *required* fields, which is what a step is for.
- */
 
 export const DEFAULT_LAYOUT: Layout = { editorFraction: 0.44, viewportFraction: 0.58 };
 
@@ -144,17 +76,6 @@ export function emptyProgress(): LevelProgress {
   return { completed: false, medal: Medal.None, stars: [], attempts: 0 };
 }
 
-// ---------------------------------------------------------------------------
-// Migration
-// ---------------------------------------------------------------------------
-
-/**
- * One entry per version step, keyed by the version being migrated *from*. A save at version `n`
- * runs every step from `n` upward until it reaches `SAVE_VERSION`.
- *
- * Version 0 is the unversioned shape: any object whose values are level ids mapped to source
- * strings, which is what an early build wrote and what a hand-edited export tends to look like.
- */
 type Migration = (save: Record<string, unknown>) => Record<string, unknown>;
 
 const MIGRATIONS: Record<number, Migration> = {
@@ -164,15 +85,6 @@ const MIGRATIONS: Record<number, Migration> = {
     levels: rescueLevels(raw),
     settings: emptySave().settings,
   }),
-  /*
-   * Commendations and requisition history arrive in version 2.
-   *
-   * A version 1 save records that a work order closed and what medal it took, and nothing about
-   * *how* — not which run closed it, not whether an information budget was met, not whether the
-   * player went back for a star. None of the five commendations this build issues follows from
-   * what survived, so none is reconstructed. Handing a returning player an award for a run nobody
-   * watched would be worth less than earning one.
-   */
   1: (raw) => ({
     ...raw,
     version: 2,
@@ -192,17 +104,6 @@ function reconstructStats(levels: Record<string, LevelProgress>): CampaignStats 
   return stats;
 }
 
-/**
- * Pulls every recoverable level record out of an unknown blob. Never throws.
- *
- * Medals are whitelisted against the level list on the way in, which is how a save written before
- * DESIGN.md §7 keeps loading: a build that graded `w1-01` recorded a gold there, the level no
- * longer carries a medal, and the stored string is dropped exactly as the retired char-count field
- * is. Everything beside it — the code, the close, the best ticks, the stars, the banked objectives
- * — survives untouched, so the work orders stay closed and the ticks stay on the board. Dropping
- * it here rather than at each reader is what keeps the Performance Review's denominator, the site
- * map's counts and the sector commendations agreeing without any of them knowing about A7.
- */
 function rescueLevels(raw: unknown): Record<string, LevelProgress> {
   const levels: Record<string, LevelProgress> = {};
   const source = isRecord(raw) && isRecord(raw['levels']) ? raw['levels'] : raw;
@@ -234,12 +135,6 @@ function rescueLevels(raw: unknown): Record<string, LevelProgress> {
   return levels;
 }
 
-/**
- * Normalises anything into a current-version `SaveFile`.
- *
- * A save from a *newer* build is not thrown away either: its levels are rescued field by field,
- * so downgrading costs settings, never code.
- */
 export function migrate(raw: unknown): SaveFile {
   if (!isRecord(raw)) return emptySave();
 
@@ -284,13 +179,6 @@ export function migrate(raw: unknown): SaveFile {
   };
 }
 
-/**
- * Routine name to work order ids, or nothing at all.
- *
- * Returns the wrapper rather than the value so that a save that has never called a subroutine
- * stays free of the key entirely — an empty object here and an absent one mean the same thing, and
- * writing one is how a field starts appearing in every export for no reason.
- */
 function rescueRoutineOrders(raw: unknown): { routineOrders: Record<string, string[]> } | null {
   if (!isRecord(raw)) return null;
   const orders: Record<string, string[]> = {};
@@ -302,17 +190,6 @@ function rescueRoutineOrders(raw: unknown): { routineOrders: Record<string, stri
   return Object.keys(orders).length > 0 ? { routineOrders: orders } : null;
 }
 
-/**
- * Commendations are timestamps. A junk value still counts as earned, dated now.
- *
- * Retired ids are dropped here and nowhere else, the same way a medal on a level that no longer
- * carries one is dropped in `rescueLevels`: one whitelist on read, so no screen has to know which
- * commendations this build stopped issuing. Everything beside a dropped id survives — a save that
- * held ten of the old fifteen keeps whichever of them this build still issues.
- *
- * An id that is merely *unrecognised* is kept. It was written by a build that is not this one, and
- * a player who opens an older binary must not have their record eaten by it.
- */
 function rescueAchievements(raw: unknown): Record<string, number> {
   if (!isRecord(raw)) return {};
   const earned: Record<string, number> = {};
@@ -338,7 +215,6 @@ function rescueStrings(raw: unknown): string[] {
   return [...new Set(raw.filter((value): value is string => typeof value === 'string'))];
 }
 
-/** Tier ranks are whole numbers from one upward. Anything else was never written by this game. */
 function rescueRanks(raw: unknown): number[] {
   if (!Array.isArray(raw)) return [];
   const ranks = raw.filter(
@@ -346,10 +222,6 @@ function rescueRanks(raw: unknown): number[] {
   );
   return [...new Set(ranks)].sort((a, b) => a - b);
 }
-
-// ---------------------------------------------------------------------------
-// Storage
-// ---------------------------------------------------------------------------
 
 export interface SaveStorage {
   getItem(key: string): string | null;
@@ -376,7 +248,6 @@ export function loadSave(storage: SaveStorage | null = defaultStorage()): SaveFi
   return parseSave(text);
 }
 
-/** Parses save JSON. Corrupt input yields an empty save rather than an exception. */
 export function parseSave(text: string): SaveFile {
   try {
     return migrate(JSON.parse(text) as unknown);
@@ -398,13 +269,6 @@ export function exportSave(save: SaveFile): string {
   return JSON.stringify({ ...save, version: SAVE_VERSION }, null, 2);
 }
 
-/**
- * Import replaces settings but merges levels, keeping the better result on each side.
- *
- * Commendations, counters and requisition history merge the same way progress does: a
- * commendation earned on either side is earned, dated from whichever side earned it first. An
- * import can raise a total. It can never lower one.
- */
 export function importSave(current: SaveFile, text: string): SaveFile {
   const incoming = parseSave(text);
   const levels: Record<string, LevelProgress> = { ...current.levels };
@@ -448,7 +312,6 @@ export function mergeStats(current: CampaignStats, next: CampaignStats): Campaig
   };
 }
 
-/** Keeps the better of two records. Incoming code wins, because import is an explicit act. */
 export function mergeProgress(
   current: LevelProgress | undefined,
   next: LevelProgress,

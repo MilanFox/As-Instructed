@@ -8,26 +8,13 @@ import { linkProgram, moduleStack, resolveModuleLocation } from './modules.ts';
 import { measureWrapperOffset } from './wrapper.ts';
 import { topFrameLine } from './errors.ts';
 
-/**
- * One seed, start to finish: build the world, bind the API, run the player's program to
- * completion, and turn whatever happened into a `PerSeedResult`.
- *
- * Deliberately free of worker plumbing so it can be driven straight from a test. It must produce
- * byte-identical results to `src/levels/harness.ts` (`runLevel`); where they disagree, the harness
- * is right (docs/ENGINE.md §2).
- */
-
 export interface SeedRunOptions {
   level: LevelDef;
   seed: number;
-  /** Emitted JavaScript, not TypeScript. */
   js: string;
-  /** The original source, as the player typed it. Carried for diagnostics; never executed. */
   source: string;
-  /** Emitted-line to source-line map from `compile.ts`. See `sourcemap.ts`. */
   lineMap?: readonly number[];
   unlockedHardware: readonly string[];
-  /** The player's shared library, already emitted. Linked in front of `js` when present. */
   library?: LibraryRequest | undefined;
   costOverrides?: CostOverrides;
   maxTicks?: number;
@@ -38,13 +25,11 @@ export interface SeedRun {
   result: PerSeedResult;
   trace: Trace;
   verdict: Verdict;
-  /** Present whenever a library was linked. Feeds the Refactor screen's tick attribution. */
   usage?: LibraryUsage;
 }
 
 let cachedOffset: number | undefined;
 
-/** The `new Function` line offset, measured once per worker. */
 export function wrapperOffset(): number {
   cachedOffset ??= measureWrapperOffset(topFrameLine);
   return cachedOffset;
@@ -67,9 +52,6 @@ export function runSeed(options: SeedRunOptions): SeedRun {
 
   let failure: RuntimeFailure | undefined;
 
-  /* Both files go through the linker, library or not. With no imports and no library the emitted
-     body is the same program it always was; what the linker adds is the `//# sourceURL` that lets
-     a failure say which file it came from. Line arithmetic is unchanged either way. */
   const maps = {
     program: options.lineMap,
     lib: options.library?.lineMap,
@@ -115,8 +97,6 @@ export function runSeed(options: SeedRunOptions): SeedRun {
     ops: verdict.stats.ops,
     objectives: verdict.objectives,
   };
-  /* A second pass rather than a second entry in the list above: `buildVerdict` derives `passed`
-     from every objective it is handed, and a bonus that is missed is not a failed run. */
   const bonus = level.bonus ?? [];
   if (bonus.length > 0) {
     result.bonus = evaluateObjectives(bonus, {

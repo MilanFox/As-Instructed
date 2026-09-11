@@ -42,9 +42,7 @@ import {
 
 const SIZE = 30;
 const LIFT: Vec = { x: 4, y: 4 };
-/** The route is kept inside this box so a collapse always has room for a way round it. */
 const EDGE = 3;
-/** How far a false trunk is driven, and the shortest one worth leaving in the ground. */
 const TRUNK_LENGTH = 30;
 const TRUNK_MINIMUM = 9;
 const LETTER: Readonly<Record<Dir, string>> = { 0: 'N', 1: 'E', 2: 'S', 3: 'W' };
@@ -54,7 +52,6 @@ export interface Leg {
   length: number;
 }
 
-/** A leg whose middle has come down, and the perpendicular the way round bulges into. */
 export interface Collapse {
   leg: number;
   side: Dir;
@@ -63,11 +60,9 @@ export interface Collapse {
 export interface Survey {
   legs: Leg[];
   collapsed: Collapse[];
-  /** Section n holds `legs[sections[n] .. sections[n + 1] - 1]`. */
   sections: number[];
   cipherKey: number;
   decoys: number;
-  /** Dead-end workings driven off the route. Not on the plan, and not in the packets either. */
   trunks: number;
   locker: Vec;
 }
@@ -80,23 +75,6 @@ interface Drift {
   trunks: number;
 }
 
-/**
- * Seed 2 is the zero-drift instance: the plan is perfect and following it literally works, which
- * is the only way a player ever gets to believe the plan. Seed 4 is heavy drift — five legs of
- * twelve have come down — so anything that trusts the plan without checking walks into rock.
- * Neither blind trust nor blind distrust survives the set (CURRICULUM.md §10).
- *
- * Zero drift is the degenerate case, so it is not seed 1. It used to be, and on it "decode the
- * plan, walk it, never check" recovered the form outright — the honest general solution and a
- * lazy one both passing the seed everyone starts on, which is what CURRICULUM.md §15.3 and
- * DESIGN.md §11.5 forbid. Seeds 1 and 2 swapped rows; the seed *set* is unchanged, so seed 4 is
- * still the slowest instance and par 116 is still measured off it.
- *
- * No seed ships shift 0. A zero shift leaves the traffic in clear, so a run that never looked for
- * a key at all would read the packets straight off the band and file `plan 0 <legs>` without ever
- * learning there was a cipher — a wrong general rule passing on the friendliest seed, which is
- * what DESIGN.md §11.5 forbids.
- */
 const DRIFTS: Readonly<Record<number, Drift>> = Object.freeze({
   1: { legs: 12, stale: 2, cipherKey: 41, decoys: 3, trunks: 7 },
   2: { legs: 11, stale: 0, cipherKey: 58, decoys: 2, trunks: 7 },
@@ -112,7 +90,6 @@ function driftFor(seed: number): Drift {
 const inBox = (at: Vec): boolean =>
   at.x >= EDGE + 1 && at.y >= EDGE + 1 && at.x <= SIZE - EDGE - 2 && at.y <= SIZE - EDGE - 2;
 
-/** The filed route is held inside the box; the old workings may run anywhere on the site. */
 const onSite = (at: Vec): boolean => at.x >= 1 && at.y >= 1 && at.x <= SIZE - 2 && at.y <= SIZE - 2;
 
 const cell = (at: Vec): number => at.y * SIZE + at.x;
@@ -126,7 +103,6 @@ function stepBy(from: Vec, dir: Dir, count: number): Vec {
 const acrossFrom = (dir: Dir): Dir[] =>
   dir === Dir.North || dir === Dir.South ? [Dir.East, Dir.West] : [Dir.North, Dir.South];
 
-/** The tiles a leg carves, excluding the one it starts on. */
 function legTiles(leg: Leg): Vec[] {
   const out: Vec[] = [];
   let at = leg.from;
@@ -141,14 +117,6 @@ function endOf(leg: Leg): Vec {
   return stepBy(leg.from, leg.dir, leg.length);
 }
 
-/**
- * Whether a stretch can be carved without coming alongside anything already carved.
- *
- * Every corridor here is an induced path: two floor tiles are neighbours only where they are
- * consecutive on the same corridor. That is what makes the filed plan worth having. The workings
- * are a tree, so the route the plan describes is the *only* way to the locker, and a wrong turn
- * is a walk back rather than a longer way round.
- */
 function clearOf(taken: Set<number>, tiles: readonly Vec[], joins: readonly Vec[]): boolean {
   const own = new Set([...tiles, ...joins].map(cell));
   for (const at of tiles) {
@@ -161,7 +129,6 @@ function clearOf(taken: Set<number>, tiles: readonly Vec[], joins: readonly Vec[
   return true;
 }
 
-/** Around the fallen stretch: out three, along four, back three. Six moves more than the plan. */
 function bypassPath(leg: Leg, side: Dir): Vec[] {
   const out: Vec[] = [];
   let at = stepBy(leg.from, leg.dir, 2);
@@ -181,17 +148,14 @@ function bypassPath(leg: Leg, side: Dir): Vec[] {
   return out;
 }
 
-/** The two tiles of this leg that are under the fall. */
 function fallenOf(leg: Leg): Vec[] {
   return [stepBy(leg.from, leg.dir, 3), stepBy(leg.from, leg.dir, 4)];
 }
 
-/** The perpendicular the way round fits into, or null when neither side is clear. */
 function sideFor(leg: Leg, taken: Set<number>): Dir | null {
   const joins = [stepBy(leg.from, leg.dir, 2), stepBy(leg.from, leg.dir, 6)];
   for (const side of acrossFrom(leg.dir)) {
     const path = bypassPath(leg, side);
-    // The last tile is the leg's own, where the way round rejoins it.
     if (clearOf(taken, path.slice(0, -1), joins)) return side;
   }
   return null;
@@ -253,7 +217,6 @@ export function surveyFor(seed: number): Survey {
   throw new Error(`w8-04: seed ${String(seed)} would not lay a route out`);
 }
 
-/** The plan as it was filed: one run per leg, run-length encoded, grouped into sections. */
 export function sectionText(survey: Survey, index: number): string {
   const first = survey.sections[index] as number;
   const last = survey.sections[index + 1] ?? survey.legs.length;
@@ -274,7 +237,6 @@ function carveLeg(world: World, leg: Leg): void {
   }
 }
 
-/** Whether a corridor may be extended onto `at`, having arrived from `from`. */
 function openFor(world: World, at: Vec, from: Vec): boolean {
   if (!onSite(at)) return false;
   if (tileAt(world, at)?.terrain !== Terrain.Rock) return false;
@@ -286,14 +248,6 @@ function openFor(world: World, at: Vec, from: Vec): boolean {
   return true;
 }
 
-/**
- * One dead-end working, driven off the route until the rock runs out.
- *
- * It turns every few tiles, and that is the whole of its function. A straight stub is dismissed
- * for nothing by a single `look` down it, so only a corridor that bends can charge a search the
- * walk to its end and the walk back. Reverted rather than left where it came out too short to
- * cost anybody anything.
- */
 function driveTrunk(world: World, rng: Rng, anchor: Vec): Vec | null {
   let at = anchor;
   const opening = rng.shuffle(ALL_DIRS).find((dir) => openFor(world, step(at, dir), at));
@@ -342,9 +296,6 @@ function build(seed: number): World {
     fallen.push(...fallenOf(leg));
   }
 
-  // Old workings. They are not on the plan and they do not go anywhere, which is the point.
-  // Driven off the near half of the route first, so the first fork arrives early enough that a
-  // search has to choose before it has any grounds to choose on.
   const onRoute = survey.legs
     .flatMap((leg) => legTiles(leg))
     .filter((at) => !fallen.some((rock) => eq(rock, at)));
@@ -369,9 +320,6 @@ function build(seed: number): World {
   const lockerTile = tileAt(world, locker);
   if (lockerTile) lockerTile.mark = 'KD-0001-T (unsigned)';
 
-  // Every working ends in a locker, and the ids say nothing about which one the memo means.
-  // `probe(id)` reaches any machine on the site for nothing, so one locker with a guessable name
-  // would have handed the whole level away at tick zero.
   rng.shuffle([locker, ...deadEnds]).forEach((at, ordinal) => {
     addMachine(world, {
       id: `locker-${String(ordinal)}`,
@@ -421,9 +369,6 @@ function build(seed: number): World {
   if (!worldDistances(world, LIFT).has(locker.y * SIZE + locker.x)) {
     throw new Error(`w8-04: seed ${String(seed)} sealed the locker off`);
   }
-  // The point of the level, asserted rather than hoped for: the filed route is the shortest walk
-  // to the locker there is, and a way round a fall is six moves dearer than the leg it replaces.
-  // Anything cheaper means a working joined two legs and handed the search a short cut.
   const filed = survey.legs.reduce((total, leg) => total + leg.length, 0);
   const walk = worldDistance(world, LIFT, locker);
   if (walk !== filed + 6 * survey.collapsed.length) {
@@ -436,7 +381,6 @@ function build(seed: number): World {
 
 const PLAN_KEYWORD = 'plan';
 
-/** The lines the run filed as its reading of the plan, in the order it printed them. */
 function planLines(ctx: ObjectiveContext): string[] {
   const prefix = `${PLAN_KEYWORD} `;
   return ctx.trace.events
@@ -444,7 +388,6 @@ function planLines(ctx: ObjectiveContext): string[] {
     .map((event) => (event.kind === 'print' ? event.text : ''));
 }
 
-/** `plan <cipher> <legs>` split back into its two halves, or null when it is not that shape. */
 function readPlanNote(line: string): { cipher: number; legs: number } | null {
   const parts = line.split(' ');
   if (parts.length !== 3) return null;
@@ -463,14 +406,6 @@ function planRead(ctx: ObjectiveContext): boolean {
   return claim.cipher === survey.cipherKey && claim.legs === survey.legs.length;
 }
 
-/**
- * Where the reading and the filed plan part company, without handing either number over.
- *
- * Both figures are the whole bonus: the shift is only recoverable by trying all ninety-five
- * against the checksum, and the leg count is only recoverable by throwing the traffic that does
- * not add up away and reading what is left in section order. A wrong claim comes back as the
- * claim, so it rules one answer out and leaves the work that finds the right one where it was.
- */
 function misreadPlan(ctx: ObjectiveContext): Divergence {
   const said = planLines(ctx);
   const line = said[0];
@@ -512,14 +447,6 @@ const holdsForm = (ctx: ObjectiveContext): boolean => {
   return bot !== undefined && inventoryCount(bot, ItemKind.Chip) > 0;
 };
 
-/**
- * Where KD-0001-T ended the shift, in words the run has already earned.
- *
- * The locker's tile is the last thing the filed plan resolves to, so a form still sitting in it
- * is described and never located. What the report does add is whether anybody stood there: a
- * route that arrived and did not pick up and a route that never arrived are the same `not met`
- * and completely different bugs.
- */
 function formStanding(ctx: ObjectiveContext): string {
   for (const bot of ctx.world.bots) {
     if (inventoryCount(bot, ItemKind.Chip) > 0) return `in the hold of ${bot.name}`;
@@ -533,7 +460,6 @@ function formStanding(ctx: ObjectiveContext): string {
     : 'still in the locker; nobody reached it';
 }
 
-/** The tick and tile the run ended on, and what the sim said stopped it. */
 function died(ctx: ObjectiveContext): Divergence {
   const death = ctx.trace.events.find((event): event is DieEvent => event.kind === 'die');
   if (death === undefined) {
@@ -546,16 +472,6 @@ function died(ctx: ObjectiveContext): Divergence {
   };
 }
 
-/**
- * Par: measured from the reference, which drives the filed plan and only re-surveys where the
- * plan turns out to be wrong. That lands between 83 and 116 ticks across the five seeds and par
- * is the worst of them, because every seed has to clear it.
- *
- * The number only means anything because the workings are a tree (`clearOf`). The filed route is
- * the shortest walk to the locker there is, so a program that throws the plan away cannot walk
- * less than one that keeps it — it can only walk the same ground plus whichever dead ends it
- * tried first. Measured, the two best off-plan programs cost 261–290 and 121–358 against par 116.
- */
 export const w8_04: LevelDef = {
   id: 'w8-04',
   world: 8,
@@ -575,22 +491,6 @@ export const w8_04: LevelDef = {
     '',
     'Bring the form up. The run ends once it is in the bot.',
   ].join('\n'),
-  /**
-   * DESIGN.md §11.10, on an order where the plan is the thing being checked.
-   *
-   * The two figures the reading asks for are named as axes and left without numbers. Both are the
-   * star: the shift is only recoverable by trying all ninety-five against the checksum, and the
-   * leg count only by throwing away the traffic that does not add up and reading what is left in
-   * section order. A range on either would be most of the answer, and the sections the antenna
-   * publishes would finish it.
-   *
-   * The fixed half is the guarantee the whole level rests on, asserted in `build` rather than
-   * hoped for: the workings are a tree, so the filed route is the shortest walk to the locker
-   * there is, every old working is a dead end that joins nothing, and a fall never seals the
-   * route — the way round is six moves dearer than the stretch it replaces. Without those on the
-   * sheet, "throw the plan away and search" reads like a program with unknown cost rather than
-   * one whose cost is the plan plus whichever dead ends it tried first.
-   */
   board: {
     fixed: [
       'the site is 28 by 28 of rock inside the wall, and the lift is the only way in',
@@ -691,9 +591,6 @@ export const w8_04: LevelDef = {
     ),
   ],
   bonus: [
-    /* No `progress()`. Neither figure is a running total of anything the trace counts, so
-       `budgetFor` would have had to guess a meter for the bar and would have drawn the wrong
-       one. A star with no honest meter to show gets no bar rather than a dishonest one. */
     Objectives.custom(
       'read-the-plan',
       'Report the shift the plan was filed under, and how many legs it describes',

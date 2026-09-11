@@ -1,28 +1,3 @@
-/**
- * The trace player.
- *
- * The renderer never talks to the simulation (DESIGN.md §3). It is handed a finished `Trace` and
- * draws whatever tick it is told to, at a *fractional* tick so movement interpolates between the
- * integer ticks the engine actually produced.
- *
- * Before the first run there is no trace, and a black rectangle is not a level.
- * `setPreview` takes the level's starting `World` and draws it still — same terrain, same
- * features, bots at rest — so the board is readable before anything has been executed. A trace
- * outranks a preview: `setTrace` takes the picture over and clearing it hands the picture back.
- *
- * Frame budget discipline:
- *
- * - Static terrain lives in an offscreen canvas and is rebuilt only when the current tick crosses
- *   a `tileChange` (see `terrain.ts`).
- * - Bot poses come from precompiled per-bot timelines (`timeline.ts`), so a frame is a binary
- *   search plus arithmetic — never a replay.
- * - The world snapshot behind items, machines and crops is recomputed via `replayTo` only when the
- *   world *revision* changes, which is a binary search over a precomputed tick array.
- * - Nothing in `frame()` allocates: poses, draw order and the particle pool are all preallocated.
- *
- * Consequence: scrubbing backwards costs exactly what scrubbing forwards costs.
- */
-
 import {
   maturity,
   sproutsIn,
@@ -90,23 +65,12 @@ import { TraceTimeline, createPose, dirVectorX, dirVectorY } from './timeline.ts
 import { VisitTrail } from './trail.ts';
 import type { BotPose } from './timeline.ts';
 
-/** Playback speed is expressed in engine ticks per wall-clock second. */
 export const DEFAULT_SPEED = 4;
 
-/**
- * What the end of a run felt like. `pass` and `fail` are the verdict on its own; the three medals
- * are the verdict plus a medal, and each is visually the same gesture at a different size — the
- * same escalation the audio stingers make.
- */
 export type CelebrationKind = 'gold' | 'silver' | 'bronze' | 'pass' | 'fail';
 
 export interface CelebrationOptions {
-  /** Where the flourish is centred, in tile coordinates. Defaults to the last acting bot. */
   at?: Vec;
-  /**
-   * Seconds to hold the screen wash for. The default is matched to the medal stinger; passing
-   * anything much longer will start to feel like a cutscene, which this is not.
-   */
   seconds?: number;
 }
 
@@ -118,42 +82,11 @@ interface CelebrationState {
   duration: number;
 }
 
-/**
- * Delay, in seconds, between `celebrate()` and the medal figure starting.
- *
- * `Conductor.outcome` plays the verdict immediately and the medal stinger 140ms later. The rings
- * are scheduled against the same number so the first ring lands on the first note, and the rest
- * step with it. Getting this wrong is the difference between "synchronised" and "nearly".
- *
- * It is duplicated from `MEDAL_BEAT` in `src/audio/conductor.ts` rather than imported: the
- * renderer does not depend on the audio system, and this is the one number the two must agree on.
- */
 const MEDAL_BEAT = 0.14;
 
-/**
- * The playback lean.
- *
- * `setHighlights` is called with the cells the objective in progress still has to reach, and it
- * is called again every time the run reaches one of them. So the camera is told where the work is
- * going several times a second during a busy stretch, and each telling refreshes a short focus —
- * which adds up to a view that sits slightly towards whatever the run is currently doing and
- * drifts back to centre when it stops doing anything.
- *
- * `LEAN_SECONDS` is the tail: long enough that consecutive refreshes overlap into one continuous
- * lean rather than a series of twitches, short enough that a run which stalls lets go on its own.
- * `LEAN_PULL` is deliberately below the celebration's 0.55 — a medal landing is an event and may
- * take the camera, an objective in progress is only the subject and may lean towards it. On a
- * grid that fits the viewport, which is most of them, `MAX_FOCUS_PX` caps the whole gesture at
- * fourteen pixels of drift.
- */
 const LEAN_SECONDS = 2.4;
 const LEAN_PULL = 0.32;
 
-/**
- * `peak` is the opacity of the screen wash at the very edge of the viewport, measured rather than
- * guessed: at 0.3 a gold corner reads RGB 79 against a void of RGB 6, which is a glow, and glow is
- * exactly what DESIGN.md §8 forbids. At 0.2 it is unmistakably gold and still furniture.
- */
 const CELEBRATION_TIERS: Readonly<
   Record<CelebrationKind, { color: string; peak: number; strength: number }>
 > = {
@@ -168,7 +101,6 @@ export interface FrameInfo {
   tick: number;
   endTick: number;
   playing: boolean;
-  /** Milliseconds spent inside `frame()`, smoothed. */
   frameMs: number;
   fps: number;
   particles: number;
@@ -176,23 +108,14 @@ export interface FrameInfo {
 }
 
 export interface RendererOptions {
-  /** World number, 1..8. Selects the biome palette. */
   world?: number;
-  /** Attach pointer handlers for drag-pan, wheel-zoom and hover. Default true. */
   interactive?: boolean;
-  /** Base URL for the tile atlas. */
   assetBase?: string;
-  /** Art direction to select at construction. Defaults to whichever one is already current. */
   theme?: ArtId;
   onFrame?: (info: FrameInfo) => void;
   onComplete?: () => void;
   onHover?: (readout: TileReadout | null) => void;
-  /** Mirrors `settings.celebrations`. Default true; false makes the whole arc a no-op. */
   celebrations?: boolean;
-  /**
-   * Forces the reduced-motion behaviour on or off. Omit to follow
-   * `prefers-reduced-motion: reduce`, which is what it should normally do.
-   */
   reducedMotion?: boolean;
 }
 
@@ -211,10 +134,8 @@ export class Renderer {
   private timeline: TraceTimeline | null = null;
   private trail: VisitTrail | null = null;
 
-  /** Starting world for the still, pre-run board. Outranked by a trace while one is loaded. */
   private previewWorld: World | null = null;
   private previewUsesFuel = false;
-  /** Resting poses, one per preview bot. Grown, never rebuilt — `frame()` must not allocate. */
   private readonly previewPoses: BotPose[] = [];
   private readonly previewOrder: number[] = [];
 
@@ -225,30 +146,13 @@ export class Renderer {
   private worldNumber = 1;
 
   private snapshot: World | null = null;
-  /** Integer tick `snapshot` is valid for. `-1` means "nothing yet". */
   private snapshotTick = -1;
-  /** Index of the first trace event not yet applied to `snapshot`. */
   private workingIndex = 0;
   private snapshotUsesFuel = false;
-  /**
-   * World the three cell indices below describe.
-   *
-   * The replay path re-indexes whenever `refreshSnapshot` touches the snapshot. A preview has no
-   * events to touch it, so the identity of the world it was built from is the whole cache key —
-   * and it is also what stops a cleared trace leaving its stale cells behind the preview.
-   */
   private indexedWorld: World | null = null;
   private readonly cropCells: number[] = [];
   private readonly markCells: number[] = [];
 
-  /**
-   * One reused options bag for every `particles.emit`.
-   *
-   * A fresh object literal per emitted event is a small, *steady* allocation — a busy World 7
-   * trace crosses hundreds of events a second — and steady small allocations are what turn into a
-   * periodic multi-frame GC pause halfway through a replay. `emit` reads this synchronously and
-   * never retains it, so one bag is enough. Every field is written on every call.
-   */
   private readonly fx: Required<FxOptions> = {
     dx: 0,
     dy: 0,
@@ -258,22 +162,8 @@ export class Renderer {
     delay: 0,
   };
 
-  /**
-   * The bag handed to an art direction's `backdrop` and `post` hooks.
-   *
-   * Rebuilt only when the context changes, for the same reason `this.fx` is reused: a direction
-   * that paints a scanline pass would otherwise cost one object per frame for a whole replay.
-   */
   private paint: PostPaint | null = null;
 
-  /**
-   * The bags handed to a direction's `drawMachine`, `drawCrop` and `drawItem`.
-   *
-   * One each, rewritten in place per call. A 25-tile field at 60 fps is 1500 object literals a
-   * second if these are built inline, which is the allocation shape `this.fx` and `this.paint`
-   * were already hoisted for. `ctx` is assigned on every call because the preview and the replay
-   * hand in different contexts.
-   */
   private readonly machinePaint: MachinePaint = {
     ctx: null as unknown as CanvasRenderingContext2D,
     x: 0,
@@ -317,13 +207,11 @@ export class Renderer {
   private readonly poses = new Map<number, BotPose>();
   private readonly drawOrder: number[] = [];
   private readonly range: ViewRange = { ...EMPTY_RANGE };
-  /** Hoisted out of `drawBots`: an inline comparator would be a new closure every frame. */
   private readonly byScreenDepth = (a: number, b: number): number => {
     const pa = this.poses.get(a) as BotPose;
     const pb = this.poses.get(b) as BotPose;
     return pa.y - pb.y || a - b;
   };
-  /** The same, over `previewPoses` indices. A preview has no timeline and so no pose map. */
   private readonly byPreviewDepth = (a: number, b: number): number => {
     const pa = this.previewPoses[a] as BotPose;
     const pb = this.previewPoses[b] as BotPose;
@@ -344,16 +232,7 @@ export class Renderer {
 
   private highlights: readonly Vec[] = [];
   private highlightsMet = false;
-  /**
-   * True once the player has panned or zoomed by hand.
-   *
-   * The lean is the camera taking an interest, and a camera that takes an interest in something
-   * the player has just deliberately looked away from is a camera fighting them. So the first
-   * manual pan or zoom hands the view over for the rest of this replay; `fit` and the next
-   * `setTrace` give it back, and neither is far away.
-   */
   private cameraHeld = false;
-  /** A lean is in flight, as opposed to a celebration's focus. Only leans yield to the transport. */
   private leaning = false;
   private hoverCell: Vec | null = null;
   private activeBot: number | null = null;
@@ -376,22 +255,14 @@ export class Renderer {
   private emitCursor = 0;
   private disposed = false;
 
-  /** Index of the `objective` event that completes the run. `-1` when the trace has none. */
   private finalObjective = -1;
-  /** 0..1, decaying. The breath the picture takes when the run reaches its last tick. */
   private completion = 0;
   private celebration: CelebrationState | null = null;
-  /** Mirrors `settings.celebrations`. False makes `celebrate` and `pulse` no-ops outright. */
   private celebrationsEnabled = true;
-  /** Varies the staged pulses so fifteen commendations are not fifteen identical rings. */
   private pulseSeed = 0;
   private reducedOverride: boolean | null = null;
   private reducedMatch = false;
   private motionQuery: MediaQueryList | null = null;
-  /**
-   * Wall clock of the last camera kick. Twenty bots deadlocking against each other in World 7
-   * would otherwise ask for twenty kicks on one frame, which is a shake, which is banned.
-   */
   private lastKick = -1;
 
   private resizeObserver: ResizeObserver | null = null;
@@ -411,10 +282,6 @@ export class Renderer {
     this.watchMotion();
   }
 
-  // -------------------------------------------------------------------------
-  // Lifecycle
-  // -------------------------------------------------------------------------
-
   async mount(canvas: HTMLCanvasElement): Promise<void> {
     if (this.disposed) throw new Error('Renderer: mount after dispose');
     this.canvas = canvas;
@@ -433,9 +300,6 @@ export class Renderer {
 
     this.resize();
     this.camera.fit(true);
-    // A screenshot harness needs a handle on the live instance to switch directions and step
-    // frames. `import.meta.env.DEV` is a compile-time constant, so this block is gone from a
-    // production bundle rather than merely unreachable in it.
     if (import.meta.env.DEV) {
       (window as unknown as { __renderer?: Renderer }).__renderer = this;
     }
@@ -468,10 +332,6 @@ export class Renderer {
     this.ctx = null;
   }
 
-  // -------------------------------------------------------------------------
-  // Trace and transport
-  // -------------------------------------------------------------------------
-
   setTrace(trace: Trace | null): void {
     this.trace = trace ? reviveTrace(trace) : null;
     this.timeline = trace ? new TraceTimeline(trace) : null;
@@ -499,22 +359,10 @@ export class Renderer {
       this.snapshotUsesFuel = usesFuel(trace.initialWorld);
       this.refreshSnapshot(0);
     } else {
-      // Clearing the trace hands the picture back to whatever preview was set behind it.
       this.enterPreview();
     }
   }
 
-  /**
-   * The level's starting world, drawn still until a trace arrives.
-   *
-   * This is the board a player sees while writing the program that will run on it: real terrain,
-   * real machines and crops, bots parked where the level puts them, goal brackets on the cells
-   * the objective is about. Nothing moves except the idle tells, because nothing has happened yet
-   * — and under `prefers-reduced-motion` not even those.
-   *
-   * Setting a preview while a trace is loaded is legal and silent: the trace keeps the picture,
-   * and the preview appears the moment `setTrace(null)` clears it.
-   */
   setPreview(world: World | null): void {
     if (world === this.previewWorld) return;
     this.previewWorld = world;
@@ -523,7 +371,6 @@ export class Renderer {
     if (!this.trace) this.enterPreview();
   }
 
-  /** Frames the preview and rebuilds everything the replay path would have owned. */
   private enterPreview(): void {
     const world = this.previewWorld;
     if (!world) return;
@@ -537,7 +384,6 @@ export class Renderer {
     this.leaning = false;
   }
 
-  /** Grows the pose pool. Never shrinks it: a level reload should not cost a fresh allocation. */
   private ensurePreviewPoses(count: number): void {
     while (this.previewPoses.length < count) this.previewPoses.push(createPose());
   }
@@ -558,12 +404,9 @@ export class Renderer {
     return this.speed;
   }
 
-  /** Jumps to a fractional tick. Backwards seeks reset the fx pool so replays stay honest. */
   seek(tick: number): void {
     const end = this.endTick;
     const next = Math.max(0, Math.min(end, tick));
-    // Any deliberate move of the playhead outranks a celebration. Scrub-safety is the same rule
-    // for pixels as for sound: nothing left ringing, nothing left on screen.
     if (next !== this.currentTick) {
       this.skipCelebration();
       this.releaseLean();
@@ -572,8 +415,6 @@ export class Renderer {
     if (next < this.currentTick) {
       this.particles.clear();
       this.emitCursor = this.trace ? eventIndexAt(this.trace, next) : 0;
-      // `eventIndexAt` returns the first event at or after `next`; events exactly at `next` have
-      // already been shown, so step past them.
       if (this.trace) {
         while (
           this.emitCursor < this.trace.events.length &&
@@ -600,17 +441,12 @@ export class Renderer {
 
   pause(): void {
     this.playing = false;
-    // A camera still drifting after the player has stopped the run reads as lag, not as intent.
     this.releaseLean();
   }
 
   setSpeed(ticksPerSecond: number): void {
     this.speed = Math.max(0.1, ticksPerSecond);
   }
-
-  // -------------------------------------------------------------------------
-  // Presentation controls
-  // -------------------------------------------------------------------------
 
   setWorld(world: number): void {
     this.worldNumber = world;
@@ -623,34 +459,17 @@ export class Renderer {
     this.terrain.invalidate();
   }
 
-  /**
-   * Switches art direction, chrome included.
-   *
-   * `applyArtDirection` deliberately does not touch the terrain cache — the cache belongs to the
-   * renderer, and this is the renderer telling it that the thing it keyed on has changed.
-   */
   setArt(id: ArtId): void {
     applyArtDirection(id);
     this.terrain.invalidate();
   }
 
-  /**
-   * Cells the current objective is about. Drawn as pulsing brackets under the bots, and — while
-   * the run is playing — leaned towards. See `LEAN_SECONDS`.
-   */
   setHighlights(cells: readonly Vec[], met = false): void {
     this.highlights = cells;
     this.highlightsMet = met;
     this.lean();
   }
 
-  /**
-   * Points the camera a little way towards the work in progress.
-   *
-   * Every condition here is a reason the camera is already somebody else's: the player's hands,
-   * a follow target, a celebration, a stopped playhead, or reduced motion — under which this is
-   * the whole feature, and it is simply off.
-   */
   private lean(): void {
     const at = this.highlights[0];
     if (!at) return;
@@ -660,7 +479,6 @@ export class Renderer {
     this.leaning = true;
   }
 
-  /** Drops a lean, leaving a celebration's focus alone. */
   private releaseLean(): void {
     if (!this.leaning) return;
     this.leaning = false;
@@ -671,7 +489,6 @@ export class Renderer {
     this.activeBot = botId;
   }
 
-  /** Follow-active-bot. Pass `null` to release the camera. */
   setFollow(botId: number | null): void {
     if (botId === null) {
       this.camera.follow(null);
@@ -687,7 +504,6 @@ export class Renderer {
     this.camera.fit(true);
   }
 
-  /** Tile under a CSS-pixel point, with everything on it as of the current tick. */
   readoutAt(cssX: number, cssY: number): TileReadout | null {
     const cell = this.camera.tileAtScreen(cssX, cssY);
     const world = this.world;
@@ -705,34 +521,10 @@ export class Renderer {
     this.hoverCell = cell;
   }
 
-  /**
-   * The world as of the current tick, or the preview's starting world when no trace is loaded.
-   * The UI may read it; it must not mutate it.
-   */
   get world(): World | null {
     return this.snapshot ?? this.previewWorld;
   }
 
-  // -------------------------------------------------------------------------
-  // Celebrations
-  // -------------------------------------------------------------------------
-
-  /**
-   * Plays the end-of-run flourish for a verdict.
-   *
-   * Call it at the same moment as `GameAudio.outcome({ passed, medal })` and the two line up:
-   * the wash rises with the verdict tone, and one ring lands on each note of the medal figure.
-   * There is no callback and nothing to await — it is decoration, it never blocks anything, and
-   * a second call replaces the first rather than queueing behind it.
-   *
-   * ```ts
-   * audio.outcome({ passed: verdict.passed, medal });
-   * renderer.celebrate(medal === 'none' ? 'pass' : medal);
-   * ```
-   *
-   * Under `prefers-reduced-motion` this still runs: the colour still arrives and the rings still
-   * mark the beats, but the camera does not move and the burst does not fly.
-   */
   celebrate(kind: CelebrationKind, options: CelebrationOptions = {}): void {
     const tier = CELEBRATION_TIERS[kind];
     if (!tier || !this.celebrationsEnabled) return;
@@ -745,7 +537,6 @@ export class Renderer {
       duration: options.seconds ?? (tier.strength > 0 ? 1.5 : 1),
     };
 
-    // The finale outranks the lean; from here the focus belongs to the celebration arc.
     this.leaning = false;
     const at = options.at ?? this.celebrationCell();
     if (tier.strength > 0) {
@@ -760,9 +551,6 @@ export class Renderer {
         tier.strength,
         MEDAL_BEAT,
       );
-      // Silver and gold hand the moment to the machines that earned it: one small ring per bot,
-      // rippling outward from the objective in the order they happen to be standing in. Cheap,
-      // and it stops a good result being one ring in one corner of an otherwise still picture.
       if (tier.strength >= 3) {
         const order = this.drawOrder;
         const limit = Math.min(order.length, 6);
@@ -791,19 +579,6 @@ export class Renderer {
     }
   }
 
-  /**
-   * One small beat on the objective, for a results screen that reveals itself in stages.
-   *
-   * `celebrate` is the medal landing — one call, one arc. A panel that ticks objectives off one at
-   * a time, or lands commendations one by one, wants a beat per item instead, and this is it: a
-   * single ring on the pad, no camera movement, no screen wash. Call it as each row arrives.
-   *
-   * ```ts
-   * objectives.forEach((o, i) => { audio.cue('objective', i); renderer.pulse(); });
-   * audio.medal(medal); renderer.celebrate(medal);
-   * commendations.forEach((_, i) => { audio.commend(i); renderer.pulse('commend'); });
-   * ```
-   */
   pulse(kind: 'objective' | 'commend' = 'objective', at?: Vec): void {
     if (!this.celebrationsEnabled) return;
     const cell = at ?? this.celebrationCell();
@@ -821,13 +596,6 @@ export class Renderer {
     );
   }
 
-  /**
-   * Master switch for everything on this page, mirroring `settings.celebrations`.
-   *
-   * Off means off: `celebrate` and `pulse` become no-ops rather than quieter, and anything already
-   * in flight is cut. A player who has turned the reward sequence off has said something about
-   * every run from now on, not about the volume of this one.
-   */
   setCelebrationsEnabled(enabled: boolean): void {
     this.celebrationsEnabled = enabled;
     if (!enabled) this.skipCelebration();
@@ -837,7 +605,6 @@ export class Renderer {
     return this.celebrationsEnabled;
   }
 
-  /** Cuts a celebration dead. Called by every transport control, and safe to call at any time. */
   skipCelebration(): void {
     if (this.celebration) {
       this.celebration = null;
@@ -849,7 +616,6 @@ export class Renderer {
     return this.celebration !== null;
   }
 
-  /** Pass `null` to go back to following the media query. */
   setReducedMotion(value: boolean | null): void {
     this.reducedOverride = value;
   }
@@ -869,7 +635,6 @@ export class Renderer {
     this.motionQuery.addEventListener('change', this.onMotionChange);
   }
 
-  /** Where a flourish belongs when the caller does not say: the objective, else the active bot. */
   private celebrationCell(): Vec {
     const highlight = this.highlights[this.highlights.length - 1];
     if (highlight) return highlight;
@@ -879,10 +644,6 @@ export class Renderer {
     const world = this.snapshot;
     return { x: world ? world.w / 2 - 0.5 : 0, y: world ? world.h / 2 - 0.5 : 0 };
   }
-
-  // -------------------------------------------------------------------------
-  // Loop
-  // -------------------------------------------------------------------------
 
   private startLoop(): void {
     if (this.rafId) return;
@@ -897,8 +658,6 @@ export class Renderer {
       this.frameMs += (cost - this.frameMs) * 0.1;
       this.fps += (1 / Math.max(dt, 1e-4) - this.fps) * 0.1;
       if (this.options.onFrame) {
-        // Reused, not rebuilt: a fresh object every frame is the kind of small steady allocation
-        // that turns into a periodic GC pause during a long replay.
         const info = this.frameInfo;
         info.tick = this.currentTick;
         info.endTick = this.endTick;
@@ -913,13 +672,6 @@ export class Renderer {
     this.rafId = requestAnimationFrame(tick);
   }
 
-  /**
-   * Advances by `dt` seconds and draws one frame, synchronously.
-   *
-   * The RAF loop is the normal caller. It is public because a caller sometimes needs a frame
-   * *now* and cannot wait for rAF — a thumbnail after a seek, or a frame-cost measurement in a
-   * background tab, where Chrome throttles rAF to a few hertz and makes profiling meaningless.
-   */
   renderFrame(dt = 0): void {
     this.advance(dt);
     this.frame();
@@ -938,8 +690,6 @@ export class Renderer {
         this.currentTick = this.endTick;
         this.playing = false;
         this.emitPending();
-        // The run landing is its own small beat, before whatever the UI decides to say about it.
-        // Everything settles for a second: the goal brackets brighten and the frame breathes in.
         this.completion = 1;
         this.options.onComplete?.();
       } else {
@@ -959,17 +709,11 @@ export class Renderer {
     this.camera.update(dt);
   }
 
-  /**
-   * How hard playback is being pushed, 0..1. Below 8 ticks per second a bot moving one tile in
-   * 125ms needs no help reading as motion; above it, the eye starts seeing teleports instead of
-   * travel, and the smear and speed lines put the travel back.
-   */
   private get rush(): number {
     if (this.reducedMotion) return 0;
     return Math.max(0, Math.min(1, (this.speed - 8) / 24));
   }
 
-  /** Rate-limited so a room full of blocked bots produces one nudge, not a shake. */
   private nudge(dx: number, dy: number, strength: number): void {
     if (this.reducedMotion) return;
     if (this.elapsed - this.lastKick < 0.28) return;
@@ -977,7 +721,6 @@ export class Renderer {
     this.camera.kick(dx, dy, strength);
   }
 
-  /** Fires fx for every trace event the playhead has passed since the last frame. */
   private emitPending(): void {
     const trace = this.trace;
     if (!trace) return;
@@ -990,7 +733,6 @@ export class Renderer {
     }
   }
 
-  /** Fills the reused options bag and fires one burst. Never allocates. */
   private burst(
     name: FxName,
     x: number,
@@ -1040,8 +782,6 @@ export class Renderer {
             dx,
             dy,
           );
-          // The arrival puff, held back until the bot is actually there. In particle time, which
-          // scales with playback speed, one engine tick is one `DEFAULT_SPEED`-th of a second.
           const dwell =
             ('dt' in event && typeof event.dt === 'number' ? event.dt : 1) / DEFAULT_SPEED;
           this.burst(
@@ -1056,7 +796,6 @@ export class Renderer {
             dwell,
           );
         } else {
-          // DESIGN.md §8. The bump is drawn by the bot itself; this is the impact burst.
           const dirX = dirDeltaX(event.dir);
           const dirY = dirDeltaY(event.dir);
           this.burst(
@@ -1068,13 +807,11 @@ export class Renderer {
             dirX,
             dirY,
           );
-          // A wall pushing back on the camera, once. It is the joke landing, not an alarm.
           this.nudge(dirX, dirY, 0.5);
         }
         break;
       }
       case 'send': {
-        // A failed transmission gets the same "this did not work" language as a blocked move.
         const pose = this.poses.get(event.botId);
         if (!pose) break;
         this.burst(
@@ -1088,8 +825,6 @@ export class Renderer {
       }
       case 'objective':
         if (event.state === 'met') {
-          // The last objective of a run is the one the whole thing was for, so it gets the bigger
-          // gesture and the camera leans towards it. Every other one stays a quiet acknowledgement.
           const finale = index === this.finalObjective;
           const cells = this.highlights;
           const limit = Math.min(cells.length, 12);
@@ -1119,21 +854,6 @@ export class Renderer {
     }
   }
 
-  // -------------------------------------------------------------------------
-  // World snapshot
-  // -------------------------------------------------------------------------
-
-  /**
-   * Keeps `this.snapshot` at `floor(tick)`.
-   *
-   * Playing forward applies the events the playhead just passed *in place*: no clone, so a long
-   * run produces no garbage and the frame times stay flat instead of being punctuated by GC.
-   * Seeking backwards falls back to `replayTo`, which starts from the nearest keyframe — that is
-   * what keeps a backwards scrub as cheap as a forwards one (ENGINE.md §4).
-   *
-   * The snapshot is only ever read for items, machines, crops, marks and fuel. Bot *positions*
-   * come from the timelines, because `replayTo` only knows integer ticks.
-   */
   private refreshSnapshot(tick: number): void {
     const trace = this.trace;
     if (!trace) return;
@@ -1165,11 +885,6 @@ export class Renderer {
     if (touched) this.indexSnapshot(this.snapshot);
   }
 
-  /**
-   * Caches the cells that need per-frame attention, so `frame()` never scans the whole grid.
-   * Indexes straight off `world.tiles` rather than through `tileAt`, which would allocate a
-   * position object per cell.
-   */
   private indexSnapshot(world: World): void {
     this.indexedWorld = world;
     this.cropCells.length = 0;
@@ -1182,10 +897,6 @@ export class Renderer {
       if (tile.mark) this.markCells.push(i);
     }
   }
-
-  // -------------------------------------------------------------------------
-  // Drawing
-  // -------------------------------------------------------------------------
 
   private frame(): void {
     const ctx = this.ctx;
@@ -1221,16 +932,12 @@ export class Renderer {
     }
     paint.preview = world !== null && timeline === null;
 
-    // The post pass is the direction's treatment of the *canvas*, not of the board, so an empty
-    // canvas still gets it — a CRT that switches itself off between levels is not a CRT.
     if (!world) {
       art.post?.(paint);
       return;
     }
 
     const tilePx = this.camera.deviceTilePx;
-    // Snapping the world origin to whole device pixels is what keeps the cached terrain layer
-    // crisp; bot positions stay fractional inside this transform, so motion is still smooth.
     const originX = Math.round(this.camera.originX() * dpr);
     const originY = Math.round(this.camera.originY() * dpr);
     ctx.setTransform(1, 0, 0, 1, originX, originY);
@@ -1241,7 +948,6 @@ export class Renderer {
     paint.rows = world.h;
     this.camera.visibleRange(this.range, 1);
 
-    // --- terrain -----------------------------------------------------------
     this.terrain.sync(
       world,
       tiles,
@@ -1255,8 +961,6 @@ export class Renderer {
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(cache, 0, 0, cache.width, cache.height, 0, 0, world.w * tilePx, world.h * tilePx);
 
-    // The visited-tile trail sits between the floor and the grid: the grid lines stay legible on
-    // top of it, and every feature, mark, item and bot below draws over it (DESIGN.md §8).
     if (this.trail) {
       this.trail.sync(tick);
       this.trail.draw(ctx, tilePx, this.range);
@@ -1266,34 +970,26 @@ export class Renderer {
     drawOutOfBounds(ctx, world.w, world.h, tilePx, dpr);
     drawGoals(ctx, this.highlights, tilePx, this.elapsed, this.highlightsMet, this.completion, dpr);
 
-    // --- features ----------------------------------------------------------
     ctx.imageSmoothingEnabled = tilePx < cacheTile;
     this.drawCrops(ctx, world, tilePx, tick);
     this.drawMachines(ctx, world, tilePx);
     this.drawMarks(ctx, world, tilePx);
 
-    // --- items -------------------------------------------------------------
     this.drawItems(ctx, world, tilePx);
 
-    // --- fx under ----------------------------------------------------------
     this.particles.draw(ctx, FX_LAYER_UNDER, tilePx);
 
-    // --- bots --------------------------------------------------------------
     if (timeline) this.drawBots(ctx, timeline, world, tilePx, tick);
     else this.drawRestingBots(ctx, world, tilePx);
 
-    // --- fx over -----------------------------------------------------------
     this.particles.draw(ctx, FX_LAYER_OVER, tilePx);
 
-    // --- top overlays ------------------------------------------------------
     if (this.hoverCell) drawHover(ctx, this.hoverCell, tilePx, dpr);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     drawVignette(ctx, deviceW, deviceH);
 
     const show = this.celebration;
     if (show) {
-      // In, hold, out. The rise is short enough to feel like a response and long enough that it
-      // is a fade rather than a flash — nothing here is ever one frame of bright.
       const u = show.elapsed / show.duration;
       const envelope = u < 0.12 ? u / 0.12 : Math.max(0, 1 - (u - 0.12) / 0.88);
       drawCelebration(ctx, deviceW, deviceH, show.color, envelope * show.peak);
@@ -1302,7 +998,6 @@ export class Renderer {
     art.post?.(paint);
   }
 
-  /** Refreshes the reused hook bag. Rebuilt only when the context behind it changes. */
   private artPaint(
     ctx: CanvasRenderingContext2D,
     width: number,
@@ -1332,8 +1027,6 @@ export class Renderer {
     paint.dpr = dpr;
     paint.time = this.elapsed;
     paint.reducedMotion = this.reducedMotion;
-    // Cleared rather than left alone: the bag outlives the frame, and a `post` handed last frame's
-    // transform on a frame that drew no board would place its marks on a board that is not there.
     paint.tilePx = 0;
     paint.cols = 0;
     paint.rows = 0;
@@ -1349,10 +1042,6 @@ export class Renderer {
     );
   }
 
-  /**
-   * Crops. Maturity is *derived* from the tick (ENGINE.md §6.4), so it changes on frames where no
-   * event fired — which is exactly why crops cannot live in the cached terrain layer.
-   */
   private drawCrops(
     ctx: CanvasRenderingContext2D,
     world: World,
@@ -1380,13 +1069,10 @@ export class Renderer {
       const max = tile.maxGrowth ?? 0;
       const growth = maturity(tile, t);
       const sprouting = sproutsIn(tile, t);
-      // The same clock, past its mark instead of short of it. Never both on one tile.
       const overripe = sprouting > 0 ? 0 : ripeFor(tile, t);
       if (painter) {
         paint.x = x;
         paint.y = y;
-        /* A tile carrying growth but no authored kind is the crop. `w2-05` is the only level that
-         * sows anything else, and it names both. */
         paint.kind = tile.crop ?? 'crop';
         paint.growth = growth;
         paint.max = max;
@@ -1414,7 +1100,6 @@ export class Renderer {
     paint.time = this.elapsed;
     paint.dpr = this.camera.dpr;
     paint.reduced = this.reducedMotion;
-    // Tethers first, so a line runs under the plates it joins rather than across them.
     this.drawMachineTethers(ctx, world, tilePx);
     for (let m = 0; m < world.machines.length; m++) {
       const machine = world.machines[m] as Machine;
@@ -1446,17 +1131,6 @@ export class Renderer {
     }
   }
 
-  /**
-   * What a machine is carrying, drawn on top of whatever painted the machine itself.
-   *
-   * Here rather than behind the `drawMachine` art hook on purpose. A direction owns machine
-   * *identity* — ten kinds a level's `link`, `power` and `transmit` verbs address by name — and
-   * these are not identity, they are the level's own content: a node's capacity, a station that
-   * refuses `power()`, an antenna with eleven packets nobody has read. That content is the same
-   * fact whichever direction is selected, and DESIGN.md §11.7 asks for it on every board, not on
-   * the boards whose direction happened to implement it. `drawSprouting` is already placed by this
-   * same argument, called after both branches of `drawCrops`.
-   */
   private drawMachineReadout(
     ctx: CanvasRenderingContext2D,
     world: World,
@@ -1468,9 +1142,6 @@ export class Renderer {
     const y = machine.at.y;
     const tile = world.tiles[y * world.w + x];
 
-    // Gated on the tile actually carrying a band rather than on a list of machine kinds, which is
-    // the same shape as `usesFuel()` gating the fuel gauge: the readout appears exactly where the
-    // state it reports exists, and a level that puts a band under a router gets it for free.
     if (tile) {
       const inbound = bandLines(tile, 'rx');
       if (inbound >= 0) {
@@ -1479,8 +1150,6 @@ export class Renderer {
       }
     }
 
-    // More than two entries means the machine has somewhere to be *partway* to. A two-state
-    // door is already told by its own sprite and does not want a ring saying `1/1`.
     const cycle = machine.cycle;
     let steps = 0;
     if (cycle && cycle.length > 2) {
@@ -1492,40 +1161,22 @@ export class Renderer {
     }
 
     const key = badgeVarKey(machine);
-    // A level that publishes the total as a var — `w8-05`'s `stages`, `w7-04`'s `cost` — has said
-    // the same number twice once the ring is up, and the ring says it with a position attached.
     if (key !== '' && machine.vars[key] !== steps) {
       drawVarBadge(ctx, x, y, tilePx, machine.vars[key] as number, dpr);
     }
     if (machine.vars[MANUAL_ONLY] === 1) drawCrank(ctx, x, y, tilePx, dpr);
   }
 
-  /**
-   * The two bindings a machine has to somewhere else on the board: what feeds it, and what it
-   * moves.
-   *
-   * A pass of its own because the lines have to go under every plate, not only under the plate of
-   * the machine that owns them — a `fed:` tether crossing a third machine and stopping at its edge
-   * reads as ending there.
-   */
-  private drawMachineTethers(
-    ctx: CanvasRenderingContext2D,
-    world: World,
-    tilePx: number,
-  ): void {
+  private drawMachineTethers(ctx: CanvasRenderingContext2D, world: World, tilePx: number): void {
     const dpr = this.camera.dpr;
     const machines = world.machines;
     for (let m = 0; m < machines.length; m++) {
       const machine = machines[m] as Machine;
       const here = this.inRange(machine.at.x, machine.at.y);
 
-      // `links` is drawn live once the machine is powered, because that is the tick its tiles
-      // actually flip. Before then the dashed line is the only thing on the board saying those
-      // two walls are ever going to move.
       const links = machine.links;
       if (links) {
-        const open =
-          machine.state === 'on' || machine.state === 'open' || machine.state === 'busy';
+        const open = machine.state === 'on' || machine.state === 'open' || machine.state === 'busy';
         for (let i = 0; i < links.length; i++) {
           const cell = links[i] as Vec;
           if (!here && !this.inRange(cell.x, cell.y)) continue;
@@ -1533,8 +1184,6 @@ export class Renderer {
         }
       }
 
-      // `for…in` and a hand-rolled lookup rather than `Object.keys().find()`: this runs every
-      // frame and neither an array of keys nor a closure per machine may be allocated here.
       for (const varKey in machine.vars) {
         if (!varKey.startsWith(FED_BY)) continue;
         const feederId = varKey.slice(FED_BY.length);
@@ -1611,11 +1260,6 @@ export class Renderer {
     }
   }
 
-  /**
-   * All bots, each on its own virtual clock (DESIGN.md §8). Poses are read from precompiled
-   * timelines, so two bots whose clocks differ are legitimately at different points in their
-   * animations on the same frame.
-   */
   private drawBots(
     ctx: CanvasRenderingContext2D,
     timeline: TraceTimeline,
@@ -1636,7 +1280,6 @@ export class Renderer {
       if (!this.inRange(Math.round(pose.x), Math.round(pose.y))) continue;
       order.push(id);
     }
-    // Painter's order: further up the screen draws first, so overlapping bots stack correctly.
     order.sort(this.byScreenDepth);
 
     const dpr = this.camera.dpr;
@@ -1664,21 +1307,12 @@ export class Renderer {
       opts.carrying = record ? countItems(record.inventory) : 0;
       const hasFuel = Boolean(record) && Number.isFinite(record?.fuelMax ?? Infinity);
       opts.fuel = hasFuel && record ? record.fuel / record.fuelMax : 1;
-      // A level opts into fuel per *bot* (ENGINE.md §3a), so a ring on every bot in a mixed level
-      // would be a lie. Only gauge the ones that can run dry.
       opts.showFuel = this.snapshotUsesFuel && hasFuel;
       opts.showLabel = timeline.botOrder.length > 1;
       drawBot(ctx, pose, tilePx, opts);
     }
   }
 
-  /**
-   * The same bots, standing still, for the pre-run board.
-   *
-   * No timeline exists yet, so there are no treads to lay down and no clocks to disagree about.
-   * Everything else is the replay path: same sprite, same accents, same painter's order, so the
-   * moment the run starts nothing about the picture jumps.
-   */
   private drawRestingBots(ctx: CanvasRenderingContext2D, world: World, tilePx: number): void {
     const bots = world.bots;
     this.ensurePreviewPoses(bots.length);
@@ -1723,10 +1357,6 @@ export class Renderer {
     }
   }
 
-  // -------------------------------------------------------------------------
-  // Sizing and input
-  // -------------------------------------------------------------------------
-
   private observeSize(): void {
     const canvas = this.canvas;
     if (!canvas || typeof ResizeObserver === 'undefined') return;
@@ -1746,10 +1376,6 @@ export class Renderer {
     this.dprQuery.addEventListener('change', this.onDprChange);
   }
 
-  /**
-   * Resizes the backing store to device pixels. Drawing happens in device space, so a DPR change
-   * only has to move the camera's ladder — nothing downstream needs to know.
-   */
   resize(): void {
     const canvas = this.canvas;
     if (!canvas) return;
@@ -1843,26 +1469,9 @@ export class Renderer {
   }
 }
 
-/** Slowest of the idle oscillations, so a row of parked bots breathes rather than flickers. */
 const REST_IDLE_HZ = 0.55;
-/**
- * Floor of the resting `idle` value.
- *
- * `idle` is a gate, not an amplitude — `sprites.ts` only asks whether it is above zero — so this
- * has to stay positive through the whole cycle or the waiting tell would strobe on and off once
- * a second, which is precisely the thing it exists to avoid.
- */
 const REST_IDLE_FLOOR = 0.4;
 
-/**
- * A bot standing on the board with nothing to do yet.
- *
- * Pure, and written into a caller-owned pose, because the preview runs inside `frame()` and
- * `frame()` does not allocate. The only animated field is `idle`: a resting bot is *waiting for
- * a program*, and a board of frozen machines reads as a broken canvas rather than as a level
- * ready to run. Under `prefers-reduced-motion` the oscillation flattens to its floor, which keeps
- * the tell present and stops it moving.
- */
 export function restingPose(
   bot: Bot,
   elapsed: number,
@@ -1910,13 +1519,6 @@ function botRecord(world: World, id: number): Bot | undefined {
   return undefined;
 }
 
-/**
- * Index of the `objective` event that finishes the run, or `-1`.
- *
- * "The last objective met" is deliberately positional rather than semantic: the renderer has no
- * business knowing which objective mattered, only that this was the one after which nothing else
- * was achieved, which is precisely the one worth a flourish.
- */
 function lastObjectiveIndex(trace: Trace | null): number {
   if (!trace) return -1;
   const events = trace.events;

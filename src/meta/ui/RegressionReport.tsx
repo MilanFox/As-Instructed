@@ -6,14 +6,6 @@ import { useLibrary } from '../store.ts';
 import type { RegressionEntry } from '../types.ts';
 import './library.css';
 
-/**
- * What the last library edit did to everything that was already finished.
- *
- * Two buttons, and the asymmetry between them is the design: **restore** is always available and
- * always safe, **accept** is the only path by which a recorded medal ever moves, and it says so on
- * the button. The player is never told after the fact that a gold became a silver.
- */
-
 function detailOf(entry: RegressionEntry): string {
   const parts: string[] = [];
   if (entry.beforeTicks !== undefined && entry.afterTicks !== undefined) {

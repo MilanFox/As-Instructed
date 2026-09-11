@@ -1,27 +1,3 @@
-/**
- * A minimal offline WebAudio implementation, so the audio tests can assert on samples.
- *
- * Vitest runs in Node (`vitest.config.ts`), which has no WebAudio and no `OfflineAudioContext`,
- * and DESIGN.md §2 forbids adding a dependency to get one. Everything under `src/audio` uses a
- * deliberately small slice of the API, so the slice is implemented here instead and the sounds
- * are rendered to a real buffer — peaks, DC offset, clipping and decay-to-silence are then
- * ordinary numeric assertions rather than guesses about a graph.
- *
- * It is a test double, so it is honest about what it is not:
- *
- * - **Mono.** Nothing in the catalogue pans, so the destination sums to one channel.
- * - **`DynamicsCompressorNode` is a pass-through.** That is on purpose: it means a "peak <= 1"
- *   assertion proves the material is safe *before* the limiter, which is a stronger claim than
- *   proving the limiter caught it.
- * - **Oscillators are not band-limited.** Square and sawtooth alias above Nyquist. Amplitude,
- *   envelope and timing assertions hold; spectral ones would not.
- * - **`AudioParam` errors are enforced.** `exponentialRampToValueAtTime` towards or away from
- *   zero throws exactly as it does in a browser, which is the single easiest way to write a
- *   sound that is silent on real hardware and fine in a mock.
- * - **`currentTime` is manual.** `advanceTo` moves it, which is how a test simulates frames,
- *   pauses and seeks against the same timeline it later renders.
- */
-
 type ParamTarget = MiniParam;
 
 type EventKind = 'set' | 'linear' | 'exponential' | 'target';
@@ -75,7 +51,6 @@ export class MiniParam {
     this.events.sort((a, b) => a.time - b.time);
   }
 
-  /** Renders the automation curve, plus anything connected to the param, into `out`. */
   renderInto(out: Float32Array, sampleRate: number, state: RenderState): void {
     const events = this.events;
     let previousTime = 0;
@@ -307,8 +282,6 @@ export class MiniBiquad extends MiniNode {
     let b2 = 0;
     let a1 = 0;
     let a2 = 0;
-    // Coefficients are refreshed on a 32-sample grid: fine enough to track the frequency sweeps
-    // in the catalogue, coarse enough that the filters are not the cost of the test suite.
     for (let i = 0; i < state.length; i++) {
       if (i % 32 === 0) {
         const coefficients = biquadCoefficients(
@@ -335,7 +308,6 @@ export class MiniBiquad extends MiniNode {
   }
 }
 
-/** RBJ cookbook, matching the Web Audio spec's filter definitions for the three types used. */
 function biquadCoefficients(
   type: BiquadFilterType,
   frequency: number,
@@ -345,7 +317,6 @@ function biquadCoefficients(
   const w0 = (2 * Math.PI * frequency) / sampleRate;
   const cos = Math.cos(w0);
   const sin = Math.sin(w0);
-  // The spec reads Q in dB for lowpass and highpass, and linearly for bandpass.
   const linearQ = type === 'bandpass' ? Math.max(q, 1e-4) : Math.pow(10, q / 20);
   const alpha = sin / (2 * Math.max(linearQ, 1e-4));
   const a0 = 1 + alpha;
@@ -380,7 +351,6 @@ export class MiniDelay extends MiniNode {
   }
 }
 
-/** Pass-through by design; see the file header. */
 export class MiniCompressor extends MiniNode {
   readonly threshold = new MiniParam(-24);
   readonly knee = new MiniParam(30);
@@ -417,14 +387,12 @@ export class MiniBuffer {
 export class MiniContext {
   readonly destination: MiniNode;
   currentTime = 0;
-  /** Models the browser autoplay policy: a suspended context is silent and its clock is stopped. */
   state: 'running' | 'suspended' = 'running';
 
   constructor(readonly sampleRate = 44100) {
     this.destination = new MiniDestination(this);
   }
 
-  /** Moves the transport. Tests use it to simulate frames between scheduling calls. */
   advanceTo(time: number): void {
     this.currentTime = time;
   }
@@ -466,7 +434,6 @@ export class MiniContext {
 
   async close(): Promise<void> {}
 
-  /** Renders `[0, seconds)` of the graph reaching `destination`. */
   render(seconds: number): Float32Array {
     const length = Math.ceil(seconds * this.sampleRate);
     const state: RenderState = {
@@ -478,24 +445,16 @@ export class MiniContext {
     return this.destination.pull(state);
   }
 
-  /** The cast every test needs. The double implements the slice `src/audio` actually calls. */
   asContext(): BaseAudioContext {
     return this as unknown as BaseAudioContext;
   }
 }
 
-// ---------------------------------------------------------------------------
-// Buffer assertions
-// ---------------------------------------------------------------------------
-
 export interface BufferStats {
   peak: number;
   rms: number;
-  /** Mean sample value. A non-zero mean is a DC offset, which wastes headroom and thumps. */
   dc: number;
-  /** Seconds from 0 to the last sample above `silenceFloor`. */
   lastSound: number;
-  /** Seconds from 0 to the first sample above `silenceFloor`. */
   firstSound: number;
 }
 
@@ -531,7 +490,6 @@ export function analyse(
   };
 }
 
-/** Peak magnitude of a slice, for "is it actually silent after the seek" assertions. */
 export function peakBetween(
   buffer: Float32Array,
   sampleRate: number,

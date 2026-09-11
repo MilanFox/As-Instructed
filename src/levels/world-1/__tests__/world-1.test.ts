@@ -11,26 +11,12 @@ import { solution as w1_05Solution } from '../__solutions__/w1-05.ts';
 import { unlockedApiNames } from '../../../runtime/ambient.ts';
 import { compileErrors } from './ambient-check.ts';
 
-/**
- * Boot Sector: solvability, par, and the anti-hardcode claims.
- *
- * Every level is proved solvable on every seed within par, and every level whose CURRICULUM.md
- * block claims that randomization defeats a memorized answer is also proved to *reject* that
- * memorized answer. A generalization rule nobody tests is a comment.
- */
-
 const SOLUTIONS: Record<string, ReferenceSolution> = {
   'w1-01': w1_01Solution,
   'w1-03': w1_03Solution,
   'w1-05': w1_05Solution,
 };
 
-/**
- * The levels whose bonus any correct run already earns, and is meant to.
- *
- * `w1-03` and `w1-05` are deliberately not here: their stars ask for something the obvious answer
- * does not do, and both directions of that claim are proved in `bonus stars are missable` below.
- */
 const UNCHANGED_BONUS = new Set(['w1-02', 'w1-04']);
 
 const starEarned = (level: LevelDef, result: LevelRunResult): boolean =>
@@ -176,10 +162,6 @@ describe('starters do not solve their own level', () => {
 });
 
 describe('hardcoded answers are rejected', () => {
-  /**
-   * The one w1-01 answer that skips the counting. Nothing distinguishes five counted loops from
-   * seventy-eight typed-out moves in a trace, so the booking is what the level actually gates on.
-   */
   test('w1-01: firing moves at the wall until they stop working overruns the booking', () => {
     const level = byId('w1-01');
     const result = runLevel(level, level.seeds[0] as number, (sim, botId) => {
@@ -243,13 +225,6 @@ describe('hardcoded answers are rejected', () => {
   });
 });
 
-/**
- * Both directions of every star this world asks for.
- *
- * A bonus nobody can fail is decoration, so each of these levels gets two drivers: one that earns
- * the star on every declared seed, and one that solves the level the obvious way and does not. The
- * obvious way is the shipped reference solution wherever that is what a player would write.
- */
 describe('bonus stars are missable', () => {
   const stride =
     (tiles: number) =>
@@ -336,14 +311,6 @@ describe('bonus stars are missable', () => {
     }
   };
 
-  /**
-   * The sweep that never inspects a tile twice, whatever shape the bay turns out to be.
-   *
-   * Row one is swept first because it costs nothing either way, and it reports how many columns the
-   * west half has. An even count means the row serpentine already ends at the doorway corner. An
-   * odd count means it would end at the far wall, so the rest of the half is combed by columns
-   * instead — back along row two, down and up to the second-to-last column, then East and down.
-   */
   const combedSweep = (sim: Sim, botId: number): void => {
     const columns = sweep(sim, botId, Dir.East) + 1;
     if (columns % 2 === 1) {

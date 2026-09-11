@@ -3,12 +3,6 @@ import { Dir } from '../../../engine/index.ts';
 import type { ReferenceSolution } from '../../types.ts';
 import { playerApi } from './_api.ts';
 
-/**
- * TEST FIXTURE. Never imported from src/main.tsx — vite.config.ts fails the build if it is.
- *
- * Read the whole line for nothing, work out which way it runs from the reactor to sub-1, then
- * drive that way once, using each station as the bot reaches it.
- */
 export const solution: ReferenceSolution = {
   levelId: 'w5-01',
   run(sim: Sim, botId: number): void {

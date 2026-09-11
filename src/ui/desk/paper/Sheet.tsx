@@ -1,34 +1,3 @@
-/**
- * One sheet of paper on the desk.
- *
- * This is the physical half of every document: where it lies, how it is dragged, how it is
- * enlarged, and the pin that puts it on the copy stand. What is printed on it is the caller's
- * business.
- *
- * **A document has exactly one gesture and two controls.** The gesture is drag: press it anywhere,
- * move it, and it stays where it is dropped. Enlarging and pinning are buttons printed on the
- * sheet. The first build overloaded the click — press to drag, click to enlarge — and an
- * overloaded gesture is a gesture nobody discovers: a player who pressed a sheet meaning to move
- * it got it flying across the desk at 1.23x instead, and once it was up, dragging did nothing at
- * all. It is the same defect as the 10px chips elsewhere in this game, and the desk's
- * whole thesis is that things are objects you can see.
- *
- * **Enlarging is a transform on this element and nothing else.** As a portal or an overlay it
- * would reintroduce exactly the self-destroying-ceremony problem the desk exists to remove. So
- * the held sheet is the same node
- * in the same layer with a different `transform`, and putting it down restores the position it was
- * already in.
- *
- * The lift is sized to be read rather than to a fixed number: `min(1.9, 0.92 × innerHeight / its
- * own height, 0.42 × innerWidth / its own width)`, floored at 1, parked against the right of the
- * desk so it never covers the terminal. Where that floor binds — a long work order at `--ts: 1.5`
- * on a 13" laptop — the sheet scrolls rather than running off the bottom of the screen, and its
- * controls stay stuck to the top of it, because whatever opens on the desk closes without
- * scrolling.
- *
- * Geometry is in design units offset from the centre of the frame, never in pixels, so a sheet
- * dragged at one window size is in the same place at another.
- */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { useDeskSize } from '../scale.ts';
@@ -40,7 +9,6 @@ interface Lift {
   left: number;
   top: number;
   maxHeight: number;
-  /** True only where the window has no room left. Then, and only then, the sheet scrolls. */
   scrolls: boolean;
 }
 
@@ -52,7 +20,6 @@ function liftFor(width: number, height: number): Lift {
   const maxHeight = (window.innerHeight * 0.92) / scale;
   return {
     scale,
-    /* `transform-origin: 50% 0`, so the box grows about its own centre-top. */
     left: window.innerWidth - window.innerWidth * 0.04 - (width * (1 + scale)) / 2,
     top: window.innerHeight * 0.035,
     maxHeight,
@@ -93,11 +60,6 @@ export function Sheet({
     };
   }, [doc.id]);
 
-  /*
-   * Measured, not assumed: `offsetHeight` is the sheet's own layout height, before the resting
-   * scale and before the rotation, so the fit is right whatever the type scale has done to the
-   * prose inside it.
-   */
   const measure = useCallback(() => {
     const element = node.current;
     if (!element) return;
@@ -125,11 +87,6 @@ export function Sheet({
         top: `${String(Math.round(held.top))}px`,
         transform: `rotate(-0.5deg) scale(${String(held.scale)})`,
         maxHeight: `${String(Math.round(held.maxHeight))}px`,
-        /*
-         * Overflow is only turned on where the sheet genuinely cannot fit. A scroll container
-         * clips on both axes, and turning it on unconditionally cut the corner controls off the
-         * one sheet that most needs them.
-         */
         overflowY: held.scrolls ? 'auto' : 'visible',
         zIndex: doc.z,
       }
@@ -140,18 +97,6 @@ export function Sheet({
         zIndex: doc.z,
       };
 
-  /*
-   * Drag, and only drag. There is no threshold, because there is nothing to disambiguate from.
-   *
-   * The sheet follows the cursor for the whole gesture and the store is written **once**, on
-   * release. Nothing moved until release in the first build and the player concluded the drag was
-   * broken; committing per move instead is the other failure, because `looseDocs` re-derives and
-   * every subscriber re-renders on every mouse event. Live transform, single commit.
-   *
-   * `translate` is the independent property rather than part of `transform`: it composes outside
-   * the resting rotate-and-scale, so the sheet tracks the pointer one-for-one whatever the sheet
-   * is already doing, and the resting transform never has to be rebuilt per frame.
-   */
   const onPointerDown = (event: React.PointerEvent<HTMLElement>): void => {
     if (lifted) return;
     const target = event.target as HTMLElement;
@@ -182,10 +127,6 @@ export function Sheet({
     moveTo(doc.id, at.x + (event.clientX - from.x) / unit, at.y + (event.clientY - from.y) / unit);
   };
 
-  /*
-   * The live translate is dropped only once the committed `left`/`top` are on the element, or the
-   * sheet snaps back for one frame before it lands.
-   */
   useLayoutEffect(() => {
     if (node.current) node.current.style.translate = '';
   }, [doc.moved, lifted]);
@@ -214,10 +155,6 @@ export function Sheet({
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
     >
-      {/*
-        Printed on the sheet, first in the flow and stuck to the top of it, so a sheet taller than
-        the window still carries the control that closes it.
-      */}
       <div className="doc__tools">
         <button
           type="button"
@@ -245,14 +182,6 @@ export function Sheet({
             {pinned ? 'on the copy stand' : 'pin to the copy stand'}
           </button>
         ) : null}
-        {/*
-          Away means the in-tray, and the in-tray means retrievable. Paper still persists until it
-          is filed; this is only the difference between paper on the desk and paper put away, and
-          without it there was no way at all to clear a sheet off the work.
-
-          The standing sheet has no `put it away`, because a grade you can put down is an event
-          rather than a standing.
-        */}
         {doc.kind === 'standing' ? null : (
           <button
             type="button"

@@ -1,11 +1,3 @@
-/**
- * What The Grid says when a district fails to come up.
- *
- * World 5 grades order as much as outcome: a station switched on before the machine feeding it,
- * a feeder taken over its ceiling, a cable that overran the drum. Every one of those is a
- * comparison the level had already run in order to answer yes or no, and every one of them used
- * to report the bare bit. These are the assertions that they now report the comparison.
- */
 import { describe, expect, test } from 'vitest';
 import type { Machine, Objective, Sim, UseEvent, Vec } from '../../../engine/index.ts';
 import { Dir, machineById, manhattan } from '../../../engine/index.ts';
@@ -125,12 +117,6 @@ describe('w5-02 — the patch report, and what it refuses to say', () => {
     });
   });
 
-  /**
-   * The break is the level. A report that named the side it lies on would be worth one reading,
-   * and a player who took one reading per run could close two hundred segments in eight runs
-   * without ever bisecting anything — so the only thing said about a wrong patch is that it is
-   * wrong, and no number appears anywhere in the pair.
-   */
   test('a single wrong patch is told it is wrong, and never which way the break lies', () => {
     const { met, divergence } = diverge(w5_02, 1, 'patched', (sim, botId) => {
       playerApi(sim, botId, 'w5-02').power('relay-0', 'patched');
@@ -184,12 +170,6 @@ describe('w5-03 — the cable, the order and the walk', () => {
     });
   });
 
-  /**
-   * `dependencies` can only point a station at one built before it, so until `relabel` was added
-   * the ids were a topological order of themselves and bringing the district up in id order
-   * cleared the objective the level is about with the graph unread. This is that answer, refused
-   * on every seed — a program that cables and switches everything, and still gets the order wrong.
-   */
   test('a bare ascending loop over the ids is refused on every seed', () => {
     for (const seed of w5_03.seeds) {
       const count = withPrefix(w5_03, seed, 'sub-').length;
@@ -202,16 +182,11 @@ describe('w5-03 — the cable, the order and the walk', () => {
     }
   });
 
-  /**
-   * The allowance is on the reactor, so the number is not news. Which two stations the crew was
-   * walking between when it ran out is, and it names no better order to have taken.
-   */
   test('tight-order names the leg of the walk that spent the allowance', () => {
     const stations = withPrefix(w5_03, 1, 'sub-');
     const reactor = must(machineById(w5_03.build(1), 'reactor'), 'the reactor');
     const budget = w5_03.build(1).vars.travelBudget ?? 0;
 
-    /* The mirror image of the intended walk: always cross the district for the next station. */
     const order: Machine[] = [];
     const left = stations.slice();
     let from: Vec = reactor.at;
@@ -288,11 +263,6 @@ describe('w5-04 — the consumer, the ceiling and the feeder held back', () => {
     });
   });
 
-  /**
-   * The comparison the star is graded on is `loadOn(largest) === 0`, and every capacity in the
-   * yard is a free read. Printing the two sides of that comparison costs the level nothing and
-   * is the difference between "not met" and knowing which cable to have laid elsewhere.
-   */
   test('largest-idle names the largest feeder, its ceiling and the load left on it', () => {
     const world = w5_04.build(1);
     const feeders = world.machines.filter((machine) => machine.id.startsWith('feeder-'));
@@ -314,7 +284,6 @@ describe('w5-04 — the consumer, the ceiling and the feeder held back', () => {
       expected: 'no consumers on it',
       received: `1, drawing ${String(draw ?? 0)}`,
     });
-    /* Which consumer to move instead is the packing, and the packing is the level. */
     expect(`${shown.where} ${shown.expected} ${shown.received}`).not.toContain('consumer-');
   });
 });
@@ -383,11 +352,6 @@ describe('w5-05 — the island, the drum and the dead cable', () => {
     });
   });
 
-  /**
-   * An early switch-on the run came back and made good is forgiven by the objective, so the report
-   * must not point at it. Naming the first pass of a retry loop would send the player after a tick
-   * the run had already corrected.
-   */
   test('energised looks past a switch-on the run came back and made good', () => {
     const { met, divergence } = diverge(w5_05, 1, 'energised', (sim, botId) => {
       const { link, power } = playerApi(sim, botId, 'w5-05');
@@ -404,8 +368,6 @@ describe('w5-05 — the island, the drum and the dead cable', () => {
     });
   });
 
-  /* The shape of the line is in the facts, so a line that is not that shape is told so rather
-     than being read as a claim about some station the run never named. */
   test('name-the-weak-link tells a malformed line what shape was wanted', () => {
     const { met, divergence } = diverge(w5_05, 1, 'name-the-weak-link', (sim, botId) => {
       playerApi(sim, botId, 'w5-05').print('weak sub-1');
@@ -418,11 +380,6 @@ describe('w5-05 — the island, the drum and the dead cable', () => {
     });
   });
 
-  /**
-   * The star never names the station and never gives the figure. A run that filed nothing is told
-   * a line was wanted; a run that named the wrong station gets its own line back and no hint at
-   * which one it should have been.
-   */
   test('name-the-weak-link says a line was wanted when the run filed none', () => {
     const world = w5_05.build(1);
     const stations = world.machines.filter((machine) => machine.id.startsWith('sub-'));
@@ -445,7 +402,6 @@ describe('w5-05 — the island, the drum and the dead cable', () => {
     const count = world.machines.filter((machine) => machine.id.startsWith('sub-')).length;
     const { met, divergence } = diverge(w5_05, 1, 'name-the-weak-link', (sim, botId) => {
       const api = playerApi(sim, botId, 'w5-05');
-      // One long chain: the far end of it carries the district, and sub-1 is the leaf.
       api.link('reactor', `sub-${String(count)}`);
       for (let i = count - 1; i >= 1; i--) api.link(`sub-${String(i + 1)}`, `sub-${String(i)}`);
       api.print('weak sub-1 99');
@@ -457,7 +413,6 @@ describe('w5-05 — the island, the drum and the dead cable', () => {
     expect(shown.received).toBe('weak sub-1 99');
   });
 
-  /* Naming the right station and miscounting it is told only that the figure is wrong. */
   test('name-the-weak-link confirms nothing but the station when the count is off', () => {
     const world = w5_05.build(1);
     const count = world.machines.filter((machine) => machine.id.startsWith('sub-')).length;

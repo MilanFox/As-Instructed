@@ -1,18 +1,3 @@
-/**
- * The copy stand — a typist's copyholder standing to the right of the desk.
- *
- * Pinning is not zoom and it is not pick-up. Pick-up is for reading *now*; pinning is for keeping
- * a specification legible **while you write**, hands on the keyboard, across runs.
- *
- * **The pinned form is a second authored view of the same content, not a CSS scale of the
- * sheet.** What goes on the stand is the ask and
- * the site data, set larger than the sheet itself carries. The flavour paragraph, the addressing
- * block, the field notes and the footnotes stay on the paper. What you pin is the specification,
- * never the memo.
- *
- * Anything outside this lane that wants the stand builds a `PinnedPage` and calls `pinPage` — the
- * reference manual is the case that exists for.
- */
 import { currentLevel, useGame } from '../../../game/store.ts';
 import { InlineMarkdown } from '../../components/Markdown.tsx';
 import { hardwareNote } from '../../copy.ts';
@@ -26,11 +11,6 @@ export function CopyStand(): React.JSX.Element {
   const doc = usePapers((state) => docById(state, pinnedId));
   const level = useGame(currentLevel);
 
-  /*
-   * A pinned document is projected live rather than snapshotted: pin the work order, ask for a
-   * hint, and the stand should be showing you the order you are working from, not a copy of it
-   * taken a minute ago. A page pinned from outside this lane has no document to re-read.
-   */
   const page = doc ? pageFor(doc, level) : storedPage;
 
   return (
@@ -86,13 +66,6 @@ export function CopyStand(): React.JSX.Element {
 
 type Level = ReturnType<typeof currentLevel>;
 
-/**
- * The projection. Two authored views exist per pinnable document and this is the second one.
- *
- * The ask is the level's own objectives — the specification, in the level's own words, and the
- * one thing that cannot go stale against the rail. The facts are the level's `facts` table, which
- * is already the numbers-and-formats half of the brief and was written to be read as a table.
- */
 function pageFor(doc: DeskDoc, level: Level): PinnedPage | null {
   if (doc.payload.kind === 'order') {
     if (!level || level.id !== doc.payload.levelId) return null;

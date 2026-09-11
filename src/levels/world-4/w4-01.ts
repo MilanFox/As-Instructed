@@ -15,7 +15,6 @@ import { botEndsOn, endedOn } from './objectives.ts';
 const CELLS = 11;
 const SIZE = 2 * CELLS + 1;
 
-/** Path length in cells. 16..30 cells is 31..59 floor tiles, the length the curriculum asks for. */
 function tunnelCells(rng: Rng): number {
   return rng.int(16, 30);
 }
@@ -33,40 +32,11 @@ function build(seed: number): World {
   return world;
 }
 
-/**
- * The allowance for the whole shift, in rays.
- *
- * Measured, not guessed. A run that looks one tile ahead before every step casts 85, 108 and 69
- * rays on the three declared seeds; a run that looks *down* each corridor and drives the straight
- * stretch it sees casts 35, 41 and 19 for the identical route and the identical tick count. Sixty
- * sits between the two families with room on both sides: it admits a bot that checks all four
- * directions at every bend rather than stopping at the first opening, and refuses anything that
- * treats the ray as a one-tile feeler.
- *
- * The seed the two families crowd on is the short one, and that is what picked it out of the
- * candidates: seed 46 is a shortest-possible tunnel on which the feeler still overspends (69), so
- * the budget separates the two programs on every seed rather than on the long ones only. The other
- * minimum draws in reach — seeds 7, 35 and 45 — hand the star to the feeler at 52, 55 and 55, and
- * a degenerate case that also degrades the star is a different level on that seed.
- */
 const LOOK_BUDGET = 60;
 
-/** Rays cast this run. Counted off the trace, which is exact — `Verdict.stats.senses` is too. */
 const raysCast = (ctx: ObjectiveContext): number =>
   ctx.senses?.['look'] ?? senseTotals(ctx.trace)['look'] ?? 0;
 
-/**
- * A single tunnel with no branches and no cycles, so the only decision on each tile is "which way
- * is not the way I came from". Par is the longest seed's tunnel: the route is forced, the
- * reference walks it once, and there is nothing honest left to shave off.
- *
- * Seed 46 is the degenerate case CURRICULUM §2 rule 3 and §15 rule 3 ask for, and §15 rule 3 is
- * also why it is third rather than first. `tunnelCells` declares `rng.int(16, 30)` and the list
- * used to draw 25, 27 and 26 — three middling tunnels, so the shortest instance the generator can
- * produce had never been played. Seed 46 draws the floor of that range: 16 cells, 31 floor tiles,
- * the reference on it costs 30 ticks and 19 rays. Par is unmoved at 52, which is seed 2's exact
- * cost, because a shorter tunnel cannot raise the longest one.
- */
 export const w4_01: LevelDef = {
   id: 'w4-01',
   world: 4,
@@ -87,22 +57,6 @@ export const w4_01: LevelDef = {
     'There is one tunnel. It bends, it does not fork, and it ends on a marked pad.',
     'Drive the bot onto that pad.',
   ].join('\n'),
-  /**
-   * DESIGN.md §11.10.
-   *
-   * The brief says the tunnel bends and does not fork, which is the level's premise. What it does
-   * not say is the stronger thing `carveTunnel` guarantees: two cells are two tiles apart, so the
-   * corridor never runs alongside itself and no tile on it ever shows more than two openings. That
-   * is the difference between "I have not seen a fork yet" and "there is no fork", and only the
-   * second one licenses hint 2's rule — the openings are two, one of them is where I came from,
-   * therefore the other is the way on. A player who does not know the corridor cannot touch itself
-   * writes a program that handles a third opening that will never arrive.
-   *
-   * The ray allowance is fixed while the tunnel length is not, which is the one place on this sheet
-   * where the two halves have to be read together. Sixty rays is generous for a feeler on the short
-   * draw and nowhere near enough on the long one, so a run tuned to the board in front of it takes
-   * the star on one shift and loses it on the next for no reason it can see.
-   */
   board: {
     fixed: [
       'the map is 23 tiles square, and rock everywhere the tunnel is not',
@@ -157,20 +111,6 @@ export const w4_01: LevelDef = {
     ),
   ],
   bonus: [
-    /*
-     * `single-pass` — reach the pad without entering a tile twice — was measured free. The tunnel
-     * does not fork, so any program that arrives has already walked it once and nothing else; the
-     * reference took the star on all three seeds and so does every correct program — this is the
-     * one level in Worlds 3–8 where the route is forced and par cannot rank anything.
-     *
-     * That is what makes an information budget the only honest star here. Ticks are identical for
-     * every correct program; rays are not. The id is minted in the engine's `within-<n>-<meter>`
-     * shape on purpose, so the readout takes the meter from the id and never from the label
-     * (DESIGN.md §5) — this level counts the whole of the `look` meter, so the bar is honest.
-     *
-     * The arrival conjunct is not decoration. A budget alone is satisfied by a program that never
-     * runs: nought rays is inside any allowance. A star has to be earned by playing.
-     */
     Objectives.custom(
       'within-60-look',
       `Reach the pad on ${String(LOOK_BUDGET)} rays or fewer`,

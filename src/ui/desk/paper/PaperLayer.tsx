@@ -1,14 +1,3 @@
-/**
- * The loose paper on the desk.
- *
- * One layer, back to front by `z`. Nothing here is a modal, nothing has a backdrop, and nothing is
- * dismissed by a click on the desk — that is the whole argument for the desk existing, and
- * re-adding a self-destroying ceremony anywhere in this file would undo it.
- *
- * A sheet leaves only when it is *filed*, and filing is an act with an object behind it: the stamp
- * block for a certificate, the pen for a requisition, the acknowledgement on a notice. Filed paper
- * is not deleted — it is in the Repository, which is where a closed work order goes.
- */
 import { useEffect, useRef, useState } from 'react';
 
 import type { DeskDoc } from './papers.ts';
@@ -19,18 +8,12 @@ import { ReportSheet } from './ReportSheet.tsx';
 import { RequisitionSheet } from './RequisitionSheet.tsx';
 import { PerformanceMemo, RepositoryNote, StandingSheet } from './Notices.tsx';
 
-/** How long a filed sheet stays on screen on its way to the Repository. */
 const FILING_MS = 620;
 
 export function PaperLayer(): React.JSX.Element {
   const docs = usePapers(looseDocs);
   const [leaving, setLeaving] = useState<DeskDoc[]>([]);
 
-  /*
-   * Which sheets were already on the desk when this session started. A certificate restored from
-   * `localStorage` has not just arrived, so it neither slides in nor plays its ceremony — that is
-   * the difference between paper being issued and paper lying where you left it.
-   */
   const arrivals = useRef<Map<string, boolean> | null>(null);
   if (arrivals.current === null) {
     arrivals.current = new Map(docs.map((doc) => [doc.id, false]));
@@ -40,7 +23,6 @@ export function PaperLayer(): React.JSX.Element {
   }
   const fresh = arrivals.current;
 
-  /* A sheet that has just been stamped or signed is watched off the desk rather than blinking. */
   const onDesk = useRef<DeskDoc[]>(docs);
   useEffect(() => {
     const ids = new Set(docs.map((doc) => doc.id));

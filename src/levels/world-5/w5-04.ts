@@ -20,23 +20,10 @@ const HEIGHT = 20;
 const DEPOT_AT = vec(1, 1);
 
 export interface YardPlan {
-  /** feeder-1 … feeder-m, in world order. Exactly one is strictly the largest. */
   capacities: number[];
-  /** consumer-1 … consumer-k, in world order. */
   draws: number[];
 }
 
-/**
- * Slack per seed, measured against the feeders that must actually carry the load — that is, every
- * feeder except the largest one.
- *
- * The bonus asks for the largest feeder to end cold, which is only possible when the remaining
- * feeders can hold the whole load. That forces the reduced set to be the tight problem and the
- * full set to look roomy. Seed 1 is the teaching instance and seed 3 is built by hand below.
- *
- * Seed 1 carries the most slack of the drawn seeds and still refuses a run that cables consumers
- * in the order it read them — see `orderDecides`.
- */
 const REDUCED_SLACK: Readonly<Record<number, number>> = Object.freeze({
   1: 1.15,
   2: 1.12,
@@ -44,12 +31,6 @@ const REDUCED_SLACK: Readonly<Record<number, number>> = Object.freeze({
   5: 1.08,
 });
 
-/**
- * Seed 3 is constructed, not drawn. Six feeders of 10 and twelve consumers offered as
- * 4,4,4,4,4,4,6,6,6,6,6,6: taking them in that order wedges pairs of fours into bins that then
- * cannot hold a six. Taking the sixes first fits all twelve exactly. The seventh feeder is the
- * one the bonus asks you to leave alone.
- */
 const CONSTRUCTED: Readonly<Record<number, YardPlan>> = Object.freeze({
   3: {
     capacities: [10, 10, 10, 10, 10, 10, 14],
@@ -57,7 +38,6 @@ const CONSTRUCTED: Readonly<Record<number, YardPlan>> = Object.freeze({
   },
 });
 
-/** Every feeder but the largest, in world order — the set the bonus has to pack into. */
 const workingSet = (capacities: number[]): number[] => {
   const largest = capacities.reduce((best, capacity) => Math.max(best, capacity), 0);
   const at = capacities.indexOf(largest);
@@ -74,23 +54,12 @@ const packs = (capacities: number[], order: number[]): boolean => {
   return true;
 };
 
-/**
- * Does this draw make the order matter?
- *
- * Cabling consumers in the order they were read has to strand one, and taking the heaviest first
- * has to fit them all. A draw roomy enough that any order works teaches the wrong rule to whoever
- * starts on it (CURRICULUM.md §15.3), so `yardPlan` redraws rather than ship it.
- */
 const orderDecides = ({ capacities, draws }: YardPlan): boolean => {
   const bins = workingSet(capacities);
   const heaviestFirst = [...draws].sort((a, b) => b - a);
   return !packs(bins, draws) && packs(bins, heaviestFirst);
 };
 
-/**
- * One candidate yard. The floor on the consumer count is what keeps the yards full-sized: a tight
- * fit is easiest to draw in a small yard, so a redraw left to itself collects nothing else.
- */
 function drawPlan(rng: Rng, slack: number): YardPlan {
   const consumers = rng.int(14, 20);
   const draws: number[] = [];
@@ -162,7 +131,6 @@ const cabledTo = (world: World, feeder: Machine): string[] =>
     .filter((consumer) => feeder.vars[`link:${consumer.id}`] === 1)
     .map((consumer) => consumer.id);
 
-/** The first consumer that did not end the shift on exactly one feeder, and what it is on. */
 const misassigned = (ctx: ObjectiveContext): Divergence | undefined => {
   for (const consumer of consumers(ctx.world)) {
     const on = feedersOf(ctx.world, consumer.id);
@@ -176,12 +144,6 @@ const misassigned = (ctx: ObjectiveContext): Divergence | undefined => {
   return undefined;
 };
 
-/**
- * The first feeder the run took past its ceiling, with the load it ended up carrying.
- *
- * The cable is permanent, so the point of the report is which feeder was overfilled and by how
- * much — never which consumer should have gone somewhere else, because deciding that is the level.
- */
 const overCapacity = (ctx: ObjectiveContext): Divergence | undefined => {
   for (const feeder of feeders(ctx.world)) {
     const load = loadOn(ctx.world, feeder);
@@ -195,12 +157,6 @@ const overCapacity = (ctx: ObjectiveContext): Divergence | undefined => {
   return undefined;
 };
 
-/**
- * What the highest-capacity feeder was left carrying, against the nothing the star asks for.
- *
- * Every capacity is a free read, so which feeder is the largest is not a secret — the comparison
- * the level already ran to grade the star is the whole of the report.
- */
 const largestLoaded = (ctx: ObjectiveContext): Divergence | undefined => {
   const largest = largestFeeder(ctx.world);
   if (largest === undefined) return undefined;
@@ -213,7 +169,6 @@ const largestLoaded = (ctx: ObjectiveContext): Divergence | undefined => {
   };
 };
 
-/** Feeders sit down the West wall; consumers are scattered across the yard. */
 function feederAt(index: number): Vec {
   return vec(2, 2 + index * 2);
 }
@@ -228,19 +183,6 @@ function consumerAt(rng: Rng, taken: Set<string>): Vec {
   }
 }
 
-/**
- * Par: the reference lays exactly one cable per consumer and never moves, so *every* correct run
- * costs 2 × consumers. The five seeds draw 16 / 18 / 12 / 16 / 14 of them, measured, so the clock
- * reads 32 / 36 / 24 / 32 / 28 and no program of any quality reads lower on a given seed — FFD and
- * a perfect packing cost the same ticks here, because what varies is whether the yard packs at all.
- *
- * 36 is therefore the figure: the worst seed, which is the one the medal is taken from
- * (`runtime/aggregate.ts` scores the worst seed of the run). 40 was the ceiling of a `rng.int(14,
- * 20)` draw no seed has ever made — the "twenty-consumer seed" it named does not exist. The median
- * seed reads 32, which CURRICULUM §2 rule 4 would nominate, and it is the wrong number *on this
- * level*: seed 2 costs 36 whatever the player writes, so a par of 32 does not tighten the ladder,
- * it deletes the top rung and hands out silver for a draw the player did not make.
- */
 export const w5_04: LevelDef = {
   id: 'w5-04',
   world: 5,
@@ -257,24 +199,6 @@ export const w5_04: LevelDef = {
     '',
     'Put every consumer on a feeder. Take no feeder over its ceiling.',
   ].join('\n'),
-  /**
-   * DESIGN.md §11.10.
-   *
-   * The cable is permanent, so this is the one order in the district where a wrong assumption
-   * cannot be walked back — which makes the fixed half worth more here than anywhere else in the
-   * world. Three things the generator guarantees and the yard does not show:
-   *
-   * `yardPlan` draws until exactly one feeder is strictly the largest, so "the highest-capacity
-   * feeder" the star names is never a tie the player has to break; the feeders other than that one
-   * can always hold the whole load, so the star is available on every seed rather than on the
-   * roomy ones; and `orderDecides` rejects any draw where taking the consumers as reported fits
-   * anyway, so the level's premise holds on seed 1 as well as on seed 5 (CURRICULUM.md §15.3).
-   * The last of those states which order fails and stops there. Which order works is the level.
-   *
-   * `link` addresses both ends by id, so nothing in the yard has to be walked to — worth saying
-   * because every earlier order in World 3 was a driving job, and a run that assumes it has to
-   * park next to a feeder spends its whole budget on travel that buys nothing.
-   */
   board: {
     fixed: [
       'yard 4 is 26 by 20 of open floor',

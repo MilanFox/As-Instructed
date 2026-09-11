@@ -15,17 +15,12 @@ import type { LevelDef } from '../types.ts';
 import { at, blockedMoves, firstBump, localSeed } from './shared.ts';
 
 const HEIGHT = 9;
-/** The tunnel, and both rooms' loading aisle, share this row. */
 export const AISLE = 7;
-/** The silo is the whole west wall bay: a crate counts as delivered anywhere in this column. */
 export const SILO_X = 1;
 
 export interface Site {
-  /** Tunnel length in tiles. */
   tunnel: number;
-  /** Crate column offset East of the tunnel mouth, one per bot, all distinct. */
   columns: number[];
-  /** How many crates each bot's pile holds. */
   loads: number[];
 }
 
@@ -50,12 +45,16 @@ export function siteWidth(site: Site): number {
 }
 
 function totalCrates(world: World): number {
-  return world.items.reduce((sum, stack) => (stack.kind === ItemKind.Crate ? sum + stack.count : sum), 0);
+  return world.items.reduce(
+    (sum, stack) => (stack.kind === ItemKind.Crate ? sum + stack.count : sum),
+    0,
+  );
 }
 
 function cratesHome(world: World): number {
   return world.items.reduce(
-    (sum, stack) => (stack.kind === ItemKind.Crate && stack.at.x === SILO_X ? sum + stack.count : sum),
+    (sum, stack) =>
+      stack.kind === ItemKind.Crate && stack.at.x === SILO_X ? sum + stack.count : sum,
     0,
   );
 }
@@ -64,10 +63,6 @@ function delivered(ctx: ObjectiveContext): [number, number] {
   return [cratesHome(ctx.world), totalCrates(ctx.initialWorld)];
 }
 
-/**
- * The first crate the run did not get into the silo bay — on the ground in the wrong column, or
- * still in a gripper because the bot that picked it up never put it down.
- */
 function strayCrate(ctx: ObjectiveContext): Divergence | undefined {
   const stray = ctx.world.items
     .filter((stack) => stack.kind === ItemKind.Crate && stack.at.x !== SILO_X)
@@ -107,18 +102,6 @@ export const w7_03: LevelDef = {
     '',
     'Every crate in the east yard has to end up in the silo. All of it goes through the tunnel.',
   ].join('\n'),
-  /**
-   * DESIGN.md §11.10, written as narrowly as this order allows.
-   *
-   * This level is on the Frustration Watch (CURRICULUM.md §11): the livelock has to land cold, so
-   * the sheet says what the site *is* and nothing whatever about what happens when two bots meet
-   * in the tunnel. Everything below is geometry and stock. The fleet size is the axis worth
-   * naming — it is two on the opening shift and six on another, and a program written against a
-   * pair of bots is not the program six of them need. The load line is here for the same reason:
-   * no shift is one trip each, because `siteFor` forces a second crate into a pile when the draw
-   * would have made every pile a single, so a run that plans one crossing per bot has planned for
-   * a board that does not ship.
-   */
   board: {
     fixed: [
       'one tunnel between the rooms, one bot wide, on row 7 every shift',
@@ -155,7 +138,7 @@ export const w7_03: LevelDef = {
     {
       label: '`canMove(dir)`',
       value:
-        'Free, and it asks `move`\'s own question about the tick this bot would arrive on. Only another bot moving can change the answer, so a `canMove` answered by that same `move` never bounces.',
+        "Free, and it asks `move`'s own question about the tick this bot would arrive on. Only another bot moving can change the answer, so a `canMove` answered by that same `move` never bounces.",
     },
   ],
   seeds: [1, 2, 3, 4],
@@ -167,7 +150,8 @@ export const w7_03: LevelDef = {
     const eastX = 8 + site.tunnel;
     for (let y = 1; y <= AISLE; y++) {
       for (let x = 1; x <= 7; x++) setTile(world, vec(x, y), { terrain: Terrain.Floor });
-      for (let x = eastX; x <= eastX + 6; x++) setTile(world, vec(x, y), { terrain: Terrain.Floor });
+      for (let x = eastX; x <= eastX + 6; x++)
+        setTile(world, vec(x, y), { terrain: Terrain.Floor });
     }
     for (let y = 1; y <= AISLE; y++) setTile(world, vec(SILO_X, y), { terrain: Terrain.Pad });
     for (let x = 8; x < eastX; x++) setTile(world, vec(x, AISLE), { terrain: Terrain.Floor });

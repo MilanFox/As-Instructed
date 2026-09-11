@@ -9,16 +9,6 @@ import {
 import { hashText } from './hash.ts';
 import type { MetaRunOutcome, MetaRunRequest, MetaRunner } from './regression.ts';
 
-/**
- * The seam between the metagame and the things that actually run code.
- *
- * `runSuite` and `probe` need one capability — "run this work order against this library and tell
- * me what happened" — and neither should know that a capability involves Monaco, a Web Worker, or
- * a source map. Everything browser-shaped is here, in about a hundred lines, and the whole of
- * `src/meta` is testable in Node because of it.
- */
-
-/** The slice of `Runner` this module uses. */
 export interface RunnerLike {
   run(request: RunRequest): Promise<RunResponse>;
 }
@@ -31,20 +21,9 @@ interface Emitted {
   lineMap: number[];
 }
 
-/**
- * Builds a `MetaRunner` over Monaco and the simulation worker.
- *
- * Two scratch models are reused for every compile rather than one per work order: Monaco keeps
- * every model it is given alive in the language service, and forty of them would make the editor's
- * own type checking slower for the entire session.
- *
- * The library emit is cached on its content hash, so a suite of thirty work orders compiles
- * `lib.ts` exactly once.
- */
 export function createMetaRunner(options: {
   monaco: MonacoApi;
   runner: RunnerLike;
-  /** Watchdog budget per work order. Suites are background work; be generous. */
   timeoutMs?: number;
 }): MetaRunner & { dispose(): void } {
   const { monaco } = options;
@@ -112,13 +91,6 @@ export function createMetaRunner(options: {
   };
 }
 
-/**
- * Collapses a `RunResponse` to the four facts the metagame cares about.
- *
- * The worst seed decides, exactly as the campaign scores it: a work order that passes on two
- * layouts and fails on a third has not closed, and reporting the best of the three would make the
- * regression suite the one place in the game that lies to make itself look calm.
- */
 export function toOutcome(response: RunResponse): MetaRunOutcome {
   if (!response.ok) {
     const failure: MetaRunOutcome['failure'] = { message: response.error.message };
@@ -151,23 +123,10 @@ export function toOutcome(response: RunResponse): MetaRunOutcome {
   return outcome;
 }
 
-/** Identity of a library source, used as the cache key everywhere. */
 export function libraryHashOf(source: string): string {
   return hashText(source);
 }
 
-/**
- * Compiles the current `lib.ts` once and hands back everything the rest of the app needs from it.
- *
- * The integrator calls this on start-up and after every commit. It does two jobs that are easy to
- * forget separately and disastrous to forget individually: it installs `declare module 'lib'` so
- * the *level* editor type-checks the player's imports, and it produces the `RunRequest.library`
- * payload so a normal Run links the library in with a correct line map.
- *
- * Returns `undefined` for `request` when the library does not build. The caller should run the
- * work order anyway when it imports nothing, and refuse with `LIBRARY_FAILURE.notCompiled` when
- * it does.
- */
 export async function prepareLibrary(
   monaco: MonacoApi,
   source: string,

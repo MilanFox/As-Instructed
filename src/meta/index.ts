@@ -1,9 +1,3 @@
-/**
- * Public surface of the metagame — the Shared Subroutines Repository.
- *
- * The host imports from here and nothing deeper.
- */
-
 export type {
   CachedRun,
   Discrepancy,

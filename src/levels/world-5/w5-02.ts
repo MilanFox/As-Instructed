@@ -15,7 +15,6 @@ import {
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
 
-/** The run is always 200 segments; the brief says so, so the player never spends a probe on it. */
 export const SEGMENTS = 200;
 const PER_ROW = 40;
 const ROWS = SEGMENTS / PER_ROW;
@@ -23,11 +22,6 @@ const WIDTH = PER_ROW + 3;
 const HEIGHT = ROWS + 2;
 const FIRST_COLUMN = 2;
 
-/**
- * Break positions are placed, not drawn. CURRICULUM.md §15.3 requires the degenerate cases in the
- * seed list, and a uniform draw over 200 indices will not hand you 0 and 199 in five tries.
- * Seed 1 is the teaching instance and sits comfortably in the middle.
- */
 const BREAK_AT: Readonly<Record<number, number>> = Object.freeze({
   1: 97,
   2: 0,
@@ -40,7 +34,6 @@ export function breakIndex(seed: number): number {
   return BREAK_AT[seed] ?? new Rng(seed * 4409 + 13).int(0, SEGMENTS - 1);
 }
 
-/** Segment `k` snakes: even rows run East, odd rows run West, so the run is one unbroken line. */
 export function segmentAt(index: number): { x: number; y: number } {
   const row = Math.floor(index / PER_ROW);
   const column = index % PER_ROW;
@@ -55,17 +48,6 @@ const patchedIds = (world: World): string[] =>
     .filter((machine) => machine.state === 'patched')
     .map((machine) => machine.id);
 
-/**
- * What the patch report may say, and — the harder half — what it may not.
- *
- * It reports how many relays ended up patched and which, because a search that tests with `power`
- * instead of `probe` leaves three or four of them behind and cannot see that from its own source.
- * It never reports which side of the patched relay the break is on, and never that relay's own
- * `live` reading, because either one is a free reading: a player told the direction after every
- * run could close the two hundred segments by running eight times and never bisect anything.
- * Finding the break is the level. The only thing said about a wrong single patch is that it is
- * wrong, which the run already knows.
- */
 const patchReport = (ctx: ObjectiveContext): Divergence => {
   const patched = patchedIds(ctx.world);
   const only = patched[0];
@@ -86,10 +68,6 @@ const patchReport = (ctx: ObjectiveContext): Divergence => {
   };
 };
 
-/**
- * Par: the reference spends exactly one `power`, so 2 ticks is the whole clock cost and par is
- * that. The scoring pressure on this level is the probe budget, not the clock.
- */
 export const w5_02: LevelDef = {
   id: 'w5-02',
   world: 5,
@@ -186,9 +164,6 @@ export const w5_02: LevelDef = {
         divergence: patchReport,
       },
     ),
-    /* Id left as `withinSenses` mints it: `game/achievements.ts` recognises an information
-       budget by the `within-<n>-<command>` shape, and `probe-budget` did not match. Objective
-       ids are not save keys — `LevelProgress` records medals and star ids only. */
     Objectives.withinSenses('probe', 10, {
       label: 'Locate the break using at most 10 probes',
     }),

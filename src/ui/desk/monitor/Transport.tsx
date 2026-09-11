@@ -1,23 +1,3 @@
-/**
- * The transport, screwed to the monitor's case.
- *
- * Physical keys, a scrub track and a screen-printed readout, in the same 1988 language as the
- * housing they are on — every verb in this game is an object with a reason to exist, and playback
- * is the one verb the site feed owns.
- *
- * Two things here are requirements rather than decoration:
- *
- * **The zoom.** The board is a picture and the SIZE dial is a type scale, so the only honest
- * answer to "make the board bigger" is the camera's own `ZOOM_LADDER`. That is why it is a key on
- * the case and not a chip in a corner or a documented shortcut: the doors to everything in this
- * game used to be 10px chips, and that is the chrome the desk exists to abolish. The wheel still
- * works over the canvas; it is not the only way in.
- *
- * **The word `PLAYHEAD`.** Three tick counters used to show two current values within 700px, all
- * called ticks. This one is the position of the recording. The terminal's rail
- * keeps `par`, `limit` and `shift ends at`; nothing on the desk calls two different numbers by the
- * same noun.
- */
 import { useMemo } from 'react';
 
 import { landmarks, playbackFor, progressMarks, segments } from '../../../game/playback.ts';
@@ -28,8 +8,6 @@ function speedLabel(speed: number): string {
 }
 
 interface TransportProps {
-  /** Rungs up the camera's zoom ladder; `0` frames the whole site. Owned by `Monitor`, which has
-      to know when the player has taken the camera. */
   onZoom(rungs: number): void;
 }
 
@@ -102,11 +80,6 @@ export function Transport({ onZoom }: TransportProps): React.ReactElement {
         </button>
       </div>
 
-      {/*
-       * The run, as acts. A featureless bar tells you nothing about a three-minute solve; this one
-       * shows which stretch belonged to which objective and pips the tick each closed on, so "the
-       * moment it went wrong" is somewhere to aim at rather than to hunt for.
-       */}
       <div className="fc-scrub">
         {acts.length > 0 || steps.length > 0 ? (
           <div className="fc-acts" aria-hidden="true">
@@ -178,10 +151,6 @@ export function Transport({ onZoom }: TransportProps): React.ReactElement {
         <span>{String(endTick).padStart(4, '0')}</span>
       </div>
 
-      {/*
-       * The accessibility tree prints `combobox "1x"` because that is the control's *value*.
-       * It already has a name from the label below. An `aria-label` here would give it a second one.
-       */}
       <label className="sr-only" htmlFor="speed">
         Playback speed
       </label>
@@ -198,13 +167,6 @@ export function Transport({ onZoom }: TransportProps): React.ReactElement {
         ))}
       </select>
 
-      {/*
-       * These keys follow the ruling that every door is an object with weight rather than a corner
-       * chip. They used to be three unlabelled ~10px glyphs beside a 6px legend: a player who
-       * could not read the walls spent two minutes resizing the browser and found `FIT` by
-       * reading the accessibility tree, not by looking at the screen. It solved their problem the
-       * moment they pressed it. Same place, same three rungs, drawn as keys with words on them.
-       */}
       <div className="fc-zoom">
         <span className="fc-legend">ZOOM</span>
         <button

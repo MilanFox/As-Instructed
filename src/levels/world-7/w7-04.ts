@@ -18,10 +18,8 @@ import { localSeed, reportedLines } from './shared.ts';
 
 const WIDTH = 28;
 const HEIGHT = 20;
-/** Depot 0. The fleet musters here and the yard runs east of it. */
 const DEPOT_X = 2;
 const YARD_X0 = 8;
-/** The walk from Depot 0 to the near edge of the yard. Published as part of the load bound. */
 const WALK_OUT = YARD_X0 - DEPOT_X;
 const JOB_PREFIX = 'job-';
 
@@ -33,15 +31,6 @@ export interface Requisition {
   shape: Shape;
 }
 
-/**
- * One distribution shape per seed, because the level is about the *condition* under which
- * dealing the jobs out in advance is fine, not about a rule (CURRICULUM.md §9).
- *
- * Seed 1 is near-uniform and comfortably wide: round-robin is a correct answer there and the
- * player should get to notice that. Seed 3 is the skewed one — three quarters of the jobs are
- * trivial and a handful are twenty ticks, so dealing in advance hands one bot two of them and
- * doubles the makespan. Seed 5 is the squeeze: the largest job set against the smallest fleet.
- */
 const REQUISITIONS: Readonly<Record<number, Requisition>> = Object.freeze({
   1: { bots: 6, jobs: 18, shape: 'uniform' },
   2: { bots: 6, jobs: 24, shape: 'spread' },
@@ -76,20 +65,12 @@ export interface Job {
   cost: number;
 }
 
-/**
- * The work is packed into one block rather than sprinkled across the yard, so walking is a real
- * cost and never the deciding one. This level is about *when* a bot starts a job, and a layout
- * where routing dominates would just re-teach w3-02's lookup-table idea instead of scheduling.
- */
 export function jobsFor(seed: number): Job[] {
   const { jobs, shape } = requisitionFor(seed);
   const rng = new Rng(localSeed(seed) + 401);
   const width = 7;
   const rows = Math.ceil((jobs * 1.4) / width);
   const top = Math.max(1, Math.floor((HEIGHT - (2 * rows - 1)) / 2));
-  // Every other row is left empty. A bot parked on a finished job is a wall from then on, and
-  // without the gaps a late job can end up walled in by the fleet that already served its
-  // neighbours.
   const cells: Vec[] = [];
   for (let r = 0; r < rows; r++) {
     for (let x = YARD_X0; x < YARD_X0 + width; x++) cells.push(vec(x, top + r * 2));
@@ -106,7 +87,6 @@ export function jobsFor(seed: number): Job[] {
   return out;
 }
 
-/** `cost` uses to reach `done`, and a wrap after it, so overshooting a job undoes it. */
 function cycleFor(cost: number): string[] {
   const cycle = ['open'];
   for (let i = 1; i < cost; i++) cycle.push(String(i));
@@ -120,11 +100,6 @@ const jobMachines = (world: World): Machine[] =>
 const doneCount = (world: World): number =>
   jobMachines(world).filter((machine) => machine.state === 'done').length;
 
-/**
- * The number no schedule can beat: nobody finishes before the longest single job is done, every
- * job costs at least a step in and a step out on top of its own price, the rest has to be shared
- * across the fleet, and somebody has to walk out of the depot first.
- */
 export function boundOf(jobCosts: readonly number[], fleet: number): number {
   let total = 0;
   let longest = 0;
@@ -139,13 +114,6 @@ function progress(ctx: ObjectiveContext): [number, number] {
   return [doneCount(ctx.world), jobMachines(ctx.initialWorld).length];
 }
 
-/**
- * The first job still on the board, and how far into it the fleet got.
- *
- * `4 of 12 uses` is the reading `2 of 26` could never give: a job left untouched and a job the
- * fleet walked away from halfway are different mistakes, and one use too many wraps the state
- * back to `open`, which looks from the outside exactly like never having started.
- */
 function unfinishedJob(ctx: ObjectiveContext): Divergence | undefined {
   const job = jobMachines(ctx.world).find((machine) => machine.state !== 'done');
   if (job === undefined) return undefined;
@@ -160,10 +128,6 @@ function unfinishedJob(ctx: ObjectiveContext): Divergence | undefined {
   };
 }
 
-/**
- * The tick each job's own clock stopped on: the reading the bot that closed it had straight
- * after its last `use`. A job nobody finished is absent.
- */
 function closedAt(ctx: ObjectiveContext): Map<string, number> {
   const closed = new Map<string, number>();
   for (const event of ctx.trace.events) {
@@ -178,7 +142,6 @@ function closedAt(ctx: ObjectiveContext): Map<string, number> {
   return closed;
 }
 
-/** The tick the board went clear, and every job that could be said to have decided it. */
 function deciders(ctx: ObjectiveContext): { tick: number; jobs: Set<string> } {
   const closed = closedAt(ctx);
   const tick = Math.max(0, ...closed.values());
@@ -187,7 +150,6 @@ function deciders(ctx: ObjectiveContext): { tick: number; jobs: Set<string> } {
   return { tick, jobs };
 }
 
-/** `last <job> <tick>` split back into its two halves, or null when it is not that shape. */
 function readDecider(line: string): { job: string; tick: number } | null {
   const parts = line.split(' ');
   if (parts.length !== 3) return null;
@@ -196,14 +158,6 @@ function readDecider(line: string): { job: string; tick: number } | null {
   return { job: parts[1] as string, tick };
 }
 
-/**
- * Where the shift report and the run part company, without naming the job.
- *
- * Naming it is the whole bonus. What comes back instead is the run's own answer priced against
- * the run's own makespan — a tick the player can already read off their own clock — so a wrong
- * guess rules that job out and leaves the bookkeeping that finds the right one exactly where it
- * was.
- */
 function misreadDecider(ctx: ObjectiveContext): Divergence | undefined {
   const said = reportedLines(ctx.trace.events, 'last');
   const { tick, jobs } = deciders(ctx);
@@ -252,12 +206,6 @@ function misreadDecider(ctx: ObjectiveContext): Divergence | undefined {
   };
 }
 
-/**
- * Par: measured from the reference, which hands the longest job still on the board to whichever
- * bot comes free soonest. That lands between 51 and 79 ticks across the five seeds and par is
- * the worst of them, because every seed has to clear it. Dealing the board out in advance is
- * fine on seed 1 and misses by roughly double on seed 3, which is the whole level.
- */
 export const w7_04: LevelDef = {
   id: 'w7-04',
   world: 7,
@@ -275,21 +223,6 @@ export const w7_04: LevelDef = {
     '',
     'Clear the board. Every job has to be `done` when your program stops.',
   ].join('\n'),
-  /**
-   * DESIGN.md §11.10.
-   *
-   * The redrawn half of this order is the level. Two numbers and a distribution move, and the
-   * distribution is the one that decides whether dealing the board out before anybody walks is a
-   * correct answer or twice the shift — it is a correct answer on the near-uniform draw, and a
-   * player who met that one first has no way of telling it apart from the skewed draw waiting
-   * behind it. Naming the axis is CURRICULUM.md §2 rule 2 said to the player; it names the shape
-   * of the board and not what to do about it, which is where rule 7 draws the line.
-   *
-   * The fixed half is the yard. The empty row between every row of jobs is a generator
-   * guarantee — a bot parked on a finished job is a wall from then on, and without the gaps a
-   * late job can be walled in by the fleet that already served its neighbours — so a run may take
-   * it that no job is ever unreachable, which is not a thing the one board in front of it shows.
-   */
   board: {
     fixed: [
       'the yard is 26 by 18 of open floor inside its wall',

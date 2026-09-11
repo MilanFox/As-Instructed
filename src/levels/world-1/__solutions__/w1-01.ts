@@ -1,12 +1,6 @@
 import { Dir, type Sim } from '../../../engine/index.ts';
 import type { ReferenceSolution } from '../../types.ts';
 
-/**
- * TEST FIXTURE. Never imported from src/main.tsx — vite.config.ts fails the build if it is.
- *
- * Round the pillar through the gap above it, then one counted loop per leg. 78 moves, which is
- * the whole route and the whole level.
- */
 export const solution: ReferenceSolution = {
   levelId: 'w1-01',
   run(sim: Sim, botId: number): void {

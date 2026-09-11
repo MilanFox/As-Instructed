@@ -1,12 +1,5 @@
-/**
- * Tick cost of every action. DESIGN.md §4.4.
- *
- * Sensing is free. Acting costs ticks. Levels may override any entry via
- * `LevelDef`-supplied `costOverrides`, which is how a world can make (say) mining expensive.
- */
 export interface CostTable {
   move: number;
-  /** Charged when a move fails: out of bounds, wall, or another bot in the way. */
   moveBlocked: number;
   turn: number;
   harvest: number;
@@ -15,7 +8,6 @@ export interface CostTable {
   pickup: number;
   drop: number;
   use: number;
-  /** Multiplier: `wait(n)` costs `n * wait`. */
   wait: number;
   send: number;
   spawn: number;

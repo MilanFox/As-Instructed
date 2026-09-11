@@ -3,18 +3,6 @@ import { FailureCode } from '../engine/index.ts';
 import type { RunResponse, WorkerInbound, WorkerOutbound } from './protocol.ts';
 import { apiBootFailure, serveRunRequest } from './serve.ts';
 
-/**
- * The simulation worker. Receives a `RunRequest`, hands it to `serve.ts`, and posts back a
- * `RunResponse`.
- *
- * The player's program is synchronous and runs to completion here, off the main thread
- * (DESIGN.md §3, §10.7). Everything interesting lives in `serve.ts`, `run-level.ts` and
- * `aggregate.ts` so it stays testable in Node; this file is message plumbing and nothing else.
- *
- * `postMessage` is captured before any player code can exist, and shadowed away inside the
- * player's scope (`wrapper.ts`), so the protocol cannot be corrupted from a program.
- */
-
 const scope = self as unknown as DedicatedWorkerGlobalScope;
 const reply = (message: WorkerOutbound): void => {
   scope.postMessage(message);

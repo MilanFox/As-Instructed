@@ -2,15 +2,6 @@ import type { Sim, Vec } from '../../../engine/index.ts';
 import { Dir } from '../../../engine/index.ts';
 import type { ReferenceSolution } from '../../types.ts';
 
-/**
- * TEST FIXTURE. Never imported from src/main.tsx — vite.config.ts fails the build if it is.
- *
- * Nothing is dealt out in advance. The board is kept sorted longest-first, and every time a bot
- * comes free it takes the head of it, so the twenty-tick jobs land while there is still shift
- * left to absorb them and the one-tick jobs fill the gaps at the end. List scheduling with the
- * longest job first — the intended heuristic (CURRICULUM.md §2 rule 4), not an optimal solver.
- */
-
 interface Hand {
   id: number;
   at: Vec;
@@ -40,11 +31,6 @@ export const solution: ReferenceSolution = {
       [Dir.West, -1, 0],
     ];
 
-    /**
-     * The yard is a walled rectangle of open floor, so the only obstacles are the other bots —
-     * and a bot that has stopped never gives its tile back. Route around where they are now and
-     * re-plan whenever the picture has changed by the time we get there.
-     */
     const route = (from: Vec, to: Vec, taken: ReadonlySet<string>): Dir[] => {
       const via = new Map<string, { at: Vec; dir: Dir }>();
       const seen = new Set<string>([key(from)]);
@@ -88,7 +74,6 @@ export const solution: ReferenceSolution = {
           hand.clock++;
           moved++;
         }
-        // Letting the clock run is a real move here: a tile stays held until its occupant leaves.
         if (moved === 0) {
           sim.wait(hand.id, 1);
           hand.clock++;
@@ -114,8 +99,6 @@ export const solution: ReferenceSolution = {
         hand.clock++;
       }
       hand.at = job.at;
-      // The board is worked longest-first, so the job that closes the shift is rarely the last
-      // one dispatched: it is whichever bot's clock ends up highest when its own job comes off.
       const closed = sim.clock(hand.id);
       if (closed > decidedAt) {
         decidedAt = closed;

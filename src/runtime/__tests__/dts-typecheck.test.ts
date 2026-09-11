@@ -3,17 +3,6 @@ import ts from 'typescript';
 import { describe, expect, test } from 'vitest';
 import { buildAmbientDts, unlockedApiNames } from '../ambient.ts';
 
-/**
- * Type-checks the generated declarations with the real TypeScript compiler.
- *
- * `buildAmbientDts` produces source text that is handed to a compiler we cannot run in Node —
- * Monaco's. This test runs the *same* compiler version against the same text, so a malformed
- * declaration is caught here rather than by a player staring at an editor with no autocomplete.
- *
- * It also pins the central progression rule: calling hardware you have not installed is
- * `error TS2304: Cannot find name`, not a runtime surprise (DESIGN.md §6).
- */
-
 const AMBIENT_FILE = '/firmware.d.ts';
 const PLAYER_FILE = '/program.ts';
 
@@ -117,11 +106,6 @@ describe('locked hardware is a type error', () => {
   });
 });
 
-/**
- * The `Bot` handle is the one declaration generated per level rather than copied out of the spec,
- * so it needs the compiler pointed at it directly: a member that is bound at runtime and missing
- * here would cost the player autocomplete on every World 7 line they write.
- */
 describe('the bot handle type-checks', () => {
   test('a World 7 program written against handles compiles', () => {
     const source = [

@@ -8,18 +8,9 @@ import { emptyProgress, emptySave } from '../save.ts';
 import type { GameState } from '../store.ts';
 import { isLevelUnlocked, useGame } from '../store.ts';
 
-/**
- * A runner the test drives by hand, so every branch of the state machine is reachable.
- *
- * `openLevel` now fires its own background request (the silent prime) alongside whatever a test
- * triggers on purpose, so a single instance can have several calls in flight at once. `settle`/
- * `fail` address one by arrival order — index 0 is the first `run()` this instance ever saw —
- * rather than assuming there is only ever one to answer.
- */
 class ScriptedRunner implements RunnerPort {
   private readonly pending: {
     settle: (response: RunResponse) => void;
-    /** The host itself breaking, which is the only thing `RunnerPort.run` is allowed to reject with. */
     fail: (error: unknown) => void;
   }[] = [];
   cancelled = 0;
@@ -45,7 +36,6 @@ class ScriptedRunner implements RunnerPort {
   dispose(): void {}
 }
 
-/** The worst case DESIGN.md §10.6 has to survive: a host that answers nothing and cancels nothing. */
 class WedgedRunner implements RunnerPort {
   prepare(): void {}
   run(): Promise<RunResponse> {
@@ -82,7 +72,6 @@ function reset(): void {
   });
 }
 
-/** Round the pillar, then a loop per leg. The reference solution for w1-01, as a player types it. */
 const W1_01_ROUTE = [
   'move(Dir.East);',
   'move(Dir.North);',
@@ -98,7 +87,6 @@ const W1_01_ROUTE = [
 
 const W1_01_SOLUTION = W1_01_ROUTE.join('\n');
 
-/** The same route with three ticks burned in the middle: still inside the booking, still worse. */
 const W1_01_SLOWER = [...W1_01_ROUTE.slice(0, 5), 'wait(3);', ...W1_01_ROUTE.slice(5)].join('\n');
 
 async function runOnce(code: string): Promise<void> {
@@ -230,13 +218,7 @@ describe('run state machine', () => {
   });
 });
 
-/**
- * "Try it" against "commit it" — the whole point of `preview()` is that it can never be mistaken
- * for a dispatch: one seed, no save write, and the report never opens.
- */
 describe('preview', () => {
-  // A level with more than one seed proves preview picks the first rather than the level's own
-  // full schedule; `w1-01`'s single seed could not tell the two apart.
   const level = getLevel('w1-03');
 
   async function previewOnce(code: string): Promise<void> {
@@ -246,7 +228,6 @@ describe('preview', () => {
   }
 
   afterEach(() => {
-    // Restores the default level so the describes after this one keep seeing 'w1-01' unasked.
     useGame.getState().openLevel('w1-01');
   });
 
@@ -260,7 +241,6 @@ describe('preview', () => {
     useGame.getState().preview();
 
     expect(runner.requests[0]?.seeds).toEqual([level?.seeds[0]]);
-    // Clears the watchdog `ScriptedRunner` will otherwise leave ticking as a real timer.
     useGame.getState().resetPreview();
   });
 
@@ -315,7 +295,6 @@ describe('preview', () => {
     expect(state.trace).toBeNull();
     expect(state.verdict).toBeNull();
     expect(state.runMode).toBeNull();
-    // Not the player's own Reset — the edit itself did the clearing.
     expect(state.code).toBe('move(Dir.South);\nmove(Dir.East);');
   });
 
@@ -352,8 +331,6 @@ describe('preview', () => {
     const recorded = useGame.getState().save;
     expect(recorded.levels['w1-01']?.completed).toBe(true);
 
-    // Previewing the same program that was just dispatched — no `setCode` in between, so the only
-    // way `save` could change here is `preview()` itself writing to it, which it must not.
     useGame.getState().preview();
     await vi.waitFor(() => expect(useGame.getState().previewState).toBe('idle'));
 
@@ -415,7 +392,6 @@ describe('playback', () => {
 });
 
 describe('rewards', () => {
-  /* Closing a work order is the game working, not an achievement. Most closes pay nothing. */
   it('pays no commendation for an ordinary close', async () => {
     reset();
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
@@ -427,11 +403,6 @@ describe('rewards', () => {
     expect(state.save.achievements).toEqual({});
   });
 
-  /*
-   * The facts below are the ones the store has to assemble itself — from the source, from the
-   * trace, and from the save — rather than read off a `Verdict`. `earnedBy` is tested on the
-   * snapshot; these prove the snapshot says what happened.
-   */
   it('notices a comment the player wrote, and not the one the starter shipped', async () => {
     reset();
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
@@ -475,7 +446,6 @@ describe('rewards', () => {
     expect(useGame.getState().save.achievements['resubmitted']).toBeGreaterThan(0);
   });
 
-  /* One field, written once, and the only thing in the save that survives a session boundary. */
   it('stamps the first run and never moves it', async () => {
     reset();
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
@@ -500,8 +470,6 @@ describe('rewards', () => {
     expect(useGame.getState().save.firstRunAt).toBe(yesterday);
   });
 
-  /* A sector is closed when every order in it is, and world 1 is the only one small enough to
-     seed by hand without asserting the campaign's shape. */
   it('files the sector award only once the last order in it is closed', async () => {
     reset();
     const world = campaignOrder().filter((level) => level.world === 1);
@@ -579,12 +547,6 @@ describe('rewards', () => {
     expect(best).not.toBeNull();
     expect(best?.now).toBeLessThan(best?.previous ?? 0);
 
-    /*
-     * `w1-01` is ungraded (DESIGN.md §7), and this is the test that proves ungrading removed
-     * the ladder without removing the mirror: no medal is recorded, while the personal best — the
-     * diff both playtesters named the best reward in the game — still fires. It is not a
-     * commendation and never was, which is why the cut to five did not touch it.
-     */
     expect(useGame.getState().save.levels['w1-01']?.medal).toBe('none');
 
     await runOnce(W1_01_SOLUTION);
@@ -639,17 +601,12 @@ describe('rewards', () => {
     useGame.getState().award('repository');
     expect(useGame.getState().save.achievements['repository']).toBe(at);
 
-    /* `src/ui/library.ts` still raises the retired regression-pass award; it must not be stored. */
     useGame.getState().award('no-regressions');
     expect(useGame.getState().save.achievements['no-regressions']).toBeUndefined();
     expect(useGame.getState().freshCommendations).not.toContain('no-regressions');
   });
 });
 
-/**
- * DESIGN.md §6. The property that matters is not the number two — it is that no single work
- * order can be the end of a campaign. Being stuck must always leave somewhere else to go.
- */
 describe('the unlock gate', () => {
   const order = campaignOrder();
   const closing = (...ids: string[]): SaveFile => {
@@ -672,7 +629,6 @@ describe('the unlock gate', () => {
   });
 
   it('lets a player skip the one they are stuck on and bank the next', () => {
-    /* Stuck on order 2, closed order 3. The frontier moved even though 2 is still open. */
     const save = closing(order[0]?.id ?? '', order[2]?.id ?? '');
     expect(isLevelUnlocked(save, order[1]?.id ?? '')).toBe(true);
     expect(isLevelUnlocked(save, order[4]?.id ?? '')).toBe(true);
@@ -696,18 +652,6 @@ describe('the unlock gate', () => {
   });
 });
 
-/**
- * A work order that has not been dispatched in this session wears no verdict.
- *
- * The desk reads this store and nothing else — the terminal's `EDIT / SENT / RETURNED / CLOSED`
- * word, the site feed's `NO TRACE ON FILE`, the objectives rail, the transport and the `OUTPUT`
- * log are one subscription each. So a run left behind after the order that produced it has gone is
- * not a rendering fault on one surface; it is every surface at once, agreeing about something that
- * is not true.
- *
- * "Clean" is not a list restated here. It is the store's own resting shape, read before anything
- * has run, so a field added to the run later is covered without this file being edited.
- */
 const RUN_SHAPED = [
   'runState',
   'runMode',
@@ -733,20 +677,11 @@ function runShape(state: GameState): Record<string, unknown> {
 
 const AT_REST = runShape(useGame.getState());
 
-/**
- * Everything a settled promise still owes.
- *
- * `runState` is already `idle` the moment the order changes, so waiting on it would answer before
- * the abandoned run's own handler has run at all and pass against a store that is about to be
- * written. A turn of the macrotask queue drains every microtask behind it.
- */
 function afterTheHostAnswers(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 describe('a freshly opened work order carries no run', () => {
-  /* Every route into an order lands on `openLevel`: the site map's nodes, the Repository's "open
-     the order" button through its host, and the campaign advance. Each one is driven here. */
   async function aRunOn(levelId: string): Promise<void> {
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
     useGame.getState().openLevel(levelId);
@@ -771,12 +706,6 @@ describe('a freshly opened work order carries no run', () => {
     expect(runShape(useGame.getState())).toEqual(AT_REST);
   });
 
-  /*
-   * The other half of the same rule, and the one a fix must not break: leaving to the site map is
-   * not leaving the order. `back to the station` returns a player to the run they were watching,
-   * so the trace has to survive the round trip. It stops being theirs when a different order is
-   * opened, not when the map is.
-   */
   it('but the site plan and back is the same order, and keeps it', async () => {
     reset();
     await aRunOn('w1-01');
@@ -811,14 +740,6 @@ describe('a freshly opened work order carries no run', () => {
     }
   });
 
-  /*
-   * The one that was broken. A run the player walked out on is dropped by token everywhere it is
-   * read back — except in the rejection arm, where the halt line and the run counters were written
-   * before anything asked whose run it was. `RunnerPort.run` rejects only when the host broke, and
-   * the host is Monaco's chunk, the library compile and the transpile, so a flaky network is
-   * enough: the next order opens with someone else's halt in its `OUTPUT` log and a failure
-   * charged to the record for a run nobody watched.
-   */
   it('and a run walked out on cannot file its halt against the next one', async () => {
     reset();
     const runner = new ScriptedRunner();
@@ -827,7 +748,6 @@ describe('a freshly opened work order carries no run', () => {
     useGame.getState().run();
 
     useGame.getState().openLevel('w1-03');
-    // Index 1: request 0 is the silent prime `openLevel('w1-01')` fired on its own way in.
     runner.fail(1, new Error('the simulator could not be started'));
     await afterTheHostAnswers();
 
@@ -848,7 +768,6 @@ describe('a freshly opened work order carries no run', () => {
       levelId: 'w1-01',
       seeds: [1],
     });
-    // Index 1: request 0 is the silent prime `openLevel('w1-01')` fired on its own way in.
     runner.settle(1, answer);
     await afterTheHostAnswers();
 

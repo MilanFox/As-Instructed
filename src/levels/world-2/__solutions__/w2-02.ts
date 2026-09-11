@@ -2,13 +2,6 @@ import type { Dir as DirType, Sim } from '../../../engine/index.ts';
 import { Dir } from '../../../engine/index.ts';
 import type { ReferenceSolution } from '../../types.ts';
 
-/**
- * TEST FIXTURE. Never imported from src/main.tsx — vite.config.ts fails the build if it is.
- *
- * Two free questions at the start fix which way the field runs from whichever corner the mule
- * parked in; after that it is the same serpentine as ever. Per tile the order is fixed: take the
- * crop first, then put the seed in the hole it left.
- */
 export const solution: ReferenceSolution = {
   levelId: 'w2-02',
   run(sim: Sim, botId: number): void {

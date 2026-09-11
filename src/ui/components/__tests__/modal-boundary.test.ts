@@ -1,22 +1,3 @@
-/**
- * The safety net, jumped into.
- *
- * `ModalBoundary` exists for one defect: a throw inside a dialog took the whole application with
- * it and left the player looking at the background. Nothing asserted that
- * it caught anything, which is a net nobody has landed in.
- *
- * Vitest runs in node and this repo carries no DOM, so the driver below is a hand-cranked React in
- * the shape `src/meta/__tests__/publish-dialog.test.ts` set: the real component, rendered by hand,
- * with the semantics under test implemented honestly rather than stubbed. The semantics that
- * matter here are React's error contract — a throw travels up to the *nearest* boundary and no
- * further, `getDerivedStateFromError` sets the state, `componentDidCatch` is told, and the
- * boundary draws again. The precedent's driver does hooks and no error path at all, so it does not
- * fit; this one does classes and errors and no hooks, and the two do not overlap.
- *
- * The first test in the file is the floor under all the others: with no boundary in the tree the
- * throw comes out of the root render, which is the original defect reproduced. A driver that
- * quietly swallowed errors would pass every assertion below while proving nothing.
- */
 import { createElement } from 'react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
@@ -67,11 +48,6 @@ function nameOf(type: unknown): string {
   return (type as { name?: string }).name ?? 'anonymous';
 }
 
-/**
- * React's component stack, rebuilt the way React builds it: every frame the error passes through
- * adds its own name as it unwinds, innermost first. `componentDidCatch` is only useful if it names
- * the thing that threw rather than the thing that caught, so the driver has to earn that too.
- */
 const stacks = new WeakMap<object, string[]>();
 
 function guard<T>(name: string, body: () => T): T {
@@ -92,7 +68,6 @@ function stackFor(error: unknown, caughtBy: string): string {
   return [...frames, caughtBy].map((frame) => `\n    in ${frame}`).join('');
 }
 
-/** A React with error boundaries and no hooks. Renders until nothing asks for another pass. */
 function driverFor(root: () => ReactNode): { render: (limit?: number) => Drawn[] } {
   const instances = new Map<string, Instance>();
   let dirty = false;
@@ -180,7 +155,6 @@ function textOf(nodes: Drawn[]): string {
   return out;
 }
 
-/** Every button in the tree, by the words written on it. */
 function buttons(nodes: Drawn[]): { label: string; press: () => void }[] {
   return hosts(nodes, (node) => node.tag === 'button').map((node) => ({
     label: textOf(node.children).trim(),
@@ -188,7 +162,6 @@ function buttons(nodes: Drawn[]): { label: string; press: () => void }[] {
   }));
 }
 
-/** A node by the role it reports and the name it reports under, which is what a player is told. */
 function byRole(nodes: Drawn[], role: string): HostNode[] {
   return hosts(nodes, (node) => node.props['role'] === role);
 }
@@ -211,12 +184,6 @@ function HealthyModal(): ReactNode {
   );
 }
 
-/**
- * The rest of the game: a screen the player is in the middle of, with something to press.
- *
- * The defect was not "an ugly dialog", it was a blank background — so the assertion that carries
- * the whole file is that this is still drawn, and that pressing what is on it still does work.
- */
 function siteMap(runs: { count: number }): ReactNode {
   return createElement(
     'main',
@@ -235,7 +202,6 @@ function siteMap(runs: { count: number }): ReactNode {
   );
 }
 
-/** `children` is a required prop on both boundaries, so it goes in the props rather than after. */
 function boundary(label: string, onDismiss: () => void, child: () => ReactNode): ReactNode {
   return createElement(ModalBoundary, { label, onDismiss, children: createElement(child, {}) });
 }
@@ -339,11 +305,6 @@ describe('the boundary keeps the fault inside the dialog', () => {
   });
 });
 
-/**
- * A modal is drawn over the whole game, so a notice with nothing to press is a dead screen — the
- * distinction from `PanelBoundary`, which reports itself broken in its own column and is walked
- * around. The last test states that difference as an assertion rather than as prose.
- */
 describe('the fallback is a way out', () => {
   function faulted(dismiss: () => void): Drawn[] {
     return driverFor(() =>
@@ -410,14 +371,6 @@ describe('the fallback is a way out', () => {
   });
 });
 
-/**
- * Deliberate, and pinned so it stays deliberate.
- *
- * After a dismissal the boundary draws nothing for the rest of the session. That is not a missing
- * retry: the child threw on render, and rendering it again is the same throw, which is a loop the
- * player cannot leave. The way out is only guaranteed because nothing here ever puts the failed
- * child back. Anyone turning this into a remount is rebuilding the defect.
- */
 describe('the dismissed modal stays gone for the session', () => {
   function session(child: () => ReactNode): { render: (limit?: number) => Drawn[] } {
     return driverFor(() =>
@@ -448,8 +401,6 @@ describe('the dismissed modal stays gone for the session', () => {
       return createElement('div', { role: 'dialog', 'aria-label': 'The run report' }, 'ok');
     };
 
-    // The child really is renderable once `broken` clears, so a boundary that put it back would
-    // put a dialog back. That is the loop this behaviour exists to refuse.
     broken = false;
     expect(byRole(session(child).render(), 'dialog').map(nameOfNode)).toEqual(['The run report']);
 

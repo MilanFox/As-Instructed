@@ -22,21 +22,10 @@ const HEIGHT = 18;
 const REACTOR_AT = vec(2, 9);
 const PREREQ_PREFIX = 'prereq:';
 
-/**
- * The reactor, then each station once, then the `null` that ends the walk: 18 reads on the
- * widest seed. The star is for holding what came back rather than asking the grid again, and it
- * stays a star — the retry-until-stable loop CURRICULUM.md §7 deliberately lets through is
- * already priced in ticks, and failing it on reads as well would be scoring it twice.
- */
 const READ_BUDGET = 20;
 
 export type GraphShape = 'mixed' | 'chain' | 'wide' | 'split';
 
-/**
- * One shape per seed rather than a draw, because CURRICULUM.md §7 names the four cases the seed
- * list has to contain: a deep chain, a wide shallow graph, a station with three prerequisites,
- * and a graph in two disconnected pieces.
- */
 const SHAPES: Readonly<Record<number, GraphShape>> = Object.freeze({
   1: 'mixed',
   2: 'chain',
@@ -64,7 +53,6 @@ export interface StationPlan {
 export interface GridPlan {
   shape: GraphShape;
   stations: StationPlan[];
-  /** Manhattan length of the nearest-available walk over this DAG. Feeds the bonus threshold. */
   travelBudget: number;
 }
 
@@ -106,15 +94,6 @@ function dependencies(rng: Rng, shape: GraphShape, count: number): string[][] {
   return prereqs;
 }
 
-/**
- * Hands the ids out in an order the dependencies do not follow.
- *
- * `dependencies` can only point a station at one built before it, so left alone every seed would
- * accept `sub-1, sub-2, … sub-n` as an energisation order and the district would grade counting
- * rather than sorting. The deal is redealt until ascending id order breaks somewhere. The first
- * slot keeps its id, so `sub-1` is always the station wired straight to the reactor and the first
- * thing a run probes shows the `prereq:` form without any hunting.
- */
 function relabel(rng: Rng, prereqs: readonly string[][]): string[][] {
   const count = prereqs.length;
   const dealt = (slot: readonly number[]): string[][] => {
@@ -140,11 +119,6 @@ function relabel(rng: Rng, prereqs: readonly string[][]): string[][] {
   return prereqs.map((list) => list.slice());
 }
 
-/**
- * The nearest-available walk: from wherever the crew is standing, go to the closest station whose
- * prerequisites are already done. Ties go to the lower id, in both this and the reference, so the
- * two produce the same number.
- */
 export function nearestAvailableWalk(from: Vec, stations: readonly StationPlan[]): number {
   const done = new Set<string>(['reactor']);
   const remaining = stations.slice();
@@ -219,7 +193,6 @@ function cabledCount(world: World): [number, number] {
 const byPosition = (world: World): Map<string, string> =>
   new Map(world.machines.map((machine) => [`${machine.at.x},${machine.at.y}`, machine.id]));
 
-/** Successful energisations, in trace order. `power` events name a position, not an id. */
 function energisations(ctx: ObjectiveContext): { id: string; t: number }[] {
   const ids = byPosition(ctx.initialWorld);
   const order: { id: string; t: number }[] = [];
@@ -232,11 +205,6 @@ function energisations(ctx: ObjectiveContext): { id: string; t: number }[] {
   return order;
 }
 
-/**
- * A station counts as energised in order only if every prerequisite was *already* validly on.
- * A futile call is not punished beyond the two ticks it cost, so the retry-until-stable loop
- * still finishes — it just finishes a long way past par.
- */
 function orderedCount(ctx: ObjectiveContext): number {
   const live = new Set<string>(['reactor']);
   const valid = new Set<string>();
@@ -262,7 +230,6 @@ function travelled(ctx: ObjectiveContext): number {
   return total;
 }
 
-/** The first prerequisite on the district's own list that no cable was ever run for. */
 const missingCable = (ctx: ObjectiveContext): Divergence | undefined => {
   for (const station of substations(ctx.world)) {
     for (const prereq of prereqsOf(station)) {
@@ -273,16 +240,6 @@ const missingCable = (ctx: ObjectiveContext): Divergence | undefined => {
   return undefined;
 };
 
-/**
- * The first station the run brought up while something it waits on was still off.
- *
- * The station's own list of what it waits on is a free read, so naming the one that was not ready
- * hands back the run's own ordering decision rather than the order the district wants.
- *
- * An early call the run later made good is not the fault and is not reported: the objective
- * forgives it, so the retry-until-stable loop CURRICULUM.md §7 lets through is never handed a
- * divergence pointing at its own first pass. Only a station left stranded by one is named.
- */
 const poweredEarly = (ctx: ObjectiveContext): Divergence | undefined => {
   const live = new Set<string>(['reactor']);
   const valid = new Set<string>();
@@ -316,13 +273,6 @@ const poweredEarly = (ctx: ObjectiveContext): Divergence | undefined => {
   };
 };
 
-/**
- * The leg of the crew walk on which the allowance ran out.
- *
- * The allowance itself is reported by the reactor, so the number is not news; which pair of
- * stations the walk was crossing when it ran out is. It names no better order, only the point the
- * run's own order stopped fitting.
- */
 const walkOverran = (ctx: ObjectiveContext): Divergence => {
   const budget = ctx.world.vars.travelBudget ?? 0;
   let from = machineById(ctx.initialWorld, 'reactor')?.at ?? REACTOR_AT;
@@ -349,11 +299,6 @@ const walkOverran = (ctx: ObjectiveContext): Divergence => {
   };
 };
 
-/**
- * Par: the reference lays every cable once and energises every station once, so its clock is
- * 2 × (edges + stations) — 76 ticks on the widest seed. Nothing can be skipped, so par is that
- * figure rather than a shave off it.
- */
 export const w5_03: LevelDef = {
   id: 'w5-03',
   world: 5,
@@ -371,22 +316,6 @@ export const w5_03: LevelDef = {
     '',
     'Cable the district, then bring every substation up.',
   ].join('\n'),
-  /**
-   * DESIGN.md §11.10.
-   *
-   * Two of these lines are guarantees the generator spends real work on, and neither is visible
-   * from one board. `relabel` redeals the ids until ascending order stops being a legal
-   * energisation order, so "walk the list" is refused on every seed rather than on some of them;
-   * and the dependencies only ever point backwards through the deal, so the lists cannot close a
-   * circle. A player who does not know the second one writes cycle detection for a graph that will
-   * never contain a cycle, and a player who does not know the first has no way to tell whether
-   * seed 1 accepted their loop because it was right or because the ids happened to be kind.
-   *
-   * The shape of the graph is on the redrawn side because it is the anti-hardcode axis
-   * (CURRICULUM.md §2.2), and it is a shape rather than a number: one shift is a single deep chain,
-   * one is three stations wide and flat, one arrives in two halves that never touch. The count of
-   * reads the star allows is on the objective label already, so it is not repeated here.
-   */
   board: {
     fixed: [
       'the district is 24 by 18 of open floor — the crew walk between two stations is the difference in `x` plus the difference in `y`',
@@ -516,7 +445,6 @@ export const w5_03: LevelDef = {
       'Keep the crew walk inside the reported allowance, in steps',
       (ctx) => travelled(ctx) <= (ctx.world.vars.travelBudget ?? 0),
       {
-        /* Unclamped: a walk of 61 against an allowance of 48 has to read as 61, not as 48. */
         progress: (ctx) => [travelled(ctx), ctx.world.vars.travelBudget ?? 0],
         divergence: walkOverran,
       },

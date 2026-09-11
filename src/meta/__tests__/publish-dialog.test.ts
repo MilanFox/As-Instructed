@@ -2,21 +2,6 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type * as ReactModule from 'react';
 import type { MetaHost } from '../store.ts';
 
-/**
- * The publish dialog has to settle.
- *
- * The dialog once derived its selection from `offer` and handed the result back to a store action
- * that replaced `offer` with a new object, so every commit
- * invalidated the memo that caused it. React answered with `Maximum update depth exceeded` and,
- * with no boundary above the modal layer, unmounted the whole application to a black screen.
- *
- * Vitest runs in node, so there is no React DOM here to count nested updates for us. The driver
- * below is a hand-cranked React: real hook semantics, real dependency comparison, the real
- * component, rendered over and over until nothing asks for another pass. A component that settles
- * cannot run away; a component that runs away never settles. `renderUntilStable` returns the pass
- * count, and the assertion is on that number rather than on anything the dialog draws.
- */
-
 const driver = vi.hoisted(() => {
   interface Slot {
     filled: boolean;
@@ -109,7 +94,6 @@ const driver = vi.hoisted(() => {
       cursor = 0;
       dirty = false;
     },
-    /** Renders until a pass asks for no further pass, or gives up at `limit`. */
     renderUntilStable(render: () => unknown, limit = 25): number {
       let passes = 0;
       do {
@@ -129,11 +113,6 @@ vi.mock('react', async (importOriginal) => {
   return { ...actual, ...driver.hooks };
 });
 
-/**
- * zustand lives in `node_modules`, so its own `import React from 'react'` is resolved by node and
- * never sees the mock above. Its React binding is eight lines; this is those eight lines over the
- * driver's hooks. The store itself is the real one.
- */
 vi.mock('zustand', async () => {
   const { createStore } = await import('zustand/vanilla');
   const vanilla = createStore as unknown as (initialiser: unknown) => {
@@ -170,7 +149,6 @@ function lap() {
 lap();
 `;
 
-/** Every checkbox the dialog drew, in order, with the handler it drew it with. */
 function checkboxes(tree: unknown): { onChange: (event: unknown) => void }[] {
   const found: { onChange: (event: unknown) => void }[] = [];
   const walk = (node: unknown): void => {
@@ -190,7 +168,6 @@ function checkboxes(tree: unknown): { onChange: (event: unknown) => void }[] {
   return found;
 }
 
-/** The dialog's own button, by the label the player reads on it. */
 function press(tree: unknown, label: string): void {
   let handler: (() => void) | null = null;
   const walk = (node: unknown): void => {
@@ -211,7 +188,6 @@ function press(tree: unknown, label: string): void {
   (handler as () => void)();
 }
 
-/** Enough of a campaign for `confirmPublish` to run against. No dependent work orders, no suite. */
 function stubHost(): MetaHost & { levelCode: Map<string, string> } {
   const levelCode = new Map<string, string>();
   return {
@@ -243,7 +219,6 @@ describe('the publish dialog settles', () => {
 
     const passes = driver.renderUntilStable(() => PublishDialog());
 
-    // One render, one more for the effect that clears the tick state on a new offer. Then still.
     expect(passes).toBe(2);
   });
 
@@ -273,10 +248,6 @@ describe('the publish dialog settles', () => {
   });
 });
 
-/**
- * The three buttons, pressed through the dialog that draws them. The selection now travels as an
- * argument rather than through the store, so these pin that the trip still arrives.
- */
 describe('the dialog still publishes, declines and stops offering', () => {
   beforeEach(() => {
     useLibrary.getState().hydrate(null);

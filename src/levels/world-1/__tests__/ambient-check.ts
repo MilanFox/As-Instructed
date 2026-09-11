@@ -2,15 +2,6 @@ import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { buildAmbientDts, unlockedApiNames } from '../../../runtime/ambient.ts';
 
-/**
- * Type-checks a player-facing program against the exact firmware a level hands the player.
- *
- * Shared by the World 1 and World 2 suites (CONTENT-A owns both directories). It is the only
- * thing that proves a `starter` or a reference solution's `source` is code the player could
- * actually have written at that point in the campaign — the hardware they have not installed
- * yet is not merely discouraged, it is a type error (DESIGN.md §6).
- */
-
 const AMBIENT_FILE = '/firmware.d.ts';
 const PLAYER_FILE = '/program.ts';
 

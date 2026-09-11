@@ -1,17 +1,8 @@
 import type { Sim, TileView, Vec } from '../../../engine/index.ts';
 import { Dir } from '../../../engine/index.ts';
 
-/**
- * TEST FIXTURE. Never imported from src/main.tsx.
- *
- * Movement and survey routines shared by the World 3 reference solutions. Everything here goes
- * through the same public `Sim` surface a player's program gets: no reference solution reads
- * `sim.world`, so the tick counts these produce are honest par candidates.
- */
-
 export const key = (at: Vec): string => `${at.x},${at.y}`;
 
-/** Runs along x, then along y. Every World 3 yard has an open interior, so this always arrives. */
 export function goTo(sim: Sim, botId: number, target: Vec): void {
   let at = sim.pos(botId);
   while (at.x !== target.x) {
@@ -24,10 +15,6 @@ export function goTo(sim: Sim, botId: number, target: Vec): void {
   }
 }
 
-/**
- * Walks every third row of the yard, reading the row above and the row below at every step.
- * Sensing is free, so three rows of survey cost one row of walking.
- */
 export function surveyYard(sim: Sim, botId: number, note: (tile: TileView) => void): void {
   const read = (): void => {
     note(sim.scan(botId));
@@ -54,7 +41,6 @@ export function surveyYard(sim: Sim, botId: number, note: (tile: TileView) => vo
 
 export const distance = (a: Vec, b: Vec): number => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 
-/** Index of the entry in `options` closest to `from`, or -1 when there is nothing to choose. */
 export function nearestIndex(from: Vec, options: readonly Vec[]): number {
   let best = -1;
   let bestCost = Number.POSITIVE_INFINITY;
@@ -70,7 +56,6 @@ export function nearestIndex(from: Vec, options: readonly Vec[]): number {
   return best;
 }
 
-/** Length of an open tour that starts at `from` and visits `stops` in order. */
 export function tourCost(from: Vec, stops: readonly Vec[]): number {
   let total = 0;
   let at = from;
@@ -81,7 +66,6 @@ export function tourCost(from: Vec, stops: readonly Vec[]): number {
   return total;
 }
 
-/** Nearest-neighbour ordering of `stops`, starting from `from`. */
 export function nearestNeighbourTour(from: Vec, stops: readonly Vec[]): Vec[] {
   const remaining = stops.slice();
   const tour: Vec[] = [];
@@ -96,7 +80,6 @@ export function nearestNeighbourTour(from: Vec, stops: readonly Vec[]): Vec[] {
   return tour;
 }
 
-/** One improving pass of 2-opt over an open tour. Cheap, and enough for a four-stop drop round. */
 export function twoOpt(from: Vec, tour: readonly Vec[]): Vec[] {
   let best = tour.slice();
   let bestCost = tourCost(from, best);

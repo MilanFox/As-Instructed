@@ -1,10 +1,3 @@
-/**
- * What World 4's objectives say when they are missed.
- *
- * `w4-04`'s bonus is the worked example: the level knows
- * the order the run took and knows the best order, and used to report neither. These are the assertions
- * that it now reports the first, and prices it against the second without handing it over.
- */
 import { describe, expect, test } from 'vitest';
 import type { Objective, Sim, Vec } from '../../../engine/index.ts';
 import { ALL_DIRS, Terrain, eq, step } from '../../../engine/index.ts';
@@ -18,7 +11,12 @@ import { w4_01 } from '../w4-01.ts';
 import { w4_02 } from '../w4-02.ts';
 import { w4_04 } from '../w4-04.ts';
 
-function diverge(level: LevelDef, seed: number, id: string, drive: (sim: Sim, bot: number) => void) {
+function diverge(
+  level: LevelDef,
+  seed: number,
+  id: string,
+  drive: (sim: Sim, bot: number) => void,
+) {
   const result = runLevel(level, seed, drive);
   const pool: Objective[] = [...level.objectives, ...(level.bonus ?? [])];
   const objective = must(
@@ -40,7 +38,6 @@ function diverge(level: LevelDef, seed: number, id: string, drive: (sim: Sim, bo
   return { met, divergence, result };
 }
 
-/** Walks the bot along the shortest route to `to`, one tile at a time. */
 function walkTo(sim: Sim, botId: number, to: Vec): void {
   const route = pathBetween(sim.world, sim.pos(botId), to);
   if (route === null) return;
@@ -56,7 +53,6 @@ function walkTo(sim: Sim, botId: number, to: Vec): void {
 describe('w4-04 prices the order the run took against the best one', () => {
   const seed = 1;
 
-  /** The three collection points in the order that costs the most, plus the lift. */
   function worstOrder(level: LevelDef): { order: Vec[]; lift: Vec } {
     const world = level.build(seed);
     const points = tilesWithTerrain(world, Terrain.Pad);
@@ -100,10 +96,6 @@ describe('w4-04 prices the order the run took against the best one', () => {
     );
   });
 
-  /**
-   * The bonus is "work out which of six orders is cheapest". Reporting the cheapest order would be
-   * the answer; reporting what it costs is the diff. The coordinates in `where` are the run's own.
-   */
   test('it never names the best order, only what the best order costs', () => {
     const { order, lift } = worstOrder(w4_04);
     const { divergence } = diverge(w4_04, seed, 'best-order', (sim, botId) => {
@@ -161,15 +153,12 @@ describe('the rest of World 4 names a point too', () => {
     expect(Number.parseInt(shown.received, 10)).toBeGreaterThan(60);
   });
 
-  /* A run that never arrives is told where it stopped, not how many rays it had left. */
   test('w4-01 within-60-look names the pad when the bot never got there', () => {
     const world = w4_01.build(1);
     const pad = must(tilesWithTerrain(world, Terrain.Pad)[0], 'the pad');
     const { met, divergence } = diverge(w4_01, 1, 'within-60-look', () => undefined);
     expect(met).toBe(false);
-    expect(must(divergence, 'a divergence').expected).toBe(
-      `(${String(pad.x)}, ${String(pad.y)})`,
-    );
+    expect(must(divergence, 'a divergence').expected).toBe(`(${String(pad.x)}, ${String(pad.y)})`);
   });
 
   test('w4-02 reach-vein names the vein and where the bot stopped', () => {
@@ -181,10 +170,6 @@ describe('the rest of World 4 names a point too', () => {
     );
   });
 
-  /*
-   * The trail report gives back the run's own breadcrumb and the tile it was written on, never
-   * the tile the bot actually arrived from — that is the whole of what the star asks for.
-   */
   test('w4-02 breadcrumb-trail says a crumb is missing when nothing was left near the vein', () => {
     const { met, divergence } = diverge(w4_02, 1, 'breadcrumb-trail', (sim, botId) => {
       sim.mark(botId, 'v');

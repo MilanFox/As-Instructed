@@ -1,14 +1,3 @@
-/**
- * The program, and the only lazy boundary on the desk.
- *
- * One `Suspense` used to wrap the whole workspace, so the site view, the
- * work order and the objectives all sat behind Monaco's download. The boundary is here now and it
- * is as small as it can be — `MonacoProgram.tsx` is the only module in the tree that statically
- * reaches `monaco-editor`, and the fallback is drawn *in the program's own pane*, inside a screen
- * that is already lit, already showing the order's objectives and already printing the log.
- *
- * The loading state belongs to the thing that is loading.
- */
 import { Suspense, lazy } from 'react';
 
 const MonacoProgram = lazy(async () => {

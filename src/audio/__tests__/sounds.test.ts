@@ -7,7 +7,6 @@ import { SOUNDS, SOUND_NAMES, play } from '../sounds.ts';
 import type { SoundName } from '../sounds.ts';
 import { MiniContext, analyse, peakBetween } from './offline.ts';
 
-/** Every bus at unity, so an assertion is about the sound and not about the mixer. */
 const UNITY: AudioSettings = {
   ...DEFAULT_SETTINGS,
   master: 1,
@@ -28,8 +27,6 @@ describe('the catalogue', () => {
     const { buffer, rate } = renderOne(name);
     const stats = analyse(buffer, rate);
 
-    // Calibrated band: nothing is so quiet it is lost under the game, nothing is so loud it
-    // eats headroom the mix needs for a medal landing on top of an action.
     expect(stats.peak).toBeGreaterThan(0.02);
     expect(stats.peak).toBeLessThan(0.5);
     expect(Math.abs(stats.dc)).toBeLessThan(5e-4);
@@ -45,7 +42,6 @@ describe('the catalogue', () => {
 
       expect(stats.firstSound).toBeLessThan(0.05);
       expect(stats.lastSound).toBeLessThanOrEqual(spec.duration + 0.01);
-      // Nothing may be left ringing once the declared duration has passed.
       expect(peakBetween(buffer, rate, spec.duration + 0.02, spec.duration + 0.25)).toBeLessThan(
         1e-4,
       );
@@ -68,7 +64,6 @@ describe('the catalogue', () => {
     const bronze = analyse(renderOne('medalBronze').buffer, 44100);
     const silver = analyse(renderOne('medalSilver').buffer, 44100);
     const gold = analyse(renderOne('medalGold').buffer, 44100);
-    // Same family, three sizes: each tier is longer and carries more energy than the last.
     expect(silver.lastSound).toBeGreaterThan(bronze.lastSound);
     expect(gold.lastSound).toBeGreaterThan(silver.lastSound);
     expect(gold.rms).toBeGreaterThan(bronze.rms);
@@ -107,7 +102,6 @@ describe('the catalogue', () => {
     const first = renderOne('move', 11).buffer;
     const same = renderOne('move', 11).buffer;
     const other = renderOne('move', 12).buffer;
-    // Scrubbing back over a tick must produce the identical sound; two different moves must not.
     expect(Array.from(same)).toEqual(Array.from(first));
     expect(energy(other)).not.toBe(energy(first));
   });
@@ -120,7 +114,6 @@ function energy(buffer: Float32Array): number {
 }
 
 describe('the medal figure builds instead of trailing off', () => {
-  /** Loudest 20ms window, and where it is. A stinger that lands peaks at its top note. */
   function loudestAt(name: SoundName): { at: number; peak: number } {
     const { buffer, rate } = renderOne(name);
     const window = Math.round(rate * 0.02);
@@ -128,7 +121,8 @@ describe('the medal figure builds instead of trailing off', () => {
     let bestAt = 0;
     for (let start = 0; start + window < buffer.length; start += window) {
       let peak = 0;
-      for (let i = start; i < start + window; i++) peak = Math.max(peak, Math.abs(buffer[i] as number));
+      for (let i = start; i < start + window; i++)
+        peak = Math.max(peak, Math.abs(buffer[i] as number));
       if (peak > best) {
         best = peak;
         bestAt = start / rate;
@@ -139,7 +133,6 @@ describe('the medal figure builds instead of trailing off', () => {
 
   it('puts gold’s loudest moment on its last note, not its downbeat', () => {
     const gold = loudestAt('medalGold');
-    // Four notes on a 75ms step from t = 0.01, so the top note is around 0.235s.
     expect(gold.at).toBeGreaterThan(0.15);
     expect(gold.at).toBeLessThan(0.32);
   });
@@ -172,7 +165,6 @@ describe('the medal figure builds instead of trailing off', () => {
 });
 
 describe('commendations land as one ascending phrase', () => {
-  /** Dominant frequency by counting zero crossings of the loudest stretch. */
   function pitch(seed: number): number {
     const { buffer, rate } = renderOne('commend', seed);
     let crossings = 0;
@@ -195,7 +187,6 @@ describe('commendations land as one ascending phrase', () => {
   });
 
   it('holds at the top rather than climbing out of the audible range', () => {
-    // The ladder must stay audible however many rungs a build issues.
     expect(pitch(14)).toBeCloseTo(pitch(4) as number, -2);
     expect(pitch(14)).toBeLessThan(4000);
   });

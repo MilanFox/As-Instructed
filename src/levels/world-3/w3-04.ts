@@ -44,7 +44,6 @@ const slotLedger = (world: World): Map<string, number[]> => {
   return ledger;
 };
 
-/** Every crate the shift opened with, as an arrival number and the slot it was stencilled on. */
 const arrivalsOf = (world: World): { index: number; at: Vec }[] => {
   const out: { index: number; at: Vec }[] = [];
   for (let y = 0; y < world.h; y++) {
@@ -61,12 +60,6 @@ const arrivalsOf = (world: World): { index: number; at: Vec }[] => {
 
 const arrivalCount = (world: World): number => slotLedger(world).size;
 
-/**
- * Replays the trace to recover which crate was set down on the bay, and when. A crate's identity
- * is the arrival number stencilled on the slot it started in; the ledger follows it through any
- * amount of staging, so a solution that parks crates in the aisle is still judged on the order
- * they finally reach the bay.
- */
 const shipped = (ctx: ObjectiveContext): number[] => {
   const bay = bayOf(ctx.initialWorld);
   const ledger = slotLedger(ctx.initialWorld);
@@ -97,15 +90,6 @@ const inOrder = (ctx: ObjectiveContext): number => {
   return i;
 };
 
-/**
- * Whether arrival 1 is standing in the first slot a sweep of the racks would reach.
- *
- * A round that ships crates in the order it walks past them is the wrong general rule this level
- * exists to refuse, and a shift whose schedule happens to agree with its layout lets that rule
- * through — on seed 1 it would let it through first, which teaches it. So the numbering is redrawn
- * until the sweep and the schedule part company at the very first crate, where the divergence says
- * so plainly. A one-crate yard has nothing to disagree about and is left alone.
- */
 const sweptFirst = (order: readonly Vec[], rowMajor: readonly Vec[]): boolean => {
   const first = order[0];
   const swept = rowMajor[0];
@@ -125,12 +109,6 @@ const vacantSlots = (world: World): Set<string> => {
   return vacant;
 };
 
-/**
- * Steps taken into rack slots that were empty when the shift opened. Every rack row runs alongside
- * an aisle, so the stencils can all be read from an aisle tile and a slot only has to be entered
- * to lift the crate standing in it — which is a different reading of the yard from the sweep that
- * finds the same crates by walking the racks themselves.
- */
 const slotsTrodden = (ctx: ObjectiveContext): number => {
   const vacant = vacantSlots(ctx.initialWorld);
   return ctx.trace.events.filter(
@@ -138,12 +116,6 @@ const slotsTrodden = (ctx: ObjectiveContext): number => {
   ).length;
 };
 
-/**
- * The lowest-numbered crate the run never set down on the bay, named by the slot it started in.
- *
- * A round that ships fifteen of sixteen is looking at a full-looking yard and a bay it has walked
- * to fifteen times; the one slot it never visited is the whole of what it is missing.
- */
 const strandedCrate = (ctx: ObjectiveContext): Divergence => {
   const delivered = new Set(shipped(ctx));
   const missing = arrivalsOf(ctx.initialWorld).find((crate) => !delivered.has(crate.index));
@@ -162,7 +134,6 @@ const strandedCrate = (ctx: ObjectiveContext): Divergence => {
   };
 };
 
-/** The place in the bay stack where the order first came apart, and what went down there. */
 const outOfOrder = (ctx: ObjectiveContext): Divergence | undefined => {
   const order = shipped(ctx);
   const matched = inOrder(ctx);
@@ -175,7 +146,6 @@ const outOfOrder = (ctx: ObjectiveContext): Divergence | undefined => {
   };
 };
 
-/** The step that spent the slot allowance, and how far past it the round went in the end. */
 const overTrodden = (ctx: ObjectiveContext): Divergence => {
   const vacant = vacantSlots(ctx.initialWorld);
   const steps = ctx.trace.events.filter(
@@ -196,12 +166,6 @@ const overTrodden = (ctx: ObjectiveContext): Divergence => {
   };
 };
 
-/**
- * Arrival order is stencilled on the slots rather than delivered by a live conveyor: the engine
- * has no scheduled spawning, so the schedule is baked into the world instead of running during
- * it. Seed 3 numbers the crates against the way they are laid out, seed 4 is the one-crate yard,
- * and the rest draw a numbering at random under `sweptFirst`.
- */
 export const w3_04: LevelDef = {
   id: 'w3-04',
   world: 3,
@@ -223,26 +187,6 @@ export const w3_04: LevelDef = {
     '',
     'Move every crate onto the outbound bay pad, lowest arrival number first.',
   ].join('\n'),
-  /**
-   * DESIGN.md §11.10.
-   *
-   * The rack and aisle rows are already in the facts, and they are repeated here for the one thing
-   * the facts cannot say: that they are the same four rows on every shift. Read as a description of
-   * this board they are a survey result; read as a fixed frame they are four constants, and a run
-   * that knows it can step from aisle to aisle reading both rack rows beside it is the run hint 3
-   * describes. The player cannot tell those two readings apart from one board.
-   *
-   * The slot allowance is on the fixed side for the same reason in reverse. It does not scale with
-   * the crate count, so a sixteen-crate shift has proportionally less of it than a small one, and
-   * a player who assumes the number grows with the yard spends it without noticing. The figure
-   * itself stays where it already is, on the objective label.
-   *
-   * The sweep line is `sweptFirst` said to the player. The generator redraws the numbering until
-   * the first crate a rack sweep reaches is not arrival 1, precisely so that "ship them in the
-   * order I walk past them" fails on the first crate rather than the ninth — but a player who has
-   * only seen one board cannot know that disagreement is guaranteed rather than this shift's luck,
-   * and the one-crate shift is the honest exception to it.
-   */
   board: {
     fixed: [
       'the yard is 16 wide and 8 deep inside its wall',

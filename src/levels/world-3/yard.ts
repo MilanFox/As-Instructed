@@ -1,13 +1,6 @@
 import type { ItemKind, Rng, Vec, World } from '../../engine/index.ts';
 import { Terrain, setTerrain, setTile, vec } from '../../engine/index.ts';
 
-/**
- * Shared scenery for The Sorting Yards. Every World 3 level is a walled shed with an open
- * floor, so a bot can always reach any interior tile by running along x and then along y —
- * which is what keeps the reference solutions short enough to be honest translations.
- */
-
-/** The classes the Yards stock. `ice` is racked in the cold store and never sorted. */
 export const YARD_CLASSES: readonly ItemKind[] = [
   'crate',
   'part',
@@ -18,15 +11,10 @@ export const YARD_CLASSES: readonly ItemKind[] = [
   'scrap',
 ];
 
-/**
- * Discards the first few draws of a fresh stream. mulberry32 seeded with 1, 2 and 3 returns
- * near-identical first values, which would hand consecutive seeds the same crate count.
- */
 export function warm(rng: Rng): void {
   for (let i = 0; i < 3; i++) rng.next();
 }
 
-/** Walls the outer ring. The interior is everything from (1, 1) to (w - 2, h - 2). */
 export function frame(world: World): void {
   for (let x = 0; x < world.w; x++) {
     setTerrain(world, vec(x, 0), Terrain.Wall);
@@ -38,7 +26,6 @@ export function frame(world: World): void {
   }
 }
 
-/** Every interior tile, in row-major order. */
 export function interior(world: World): Vec[] {
   const out: Vec[] = [];
   for (let y = 1; y < world.h - 1; y++) {
@@ -47,10 +34,6 @@ export function interior(world: World): Vec[] {
   return out;
 }
 
-/**
- * Hands out distinct tiles from a shuffled bag. Every level draws its crates, depots and bot
- * start from one picker so that nothing is ever placed on top of anything else.
- */
 export function tilePicker(rng: Rng, pool: readonly Vec[]): () => Vec {
   const bag = rng.shuffle(pool);
   let next = 0;
@@ -61,12 +44,10 @@ export function tilePicker(rng: Rng, pool: readonly Vec[]): () => Vec {
   };
 }
 
-/** A depot pad with its class stencilled on it. Bots read the stencil with `scan(dir).mark`. */
 export function depotPad(world: World, at: Vec, kind: ItemKind): void {
   setTile(world, at, { terrain: Terrain.Pad, mark: kind });
 }
 
-/** Every pad tile that carries a stencil, paired with the class painted on it. */
 export function stencilledDepots(world: World): { at: Vec; kind: ItemKind }[] {
   const out: { at: Vec; kind: ItemKind }[] = [];
   for (let y = 0; y < world.h; y++) {
@@ -79,7 +60,6 @@ export function stencilledDepots(world: World): { at: Vec; kind: ItemKind }[] {
   return out;
 }
 
-/** Total count of `kind` lying loose anywhere in the world. */
 export function groundTotal(world: World, kind: ItemKind): number {
   return world.items.reduce((sum, stack) => (stack.kind === kind ? sum + stack.count : sum), 0);
 }

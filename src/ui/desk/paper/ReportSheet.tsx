@@ -1,20 +1,3 @@
-/**
- * The certificate of closure, and the HALT notice.
- *
- * These are the same document twice: what a run left behind. The one difference that matters is
- * that a certificate has an empty box on it and the grade is not in it yet — the stamp block is
- * the thing that closes a work order, and until it has been pressed the sheet is unfinished
- * business lying on your desk. A HALT notice arrives already filed by site systems, because
- * nothing was asked of you.
- *
- * **It is a snapshot and never a live read.** The most information-dense card in the game used to
- * be one stray click from gone. `ReportSnapshot` freezes it at the moment the run finished, so
- * running again issues a second sheet rather than rewriting the first.
- *
- * The objective rows are rendered from the same four claims the rail makes — gauge, over, limit,
- * readout — because a budget that read as a gauge while the run played and as a tick-box on the
- * certificate is two different claims about one number.
- */
 import { useCallback, useEffect, useRef } from 'react';
 
 import { getAchievement } from '../../../game/achievements.ts';
@@ -29,17 +12,8 @@ import { useReveal } from '../../hooks/useReveal.ts';
 import type { ReportRow, ReportSnapshot } from './papers.ts';
 import { celebrationFor, resultWord, stampWordFor } from './report.ts';
 
-/**
- * The reveal's tempo, in milliseconds.
- *
- * `MEDAL_BEAT` is the interval between the notes of the medal figure, and the renderer mirrors it
- * for the rings (`src/render/renderer.ts`). Staging the whole report on the same grid is what
- * makes the objectives, the medal and the commendations read as one phrase rather than three
- * things that happen to overlap.
- */
 const REVEAL_BEAT_MS = Math.round(MEDAL_BEAT * 1000);
 
-/** What each die says under its word. The stamp block presses one of these on; we print it. */
 const STAMP_SUB: Record<string, string> = {
   gold: 'AT PAR OR UNDER',
   silver: 'UP TO A QUARTER OVER',
@@ -65,8 +39,6 @@ export function ReportSheet({
     .map((id) => getAchievement(id))
     .filter((entry): entry is NonNullable<typeof entry> => entry !== undefined);
 
-  // Failure is instant. A report that makes you wait to be told it did not work is a punishment,
-  // and nothing in this game is allowed to be one.
   const medalStep = required.length + 1;
   const scoreStep = medalStep + 1;
   const commendStep = scoreStep + 1;
@@ -79,10 +51,6 @@ export function ReportSheet({
     skip();
   }, [renderer, skip]);
 
-  /*
-   * One beat per stage, audio and viewport together — but only on the sheet as it arrives. A
-   * certificate re-read a week later is paper, and paper does not play a fanfare.
-   */
   const cued = useRef(0);
   useEffect(() => {
     if (!fresh || !report.passed) return;
@@ -111,7 +79,16 @@ export function ReportSheet({
         renderer().pulse('commend');
       }
     }
-  }, [stage, fresh, report.passed, report.medal, required.length, medalStep, commendStep, renderer]);
+  }, [
+    stage,
+    fresh,
+    report.passed,
+    report.medal,
+    required.length,
+    medalStep,
+    commendStep,
+    renderer,
+  ]);
 
   const showMedal = !report.passed || stage >= medalStep;
   const showScores = !report.passed || stage >= scoreStep;
@@ -134,18 +111,11 @@ export function ReportSheet({
         </span>
         <div className="report__verdict">
           <h2>{report.passed ? VERDICT_PASS : VERDICT_FAIL}</h2>
-          {/* Grade is text before it is colour: the word survives
-              hue removal and it survives the Signal direction. */}
           {report.passed ? <span className="report__die">{stampWordFor(report.medal)}</span> : null}
           <p className="quiet">{report.headline}</p>
         </div>
       </header>
 
-      {/*
-       * The report leads with the cause, not with the flavour. A red row in a list of five is a
-       * puzzle in itself; a player who overran a budget has to be told which budget and by how
-       * much before they are told anything else. Ranked worst-first when several went wrong.
-       */}
       {report.causes.length > 0 ? (
         <section className="cause" aria-label="Why this run failed">
           <div className="cause__head">
@@ -166,11 +136,6 @@ export function ReportSheet({
                   <BudgetBar budget={cause.budget} />
                 </>
               ) : null}
-              {/*
-               * The diff, when the objective could name one point. `0 of 5 — 5 short` is the
-               * count; this is the line, cell or tick it went wrong on, and it is deliberately
-               * two values and three words rather than a sentence explaining them.
-               */}
               {cause.divergence ? (
                 <div className="cause__diff numeric">
                   <span className="cause__diff-where">{cause.divergence.where}</span>
@@ -217,9 +182,6 @@ export function ReportSheet({
           <span className="numeric">
             {report.ticks ?? '—'}
             {report.par !== null ? <span className="quiet"> par {report.par}</span> : null}
-            {/* The slot par would have stood in, saying why it does not. Printing nothing here
-                is a fact the player can only read once they have seen a certificate that does
-                print one, and the first two work orders on the site are both ungraded. */}
             {report.graded ? null : <span className="quiet"> not graded</span>}
             {report.bestTicks !== null ? (
               <span className="quiet"> · best {report.bestTicks}</span>
@@ -228,8 +190,6 @@ export function ReportSheet({
         </div>
         {report.passed ? (
           <div>
-            {/* An ungraded work order has no medal cell to fill, so the cell is not headed
-                `medal` — it reports the result, and the result is that it is closed. */}
             <b>{report.medal === null ? 'result' : 'medal'}</b>
             <span>
               {resultWord(report.medal)}
@@ -292,12 +252,6 @@ export function ReportSheet({
         </section>
       ) : null}
 
-      {/*
-       * The code and the seed, once. The objective's name used to be printed in
-       * the cause row, again in the objectives list and again here. The causes above already say
-       * which objective and by how much, so the engine's own sentence is only printed where there
-       * is no cause to have said it.
-       */}
       {!report.passed ? (
         <div className="failure-box">
           <div className="failure-box__code numeric">
@@ -325,13 +279,6 @@ export function ReportSheet({
               <small>{STAMP_SUB[mark.toLowerCase()] ?? 'ENTERED ON THE RECORD'}</small>
             </div>
           ) : (
-            /*
-             * The box says what to do, on the face of the document. Three of the four dies in the
-             * block are the company's and inert — you do not grade yourself — so `AFFIX GRADE`
-             * named a thing the player cannot do. This is the move that closed F4: the control's
-             * instruction belongs where the player's eye already is, not in a tooltip and not in a
-             * tutorial.
-             */
             <span className="stampbox__ask">
               <b>AFFIX CLOSURE</b>
               Press the {stampWordFor(null)} die from the block onto this box. Until it is stamped,
@@ -360,13 +307,6 @@ export function ReportSheet({
   );
 }
 
-/**
- * The per-seed breakdown, costing space in proportion to what it reveals.
- *
- * Five rows, character-for-character identical, is the *common* case. Identical outcomes
- * collapse to one line; disagreement expands to the list, which is
- * exactly the case the list exists to reveal.
- */
 function SeedSummary({ report }: { report: ReportSnapshot }): React.JSX.Element {
   const lines = report.seedLines;
   if (lines.length === 0) {
@@ -403,10 +343,6 @@ function SeedSummary({ report }: { report: ReportSnapshot }): React.JSX.Element 
   );
 }
 
-/**
- * One objective, as a tick-box or as a gauge — the same shapes the rail draws, from the same four
- * claims. `src/ui/__tests__/rail-report-agreement.test.ts` compares them row for row.
- */
 function ReportObjective({ row, shown }: { row: ReportRow; shown: boolean }): React.JSX.Element {
   const budget = row.budget;
   const over = budget !== undefined && budget.over > 0;
@@ -428,10 +364,6 @@ function ReportObjective({ row, shown }: { row: ReportRow; shown: boolean }): Re
         {!shown ? '' : over ? '!' : row.met && !budget ? '✓' : ''}
       </span>
       <span className="objective__label">{row.label}</span>
-      {/*
-        The same word the rail uses, for the same reason: par is a medal, a limit is a failure.
-        Never on a bonus — a bonus threshold costs a star and ends nothing.
-      */}
       {!row.bonus && budget?.meter?.kind === 'ticks' ? (
         <span className="objective__gate">limit</span>
       ) : null}
@@ -450,10 +382,6 @@ function ReportObjective({ row, shown }: { row: ReportRow; shown: boolean }): Re
   );
 }
 
-/**
- * One chip per seed, green where this objective held and red where it did not. The smallest thing
- * that answers "which layout is it still open on".
- */
 function SeedStrip({
   seeds,
 }: {

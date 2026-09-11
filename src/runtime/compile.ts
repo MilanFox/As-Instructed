@@ -4,81 +4,44 @@ import { buildAmbientDts, unlockedApiNames } from './ambient.ts';
 import { compileFailure, offsetToPosition } from './errors.ts';
 import { decodeLineMap } from './sourcemap.ts';
 
-/**
- * Compiling the player's TypeScript, in the browser, with the compiler Monaco already ships.
- *
- * DESIGN.md §2 settles this: the editor is Monaco and the player writes real TypeScript, so the
- * TypeScript worker Monaco loads for syntax highlighting is also the transpiler. Bundling a second
- * copy of `typescript` would be several megabytes for a compiler that is already on the page.
- *
- * The Monaco namespace is passed in rather than imported so this module cannot create a second
- * Monaco instance behind `@monaco-editor/react`'s back. UI owns the editor; RUNTIME owns what the
- * language service is configured to believe.
- */
-
 export type MonacoApi = typeof MonacoEditor;
 type TextModel = MonacoEditor.editor.ITextModel;
 type TsDiagnostic = MonacoEditor.languages.typescript.Diagnostic;
 
-/** The one file the player edits. Fixed, because the worker is addressed by URI. */
 export const PLAYER_FILE_PATH = 'file:///bootstrap/program.ts';
 const AMBIENT_FILE_PATH = 'file:///bootstrap/firmware.d.ts';
 
-/**
- * `ts.ModuleDetectionKind.Force`, which Monaco's namespace does not re-export.
- *
- * Without it a program with no `import` is a *script*, sharing one scope with the firmware
- * declarations, and `const clock = []` collides with the `clock()` the hardware provides —
- * "Cannot redeclare block-scoped variable", from a name the player is not even using. As a module
- * the same line simply shadows it, which is what the emitted JavaScript does anyway: the player's
- * code runs inside a function whose parameters are the API. Emit is unchanged either way.
- */
 const MODULE_DETECTION_FORCE = 3;
 
-/** What `installLanguageOptions` last pushed, per Monaco, so a level change does not push again. */
 const installedCompilerOptions = new WeakMap<object, string>();
 
 export interface CompileDiagnostic {
   message: string;
-  /** 1-based, in the player's source. */
   line: number;
-  /** 1-based. */
   column: number;
-  /** Length of the highlighted span, in characters. */
   length: number;
   severity: 'error' | 'warning' | 'info';
-  /** The TypeScript diagnostic code, e.g. 2304. */
   code: number;
 }
 
 export interface CompileSuccess {
   ok: true;
-  /** Emitted JavaScript, ready for the worker. */
   js: string;
-  /** Emitted line -> source line. See `sourcemap.ts`. */
   lineMap: number[];
-  /** Warnings and suggestions only; errors would have made this a failure. */
   diagnostics: CompileDiagnostic[];
 }
 
 export interface CompileFailure {
   ok: false;
   diagnostics: CompileDiagnostic[];
-  /** The first error, already player-facing. */
   error: RuntimeFailure;
 }
 
 export type CompileResult = CompileSuccess | CompileFailure;
 
 export interface LanguageOptions {
-  /** API names the player has unlocked. Usually `unlockedApiNames(levelId)`. */
   unlockedHardware?: readonly string[];
-  /** Convenience: derive the unlocked list from a level id. */
   levelId?: string;
-  /**
-   * `declare module 'lib' { … }` for the player's shared library. Reinstalled on every level
-   * change so the declaration survives a call that only meant to change the hardware.
-   */
   libraryDeclaration?: string;
 }
 
@@ -88,29 +51,10 @@ function resolveUnlocked(options: LanguageOptions): string[] {
   return [];
 }
 
-/**
- * Points the TypeScript language service at exactly the world the player is in.
- *
- * `lib: ['es2022']` and no DOM is deliberate twice over: the bot has no DOM, and without it a
- * player who writes `const name = ...` collides with `window.name` and gets an error they cannot
- * possibly understand.
- *
- * `noImplicitAny` and `strictNullChecks` are off for the same reason. The type checker is here to
- * catch calling hardware you have not installed, passing a `Dir` where a number belongs, or
- * misspelling an API name — real mistakes, every one of them still an error. It is not here to
- * demand an annotation on `xs.map((x) => x * 2)` or a null guard on a `Map.get` the player knows
- * is populated. A player who annotates everything still gets those checks on what they wrote; a
- * player on level three writing ordinary JavaScript is not stopped by them.
- *
- * Call once per level change; it replaces the ambient declarations wholesale, so a function that
- * was unlocked by the previous level stops existing the moment the player opens an earlier one.
- */
 export function configurePlayerLanguage(monaco: MonacoApi, options: LanguageOptions): void {
   const ts = monaco.languages.typescript;
 
   installLanguageOptions(monaco, {
-    /* Monaco's `ScriptTarget` enum stops at ES2020; `ESNext` is the honest way to say "do not
-       downlevel", which also keeps the emit close to line-for-line. */
     target: ts.ScriptTarget.ESNext,
     module: ts.ModuleKind.ESNext,
     moduleResolution: ts.ModuleResolutionKind.NodeJs,
@@ -133,15 +77,6 @@ export function configurePlayerLanguage(monaco: MonacoApi, options: LanguageOpti
   installExtraLibs(monaco);
 }
 
-/**
- * Pushes the compiler and diagnostic settings, but only when they are not already installed.
- *
- * Every one of these setters fires `typescriptDefaults.onDidChange`, and Monaco answers that by
- * disposing the TypeScript web worker and building a new one — which rejects whatever was in
- * flight and throws away the program it had already type-checked. None of these values varies
- * between work orders; only the ambient `.d.ts` does, and `setExtraLibs` updates the live worker
- * instead of replacing it. So a level change costs an ambient rebuild and nothing else.
- */
 function installLanguageOptions(
   monaco: MonacoApi,
   compilerOptions: MonacoEditor.languages.typescript.CompilerOptions,
@@ -156,13 +91,11 @@ function installLanguageOptions(
     noSemanticValidation: false,
     noSyntaxValidation: false,
     noSuggestionDiagnostics: false,
-    /* 1375/1378: top-level await. 2669: augmentation in a non-module. Neither is the player's problem. */
     diagnosticCodesToIgnore: [1375, 1378, 2669],
   });
   ts.typescriptDefaults.setEagerModelSync(true);
 }
 
-/** The ambient `.d.ts` as the editor would see it. Exported for the docs panel and for tests. */
 export { buildAmbientDts, unlockedApiNames } from './ambient.ts';
 
 function flattenMessage(message: TsDiagnostic['messageText']): string {
@@ -183,7 +116,6 @@ function severityOf(category: 0 | 1 | 2 | 3): CompileDiagnostic['severity'] {
   return 'info';
 }
 
-/** Maps Monaco's character offsets into the line/column the player sees. */
 export function toCompileDiagnostics(
   source: string,
   diagnostics: readonly TsDiagnostic[],
@@ -206,13 +138,6 @@ async function workerFor(monaco: MonacoApi, model: TextModel) {
   return getWorker(model.uri);
 }
 
-/**
- * Type and syntax errors for the editor, before the player has run anything.
- *
- * A function the player has not unlocked yet is a `Cannot find name` error here, which is the
- * whole point of generating the ambient `.d.ts` per level: the game teaches through the type
- * checker rather than through a runtime surprise.
- */
 export async function getPlayerDiagnostics(
   monaco: MonacoApi,
   model: TextModel,
@@ -228,12 +153,6 @@ export async function getPlayerDiagnostics(
 
 const SOURCE_MAP_COMMENT = /\n\/\/# sourceMappingURL=.*$/;
 
-/**
- * Transpiles the model and returns everything the worker needs.
- *
- * Any error-severity diagnostic fails the compile: the player is told before a single tick is
- * simulated, which is both faster and far less confusing than watching a bot do nothing.
- */
 export async function compilePlayerCode(
   monaco: MonacoApi,
   model: TextModel,
@@ -282,27 +201,11 @@ export async function compilePlayerCode(
   };
 }
 
-// ---------------------------------------------------------------------------
-// The shared library
-// ---------------------------------------------------------------------------
-
-/** The second file the player edits. Fixed, because the worker is addressed by URI. */
 export const LIB_FILE_PATH = 'file:///bootstrap/lib.ts';
 const LIB_TYPES_PATH = 'file:///bootstrap/lib.d.ts';
 
-/**
- * The ambient declaration installed when the library has nothing to publish.
- *
- * An empty ambient module makes every `import { x } from 'lib'` an honest "has no exported member"
- * rather than a silent `any`, which is what a missing declaration would produce.
- */
 const EMPTY_LIB_TYPES = `declare module 'lib' {\n  export {};\n}\n`;
 
-/**
- * The two extra libs the language service is holding, so either can be replaced without dropping
- * the other. `setExtraLibs` replaces the whole set, and losing the firmware declarations would
- * make every API call in the editor an error.
- */
 let currentAmbientDts = '';
 let currentLibTypes = EMPTY_LIB_TYPES;
 
@@ -313,21 +216,11 @@ function installExtraLibs(monaco: MonacoApi): void {
   ]);
 }
 
-/**
- * Publishes the library's type surface to the editor as `declare module 'lib'`.
- *
- * Path mapping would be the textbook route, but Monaco's virtual file system resolves modules
- * through a host we do not own; an ambient module declaration is resolved by the checker itself
- * and cannot be defeated by a resolution setting. The declaration source is the `.d.ts` the
- * TypeScript compiler emits from `lib.ts`, so the types the player sees in a level are the types
- * their own library actually has — no hand-written mirror to drift.
- */
 export function setLibraryTypes(monaco: MonacoApi, declaration: string | undefined): void {
   currentLibTypes = declaration === undefined ? EMPTY_LIB_TYPES : declaration;
   installExtraLibs(monaco);
 }
 
-/** `.d.ts` emit -> a body legal inside `declare module`. */
 export function toAmbientModule(dts: string): string {
   const body = dts
     .replace(/^\s*\/\/#\s*sourceMappingURL=.*$/gm, '')
@@ -347,9 +240,7 @@ export interface LibraryCompileSuccess {
   ok: true;
   js: string;
   lineMap: number[];
-  /** `declare module 'lib' { … }`, ready for `setLibraryTypes`. */
   declaration: string;
-  /** Names the library publishes, read off the emitted declaration. */
   exports: string[];
   diagnostics: CompileDiagnostic[];
 }
@@ -371,12 +262,6 @@ function exportedNames(dts: string): string[] {
   return [...names];
 }
 
-/**
- * Transpiles `lib.ts` and derives its public type surface in one pass.
- *
- * The `.d.ts` is emitted with `forceDtsEmit`, so the global compiler options stay exactly as the
- * level editor needs them and the player's Run path pays nothing for a feature it is not using.
- */
 export async function compileLibrary(
   monaco: MonacoApi,
   model: TextModel,
@@ -427,15 +312,6 @@ export async function compileLibrary(
   };
 }
 
-/**
- * Emit without asking the type checker's opinion.
- *
- * The regression suite re-compiles work orders the player has already closed, under whatever
- * hardware the *current* level unlocked — so a World 7 solution re-checked while the player sits
- * in World 4 would be full of `Cannot find name` errors that mean nothing. Those errors were
- * answered when the work order was closed. Only syntax can still be wrong here, and syntax is
- * still checked, because emitting from a file that does not parse would produce nonsense.
- */
 export async function emitOnly(monaco: MonacoApi, model: TextModel): Promise<CompileResult> {
   const source = model.getValue();
   const worker = await workerFor(monaco, model);

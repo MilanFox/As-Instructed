@@ -1,22 +1,3 @@
-/**
- * Public surface of the Canvas2D trace player.
- *
- * The UI imports from `src/render` and nothing deeper. The renderer never touches the Sim: hand it
- * a `Trace` and a tick and it draws that tick (DESIGN.md §3).
- *
- * Minimal integration:
- *
- * ```ts
- * const renderer = new Renderer({ world: level.world, onHover: setReadout });
- * await renderer.mount(canvasElement);
- * renderer.setTrace(trace);
- * renderer.setHighlights(padCells(trace.initialWorld));
- * renderer.play(4);          // 4 engine ticks per second
- * renderer.seek(3.5);        // fractional ticks are legal and interpolate
- * renderer.dispose();
- * ```
- */
-
 export { Renderer, DEFAULT_SPEED, restingPose } from './renderer.ts';
 export type {
   CelebrationKind,
@@ -52,7 +33,14 @@ export {
   plantStageName,
   terrainArt,
 } from './tiles.ts';
-export type { AtlasFrame, AtlasJson, Biome, BiomeArt, TerrainArt, TileSetOptions } from './tiles.ts';
+export type {
+  AtlasFrame,
+  AtlasJson,
+  Biome,
+  BiomeArt,
+  TerrainArt,
+  TileSetOptions,
+} from './tiles.ts';
 
 export { ParticleSystem, FX_LAYER_OVER, FX_LAYER_UNDER } from './fx.ts';
 export type { FxName, FxOptions } from './fx.ts';

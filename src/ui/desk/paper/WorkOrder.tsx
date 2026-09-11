@@ -1,20 +1,3 @@
-/**
- * The work order. The company telling you what it wants.
- *
- * Two ordering problems are solved by the order this is printed in.
- *
- * **The escape hatch is at the top.** Measured on `w1-01`, the brief was
- * 949px of content in a 300px box and `Request hint {n} of {n}` was the last element of the last
- * section, below the head, the body, Site data, Hardware requisition, the fitted chips, the
- * Repository routines and Field notes. Assume nobody reads: the field-notes strip is now the first
- * thing under the addressing block, above the prose, so the answer to "I am stuck" is on screen
- * the moment the sheet is picked up whatever the window is doing.
- *
- * **The hardware block is gone.** The order used to print `Hardware requisition
- * — Delivered with this order` with the same four chips the requisition ceremony had shown a
- * minute earlier. On the desk the requisition is its own sheet that stays, and the reference
- * manual carries what is already fitted, so the duplicate has nowhere left to be.
- */
 import { currentLevel, useGame } from '../../../game/store.ts';
 import { worldMeta } from '../../../levels/index.ts';
 import { requirementsFor } from '../../../meta/index.ts';
@@ -23,7 +6,9 @@ import { usePapers } from './papers.ts';
 
 export function WorkOrder(): React.JSX.Element | null {
   const level = useGame(currentLevel);
-  const revealed = useGame((state) => (level ? (state.save.levels[level.id]?.hintsRevealed ?? 0) : 0));
+  const revealed = useGame((state) =>
+    level ? (state.save.levels[level.id]?.hintsRevealed ?? 0) : 0,
+  );
   const revealHint = useGame((state) => state.revealHint);
 
   if (!level) return null;
@@ -77,13 +62,6 @@ export function WorkOrder(): React.JSX.Element | null {
               onClick={(event) => {
                 event.stopPropagation();
                 revealHint(revealed + 1);
-                /*
-                 * The sheet lies at the desk edge, so the hint the player just asked for arrived
-                 * one line above the bottom of the window and every further rung of the SIZE dial
-                 * pushed it further off. Requesting a hint is a deliberate act of reading, and the
-                 * answer to reading is enlarge — so the order comes up to reading size, where the
-                 * field notes strip is the first thing under the head.
-                 */
                 const id = `order:${level.id}`;
                 if (usePapers.getState().lifted !== id) usePapers.getState().lift(id);
               }}
@@ -153,9 +131,7 @@ export function WorkOrder(): React.JSX.Element | null {
         </div>
       ) : null}
 
-      <div className="ref">
-        KD-{level.id.toUpperCase()} · SHEET 1 OF 1
-      </div>
+      <div className="ref">KD-{level.id.toUpperCase()} · SHEET 1 OF 1</div>
     </>
   );
 }

@@ -6,45 +6,11 @@ import { hopperFullOf, withinFootprint } from './shared.ts';
 const WIDTH = 12;
 const HEIGHT = 6;
 const MAX_GROWTH = 8;
-/**
- * The shift. Long enough for a disciplined pass, far too short for the whole field.
- *
- * It was 84, and at 84 the level did not ask its own question. The serpentine that reads only the
- * tile under the wheels costs 58–68 across the five seeds, so it came home inside the shift on
- * every one of them and the choosing decided nothing but the medal. Measured, not guessed:
- * the two-lane route costs 47/52/52/55/48, so the whole usable
- * window is 56 to 67, and 62 is the tightest number in it that still leaves a tick above par for a
- * run to land on. The serpentine now misses on three seeds of five and cannot close the level;
- * the lane route comes home with 7 ticks in hand on its worst seed and 15 on its best.
- *
- * 44 of the 62 go on wheels once a full hopper is paid for, against a 72-tile field. Not visiting
- * everything is now arithmetic rather than advice.
- */
 const SHIFT = 62;
-/**
- * Distinct tiles a shift may enter.
- *
- * `scan(Dir.North)` and `scan(Dir.South)` mean a bot walking one row reads three, so two lanes
- * survey the whole field from a quarter of it. Measured: that route fills the hopper on 22–28
- * tiles across the five seeds, while the serpentine that also passes the level enters 41–49. Set
- * above the first and well under the second.
- */
 const FOOTPRINT = 32;
 
-/**
- * Gold is the sensor reach, and the reach is on the facts table.
- *
- * One route passes. The two lanes, reading the rows either side and stepping off for a ripe crop,
- * cost 47–55; the serpentine that reads only the tile under the wheels costs 58–68 and no longer
- * comes home inside the shift on three of the five seeds. Par golds the lane route with five ticks
- * spare on its worst seed.
- *
- * Not a trim of the old 74. That number was the serpentine's own cost plus a margin, so it paid
- * gold for ignoring the one instrument this level exists to teach.
- */
 const PAR_TICKS = 60;
 
-/** Row-major serpentine, which is the order a bot with no long-range sensor will meet the field. */
 function sweepOrder(): Vec[] {
   const order: Vec[] = [];
   for (let y = 1; y <= HEIGHT; y++) {
@@ -56,11 +22,6 @@ function sweepOrder(): Vec[] {
   return order;
 }
 
-/**
- * Ripe crop is spread one per equal slice of the sweep, so however the seed shuffles the field a
- * disciplined pass always meets enough of it to fill the hopper. Everything else — where the ice
- * sits, which crops are still coming on, how big the hopper is — is drawn per seed.
- */
 function sowField(world: World, capacity: number): void {
   const order = sweepOrder();
   for (const at of order) setTile(world, at, { terrain: Terrain.Soil });
@@ -122,25 +83,6 @@ export const w2_05: LevelDef = {
     '',
     '**Come back with the hopper full of crop.**',
   ].join('\n'),
-  /**
-   * DESIGN.md §11.10, written as narrowly as this order's arithmetic allows.
-   *
-   * `sowField` places one ripe crop per equal slice of the sweep order, so ripe crop is spread the
-   * length of the field on every seed and cannot bunch into a corner the route declines to visit.
-   * That guarantee has to be stated: the shift buys 62 ticks against 72 tiles, so the run is a bet
-   * that the crop it needs is reachable from the lanes it drives, and a bet nobody told the player
-   * was safe is the §11.4 unfairness — a lane route that came home short would look like the wrong
-   * idea rather than an unlucky draw.
-   *
-   * What is deliberately *not* on the sheet is `ripeCount = capacity + 4`. The offset is a fixed
-   * property of the generator and stating it would be a second instrument for reading the hopper:
-   * count the ripe crop with the sensor, subtract four, and the size the facts table says nothing
-   * on the bot reports falls out without ever calling `inventory()`. Choosing what to harvest
-   * against a capacity you can only measure by measuring it is the order's question. So `fixed`
-   * says there is more ripe crop than the hopper holds — which is the part the run needs, the
-   * promise that it will not be starved — and stops there. The same reasoning keeps the seven-to-
-   * nine range off `redrawn`: the axis is named, the number stays behind `inventory()`.
-   */
   board: {
     fixed: [
       'the west field is 12 by 6 of soil inside its wall, and every tile of it takes wheels',

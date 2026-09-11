@@ -2,13 +2,6 @@ import type { Dir as DirType, Sim } from '../../../engine/index.ts';
 import { Dir } from '../../../engine/index.ts';
 import type { ReferenceSolution } from '../../types.ts';
 
-/**
- * TEST FIXTURE. Never imported from src/main.tsx — vite.config.ts fails the build if it is.
- *
- * One serpentine down the west half, through the doorway at the south end of the partition, and
- * one serpentine back up the east half. Neither pass knows the bay's dimensions; both stop when
- * canMove() says the row or the column has run out.
- */
 export const solution: ReferenceSolution = {
   levelId: 'w1-05',
   run(sim: Sim, botId: number): void {

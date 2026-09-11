@@ -12,10 +12,6 @@ export interface LevelRunResult {
   ops: number;
 }
 
-/**
- * Runs a driver against one seed of a level and produces the same Verdict the worker would.
- * Shared by every level test; also the reference for what the RUNTIME worker must reproduce.
- */
 export function runLevel(
   level: LevelDef,
   seed: number,

@@ -3,19 +3,6 @@ import { DISCREPANCY } from '../copy.ts';
 import { useLibrary } from '../store.ts';
 import './library.css';
 
-/**
- * The incident list. A page, not an interruption.
- *
- * A discrepancy never blocks anything: the work order stays closed, the medal stays recorded, and
- * "close the discrepancy" is available whether or not the player fixes it — which is the joke, and
- * also the guarantee that this can be ignored for the whole game.
- *
- * What the card is *for* is the layout number. Until the layout went onto the work order's run
- * schedule (`campaign.ts`), the only thing this page could do was tell the player they were wrong
- * about something they had no way to look at, which made `Stop raising these` the most useful
- * button on it. The layout, the primary action and the line saying the result stands are all there
- * to make the other button the obvious one.
- */
 export function DiscrepancyList(): React.JSX.Element {
   const save = useLibrary((state) => state.save);
   const open = useLibrary((state) => state.openDiscrepancyLevel);

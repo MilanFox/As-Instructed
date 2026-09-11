@@ -1,53 +1,23 @@
 import { findModuleStatements, importedLibraryNames } from '../runtime/index.ts';
 import { PUBLISH } from './copy.ts';
 
-/**
- * Lifting a declaration out of a closed work order and into `lib.ts`.
- *
- * Publishing is a *text* operation on the player's own TypeScript, never on emitted JS: what lands
- * in the Repository has to be the code they wrote, comments and all, or the whole feature reads as
- * a magic trick. So this module scans the source, finds the top-level declarations, and rewrites
- * two files at once — the library gains an `export`, the work order gains an `import`.
- *
- * Three properties it must have, in order of how badly a player is hurt when it does not:
- *  1. Nothing is deleted that is not also added somewhere else.
- *  2. A declaration that references something staying behind is reported before, not after.
- *  3. The rewrite is skippable, and skipping it is free.
- *
- * Pure. No Monaco, no compiler — the type checker's opinion arrives afterwards, in the editor,
- * where the player can see it.
- */
-
-/** A top-level declaration the player could publish. */
 export interface Declaration {
   name: string;
   kind: 'function' | 'class' | 'const' | 'let' | 'var';
-  /** Character offsets into the source. */
   start: number;
   end: number;
-  /** 1-based, inclusive. */
   startLine: number;
   endLine: number;
-  /** The declaration exactly as written, including any doc comment directly above it. */
   text: string;
-  /** Identifiers it references that are also declared at the top level of this work order. */
   uses: string[];
-  /** Bot API names it calls. Used to warn that earlier work orders have no such hardware. */
   hardware: string[];
-  /** True when it binds something a later work order could call. Data and scratch do not. */
   callable: boolean;
 }
 
-// ---------------------------------------------------------------------------
-// Scanning
-// ---------------------------------------------------------------------------
-
 interface Token {
-  /** Identifier text. */
   name: string;
   start: number;
   end: number;
-  /** True when it followed a `.` or `?.` and is therefore a property, not a binding. */
   member: boolean;
 }
 
@@ -115,13 +85,6 @@ const KEYWORDS = new Set([
   'boolean',
 ]);
 
-/**
- * Every identifier in the source, outside strings, comments, templates and regexes.
- *
- * A rename that walked the text with a regex would happily rewrite the word inside a `print()`
- * message, so the scan is real. It is deliberately not a parser: it needs positions and nothing
- * about scope, which is why forty lines suffice.
- */
 export function scanIdentifiers(source: string): Token[] {
   const tokens: Token[] = [];
   let previous = '';
@@ -163,7 +126,6 @@ export function scanIdentifiers(source: string): Token[] {
       continue;
     }
     if (ch === '`') {
-      /* Substitutions are scanned like code so `${pathTo(x)}` renames correctly. */
       i += 1;
       while (i < source.length) {
         const c = source[i];
@@ -236,7 +198,6 @@ export function scanIdentifiers(source: string): Token[] {
   return tokens;
 }
 
-/** Character offset of the first character of each 1-based line. */
 function lineOffsets(source: string): number[] {
   const offsets = [0];
   for (let i = 0; i < source.length; i++) if (source[i] === '\n') offsets.push(i + 1);
@@ -257,7 +218,6 @@ function lineAt(offsets: readonly number[], offset: number): number {
 const DECLARATION_START =
   /^(?:export\s+)?(?:(?:async\s+)?function\s*\*?\s*([A-Za-z_$][\w$]*)|(?:abstract\s+)?class\s+([A-Za-z_$][\w$]*)|(const|let|var)\s+([A-Za-z_$][\w$]*))/;
 
-/** Offset of the next character that is neither whitespace nor a comment. */
 function nextSignificant(source: string, from: number): number {
   let i = from;
   while (i < source.length) {
@@ -281,7 +241,6 @@ function nextSignificant(source: string, from: number): number {
   return Math.min(i, source.length);
 }
 
-/** Offset just past the `}` closing a template substitution that opened before `from`. */
 function skipSubstitution(source: string, from: number): number {
   let depth = 1;
   let i = from;
@@ -313,13 +272,6 @@ function skipSubstitution(source: string, from: number): number {
   return -1;
 }
 
-/**
- * Offset just past the string or template starting at `from`, or `-1` when it never closes.
- *
- * Templates are walked rather than skipped to their next backtick, because a substitution can hold
- * another template — and a scan that stopped at the first backtick it saw would go on to count the
- * braces of a string as structure.
- */
 function skipLiteral(source: string, from: number): number {
   const quote = source[from] as string;
   let i = from + 1;
@@ -342,7 +294,6 @@ function skipLiteral(source: string, from: number): number {
   return -1;
 }
 
-/** Offset just past a regular expression starting at `from`, or `-1` when it never closes. */
 function skipRegex(source: string, from: number): number {
   let i = from + 1;
   let inClass = false;
@@ -363,11 +314,6 @@ function skipRegex(source: string, from: number): number {
 
 const REGEX_MAY_START = /[=(,:[!&|?{};+\-*%~^<>]$/;
 
-/**
- * The last token before a line break that says the expression is not finished, and the first token
- * after one that says the same thing. Together they are automatic semicolon insertion, which is
- * the only rule that decides where an unterminated `const` actually ends.
- */
 const CONTINUES_AFTER =
   /(?:=>|[=+\-*/%,?:&|^~!<>.])$|\b(?:new|typeof|instanceof|in|of|as|satisfies|extends|implements|keyof|await|void|delete|yield|return|else|do)$/;
 const CONTINUES_BEFORE =
@@ -375,18 +321,6 @@ const CONTINUES_BEFORE =
 
 const TAIL_LENGTH = 24;
 
-/**
- * The end of a top-level declaration that starts at `from`.
- *
- * Both shapes are decided by structure, never by lines. A `function` or `class` ends at the `}`
- * that returns every delimiter to depth zero and is not immediately followed by another `{` — the
- * second `{` being the body of `function f(): { a: number } { … }` and the first its return type.
- * A `const` ends at a `;`, or at the line break where JavaScript would insert one: a line ending
- * in `=>`, or one followed by `.`, is not a line break that ends anything.
- *
- * Nothing here counts lines. A declaration spanning twelve of them is one declaration, and the
- * only reason the old scan disagreed was that it stopped at the first newline it could reach.
- */
 function declarationEnd(source: string, from: number, braced: boolean): number {
   const open: string[] = [];
   let tail = '';
@@ -474,13 +408,11 @@ function declarationEnd(source: string, from: number, braced: boolean): number {
   return source.length;
 }
 
-/** A `//` run sharing the declaration's last line belongs to it, the way a doc comment does. */
 function trailingComment(source: string, end: number): number {
   const match = /^[ \t]*\/\/[^\n]*/.exec(source.slice(end));
   return match ? end + match[0].length : end;
 }
 
-/** Doc comment or `//` run directly above `line`, so it travels with the declaration. */
 function commentAbove(lines: readonly string[], line: number): number {
   let first = line;
   for (let index = line - 1; index >= 1; index--) {
@@ -491,13 +423,6 @@ function commentAbove(lines: readonly string[], line: number): number {
   return first;
 }
 
-/**
- * Offset of the declaration keyword, past any doc comment that travelled with the text.
- *
- * `export` has to go here rather than at offset zero: `export /** … *\/ function f` is not a
- * declaration head that `stripLibraryExports` recognises, so a commented publication would link
- * as an unpublishable file.
- */
 function declarationHead(text: string): number {
   return nextSignificant(text, 0);
 }
@@ -507,14 +432,6 @@ const FUNCTION_HEAD =
 const ARROW_HEAD =
   /^(?:export\s+)?(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*=\s*(?:async\s+)?(?:function\s*\*?\s*(?:[A-Za-z_$][\w$]*)?\s*)?(?:<[^>]*>\s*)?\(/;
 
-/**
- * Parameter names of a function-shaped declaration.
- *
- * A parameter shadows whatever the work order called the same thing, so it is not a dependency
- * left behind. Binding positions only — an identifier directly after `(`, `,`, `{` or `[` that is
- * followed by `:`, `,`, `)`, `}`, `]` or `=` — which leaves type arguments and default values,
- * both of which really can reach outwards, where they were.
- */
 function parameterNames(text: string): Set<string> {
   const head = declarationHead(text);
   const body = text.slice(head);
@@ -536,7 +453,6 @@ function parameterNames(text: string): Set<string> {
     }
   }
   if (close === -1) return new Set();
-  /* A parenthesis that is not a parameter list — `const x = (a + b) * 2` — is not one of these. */
   if (!/^\s*(?:=>|:|\{)/.test(text.slice(close + 1))) return new Set();
 
   const params = text.slice(open, close + 1);
@@ -552,7 +468,6 @@ function parameterNames(text: string): Set<string> {
   return names;
 }
 
-/** Offset of the delimiter closing the one at `open`, or `-1` when nothing closes it. */
 function matchingBracket(text: string, open: number): number {
   let depth = 0;
   let i = open;
@@ -574,7 +489,6 @@ function matchingBracket(text: string, open: number): number {
   return -1;
 }
 
-/** Offset of the `=` that introduces a binding's value, past any type annotation. */
 function initialiserAt(body: string): number {
   let i = 0;
   while (i < body.length) {
@@ -604,13 +518,6 @@ function initialiserAt(body: string): number {
   return -1;
 }
 
-/**
- * True when the declaration binds something a later work order could *call*.
- *
- * The Repository is for subroutines. A tile map, a loop counter or a best-so-far accumulator is
- * real code the player wrote, and it is still not a thing another work order imports and uses — it
- * travels as part of a routine's closure or it does not travel at all.
- */
 function isCallable(kind: Declaration['kind'], text: string): boolean {
   if (kind === 'function' || kind === 'class') return true;
   const body = text.slice(declarationHead(text));
@@ -629,14 +536,6 @@ function isCallable(kind: Declaration['kind'], text: string): boolean {
   return /^\s*(?:=>|:)/.test(value.slice(close + 1));
 }
 
-/**
- * Routines the player has already written but left indented inside something else.
- *
- * `publishableDeclarations` only looks at column zero, so a helper the player factored out and
- * then left inside `main()` is invisible to it. That player has done the thinking and is one
- * outdent away from a publishable subroutine, and telling them that is worth more than telling
- * them what a subroutine looks like. Nothing publishes from here — it only chooses the sentence.
- */
 export function nestedRoutineNames(source: string): string[] {
   const found: string[] = [];
   for (const raw of source.split('\n')) {
@@ -656,13 +555,6 @@ export function nestedRoutineNames(source: string): string[] {
   return [...new Set(found)];
 }
 
-/**
- * A routine plus everything it needs: the transitive `uses` closure, in source order.
- *
- * A subroutine is a function, the helpers it calls and the state it closes over. Asking the player
- * to assemble that by ticking one box per part is asking them to do the dependency analysis the
- * scan has already done.
- */
 export function closureOf(
   declarations: readonly Declaration[],
   names: readonly string[],
@@ -679,13 +571,6 @@ export function closureOf(
   return declarations.filter((each) => reached.has(each.name)).map((each) => each.name);
 }
 
-/**
- * Top-level declarations in the player's source, in order.
- *
- * Only the ones a work order could plausibly publish: something with a name, declared at column
- * zero-ish, that is not already an import. A statement in the middle of the program stays put —
- * publishing is for the code the player has already shaped into a subroutine.
- */
 export function publishableDeclarations(
   source: string,
   hardware: readonly string[] = [],
@@ -696,8 +581,6 @@ export function publishableDeclarations(
   const found: Declaration[] = [];
   const hardwareSet = new Set(hardware);
 
-  /* `export function f() {}` is a declaration that happens to be exported, which is exactly what
-     `lib.ts` is made of; only an import or a bare `export { … }` clause is off limits. */
   const moduleSpans = findModuleStatements(source)
     .filter((statement) => !DECLARATION_START.test(statement.text))
     .map((statement) => ({ start: statement.start, end: statement.end }));
@@ -745,7 +628,6 @@ export function publishableDeclarations(
     });
   }
 
-  /* `uses` is filled in a second pass: a declaration can reference one that appears below it. */
   const names = new Set(found.map((declaration) => declaration.name));
   for (const declaration of found) {
     const shadowed = parameterNames(declaration.text);
@@ -768,15 +650,10 @@ export function publishableDeclarations(
   return found;
 }
 
-// ---------------------------------------------------------------------------
-// Renaming
-// ---------------------------------------------------------------------------
-
 export function isValidName(name: string): boolean {
   return /^[A-Za-z_$][\w$]*$/.test(name) && !KEYWORDS.has(name);
 }
 
-/** Renames a binding through real identifier positions, so strings and comments are left alone. */
 export function renameIdentifier(source: string, from: string, to: string): string {
   if (from === to) return source;
   const spans = scanIdentifiers(source).filter((token) => token.name === from && !token.member);
@@ -789,58 +666,31 @@ export function renameIdentifier(source: string, from: string, to: string): stri
   return out + source.slice(cursor);
 }
 
-// ---------------------------------------------------------------------------
-// The rewrite
-// ---------------------------------------------------------------------------
-
 export interface PublishSelection {
-  /** `Declaration.name`. */
   name: string;
-  /** The name it will be published under. Defaults to `name`. */
   publishAs?: string;
 }
 
 export interface PublishPlan {
-  /** `lib.ts` after the declarations are appended. */
   librarySource: string;
-  /** The work order's source after the declarations are removed and the import added. */
   levelSource: string;
-  /** Names as the Repository will hold them. */
   published: string[];
-  /** Names already in the Repository, which the plan refuses to overwrite. */
   conflicts: string[];
-  /** Declarations left behind that the published ones still reference. */
   missing: string[];
-  /** Bot API the published code calls. */
   hardware: string[];
-  /**
-   * Why the plan was not applied. When this is non-empty both sources are the originals: the
-   * publish did not happen, and neither did any part of it.
-   */
   refusals: PublishRefusal[];
 }
 
-/** Something that would make the composed file unusable. A publish with any of these is refused. */
 export interface PublishRefusal {
-  /** The declaration the trouble sits inside, when it sits inside one. */
   name?: string;
   message: string;
 }
 
 interface Balance {
-  /** Offset of a delimiter, string or comment that never closes. */
   unclosed: number | null;
-  /** Offset of a closing delimiter that closes nothing. */
   stray: number | null;
 }
 
-/**
- * Whether a file's delimiters, strings, templates and comments all close.
- *
- * Not a parser, and it does not pretend to be one: it is the check that catches every way a text
- * rewrite can leave a file that cannot be read back — half a declaration, a swallowed neighbour, a
- * comment that ate the code after it. Anything it passes still has to satisfy the round trip.
- */
 function balanceOf(source: string): Balance {
   const open: { ch: string; at: number }[] = [];
   let tail = '';
@@ -890,22 +740,12 @@ function balanceOf(source: string): Balance {
   return { unclosed: open[0]?.at ?? null, stray: null };
 }
 
-/** 1-based line holding `offset`. */
 function lineOf(source: string, offset: number): number {
   let line = 1;
   for (let i = 0; i < offset && i < source.length; i++) if (source[i] === '\n') line += 1;
   return line;
 }
 
-/**
- * Whether the composed `lib.ts` can be read back as the file that was meant to be written.
- *
- * Two questions, and the second is the one that matters. *Does it close?* — every delimiter,
- * string and comment balances. *Does it round-trip?* — scanning the composed file finds each
- * published declaration again, byte for byte as it was appended. A publish that fails either
- * question is refused and nothing is written, because a refused publish is recoverable and a
- * corrupted Repository is not.
- */
 export function libraryRefusals(options: {
   source: string;
   additions: readonly { name: string; text: string }[];
@@ -935,7 +775,6 @@ export function libraryRefusals(options: {
   return refusals;
 }
 
-/** Names `lib.ts` already publishes, read from the source rather than from save data. */
 export function libraryExportNames(librarySource: string): string[] {
   const names = new Set<string>();
   for (const statement of findModuleStatements(librarySource)) {
@@ -961,12 +800,6 @@ export function libraryExportNames(librarySource: string): string[] {
 
 const PLACEHOLDER_EXPORT = /^\s*export\s*\{\s*\}\s*;?\s*$/gm;
 
-/**
- * Builds both rewritten files.
- *
- * Removal happens from the bottom up so every earlier offset is still valid, and the import is
- * merged into an existing `from 'lib'` line when there is one rather than stacking a second.
- */
 export function planPublication(options: {
   levelSource: string;
   librarySource: string;
@@ -995,8 +828,6 @@ export function planPublication(options: {
   ].sort();
   const hardware = [...new Set(chosen.flatMap((each) => each.declaration.hardware))].sort();
 
-  /* Library first. Each declaration keeps its own text; a rename is applied inside that text only,
-     which is safe because the declaration is self-contained by the time it is published. */
   const additions = chosen.map((each) => {
     const renamed = renameIdentifier(
       each.declaration.text,
@@ -1022,7 +853,6 @@ export function planPublication(options: {
     })),
   });
 
-  /* Then the work order: cut from the bottom so the offsets above stay true. */
   const ordered = [...chosen].sort((a, b) => b.declaration.start - a.declaration.start);
   let levelSource = options.levelSource;
   for (const each of ordered) {
@@ -1058,7 +888,6 @@ export function planPublication(options: {
   };
 }
 
-/** Adds names to the work order's `import … from 'lib'`, creating the statement if there is none. */
 export function withLibraryImport(source: string, names: readonly string[]): string {
   const existing = importedLibraryNames(source);
   const clause = [...new Set([...existing, ...names])]

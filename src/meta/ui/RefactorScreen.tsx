@@ -6,19 +6,6 @@ import { bestProjection, upgradeSummary } from '../profile.ts';
 import { useLibrary } from '../store.ts';
 import './library.css';
 
-/**
- * Cost analysis: what each published subroutine is costing across the whole campaign.
- *
- * This is the screen the feature lives or dies on, so it is deliberately plain. One row per
- * subroutine, sorted by ticks charged, and under the expanded row the actual work orders with
- * their actual numbers. No sparklines, no gauges — the number *is* the drama.
- *
- * The projection line under a row is the hook: "2 ticks off `pathTo` improves 7 work orders, 3 of
- * them to a better medal." It is built from measured call counts and the real medal thresholds,
- * and it is omitted entirely when nothing would change bracket, because a made-up target is worse
- * than none.
- */
-
 function Row({ report }: { report: FunctionReport }): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const projection = bestProjection(report);

@@ -1,11 +1,3 @@
-/**
- * Standalone renderer harness. Open `/src/render/__dev__/index.html` with `npm run dev`.
- *
- * Deliberately does not touch `index.html` or `src/main.tsx` — the UI agent owns those. Vite
- * serves any HTML file under the project root as its own entry, and this one is not referenced by
- * the production build's entry graph.
- */
-
 import { Renderer, padCells, snapTilePx } from '../index.ts';
 import type { ArtId, FrameInfo, TileReadout } from '../index.ts';
 import { ART_IDS, DIRECTIONS } from '../theme.ts';
@@ -89,7 +81,8 @@ function loadScene(scene: Scene): void {
   current = scene;
   renderer.setWorld(scene.world);
   renderer.setTrace(scene.trace);
-  const highlights = scene.highlights.length > 0 ? scene.highlights : padCells(scene.trace.initialWorld);
+  const highlights =
+    scene.highlights.length > 0 ? scene.highlights : padCells(scene.trace.initialWorld);
   renderer.setHighlights(highlights);
   renderer.setActiveBot(scene.trace.initialWorld.bots[0]?.id ?? null);
   renderer.setFollow(null);
@@ -183,7 +176,6 @@ window.addEventListener('keydown', (event) => {
   if (event.key === 'f') renderer.fit();
 });
 
-// Exposed for the browser-automation pass: drive the harness without synthetic pointer events.
 (window as unknown as Record<string, unknown>).__harness = {
   renderer,
   scenes,
@@ -202,14 +194,6 @@ window.addEventListener('keydown', (event) => {
     artSelect.value = id;
     renderer.setArt(id);
   },
-  /**
-   * Pins the board to one `ZOOM_LADDER` rung and holds it there.
-   *
-   * `setZoom` only moves the *target*; the camera eases onto it over the next few frames, so a
-   * screenshot taken immediately after is of the zoom on the way rather than the one asked for.
-   * The shots that prove small-tile legibility are worthless if they are half a rung off, so this
-   * lands both.
-   */
   tile: (devicePx: number) => {
     renderer.camera.setZoom(devicePx);
     renderer.camera.deviceTilePx = snapTilePx(devicePx);
@@ -219,10 +203,6 @@ window.addEventListener('keydown', (event) => {
   reduced: (on: boolean | null) => renderer.setReducedMotion(on),
   speed: (ticksPerSecond: number) => renderer.setSpeed(ticksPerSecond),
   play: (ticksPerSecond?: number) => renderer.play(ticksPerSecond),
-  /**
-   * Synchronous frame-cost measurement. rAF is throttled to a few hertz in a background tab, so
-   * an fps counter there measures Chrome's scheduler, not the renderer.
-   */
   measure: (frames = 400): Record<string, number> => {
     renderer.seek(0);
     renderer.play(6);

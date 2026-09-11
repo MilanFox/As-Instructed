@@ -1,11 +1,3 @@
-/**
- * What World 1's objectives say when they are missed.
- *
- * Boot Sector is where a player learns that a failed run is worth reading, so it is the world that
- * can least afford `not met`. Each test drives a program that is wrong in one specific way and
- * asserts the exact point that comes back, because a divergence nobody pins down drifts into a
- * restatement of the label.
- */
 import { describe, expect, test } from 'vitest';
 import type { Objective, Sim, Vec } from '../../../engine/index.ts';
 import { DIVERGENCE_VALUE_CHARS, Dir, manhattan } from '../../../engine/index.ts';
@@ -18,7 +10,12 @@ import { w1_03 } from '../w1-03.ts';
 import { w1_05 } from '../w1-05.ts';
 import { at, padPosition, walkableTiles } from '../shared.ts';
 
-function diverge(level: LevelDef, seed: number, id: string, drive: (sim: Sim, bot: number) => void) {
+function diverge(
+  level: LevelDef,
+  seed: number,
+  id: string,
+  drive: (sim: Sim, bot: number) => void,
+) {
   const result = runLevel(level, seed, drive);
   const pool: Objective[] = [...level.objectives, ...(level.bonus ?? [])];
   const objective = must(
@@ -50,10 +47,6 @@ describe('w1-01 and w1-03 name the pad and where the bot actually stopped', () =
     });
   });
 
-  /**
-   * The pad is drawn per seed here, so the coordinate is a fact about this run rather than an
-   * answer worth memorizing: every declared seed has to pass and every one of them moves the pad.
-   */
   test('w1-03 names the pad this seed drew, and the seeds disagree', () => {
     const named = w1_03.seeds.map((seed) => {
       const { met, divergence } = diverge(w1_03, seed, 'reach-pad', (sim, botId) => {
@@ -87,11 +80,6 @@ describe('w1-03 says which half of the ration ran out', () => {
     });
   });
 
-  /**
-   * The half the progress tuple could never show. `within-7-canMove` counts readings, so a run
-   * that spent none of them and drove into the far wall for eleven ticks read `0 / 7` and `not
-   * met` in the same breath.
-   */
   test('driving blind past the pad is told the ticks it wasted, not the readings it saved', () => {
     const overshoot = 29;
     const { met, divergence } = diverge(w1_03, 1, 'within-7-canMove', (sim, botId) => {
@@ -119,10 +107,6 @@ describe('w1-05 names a tile rather than a shortfall', () => {
     });
   });
 
-  /**
-   * The allowance is one move per floor tile, so a run that spends two on the same pair of tiles
-   * is over it long before it stops. The tick and the tile are the part the editor cannot show.
-   */
   test('one-move-per-tile names the tick and tile the allowance ran out on', () => {
     const filed = 200;
     const allowed = walkableTiles(w1_05.build(21)).length;
@@ -141,11 +125,6 @@ describe('w1-05 names a tile rather than a shortfall', () => {
   });
 });
 
-/**
- * The world-scoped half of `src/levels/__tests__/legibility.test.ts`, held on every declared seed
- * rather than only the first. Boot Sector's `AWAITING_A_DIFF` entries can be struck off with this
- * green: nothing in World 1 answers a miss with silence on any shift it ships.
- */
 describe('no objective in World 1 answers a miss with silence', () => {
   for (const level of WORLD_1_LEVELS) {
     for (const seed of level.seeds) {

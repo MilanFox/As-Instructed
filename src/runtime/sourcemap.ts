@@ -1,16 +1,3 @@
-/**
- * Just enough source-map decoding to map an emitted line back to the player's line.
- *
- * This is not optional polish. The TypeScript emitter *deletes* type-only lines: an `interface`
- * or a `type` alias in the middle of a program shifts every line below it, so a runtime error
- * would point at the wrong line for anyone who declares a type. Subtracting the wrapper offset
- * alone is only correct for programs with no erased lines.
- *
- * Only the line dimension is decoded, and only the first segment of each generated line — that is
- * all the error reporter needs, and it keeps this to one small pure function that a test can pin
- * down. No dependency: `source-map` would be a new package for forty lines of VLQ.
- */
-
 const BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
 const CHAR_TO_INT = new Map<string, number>();
@@ -43,12 +30,6 @@ function decodeVlq(text: string, cursor: Cursor): number | undefined {
   return negative ? -result : result;
 }
 
-/**
- * `lineMap[generatedLine - 1]` is the 1-based original line, or `0` when the emitter produced
- * that line out of nothing.
- *
- * Accepts either the raw `mappings` string or a whole source-map JSON document.
- */
 export function decodeLineMap(sourceMap: string): number[] {
   let mappings = sourceMap;
   const trimmed = sourceMap.trim();
@@ -99,11 +80,6 @@ export function decodeLineMap(sourceMap: string): number[] {
   return lineMap;
 }
 
-/**
- * Maps an emitted line to the player's line, walking forward if the emitter produced a line with
- * no origin (a helper it inserted). Returns the emitted line unchanged when there is no map, which
- * is exactly right for the common case of a program with nothing to erase.
- */
 export function toSourceLine(emittedLine: number, lineMap: readonly number[] | undefined): number {
   if (!lineMap || lineMap.length === 0) return emittedLine;
   if (emittedLine < 1) return emittedLine;

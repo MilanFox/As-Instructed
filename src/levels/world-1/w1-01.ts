@@ -18,21 +18,8 @@ const MID_ROW = 7;
 const PAD_ROW = 12;
 export const PAD = vec(23, 12);
 
-/**
- * Five moves round the pillar, then legs of 19, 5, 22, 5 and 22. Seventy-eight tiles, and the
- * only way past the pillar rejoins the run on exactly one tile, so the legs the brief quotes are
- * the legs the player walks.
- */
 const PAR_TICKS = 78;
 
-/**
- * The bay is booked for ninety ticks, which is the route plus a sixth of it again.
- *
- * Nothing in a trace can tell a `for` loop apart from seventy-eight typed-out `move` calls — they
- * emit the same events — so the gate here is not the shape of the program, it is the shape of the
- * route. Seventy-eight is far more than anyone writes by hand, and the one answer that avoids
- * counting without thinking — fire moves at a wall until they stop working — overruns the booking.
- */
 const BOOKED_TICKS = 90;
 
 function carveRoute(world: World): void {
@@ -65,22 +52,6 @@ export const w1_01: LevelDef = {
     '> WELCOME, NEW HIRE! TIP ONE OF THREE: REPETITION IS THE FOUNDATION OF ALL SAFE—',
     '> `[EVALUATION LICENCE — 0 SEATS REMAINING]`',
   ].join('\n'),
-  /**
-   * DESIGN.md §11.10 on the one order in the campaign that has nothing to redraw.
-   *
-   * The `redrawn` row looks like a formality here and is the opposite. This is the declared
-   * hardcode exception (CURRICULUM §2 rule 2) — a typed-out route is the intended answer — and a
-   * player arriving from nowhere has no reason to assume that. Every other work order they will
-   * ever open redraws something, so the default posture is to survey; a first-run contractor who
-   * writes a `canMove` sweep here because they assumed the hangar moves between attempts spends
-   * ticks on a question the level never asks, and the booking is only twelve ticks wider than the
-   * route. Saying "nothing" out loud is what licences the counted loop the level is for.
-   *
-   * The `fixed` half stays structural rather than restating the legs. The five leg lengths are
-   * already on the facts table, where they belong; what the table does not say is that the route
-   * is one tile wide with no branches, which is the fact that makes "drive 19 East" safe to write
-   * without checking anything on the way.
-   */
   board: {
     fixed: [
       'Test Hangar 3 is solid wall apart from the service route',
@@ -113,12 +84,9 @@ export const w1_01: LevelDef = {
       label: `Clear the bay within ${String(BOOKED_TICKS)} ticks`,
     }),
   ],
-  starter: [
-    '// x grows East, y grows South. Dir.North is y - 1.',
-    '',
-    'move(Dir.East);',
-    '',
-  ].join('\n'),
+  starter: ['// x grows East, y grows South. Dir.North is y - 1.', '', 'move(Dir.East);', ''].join(
+    '\n',
+  ),
   hints: [
     'The gap is above the pillar. North is y - 1.',
     'move() gives back false when something blocks it. The tick is spent either way.',

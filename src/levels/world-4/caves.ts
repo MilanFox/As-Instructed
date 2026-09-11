@@ -10,19 +10,6 @@ import {
   tileAt,
 } from '../../engine/index.ts';
 
-/**
- * Seeded cave generation for World 4.
- *
- * Everything here is a pure function of an `Rng` plus its parameters, so `LevelDef.build(seed)`
- * stays byte-reproducible. Nothing in this file touches the Sim.
- *
- * The whole world uses one layout convention: a grid of `cw x ch` **cells**, where cell (i, j)
- * lives at tile `(2i + 1, 2j + 1)`. Between two orthogonally adjacent cells sits a single
- * **connector** tile which is either carved (floor) or left solid. Tiles with both coordinates
- * even are **pillars** and are never carved. That gives corridors exactly one tile wide, which is
- * what makes `look()` read as a headlamp beam rather than a floodlight.
- */
-
 export interface Cell {
   i: number;
   j: number;
@@ -31,11 +18,8 @@ export interface Cell {
 export interface CellGrid {
   readonly cw: number;
   readonly ch: number;
-  /** Cell (i, j) is part of the cave at all. Row-major, index = j * cw + i. */
   open: boolean[];
-  /** The connector between (i, j) and (i + 1, j) is carved. Only meaningful for i < cw - 1. */
   east: boolean[];
-  /** The connector between (i, j) and (i, j + 1) is carved. Only meaningful for j < ch - 1. */
   south: boolean[];
 }
 
@@ -43,17 +27,14 @@ export function cellIndex(grid: CellGrid, i: number, j: number): number {
   return j * grid.cw + i;
 }
 
-/** The tile a cell occupies. */
 export function cellTile(i: number, j: number): Vec {
   return { x: 2 * i + 1, y: 2 * j + 1 };
 }
 
-/** The tile coordinate a cell would have, back-converted. Only valid on odd/odd tiles. */
 export function tileCell(at: Vec): Cell {
   return { i: (at.x - 1) / 2, j: (at.y - 1) / 2 };
 }
 
-/** Tile dimensions of a cell grid, before any padding a level adds. */
 export function gridExtent(grid: CellGrid): { w: number; h: number } {
   return { w: 2 * grid.cw + 1, h: 2 * grid.ch + 1 };
 }
@@ -76,7 +57,6 @@ export function isOpen(grid: CellGrid, i: number, j: number): boolean {
   return inCellBounds(grid, i, j) && grid.open[cellIndex(grid, i, j)] === true;
 }
 
-/** Is the wall between (i, j) and its neighbour in `dir` carved away? */
 export function linked(grid: CellGrid, i: number, j: number, dir: Dir): boolean {
   switch (dir) {
     case D.East:
@@ -120,12 +100,10 @@ export function cellStep(cell: Cell, dir: Dir): Cell {
   }
 }
 
-/** Directions in which this cell is carved through to a neighbour. */
 export function linkDirs(grid: CellGrid, i: number, j: number): Dir[] {
   return ALL_DIRS.filter((dir) => linked(grid, i, j, dir));
 }
 
-/** Cells with exactly one way in and out. Where a level hides something worth finding. */
 export function deadEndCells(grid: CellGrid): Cell[] {
   const out: Cell[] = [];
   for (let j = 0; j < grid.ch; j++) {
@@ -137,16 +115,6 @@ export function deadEndCells(grid: CellGrid): Cell[] {
   return out;
 }
 
-// ---------------------------------------------------------------------------
-// Generators
-// ---------------------------------------------------------------------------
-
-/**
- * Randomized depth-first search over every cell. The carved connectors form a spanning tree, so
- * the floor graph is a tree: connected, and with no cycle anywhere in it. `addCycles` is the only
- * thing that puts a loop in one, so a caller that never calls it gets that guarantee structurally
- * rather than by checking after the fact.
- */
 export function carvePerfectMaze(rng: Rng, cw: number, ch: number): CellGrid {
   const grid = newCellGrid(cw, ch);
   const seen = new Set<number>();
@@ -156,12 +124,10 @@ export function carvePerfectMaze(rng: Rng, cw: number, ch: number): CellGrid {
 
   while (stack.length > 0) {
     const cell = stack[stack.length - 1] as Cell;
-    const options = rng
-      .shuffle(ALL_DIRS)
-      .filter((dir) => {
-        const next = cellStep(cell, dir);
-        return inCellBounds(grid, next.i, next.j) && !seen.has(cellIndex(grid, next.i, next.j));
-      });
+    const options = rng.shuffle(ALL_DIRS).filter((dir) => {
+      const next = cellStep(cell, dir);
+      return inCellBounds(grid, next.i, next.j) && !seen.has(cellIndex(grid, next.i, next.j));
+    });
     const dir = options[0];
     if (dir === undefined) {
       stack.pop();
@@ -175,11 +141,6 @@ export function carvePerfectMaze(rng: Rng, cw: number, ch: number): CellGrid {
   return grid;
 }
 
-/**
- * Knocks `count` further connectors out of a spanning tree. Every one of them joins two cells
- * that were already connected, so the floor graph gains exactly `count` independent cycles.
- * Returns how many were actually carved, which is lower only on a grid with no walls left.
- */
 export function addCycles(rng: Rng, grid: CellGrid, count: number): number {
   const closed: { cell: Cell; dir: Dir }[] = [];
   for (let j = 0; j < grid.ch; j++) {
@@ -197,13 +158,6 @@ export function addCycles(rng: Rng, grid: CellGrid, count: number): number {
   return chosen.length;
 }
 
-/**
- * A single self-avoiding walk of exactly `cells` cells: one tunnel, no branches, no cycles.
- *
- * Depth-first with backtracking, so it always finds a path of the requested length on a grid
- * with room for one. Cells the walk passes near but does not enter stay solid, and because two
- * cells are two tiles apart the corridor never touches itself.
- */
 export function carveTunnel(
   rng: Rng,
   cw: number,
@@ -212,7 +166,9 @@ export function carveTunnel(
 ): { grid: CellGrid; path: Cell[] } {
   const grid = newCellGrid(cw, ch, false);
   const start: Cell = { i: rng.int(0, cw - 1), j: rng.int(0, ch - 1) };
-  const frames: { cell: Cell; options: Dir[] }[] = [{ cell: start, options: rng.shuffle(ALL_DIRS) }];
+  const frames: { cell: Cell; options: Dir[] }[] = [
+    { cell: start, options: rng.shuffle(ALL_DIRS) },
+  ];
   const onPath = new Set<number>([cellIndex(grid, start.i, start.j)]);
 
   while (frames.length > 0 && frames.length < cells) {
@@ -244,11 +200,6 @@ export function carveTunnel(
   return { grid, path };
 }
 
-// ---------------------------------------------------------------------------
-// Painting
-// ---------------------------------------------------------------------------
-
-/** Every tile the cave occupies: cell tiles plus the connectors carved between them. */
 export function caveFloorTiles(grid: CellGrid): Vec[] {
   const out: Vec[] = [];
   for (let j = 0; j < grid.ch; j++) {
@@ -262,16 +213,11 @@ export function caveFloorTiles(grid: CellGrid): Vec[] {
   return out;
 }
 
-/** Carves `grid` into an already solid world. The caller fills the world with rock first. */
 export function paintCave(world: World, grid: CellGrid, floor: Terrain = Terrain.Floor): void {
   for (const at of caveFloorTiles(grid)) {
     if (inBounds(world, at)) setTerrain(world, at, floor);
   }
 }
-
-// ---------------------------------------------------------------------------
-// Graph queries over a built world
-// ---------------------------------------------------------------------------
 
 export function keyOf(at: Vec): string {
   return `${at.x},${at.y}`;
@@ -292,7 +238,6 @@ export function walkableNeighbours(world: World, at: Vec): Vec[] {
   return out;
 }
 
-/** Breadth-first tick distance from `from` to every reachable walkable tile. */
 export function distancesFrom(world: World, from: Vec): Map<string, number> {
   const dist = new Map<string, number>([[keyOf(from), 0]]);
   const queue: Vec[] = [from];
@@ -309,7 +254,6 @@ export function distancesFrom(world: World, from: Vec): Map<string, number> {
   return dist;
 }
 
-/** Shortest walkable route, excluding `from` and including `to`. Null when unreachable. */
 export function pathBetween(world: World, from: Vec, to: Vec): Vec[] | null {
   const previous = new Map<string, string>();
   const seen = new Set<string>([keyOf(from)]);
@@ -341,11 +285,9 @@ export interface FloorGraphSummary {
   nodes: number;
   edges: number;
   components: number;
-  /** Independent cycles: edges - nodes + components. Zero means every component is a tree. */
   cycles: number;
 }
 
-/** Structural summary of everything walkable in a world. The generator tests read this. */
 export function floorGraphSummary(world: World): FloorGraphSummary {
   const tiles: Vec[] = [];
   for (let y = 0; y < world.h; y++) {
@@ -378,7 +320,6 @@ export function floorGraphSummary(world: World): FloorGraphSummary {
   return { nodes: tiles.length, edges, components, cycles: edges - tiles.length + components };
 }
 
-/** Picks `count` cells that are as far from one another as a greedy farthest-point pass gets. */
 export function spreadCells(candidates: Cell[], count: number, first: Cell): Cell[] {
   const chosen: Cell[] = [];
   const pool = candidates.slice();

@@ -1,21 +1,3 @@
-/**
- * FOCUS is a persisted boolean, and the two things that can go wrong with one are the two things
- * checked here.
- *
- * It defaults off, because a player arrives at the approved composition and asks for the other one
- * — a save that came back in a layout nobody chose would read as a bug in the desk.
- *
- * And it survives a `localStorage` that throws. That is not defensive garnish: private-mode Safari
- * throws on the first touch, the module reads the key at import time, and an uncaught throw there
- * takes the whole shell down before a single frame is drawn. `scale.ts` and `src/ui/art.ts` carry
- * the same wrapper for the same reason, so each case loads the state through a fresh module
- * registry rather than testing it in place — the read that matters happens once, on import, and a
- * test that ran second would never see it.
- *
- * `useDeskFocus` itself is `useSyncExternalStore` and needs a React tree; `environment` is `node`
- * and only `*.test.ts` is collected, so what is checked here is the store the hook reads, which is
- * where every decision in the module actually lives.
- */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type * as Focus from '../focus.ts';
@@ -26,11 +8,9 @@ type FocusModule = typeof Focus;
 interface FakeStorage {
   getItem: () => string | null;
   setItem: (key: string, value: string) => void;
-  /** Every value the module wrote, in order. */
   written: string[];
 }
 
-/** Enough of the `Storage` interface for one key, plus a record of what was written to it. */
 function fakeStorage(initial?: string): FakeStorage {
   const written: string[] = [];
   let held: string | null = initial ?? null;

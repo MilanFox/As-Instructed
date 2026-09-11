@@ -1,15 +1,3 @@
-/**
- * Monaco, and nothing else.
- *
- * This module exists to be the whole of the lazy chunk. Everything that
- * statically reaches `monaco-editor` — `@monaco-editor/react`, `../../monaco-setup.ts` and the
- * marker plumbing — lives here and is reached only through the dynamic import in `Program.tsx`,
- * so the desk, the site, the rail and the log all paint before the editor's chunk lands.
- *
- * The wiring is `src/ui/panels/EditorPanel.tsx`'s, carried over unchanged: the value binding, the
- * Ctrl/Cmd+Enter command, the runtime-failure markers under their own owner, and the problem
- * count. Only the chrome around it was a panel; the editor never was.
- */
 import Editor, { type OnMount } from '@monaco-editor/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { currentLevel, useGame } from '../../../game/store.ts';
@@ -21,14 +9,6 @@ const RUNTIME_MARKER_OWNER = 'bootstrap-runtime';
 
 type CodeEditor = monaco.editor.IStandaloneCodeEditor;
 
-/**
- * The type the SIZE dial is actually for.
- *
- * Every other line of the desk is `calc(N * var(--u) * var(--ts))`; Monaco takes numbers, so the
- * same arithmetic is done here against the same two inputs. A SIZE dial that grew the rail and the
- * log and left the program at 13px would be turning up everything except the thing being read.
- * The multipliers are the prototype's mirror: 13.5 and 21.
- */
 function useCodeMetrics(): { fontSize: number; lineHeight: number } {
   const size = useDeskSize();
   const [unit, setUnit] = useState(() =>
@@ -65,12 +45,6 @@ export function MonacoProgram({
 
   const { fontSize, lineHeight } = useCodeMetrics();
 
-  // `PLAYER_FILE_PATH` is one fixed URI, not one per level, so `@monaco-editor/react` finds the
-  // outgoing level's model still alive at that URI and reuses it instead of reading `value` — and
-  // it does that from the new `<Editor>`'s own mount effect, which runs before this component's
-  // effects do, so an effect keyed on `level` here would always lose that race. Evicting the old
-  // model during render, ahead of every effect on either side of the remount, is what actually wins
-  // it.
   const previousLevelId = useRef<string | undefined>(undefined);
   if (level?.id !== previousLevelId.current) {
     monaco.editor.getModel(monaco.Uri.parse(PLAYER_FILE_PATH))?.dispose();
@@ -86,13 +60,6 @@ export function MonacoProgram({
     runner().prepare(level.id);
   }, [level, runner]);
 
-  // A runtime failure is not a compile error, so it gets its own marker owner and is cleared
-  // the moment the next run starts.
-  //
-  // The model is looked up by URI rather than taken from the editor: `@monaco-editor/react` mounts
-  // asynchronously, so on a level change this effect runs while `editorRef` still points at the
-  // editor that is being torn down — and an early return there leaves the previous work order's
-  // error underlined in the new one.
   useEffect(() => {
     const model = monaco.editor.getModel(monaco.Uri.parse(PLAYER_FILE_PATH));
     if (!model) return;
@@ -134,19 +101,10 @@ export function MonacoProgram({
       overviewRulerLanes: 0,
       scrollbar: { verticalScrollbarSize: 10, horizontalScrollbarSize: 10 },
       fixedOverflowWidgets: true,
-      /*
-       * Nothing is closed for the player, and nothing the player types is retyped for them.
-       * Monaco's auto-closing pairs put a `}` after the cursor, the player typed their own `}` on
-       * a new line, and a program written in the style that worked on `w1-01` came back with a
-       * stray brace and `Declaration or statement expected`. This is a programming game: an editor
-       * that edits the program is worse than an editor with no conveniences.
-       */
       autoClosingBrackets: 'never' as const,
       autoClosingQuotes: 'never' as const,
       autoClosingOvertype: 'never' as const,
       autoSurround: 'never' as const,
-      /* A long line is unreadable rather than merely long: the terminal's pane does not scroll to
-         where the player is typing on its own, and they had already given up on multi-line code. */
       wordWrap: 'on' as const,
       wrappingIndent: 'indent' as const,
       bracketPairColorization: { enabled: false },

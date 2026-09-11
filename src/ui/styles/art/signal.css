@@ -1,30 +1,10 @@
-/*
- * SIGNAL — the chrome is the bezel around the tube.
- *
- * One family, one hue, one weight of rule. Nothing here is a "component"; everything is either
- * lit phosphor or the dark glass it sits behind. The palette custom properties come from
- * `src/render/art/signal.ts`.
- *
- * Two rules the rest of the file obeys. First: a box is drawn as a rule, never as a fill, because
- * a fill is paint and this machine has no paint — it has a beam that is either on or off. Second:
- * every difference that used to be a hue is now a difference in *weight, texture or count*, since
- * monochrome deletes hue as a channel and pretending otherwise is how a direction like this ships
- * a screen the player cannot read.
- */
-
 [data-art='signal'] {
   --radius: 0;
   --border: #3a2609;
   --border-strong: #5c3f12;
 
-  /* There is no prose font on this machine. Everything the terminal prints, it prints in one face. */
   --font-prose: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 
-  /*
-   * The campaign is linear and the tube has one hue, so world identity becomes brightness: World 1
-   * is a cold filament and World 8 is a driven one. Position in the sequence was always the thing
-   * worth encoding and here it is the only thing that can be.
-   */
   --world-1: #7a5417;
   --world-2: #94661d;
   --world-3: #ad7823;
@@ -34,10 +14,6 @@
   --world-7: #ffbe57;
   --world-8: #ffdca4;
 
-  /*
-   * A terminal has a character cell and everything sits on it. The old screen was 12–14 px at one
-   * weight from edge to edge, which is most of why it read as a form rather than as an instrument.
-   */
   --t-micro: 9px;
   --t-label: 10px;
   --t-body: 12px;
@@ -48,18 +24,12 @@
 
   --glow: 0 0 7px rgb(255 190 87 / 30%);
   --glow-hot: 0 0 10px rgb(255 220 164 / 55%);
-  /* Failure is texture before it is colour, so it survives being read by someone who cannot see the shift. */
   --hatch: repeating-linear-gradient(135deg, rgb(255 90 31 / 22%) 0 2px, transparent 2px 6px);
 
   --topbar-h: 58px;
   --panel-head-h: 26px;
 }
 
-/*
- * The scanline stops being a tasteful 1.5% overlay and becomes the display. It is still bounded:
- * the raster is on the *chrome*, and the canvas draws its own in `post()` where it can be tuned
- * against the board rather than against text.
- */
 [data-art='signal'] .scanlines::after {
   background: repeating-linear-gradient(to bottom, rgb(255 154 31 / 5%) 0 1px, transparent 1px 3px);
 }
@@ -77,8 +47,6 @@
   outline: 2px solid var(--accent);
   outline-offset: 0;
 }
-
-/* ---------------------------------------------------------------- masthead */
 
 [data-art='signal'] .topbar {
   align-items: center;
@@ -119,7 +87,6 @@
   letter-spacing: 0.28em;
 }
 
-/* The numbers are the instrument. They get to be the largest thing in the bezel. */
 [data-art='signal'] .stat__value {
   font-size: var(--t-big);
   font-weight: 300;
@@ -138,8 +105,6 @@
   font-size: var(--t-micro);
 }
 
-/* ------------------------------------------------------------------ chrome */
-
 [data-art='signal'] .panel,
 [data-art='signal'] .modal,
 [data-art='signal'] .console,
@@ -155,7 +120,6 @@
   border-top: 1px solid var(--border);
 }
 
-/* A head is a channel label on a rack, so it is a rule with a lit tab and not a filled bar. */
 [data-art='signal'] .panel__head {
   gap: var(--space-2);
   border-bottom: 1px solid var(--border);
@@ -176,8 +140,6 @@
   background: var(--accent);
   box-shadow: var(--glow-hot);
 }
-
-/* ----------------------------------------------------------------- buttons */
 
 [data-art='signal'] .btn,
 [data-art='signal'] .icon-btn,
@@ -213,7 +175,6 @@
   opacity: 0.45;
 }
 
-/* The one inverted element on the screen. A run is the only thing the operator commits to. */
 [data-art='signal'] .btn--run,
 [data-art='signal'] .btn--next {
   border-color: var(--accent);
@@ -250,8 +211,6 @@
   text-shadow: var(--glow);
 }
 
-/* ---------------------------------------------------------------- viewport */
-
 [data-art='signal'] .viewport {
   background: var(--bg-void);
 }
@@ -287,8 +246,6 @@
   text-transform: uppercase;
 }
 
-/* ---------------------------------------------------------------- timeline */
-
 [data-art='signal'] .timeline {
   border-top: 1px solid var(--border);
   background: var(--bg-void);
@@ -300,10 +257,6 @@
   border-radius: 0;
 }
 
-/*
- * Playhead marks: squares, and the exceptional ones are told apart by silhouette and by count
- * rather than by fill. A lost step is a hollow square with a burn in it; a bonus is a doubled one.
- */
 [data-art='signal'] .timeline__mark {
   border-radius: 0;
   background: var(--ok);
@@ -332,8 +285,6 @@
 [data-art='signal'] .timeline__scrub::-moz-range-thumb {
   border-radius: 0;
 }
-
-/* ----------------------------------------------------------------- console */
 
 [data-art='signal'] .console__body {
   font-family: var(--font-mono);
@@ -370,8 +321,6 @@
   text-shadow: var(--glow-hot);
 }
 
-/* -------------------------------------------------------- objectives, rail */
-
 [data-art='signal'] .rail__label,
 [data-art='signal'] .cause__head,
 [data-art='signal'] .par-row__label,
@@ -383,10 +332,6 @@
   text-transform: uppercase;
 }
 
-/*
- * Objective state, with no colour in it: pending is a hollow cell, met is a solid lit one, over
- * budget is hatched. Three textures a monochrome tube can hold apart at any size.
- */
 [data-art='signal'] .objective__mark,
 [data-art='signal'] .seed-chip,
 [data-art='signal'] .tag,
@@ -455,18 +400,6 @@
   box-shadow: 0 0 8px rgb(255 90 31 / 55%);
 }
 
-/* ------------------------------------------------------------------ medals */
-
-/*
- * Medals, weighted rather than coloured.
- *
- * `MedalBadge` already prints I / II / III / — / ✓, which is a shape encoding the hue was merely
- * decorating; three intensities of one amber is exactly the comparison a player cannot make from
- * memory across two sessions, and a ring count is uncountable at 18 px. So rank is carried by how
- * the beam is *driven*: gold is the only inverted badge on the screen, silver is a struck rule,
- * bronze is a dotted one, and an unearned rung has no border at all. Four weights, four
- * silhouettes, no hue.
- */
 [data-art='signal'] .medal {
   border-radius: 0;
   border-width: 1px;
@@ -517,8 +450,6 @@
   font-size: var(--t-read);
 }
 
-/* ------------------------------------------------------------ pass or fail */
-
 [data-art='signal'] .modal {
   border: 1px solid var(--border-strong);
   box-shadow:
@@ -537,11 +468,6 @@
   letter-spacing: 0.3em;
 }
 
-/*
- * A pass is the beam turned all the way up and inverted — the only lit slab in the whole chrome.
- * A failure is the same slab with the raster torn across it, so the two are told apart by texture
- * at a glance and by the shift toward burnt phosphor on a second look, never by hue alone.
- */
 [data-art='signal'] .modal__verdict--pass {
   background: var(--accent);
   color: var(--bg-void);
@@ -586,8 +512,6 @@
   border-radius: 0;
 }
 
-/* ------------------------------------------------------------ level select */
-
 [data-art='signal'] .screen,
 [data-art='signal'] .sitemap {
   font-family: var(--font-mono);
@@ -630,7 +554,6 @@
   line-height: 20px;
 }
 
-/* A level is an addressable slot on a rack, not a bubble on a map. */
 [data-art='signal'] .node,
 [data-art='signal'] .node__disc {
   border-radius: 0;
@@ -661,7 +584,6 @@
   border-color: var(--border);
 }
 
-/* The same four weights as the badges, so the two readings of "how well did I do" agree. */
 [data-art='signal'] .node--gold .node__disc {
   border-color: var(--gold);
   background: var(--gold);
@@ -705,8 +627,6 @@
   background: var(--border);
 }
 
-/* ------------------------------------------------------------------ editor */
-
 [data-art='signal'] .editor-status {
   font-family: var(--font-mono);
   font-size: var(--t-micro);
@@ -721,11 +641,6 @@
   text-transform: uppercase;
 }
 
-/*
- * The one moving thing in the chrome: the carrier lamp on the masthead, breathing at the rate a
- * forty-minute-old feed refreshes at. It is the only animation this direction adds, which is what
- * makes it affordable to delete outright when the reader has asked for stillness.
- */
 [data-art='signal'] .statusbar__status--busy {
   animation: signal-carrier 1.8s ease-in-out infinite;
 }

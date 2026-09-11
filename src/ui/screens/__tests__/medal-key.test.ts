@@ -1,21 +1,3 @@
-/**
- * The key to the discs, and whether it works in the direction it was rebuilt for.
- *
- * Every medal in the game is drawn as a ring on a node and was named nowhere, so the three words
- * the whole scoring ladder runs on were on the site map forty times over and defined zero times.
- * The key is drawn in the loaded art direction's own marks rather than in a picture of its own, and
- * that is the part with a way to be wrong: `signal` is monochrome, and a key that separates its
- * three rows by colour alone fails exactly the direction it was rebuilt for.
- *
- * So the file asks two questions a player could answer. **Does the key say the same thing the board
- * says?** — the sample for a medal has to carry the same mark the board gives a node holding that
- * medal, and the test reads both off the same render rather than naming a class. **Can the three be
- * told apart without colour?** — each row is named in words, and the marks themselves separate by
- * hue or by lightness in every direction, which is checked against each direction's own palette.
- *
- * The renderer is `src/ui/__tests__/react-driver.ts`, one hand-cranked React shared by every UI
- * test; the tree walk below is this file's own, because no other file needs a node's marks.
- */
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type * as ReactModule from 'react';
 import { reactDriver as driver } from '../../__tests__/react-driver.ts';
@@ -102,7 +84,6 @@ function classes(node: Node | undefined): string[] {
     .filter(Boolean);
 }
 
-/** Boot Sector, with one work order closed at each rung, so the board draws all three marks. */
 function boardWithEveryMedal(): void {
   const save = emptySave();
   save.levels['w1-01'] = { completed: true, medal: Medal.Gold, stars: [], attempts: 1 };
@@ -111,12 +92,10 @@ function boardWithEveryMedal(): void {
   useGame.setState({ save, screen: 'levels' });
 }
 
-/** The rows of the key, in the order they are drawn, each as the words a player reads. */
 function keyRows(tree: Node[]): {
   word: string;
   rule: string;
   sample: Node | undefined;
-  /** True when the sample sits inside something the accessibility tree is told to skip. */
   decorative: boolean;
 }[] {
   const key = named(tree, 'Medal key');
@@ -148,18 +127,12 @@ function keyRows(tree: Node[]): {
   });
 }
 
-/** The mark the board gives a node that holds this medal, read off the board itself. */
 function boardMark(tree: Node[], levelId: string): string[] {
   const slot = all(tree, (node) => node.tag === 'li' && node.text.includes(levelId))[0];
   if (!slot) return [];
   return classes(all([slot], (node) => classes(node).includes('node'))[0]);
 }
 
-/**
- * The mark the board gives a work order the site never graded, read off the board itself. The
- * `✓` is a badge in the status line rather than a class on the disc, so it is not `boardMark`'s
- * to find — an ungraded close leaves the disc reading `node--none`, which is the whole point.
- */
 function closedMark(tree: Node[], levelId: string): string[] {
   const slot = all(tree, (node) => node.tag === 'li' && node.text.includes(levelId))[0];
   if (!slot) return [];
@@ -186,10 +159,8 @@ function apart(a: number, b: number): number {
 
 const MEDALS = ['gold', 'silver', 'bronze'] as const;
 
-/** Every mark the board can draw. `closed` is an ungraded work order (DESIGN.md §7). */
 const MARKS = [...MEDALS, 'closed'] as const;
 
-/** Boot Sector's first work order, which the site does not grade. */
 const UNGRADED = 'w1-01';
 
 beforeEach(() => {
@@ -270,11 +241,6 @@ describe('the key is drawn in the marks the board is drawn in', () => {
   });
 });
 
-/**
- * The fourth mark. The first two work orders on the site are ungraded (DESIGN.md §7), so `✓`
- * is the first mark a new contractor ever sees on the board and gold, silver and bronze all read
- * zero underneath it. A key to three of the four is how that reads as three failures.
- */
 describe('the key covers the mark that is not a medal', () => {
   test('the fixture is a work order the site really does not grade', () => {
     const level = getLevel(UNGRADED);
@@ -313,11 +279,6 @@ describe('the key covers the mark that is not a medal', () => {
   });
 });
 
-/**
- * `signal` is one hue at three lightnesses. That is the direction the key had to survive, so the
- * premise is pinned first — a palette change that gave silver a different hue would make the rest
- * of this section pass for a reason that no longer holds.
- */
 describe('the three are distinguishable without colour', () => {
   test('signal really is monochrome — its three medals share a hue', () => {
     const hues = MEDALS.map((medal) => hueOf(DIRECTIONS.signal.palette[medal]));

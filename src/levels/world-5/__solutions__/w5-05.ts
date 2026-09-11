@@ -2,18 +2,6 @@ import type { MachineView, Sim } from '../../../engine/index.ts';
 import type { ReferenceSolution } from '../../types.ts';
 import { playerApi } from './_api.ts';
 
-/**
- * TEST FIXTURE. Never imported from src/main.tsx — vite.config.ts fails the build if it is.
- *
- * Grow one network out of the reactor: at every step take the cheapest cable from anything
- * already joined to anything not yet joined, lay it, and bring that station up straight away so
- * the energising order can never run ahead of the cable. Prim, which is the intended heuristic
- * (CURRICULUM.md §2 rule 4) and lands on the exact minimum here.
- *
- * The tree that comes out of it is also the answer to the star. Which station each newcomer was
- * cabled on to is the only record the run needs to keep; the district's weak point is whichever
- * station the most of those paths run through, and counting them costs no ticks at all.
- */
 export const solution: ReferenceSolution = {
   levelId: 'w5-05',
   run(sim: Sim, botId: number): void {
@@ -53,8 +41,6 @@ export const solution: ReferenceSolution = {
       joined.push(next);
     }
 
-    // Every station on the path from a newcomer back to the reactor is one it depends on, so one
-    // walk up each of those paths counts, for each station, how much of the district it carries.
     const load = new Map<string, number>();
     for (const id of feeds.keys()) {
       let at: string | undefined = id;

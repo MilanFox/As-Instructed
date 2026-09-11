@@ -23,34 +23,13 @@ import {
   tileAt,
 } from '../../engine/index.ts';
 
-/**
- * Shared toolkit for World 8.
- *
- * Three groups live here, and the split matters:
- *
- * - **Authoring** (`localRng`, `carveCaves`, `encodeCaesar`, `checksum`) runs inside `build(seed)`
- *   and may read the world freely.
- * - **Adjudication** (`sightingTick`, `useLog`, `criticalChain`, ...) runs inside objectives, which
- *   see `world`, `initialWorld` and `trace` and nothing else.
- * - **Piloting** (`KnownMap`, `follow`) is what the reference solutions use. It deliberately
- *   reads *only* what the player's API exposes — `scan`, `look`, `probe`, `canMove` — so a
- *   reference solution can never path through a wall it has not actually seen. Nothing in this
- *   group touches `sim.world`.
- */
-
 export const key = (at: Vec): string => `${at.x},${at.y}`;
 
-/** A coordinate, written the way the briefs and the facts tables write one. */
 export const point = (at: Vec): string => `(${String(at.x)}, ${String(at.y)})`;
 
-/** Build-time randomness. Never consume `world.rng`: replay depends on it staying untouched. */
 export function localRng(seed: number): Rng {
   return new Rng(seed * 7919 + 13);
 }
-
-// ---------------------------------------------------------------------------
-// Geometry over an arbitrary passability predicate
-// ---------------------------------------------------------------------------
 
 export interface Grid {
   w: number;
@@ -61,7 +40,6 @@ function within(grid: Grid, at: Vec): boolean {
   return at.x >= 0 && at.y >= 0 && at.x < grid.w && at.y < grid.h;
 }
 
-/** Breadth-first shortest route as a list of steps, or null when `to` is unreachable. */
 export function pathOn(
   grid: Grid,
   passable: (at: Vec) => boolean,
@@ -106,7 +84,6 @@ export function pathOn(
   return reversed;
 }
 
-/** Hop count from `from` to every reachable tile, keyed by `y * w + x`. */
 export function distancesOn(
   grid: Grid,
   passable: (at: Vec) => boolean,
@@ -131,7 +108,6 @@ export function distancesOn(
   return out;
 }
 
-/** Authoring/adjudication convenience: distances over the world's real terrain. */
 export function worldDistances(world: World, from: Vec): Map<number, number> {
   return distancesOn(world, (at) => isPassable(world, at), from);
 }
@@ -148,10 +124,6 @@ export function reachableTiles(world: World, from: Vec): Vec[] {
   }
   return out;
 }
-
-// ---------------------------------------------------------------------------
-// Authoring: cave carving
-// ---------------------------------------------------------------------------
 
 export interface Room {
   x: number;
@@ -172,11 +144,6 @@ export interface CarveOptions {
   floor?: Terrain;
 }
 
-/**
- * Carves rectangular rooms out of whatever the world is filled with and joins them with L-shaped
- * corridors, in the order they were placed. Corridor-joining every room to its predecessor is what
- * guarantees the result is one connected component, which every World 8 objective assumes.
- */
 export function carveCaves(world: World, rng: Rng, options: CarveOptions): Room[] {
   const margin = options.margin ?? 1;
   const floor = options.floor ?? Terrain.Floor;
@@ -232,21 +199,14 @@ export function carveLine(world: World, from: Vec, to: Vec, floor: Terrain = Ter
   }
 }
 
-/** Every walkable tile connected to `from`, shuffled, for scattering contents deterministically. */
 export function scatterCandidates(world: World, from: Vec, rng: Rng): Vec[] {
   return rng.shuffle(reachableTiles(world, from));
 }
 
-// ---------------------------------------------------------------------------
-// Authoring: the packet format World 6 taught and World 8 reuses
-// ---------------------------------------------------------------------------
-
 export const PACKET_HEADER = 'KD4470';
 export const PACKET_SEPARATOR = '|';
-/** The whole keyspace of the runtime's Caesar shift: printable ASCII 32..126. */
 export const KEY_SPACE = 95;
 
-/** Inverse of the runtime's `decode`. Author packets with this, decipher them with that. */
 export function encodeCaesar(text: string, cipherKey: number): string {
   const shift = ((Math.trunc(cipherKey) % KEY_SPACE) + KEY_SPACE) % KEY_SPACE;
   let out = '';
@@ -261,20 +221,17 @@ export function encodeCaesar(text: string, cipherKey: number): string {
   return out;
 }
 
-/** Sum of the character codes, modulo 1000. Stated in full in the briefs that use it. */
 export function checksum(text: string): number {
   let total = 0;
   for (const character of text) total += character.charCodeAt(0);
   return total % 1000;
 }
 
-/** `KD4470|a|b|c` -> `KD4470|a|b|c|<checksum of everything before the last separator>`. */
 export function sealPacket(fields: readonly (string | number)[]): string {
   const body = [PACKET_HEADER, ...fields].join(PACKET_SEPARATOR);
   return `${body}${PACKET_SEPARATOR}${String(checksum(body))}`;
 }
 
-/** Splits a decoded packet and reports whether the header and the checksum both hold. */
 export function readPacket(text: string): { fields: string[]; valid: boolean } {
   const parts = text.split(PACKET_SEPARATOR);
   const last = parts[parts.length - 1];
@@ -284,14 +241,6 @@ export function readPacket(text: string): { fields: string[]; valid: boolean } {
   return { fields: parts.slice(1, -1), valid };
 }
 
-/**
- * What the runtime's `receive()` does, for a reference solution that drives the `Sim` directly.
- *
- * The inbound queue lives in the antenna tile's `meta` (`rx` newline-separated, `rxNext` the read
- * cursor), and the cursor moves through `applyTileChange` so the read lands in the trace and a
- * replay sees the same packets. Kept here rather than in a fixture so the level that authors the
- * queue and the solution that drains it read the same two field names.
- */
 export function receivePacket(sim: Sim, botId: number, antennaId = 'antenna'): string | null {
   const antenna = sim.probe(botId, antennaId);
   if (!antenna) return null;
@@ -307,7 +256,6 @@ export function receivePacket(sim: Sim, botId: number, antennaId = 'antenna'): s
   return packets[next] as string;
 }
 
-/** Everything still queued on the antenna, in order. */
 export function drainAntenna(sim: Sim, botId: number, antennaId = 'antenna'): string[] {
   const out: string[] = [];
   for (;;) {
@@ -318,24 +266,12 @@ export function drainAntenna(sim: Sim, botId: number, antennaId = 'antenna'): st
   return out;
 }
 
-/** Loads an already-enciphered packet stream onto an antenna tile, where `receive()` finds it. */
 export function loadAntenna(world: World, at: Vec, packets: readonly string[]): void {
   const tile = tileAt(world, at);
   if (!tile) throw new Error(`loadAntenna: ${key(at)} is out of bounds`);
   tile.meta = { ...(tile.meta ?? {}), rx: packets.join('\n'), rxNext: 0 };
 }
 
-// ---------------------------------------------------------------------------
-// Piloting: the map a reference solution is allowed to have
-// ---------------------------------------------------------------------------
-
-/**
- * Everything the fleet has actually looked at, and nothing else.
- *
- * A reference solution that pathed over `sim.world` would be solving a different puzzle from the
- * player's, so this is the only map the World 8 solutions get. It is fed exclusively by `scan` and
- * `look`, both of which are free, and unknown tiles are treated as impassable until seen.
- */
 export class KnownMap {
   readonly w: number;
   readonly h: number;
@@ -367,7 +303,6 @@ export class KnownMap {
     this.seen.set(this.index(view.at), view);
   }
 
-  /** Free. Records the bot's own tile plus four rays, each stopping at the first opaque tile. */
   observe(sim: Sim, botId: number, range = 64): void {
     this.record(sim.scan(botId));
     for (const dir of ALL_DIRS) {
@@ -379,7 +314,6 @@ export class KnownMap {
     return this.view(at)?.walkable === true;
   }
 
-  /** A known-walkable tile with at least one unknown in-bounds neighbour: somewhere to go next. */
   isFrontier(at: Vec): boolean {
     if (!this.passable(at)) return false;
     for (const dir of ALL_DIRS) {
@@ -393,12 +327,10 @@ export class KnownMap {
     return pathOn(this, (at) => this.passable(at), from, to);
   }
 
-  /** Route to the nearest frontier tile, or null when the known region has no unseen edge left. */
   pathToFrontier(from: Vec): Dir[] | null {
     return this.pathToNearest(from, (at) => this.isFrontier(at));
   }
 
-  /** Breadth-first route to the closest known tile satisfying `wanted`. */
   pathToNearest(from: Vec, wanted: (at: Vec) => boolean): Dir[] | null {
     if (wanted(from)) return [];
     const cameFrom = new Map<number, number>();
@@ -425,7 +357,6 @@ export class KnownMap {
     return this.pathTo(from, goal);
   }
 
-  /** Every tile seen so far that matches `pred`, in observation order. */
   where(pred: (view: TileView) => boolean): TileView[] {
     const out: TileView[] = [];
     for (const view of this.seen.values()) if (pred(view)) out.push(view);
@@ -438,19 +369,10 @@ export class KnownMap {
 }
 
 export interface FollowOptions {
-  /** Ticks to spend waiting on a tile another bot is holding before re-planning. */
   patience?: number;
-  /** Called after every successful step, so a caller can keep looking as it walks. */
   onStep?: (at: Vec) => void;
 }
 
-/**
- * Walks `botId` to `to` over the known map, yielding rather than colliding.
- *
- * `canMove` is free and truthful, so the bot never issues a move it knows will fail — which is
- * both cheaper (a blocked move still costs a tick) and what the fleet levels' "no blocked moves"
- * bonus asks for. Returns false when the target is unreachable through known ground.
- */
 export function follow(
   sim: Sim,
   botId: number,
@@ -490,7 +412,6 @@ export function follow(
   return true;
 }
 
-/** Follows a route the caller already computed. Same yielding discipline as `follow`. */
 export function followPath(sim: Sim, botId: number, path: readonly Dir[], patience = 4): boolean {
   for (const dir of path) {
     let stalls = 0;
@@ -503,11 +424,6 @@ export function followPath(sim: Sim, botId: number, path: readonly Dir[], patien
   return true;
 }
 
-// ---------------------------------------------------------------------------
-// Adjudication: reading the trace
-// ---------------------------------------------------------------------------
-
-/** The bot whose own clock ran longest: on a fleet level it is the one that set the end tick. */
 export function lastBotStanding(ctx: ObjectiveContext): Bot | undefined {
   return ctx.world.bots.reduce<Bot | undefined>(
     (slowest, bot) => (slowest === undefined || bot.clock > slowest.clock ? bot : slowest),
@@ -515,13 +431,6 @@ export function lastBotStanding(ctx: ObjectiveContext): Bot | undefined {
   );
 }
 
-/**
- * A tick budget that was missed, pinned to the bot that was still going when it ran out.
- *
- * The clock stops when the last bot stops, so a fleet's end tick is one bot's number and the
- * other bots' idle time. Naming it turns "the shift overran" into "this lane overran", which is
- * the difference between rewriting the schedule and rewriting one route.
- */
 export function overranBy(ctx: ObjectiveContext, limit: number): Divergence {
   const last = lastBotStanding(ctx);
   return {
@@ -533,13 +442,11 @@ export function overranBy(ctx: ObjectiveContext, limit: number): Divergence {
 
 export interface UseRecord {
   t: number;
-  /** The tick the operation *finished*, which is what precedence rules compare against. */
   done: number;
   botId: number;
   machineId: string;
 }
 
-/** Every successful `use`, in trace order. */
 export function useLog(ctx: ObjectiveContext): UseRecord[] {
   const out: UseRecord[] = [];
   for (const event of ctx.trace.events) {
@@ -585,7 +492,6 @@ export function pickupLog(ctx: ObjectiveContext): TransferRecord[] {
   return transfers(ctx, 'pickup');
 }
 
-/** Distinct tiles any bot stood on, start positions included. */
 export function tilesEntered(ctx: ObjectiveContext): Set<string> {
   const seen = new Set<string>();
   for (const bot of ctx.initialWorld.bots) seen.add(key(bot.at));
@@ -595,7 +501,6 @@ export function tilesEntered(ctx: ObjectiveContext): Set<string> {
   return seen;
 }
 
-/** Total moves issued, blocked ones included — the honest measure of walking done. */
 export function moveCount(ctx: ObjectiveContext): number {
   return ctx.trace.events.filter((event) => event.kind === 'move').length;
 }
@@ -620,13 +525,6 @@ function lineOfSight(world: World, from: Vec, range: number): Sighting[] {
   return out;
 }
 
-/**
- * The earliest tick by which every tile in `targets` had been in some bot's line of sight.
- *
- * Reconstructed from the movement trace against the *initial* terrain, so it is the earliest
- * moment the fleet's path could possibly have revealed them — which is the fairest reading when
- * the sensing calls themselves leave no trace. `Infinity` when one was never in view.
- */
 export function sightingTick(ctx: ObjectiveContext, targets: readonly Vec[], range = 64): number {
   const wanted = new Set(targets.map(key));
   if (wanted.size === 0) return 0;
@@ -649,17 +547,12 @@ export function sightingTick(ctx: ObjectiveContext, targets: readonly Vec[], ran
   return wanted.size === 0 ? latest : Number.POSITIVE_INFINITY;
 }
 
-// ---------------------------------------------------------------------------
-// Adjudication: machines and stock
-// ---------------------------------------------------------------------------
-
 export function machinesWithPrefix(world: World, prefix: string): Machine[] {
   return world.machines
     .filter((machine) => machine.id.startsWith(prefix))
     .sort((a, b) => a.id.localeCompare(b.id, 'en'));
 }
 
-/** Reads a `node` machine's published dependency list back out of `vars`. */
 export function dependenciesOf(machine: Machine): string[] {
   const count = machine.vars['deps'] ?? 0;
   const out: string[] = [];
@@ -670,7 +563,6 @@ export function dependenciesOf(machine: Machine): string[] {
   return out;
 }
 
-/** Longest chain of dependencies, measured in stations. 1 for a graph with no edges. */
 export function criticalChain(world: World, prefix = 'sub-'): number {
   const stations = machinesWithPrefix(world, prefix);
   const depth = new Map<string, number>();
@@ -701,7 +593,6 @@ export function itemsOnTile(world: World, at: Vec, kind?: ItemKind): number {
   );
 }
 
-/** Every loose stack in the world, by kind. Used for "the crates that were here at start". */
 export function groundCensus(world: World, kinds: readonly ItemKind[]): Map<ItemKind, number> {
   const census = new Map<ItemKind, number>();
   for (const kind of kinds) census.set(kind, 0);

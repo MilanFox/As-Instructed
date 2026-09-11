@@ -1,10 +1,3 @@
-/**
- * The Site Map — the assignment board of Kessler & Daughters Terraforming Ltd.
- *
- * Eight worlds, strung along a route. CONTENT owns the level list and a world does not have to
- * hold five: six work orders were withdrawn and the survivors kept their ids, so the number on a
- * disc is the order's position on the board rather than anything read out of its id.
- */
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, JSX, KeyboardEvent } from 'react';
 import { emptyProgress } from '../../game/save.ts';
@@ -30,7 +23,6 @@ type WorkOrderStatus = 'CLOSED' | 'OPEN' | 'ON HOLD';
 interface WorkOrderNode {
   id: string;
   world: number;
-  /** Position on the board, 1-based. Not `LevelDef.index`, which skips a withdrawn order. */
   index: number;
   level: LevelDef;
   progress: LevelProgress;
@@ -46,25 +38,17 @@ interface WorldRow {
   closed: number;
   points: number;
   maxPoints: number;
-  /** At par or under: gold, or closed where the level carries no ladder (DESIGN.md §7). */
   gold: number;
-  /** Every issued work order in this world is closed. The sector is done. */
   complete: boolean;
-  /** Every issued work order in this world is at par or under. */
   perfect: boolean;
 }
 
 interface Tally {
   points: number;
   maxPoints: number;
-  /**
-   * Medals held, and nothing else. An ungraded work order genuinely has no medal, so it belongs in
-   * none of these three columns however it was closed (DESIGN.md §7).
-   */
   gold: number;
   silver: number;
   bronze: number;
-  /** Work orders closed at par or under, which an ungraded close is by definition. */
   atPar: number;
   stars: number;
   issued: number;
@@ -75,17 +59,10 @@ function progressOf(save: SaveFile, levelId: string): LevelProgress {
   return save.levels[levelId] ?? emptyProgress();
 }
 
-/** DESIGN.md §7: gold at par, silver inside `SILVER_FACTOR`, bronze for finishing at all. */
 const MEDAL_KEY = [
   { medal: 'gold', rule: 'at par or under' },
   { medal: 'silver', rule: 'up to a quarter over par' },
   { medal: 'bronze', rule: 'a pass' },
-  /*
-   * The fourth mark, and the only one that is not a rung. The first two work orders on the site
-   * are ungraded (DESIGN.md §7), so a first-time player's opening hour draws `✓` on the board
-   * and leaves gold, silver and bronze reading zero — and a key that stopped at bronze explained
-   * three of the four marks in front of them and none of the three zeros.
-   */
   { medal: 'closed', rule: 'not graded' },
 ] as const;
 
@@ -125,8 +102,6 @@ export function buildRows(save: SaveFile): WorldRow[] {
       0,
     );
 
-    // A world holding an ungraded level could otherwise never be `perfect`, and `ALL AT PAR` would
-    // be unattainable in worlds 1, 5 and 6 — a close there is worth a gold (DESIGN.md §7).
     const gold = levels.filter((level) => {
       const progress = progressOf(save, level.id);
       return isGraded(level) ? progress.medal === Medal.Gold : progress.completed;
@@ -183,8 +158,6 @@ export function nodeLabel(node: WorkOrderNode): string {
   const stars = starsFor(node.level.bonus, node.progress.stars);
   const bonus = stars === 1 ? '1 bonus star.' : `${stars} bonus stars.`;
   const state = node.progress.completed ? 'Closed' : 'Open';
-  // `no medal` on a closed ungraded order announces finished work as unfinished, in the identical
-  // words an untouched graded order gets. An absent medal is not a missing one (DESIGN.md §7).
   const medal = medalOf(node.level, node.progress);
   const grade = medal === null ? 'Not graded' : medalWord(medal);
   return `Work order ${name}. ${state}. ${grade}. ${bonus}`;
@@ -229,7 +202,6 @@ export function LevelSelect(): JSX.Element {
     else buttons.current.delete(id);
   }, []);
 
-  /** Where each node sits on the board. Rows are no longer all the same length. */
   const seat = useMemo(() => {
     const map = new Map<string, { row: number; column: number; flat: number }>();
     let cursor = 0;
@@ -321,13 +293,6 @@ export function LevelSelect(): JSX.Element {
           </div>
         </dl>
 
-        {/*
-          The key to the discs.
-          Every medal in the game is drawn as a ring on a node and named nowhere, so the three
-          words the whole scoring ladder runs on were on the screen forty times over and defined
-          zero times. The samples are real nodes with the real modifier classes, so whichever art
-          direction is loaded, the key is drawn in the same marks the board is.
-        */}
         <ul className="medal-key" aria-label="Medal key">
           {MEDAL_KEY.map((entry) => (
             <li className="medal-key__row" key={entry.medal}>
@@ -362,17 +327,6 @@ export function LevelSelect(): JSX.Element {
           <div className="sitemap__worlds">
             {rows.map((row) => {
               const fill = row.issued > 0 ? (row.closed / row.issued) * 100 : 0;
-              /*
-               * The world's colour comes from the art direction, not from the level definition.
-               *
-               * `WORLDS` carries eight literal accents, three of which are not in the palette at
-               * all and two of which *are* reserved semantic tokens — World 7 is `--danger` and
-               * World 8 is `--gold`, so on `w8-05` the world's colour and the medal being chased
-               * are the same colour. Eight decorative hues on top of a six-colour semantic palette
-               * is how a palette stops meaning anything (AUDIT-UI F1). Indirecting through
-               * `--world-N` leaves the level data untouched and hands the decision to whichever
-               * direction is loaded.
-               */
               const style: StyleVars = {
                 '--world-accent': `var(--world-${row.world.id})`,
                 '--rail-fill': `${fill}%`,
@@ -464,15 +418,6 @@ export function LevelSelect(): JSX.Element {
                           <span
                             className={`node__status status--${node.status.replace(' ', '-').toLowerCase()}`}
                           >
-                            {/*
-                              The grade in a glyph, beside the word. Colour was the sole channel
-                              across 33 discs at 44px (AUDIT-UI F1), and a legend does not help you
-                              tell two warm rings apart. `MedalBadge` prints `I / II / III / ✓`,
-                              which survives greyscale and survives Signal. `✓` is the ungraded
-                              close — the mark of finished work, not a fourth medal (DESIGN.md §7).
-                              The button above already announces the grade, so this is for the
-                              eye only.
-                            */}
                             {node.progress.completed ? (
                               <span className="node__medal" aria-hidden="true">
                                 <MedalBadge medal={medalOf(node.level, node.progress)} />

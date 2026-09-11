@@ -82,7 +82,6 @@ function parse(source: string): Block[] {
   return blocks;
 }
 
-/** Links render as their label only: nothing in this game navigates away. */
 function inline(text: string, key: string): React.ReactNode[] {
   const pattern = /`([^`]+)`|\*\*([\s\S]+?)\*\*|\*([^*\n]+)\*|_([^_\n]+)_|\[([^\]]*)\]\([^\s)]*\)/g;
   const out: React.ReactNode[] = [];
@@ -106,13 +105,6 @@ function inline(text: string, key: string): React.ReactNode[] {
   return out;
 }
 
-/**
- * A trailing double space or backslash forces a break; every other newline is a soft wrap.
- *
- * Soft-wrapped lines are joined before the inline pass, because a `**bold**` span that opens on
- * one source line and closes on the next is still one span, and parsing line by line would print
- * the asterisks.
- */
 function flow(lines: string[], key: string): React.ReactNode[] {
   const out: React.ReactNode[] = [];
   let buffer: string[] = [];
@@ -183,7 +175,6 @@ function block(item: Block, key: string): React.ReactNode {
   }
 }
 
-/** The same inline pass without a block wrapper, for table cells and other one-line slots. */
 export function InlineMarkdown({ source }: { source: string }): React.JSX.Element {
   const parts = useMemo(() => inline(source, 'i'), [source]);
   return <>{parts}</>;

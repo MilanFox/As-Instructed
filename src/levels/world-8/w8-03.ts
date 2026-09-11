@@ -26,15 +26,8 @@ const WIDTH = 32;
 const HEIGHT = 24;
 const USE_COST = 2;
 
-/**
- * Reading the desk and then every station once costs at most 21 probes on the widest seed, so
- * the star is there for anyone who plans from that one read rather than polling the grid for
- * state they already hold. It is deliberately not a gate: the second axis on this level is a
- * consolation, not a fifth way to fail a 9/10.
- */
 const SURVEY_BUDGET = 26;
 
-/** Where the crew parks. The desk sits in the middle of it and every bot starts within a tile. */
 const DESK = vec(2, 12);
 const CREW: readonly Vec[] = [
   vec(1, 11),
@@ -50,24 +43,9 @@ const CREW: readonly Vec[] = [
 interface Layout {
   stations: number;
   bots: number;
-  /** Number of layers in the DAG. 1 is a fan with no edges at all; `stations` is a single chain. */
   layers: number;
 }
 
-/**
- * Seed 2 is the single chain, where the fleet buys pre-positioning and nothing else. Seed 3 is the
- * flattest grid — three bands of six across six bots — where almost everything is ready at once.
- * The rest sit between them, and the station-to-bot ratio moves as well, so the correct schedule
- * is a function of both.
- *
- * Seed 3 was `layers: 1`, a fan with no edges at all, and that was two defects wearing one number.
- * `precedence-held` is *vacuously true* on a grid with no edges, so the seed did not exercise the
- * objective the level is about; and `deadlineFor` is a function of the chain, so the seed with no
- * chain got the tightest shift in the set — 98 ticks, under the silver cut of a flat par. The
- * level graded hardest on the one layout that had removed its own idea. Three bands keeps the
- * anti-hardcode axis (a program that assumes a chain still breaks here)
- * and gives the objective something to hold.
- */
 const LAYOUTS: Record<number, Layout> = {
   1: { stations: 14, bots: 4, layers: 4 },
   2: { stations: 14, bots: 4, layers: 14 },
@@ -84,26 +62,12 @@ function layoutFor(seed: number): Layout {
   return { stations, bots: rng.int(4, 8), layers: rng.int(2, 6) };
 }
 
-/** Splits `total` stations across `layers` bands, front-loaded so the top of the grid is wide. */
 function bandSizes(total: number, layers: number): number[] {
   const sizes = new Array<number>(layers).fill(1);
   for (let i = layers; i < total; i++) sizes[i % layers] = (sizes[i % layers] as number) + 1;
   return sizes;
 }
 
-/**
- * Hands the station ids out in an order the bands do not follow.
- *
- * A station's feeders are only ever drawn from the band above it, and the bands take consecutive
- * blocks of indices, so left alone `sub-0, sub-1, … sub-n` was a legal energisation order on every
- * seed: a level about a partial order accepted a run that never read `vars.deps`. The names are
- * dealt again until ascending id order breaks somewhere.
- *
- * Only the names move. A site keeps the band it was dealt into, so the tiles, the cable, the
- * critical chain and therefore `deadlineFor` are all the board the draw already made — what
- * re-measures is the reference's tie-breaking, which prefers the lower id when two stations are
- * ready at the same tick. `w5-03` closed the identical hole the same way.
- */
 function relabel(seed: number, feedersOf: readonly (readonly number[])[]): number[] {
   const identity = Array.from({ length: feedersOf.length }, (_, i) => i);
   const ascendingWorks = (label: readonly number[]): boolean =>
@@ -118,7 +82,6 @@ function relabel(seed: number, feedersOf: readonly (readonly number[])[]): numbe
   return identity;
 }
 
-/** Scattered station tiles, kept apart so the fleet is not queueing on one square of the plain. */
 function stationSites(seed: number, count: number): Vec[] {
   const rng = localRng(seed);
   const candidates: Vec[] = [];
@@ -141,10 +104,6 @@ function stationsOf(world: World): Machine[] {
   return machinesWithPrefix(world, 'sub-');
 }
 
-/**
- * Mean walking distance between two station tiles, rounded up. The plain is open, so Manhattan is
- * the true cost of a hop, and this is the honest price of "and then go to the next one".
- */
 function meanHop(world: World): number {
   const sites = stationsOf(world).map((machine) => machine.at);
   if (sites.length < 2) return 0;
@@ -159,42 +118,18 @@ function meanHop(world: World): number {
   return Math.ceil(total / pairs);
 }
 
-/** Stations the busiest bot has to own if the work is shared out evenly. */
 function lanes(world: World): number {
   const crew = world.bots.filter((bot) => bot.alive).length;
   return crew === 0 ? stationsOf(world).length : Math.ceil(stationsOf(world).length / crew);
 }
 
-/**
- * The shift.
- *
- * Two things have to happen and neither can be compressed away: the longest chain of feeders has
- * to run end to end, and the busiest bot has to walk its own round. Each is charged at a hop plus
- * an energising, and one hop is added for getting out of the yard. A grid with no edges therefore
- * gets a short shift and a grid that is one long chain gets a long one.
- */
 function deadlineFor(world: World): number {
   const hop = meanHop(world);
   return (criticalChain(world) + lanes(world)) * (USE_COST + hop) + hop;
 }
 
-/**
- * The shift and the medal ladder are the same axis, so the shift has to sit above the ladder.
- *
- * Par is flat and `deadlineFor` is not, and for one seed the two disagreed: par 128 called a run
- * gold up to 128 on a layout that failed it outright at 99. A ladder that promises a rung inside a
- * band the verdict has already refused is not a ladder. `w8-03 grades and fails on one axis` in
- * `src/levels/world-8/__tests__/divergence.test.ts` holds this on every seed, and it is what any
- * future change to `deadlineFor`, to a `LAYOUTS` row or to par has to keep true.
- *
- * Re-measured after `relabel`, which moves the reference's tie-breaks and nothing else: list
- * scheduling now costs 63 / 84 / 48 / 51 / 71 against 63 / 84 / 55 / 57 / 71 before it. The medal
- * is taken from the worst seed, that seed is unmoved at 84, and the silver cut of 105 still sits
- * under the shortest shift in the table (138), so the figure stands where it was.
- */
 const PAR_TICKS = 84;
 
-/** The first station the audit will not sign off, and why. */
 function darkStation(ctx: ObjectiveContext): { id: string; at: Vec; reason: string } | undefined {
   const switched = usedMachines(ctx);
   for (const machine of stationsOf(ctx.world)) {
@@ -222,13 +157,6 @@ function allEnergised(ctx: ObjectiveContext): number {
   ).length;
 }
 
-/**
- * Precedence, read out of the log.
- *
- * A station's start is the first tick anyone energised it; a feeder's finish is the last tick any
- * energising of it was still running. A start at exactly the feeder's finish is legal, which is
- * what makes ties unambiguous rather than a matter of taste.
- */
 interface Breach {
   station: string;
   feeder: string;
@@ -263,7 +191,6 @@ function breachesIn(ctx: ObjectiveContext): Breach[] {
   return breaches;
 }
 
-/** The earliest one, because a restart that went out of order went out of order once first. */
 function firstBreach(ctx: ObjectiveContext): Breach | undefined {
   return breachesIn(ctx).reduce<Breach | undefined>(
     (earliest, breach) =>
@@ -272,13 +199,6 @@ function firstBreach(ctx: ObjectiveContext): Breach | undefined {
   );
 }
 
-/**
- * An open plain with a dependency graph painted onto it in cable.
- *
- * The map is deliberately featureless: there is no route to work out, no wall to go around and
- * almost nothing for two bots to argue over. Everything that is hard here is in the order the
- * stations may be touched and in who is standing where when they may be touched.
- */
 export const w8_03: LevelDef = {
   id: 'w8-03',
   world: 8,
@@ -296,22 +216,6 @@ export const w8_03: LevelDef = {
     '',
     'Energise every substation before the shift ends.',
   ].join('\n'),
-  /**
-   * DESIGN.md §11.10.
-   *
-   * One line here is load-bearing beyond the rest: the station numbers are not an energising
-   * order. `relabel` deals the names again until ascending id order breaks somewhere, on every
-   * seed, which is the difference between a level about a partial order and a level that accepts
-   * counting to n. A player who reads `sub-0 … sub-n` off a board where it happens to work has
-   * been misled by the board rather than caught being lazy, and §11.4 only licences the second.
-   * Stating that ascending order is never legal states the constraint and not the schedule: the
-   * feeder lists are still the thing that has to be read, and the order still has to be built.
-   *
-   * The shape of the grid is the redrawn axis — one draw is a single chain of fourteen, another
-   * is three wide bands — and the shift Finance allocates is a function of it, which is why the
-   * desk posts the two figures in one read rather than leaving a run to discover the deadline by
-   * overrunning it.
-   */
   board: {
     fixed: [
       'the plain is 30 by 22 inside its wall and open; the cable on the ground is walkable',
@@ -428,10 +332,6 @@ export const w8_03: LevelDef = {
       addBot(world, { at: CREW[i] as Vec, facing: Dir.East, name: `RIG-8${String(30 + i)}` });
     }
 
-    /* Posted after the fleet is on the pad because the shift is a function of it: `deadlineFor`
-       divides the stations across the crew. A budget the player can only learn by overrunning it
-       is the trap `MANUAL_ONLY` is written to avoid, so it rides in `vars` where `probe` publishes
-       it, next to the station count that is read in the same call. */
     addMachine(world, {
       id: 'desk',
       kind: MachineKind.Router,
@@ -465,9 +365,6 @@ export const w8_03: LevelDef = {
       'Start no station before every feeder it hangs off has finished',
       (ctx) => breachesIn(ctx).length === 0,
       {
-        /* Divergence says which feeder was jumped; this says how much of the grid came up in
-           order anyway, so a schedule that is one edge wrong does not read like one that is
-           entirely wrong. */
         progress: (ctx) => {
           const total = stationsOf(ctx.initialWorld).length;
           const early = new Set(breachesIn(ctx).map((breach) => breach.station));

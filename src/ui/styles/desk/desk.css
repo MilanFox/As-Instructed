@@ -1,62 +1,54 @@
-/* desk.css — ported from docs/prototypes/desk/desk.css:
-   the :root custom-property block, the * / html,body resets, THE ROOM,
-   STAGE and MOTION. This is the shared file everyone reads. */
-
 .desk {
-  --u: 1px;    /* set by desk.js: the whole layout scales on it */
-  --ts: 1;     /* SIZE: the character-size knob on the terminal bezel.
-                  It scales type and line boxes, not the station geometry —
-                  the station is already fitted to the viewport, and scaling
-                  it up would only crop the desk. */
+  --u: 1px;
+  --ts: 1;
 
-  --room:      #05070a;
-  --desk:      #23261f;
-  --desk-lit:  #3a3e32;
+  --room: #05070a;
+  --desk: #23261f;
+  --desk-lit: #3a3e32;
   --desk-dark: #14160f;
 
-  --case:      #9d9a90;
-  --case-lit:  #c6c3b7;
+  --case: #9d9a90;
+  --case-lit: #c6c3b7;
   --case-dark: #6e6b62;
   --case-deep: #45433d;
-  --legend:    #3f3e39;
-  --legend-lit:#efece1;
+  --legend: #3f3e39;
+  --legend-lit: #efece1;
 
-  --scr:       #070a0c;
+  --scr: #070a0c;
   --scr-panel: #0d1216;
-  --ink:       #d2dde8;
-  --ink-dim:   #97a5b3;
-  --accent:    #35e0c8;
-  --amber:     #ffb020;
-  --danger:    #ff6a5d;
-  --ok:        #7ee06a;
+  --ink: #d2dde8;
+  --ink-dim: #97a5b3;
+  --accent: #35e0c8;
+  --amber: #ffb020;
+  --danger: #ff6a5d;
+  --ok: #7ee06a;
 
-  --paper:     #e9e3d3;
-  --paper-lo:  #d8d1be;
-  --paper-2:   #ded7c4;
-  --pink:      #ecd9d2;   /* the pink copy: notices and halts */
-  --p-ink:     #1b1d1e;
-  --p-dim:     #63615a;
-  --p-rule:    #b8b1a0;
+  --paper: #e9e3d3;
+  --paper-lo: #d8d1be;
+  --paper-2: #ded7c4;
+  --pink: #ecd9d2;
+  --p-ink: #1b1d1e;
+  --p-dim: #63615a;
+  --p-rule: #b8b1a0;
 
-  --ink-red:   #933024;
-  --ink-blue:  #26365e;
-  --i-gold:    #9a7420;
-  --i-silver:  #6d7783;
-  --i-bronze:  #86562f;
+  --ink-red: #933024;
+  --ink-blue: #26365e;
+  --i-gold: #9a7420;
+  --i-silver: #6d7783;
+  --i-bronze: #86562f;
 
   --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   --prose: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
 
-  /* docs/DESIGN.md §8 — one lamp, due north-west, and the desk obeys it too */
-  --key:    219 232 240;   /* #dbe8f0 */
-  --ink-sh:   4   9  15;   /* #04090f */
-  --arris-n: inset 0 calc(2 * var(--u)) 0 rgb(var(--key) / .46);
-  --arris-w: inset calc(2 * var(--u)) 0 0 rgb(var(--key) / .30);
-  --arris-e: inset calc(-2 * var(--u)) 0 0 rgb(0 0 0 / .32);
-  --arris-s: inset 0 calc(-3 * var(--u)) 0 rgb(0 0 0 / .38);
+  --key: 219 232 240;
+  --ink-sh: 4 9 15;
+  --arris-n: inset 0 calc(2 * var(--u)) 0 rgb(var(--key) / 0.46);
+  --arris-w: inset calc(2 * var(--u)) 0 0 rgb(var(--key) / 0.3);
+  --arris-e: inset calc(-2 * var(--u)) 0 0 rgb(0 0 0 / 0.32);
+  --arris-s: inset 0 calc(-3 * var(--u)) 0 rgb(0 0 0 / 0.38);
 
-  --settle: cubic-bezier(.16,.86,.28,1.02);
-  --drop:   cubic-bezier(.28,.9,.34,1);
+  --settle: cubic-bezier(0.16, 0.86, 0.28, 1.02);
+  --drop: cubic-bezier(0.28, 0.9, 0.34, 1);
 
   position: fixed;
   inset: 0;
@@ -67,89 +59,145 @@
   -webkit-font-smoothing: antialiased;
 }
 
-/* The reset stops at `.routines`, which hosts `src/meta/ui/library.css` — a
-   surface with its own spacing scale that predates the desk. `.desk *` is
-   (0,1,1) and every rule in that file is (0,1,0), so an unscoped reset
-   silently flattens the panel's whole layout. The exclusion is wrapped in
-   `:where()` so it contributes no specificity and every other rule on the
-   desk keeps the weight it was tuned against. */
-.desk, .desk *:not(:where(.routines, .routines *)) { box-sizing: border-box; margin: 0; padding: 0; }
-.desk .routines, .desk .routines * { box-sizing: border-box; }
+.desk,
+.desk *:not(:where(.routines, .routines *)) {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+.desk .routines,
+.desk .routines * {
+  box-sizing: border-box;
+}
 
-/* ============================== THE ROOM ========================== */
-
-.desk .room { position: fixed; inset: 0; z-index: 0; }
+.desk .room {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
 
 .desk .wall {
-  position: absolute; inset: 0 0 56% 0;
-  background:
-    linear-gradient(#151a20 0%, #0e1319 46%, #080b0f 100%);
+  position: absolute;
+  inset: 0 0 56% 0;
+  background: linear-gradient(#151a20 0%, #0e1319 46%, #080b0f 100%);
 }
-/* a shelf rail on the back wall. institutional, empty, correct. */
 .desk .wall-rail {
-  position: absolute; left: 0; right: 0; top: 27%;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 27%;
   height: calc(10 * var(--u));
   background: linear-gradient(#3c3b36, #24231f 40%, #131210);
-  box-shadow: calc(3 * var(--u)) calc(3 * var(--u)) calc(2 * var(--u)) rgb(var(--ink-sh) / .32);
-  opacity: .8;
+  box-shadow: calc(3 * var(--u)) calc(3 * var(--u)) calc(2 * var(--u)) rgb(var(--ink-sh) / 0.32);
+  opacity: 0.8;
 }
 
-.desk .desk-surface { position: absolute; inset: 42% 0 0 0; }
+.desk .desk-surface {
+  position: absolute;
+  inset: 42% 0 0 0;
+}
 .desk .desk-top {
-  position: absolute; inset: 0;
+  position: absolute;
+  inset: 0;
   background:
-    /* the lamp's own falloff, baked into the surface */
-    linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.14) 58%, rgba(0,0,0,.44) 100%),
-    radial-gradient(120% 132% at 50% -6%, #45443e 0%, #3a3934 26%, #2e2d29 54%, #232220 80%, #171614 100%);
+    linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.14) 58%, rgba(0, 0, 0, 0.44) 100%),
+    radial-gradient(
+      120% 132% at 50% -6%,
+      #45443e 0%,
+      #3a3934 26%,
+      #2e2d29 54%,
+      #232220 80%,
+      #171614 100%
+    );
 }
 .desk .desk-top::after {
-  /* linoleum tooth. one texture, deterministic, never noisy. */
-  content: ''; position: absolute; inset: 0; opacity: .5;
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.5;
   background-image:
-    repeating-linear-gradient(0deg, rgba(255,255,255,.018) 0 1px, transparent 1px 3px),
-    repeating-linear-gradient(90deg, rgba(0,0,0,.05) 0 1px, transparent 1px 4px);
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.05) 0 1px, transparent 1px 4px);
 }
 .desk .desk-edge {
-  position: absolute; left: 0; right: 0; top: 0; height: calc(5 * var(--u));
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: calc(5 * var(--u));
   background: linear-gradient(#63615a, #38362f 55%, #1c1b17);
 }
 
 .desk .lamp {
-  position: absolute; inset: 0; pointer-events: none;
-  background: radial-gradient(58% 52% at 50% 62%,
-      rgba(255,218,166,.22) 0%, rgba(255,208,152,.10) 44%, transparent 76%);
-  transition: opacity .5s ease;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    58% 52% at 50% 62%,
+    rgba(255, 218, 166, 0.22) 0%,
+    rgba(255, 208, 152, 0.1) 44%,
+    transparent 76%
+  );
+  transition: opacity 0.5s ease;
 }
 .desk .spill {
-  /* light thrown back onto the desk by the site feed while it is live */
-  position: absolute; left: 50%; top: 30%; width: 78%; height: 62%;
+  position: absolute;
+  left: 50%;
+  top: 30%;
+  width: 78%;
+  height: 62%;
   transform: translateX(-50%);
-  pointer-events: none; opacity: 0;
-  background: radial-gradient(50% 50% at 62% 20%,
-      rgba(120,210,200,.10) 0%, rgba(90,180,180,.04) 45%, transparent 72%);
-  transition: opacity .55s ease;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    50% 50% at 62% 20%,
+    rgba(120, 210, 200, 0.1) 0%,
+    rgba(90, 180, 180, 0.04) 45%,
+    transparent 72%
+  );
+  transition: opacity 0.55s ease;
 }
-.desk[data-mode='watch'] .spill { opacity: 1; }
-.desk[data-mode='watch'] .lamp { opacity: .78; }
+.desk[data-mode='watch'] .spill {
+  opacity: 1;
+}
+.desk[data-mode='watch'] .lamp {
+  opacity: 0.78;
+}
 
 .desk .vignette {
-  position: absolute; inset: 0; pointer-events: none;
-  background: radial-gradient(84% 80% at 50% 46%, transparent 48%, rgba(0,0,0,.28) 82%, rgba(0,0,0,.58) 100%);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    84% 80% at 50% 46%,
+    transparent 48%,
+    rgba(0, 0, 0, 0.28) 82%,
+    rgba(0, 0, 0, 0.58) 100%
+  );
 }
-.desk.flat .lamp { opacity: 1; }
-.desk.flat .vignette { opacity: .25; }
+.desk.flat .lamp {
+  opacity: 1;
+}
+.desk.flat .vignette {
+  opacity: 0.25;
+}
 
-/* ============================== STAGE ============================= */
-/* Everything is positioned inside a 1560 x 1000 unit stage centred in
-   the viewport. Extra viewport width becomes more desk, which is where
-   the paperwork lives. */
+.desk .station,
+.desk .slot,
+.desk .tray,
+.desk .dispatch,
+.desk .binder,
+.desk .stampblock,
+.desk .pen,
+.desk .mug,
+.desk .keyboard,
+.desk .copystand,
+.desk .paper-layer,
+.desk .binder-open {
+  position: fixed;
+  z-index: 5;
+}
 
-.desk .station, .desk .slot, .desk .tray, .desk .dispatch, .desk .binder, .desk .stampblock, .desk .pen, .desk .mug, .desk .keyboard, .desk .copystand,
-.desk .paper-layer, .desk .binder-open { position: fixed; z-index: 5; }
-
-/* What a desk object leaves behind when it throws (`components/PanelBoundary.tsx`). The desk is
-   the only thing that mounts one, so the rules live here rather than in app.css, where they were
-   the last selector the old panel workspace still reached across the boundary with. */
 .desk .panel-boundary {
   display: flex;
   flex-direction: column;
@@ -162,64 +210,10 @@
   font-size: 12px;
 }
 
-/* ============================== FOCUS ============================= */
-/* The second view. There are two, and the player throws a switch
-   between them.
+.desk[data-focus='program'] .room {
+  display: none;
+}
 
-   The desk is one composition fitted to `DESK_FRAME` and the header of
-   `Desk.tsx` is emphatic that it is not a responsive layout and that
-   moving the furniture is not polish. Nothing here moves any furniture.
-   The player asked for something else — "the 'Focus Mode' can be an
-   entirely different view. Without all the clutter of the desk and
-   stuff. Only Terminal and preview" — so FOCUS takes the furniture
-   *away* and lays the two machines out against the window instead. Throw
-   the switch back and the approved arrangement is exactly where it was,
-   unit for unit, because not one of the rules that place it has been
-   touched.
-
-   It is done in CSS on `.desk[data-focus='program']` rather than by
-   branching the tree in `Desk.tsx`. That file renders every object from
-   a list precisely so there is one place a `PanelBoundary` can be
-   omitted, and `src/ui/__tests__/desk-boundaries.test.ts` fails if an
-   object is missing from the lists at all — a view that rendered a
-   shorter list would have to be a second list to keep in step with the
-   first. Hidden here, every object is still mounted with its boundary
-   and still on the list; the view decides what is on screen, not what
-   exists.
-
-   Three consequences. Two the player accepted, and one they were not
-   asked to accept:
-
-   - The reference, the commendation book, the site plan, the in-tray
-     and the paperwork are unreachable in FOCUS. The way to them is
-     the switch, which is the only reason the bezel plate is
-     load-bearing here.
-   - The DISPATCH key is unreachable, so `ctrl+enter` is the only way to
-     run. It always was the announced way, `always: true` in `keys.ts`,
-     and the terminal's own status strip prints the hint inside the
-     glass, so it survives into this view unchanged.
-   - The stamp block is unreachable, and *that* one is a DESIGN §11
-     problem rather than a convenience: a passing verdict would land on a
-     surface the player cannot see. `Terminal.tsx` states it on the
-     status strip while focused. One sentence, factual, naming the key.
-
-   `~/lib.ts` survives, because it is the player's own code drawn on the
-   terminal's own glass and this is the view for looking at code. It is
-   the one thing on the `DESKWARE` list that is not deskware. */
-
-/* No room. There is no lamp in this view and nothing for it to light —
-   a half-lit desk with no desk on it reads as a rendering bug, so the
-   background is the flat void `.desk` already sits on. The bezels keep
-   their arrises, which are drawn from DESIGN §8's one lamp in `--u` and
-   are the same rule they always were. */
-.desk[data-focus='program'] .room { display: none; }
-
-/* Everything loose on the desk, off screen. Absent, not dimmed and not
-   pushed out of frame: a dimmed control is still a control, and a
-   control the player can see and cannot use is worse than one that is
-   not there. `src/ui/__tests__/desk-frame.test.ts` holds this list
-   against the policy, so a new piece of deskware forces a decision about
-   this view instead of leaking into it. */
 .desk[data-focus='program'] .slot,
 .desk[data-focus='program'] .tray,
 .desk[data-focus='program'] .dispatch,
@@ -232,33 +226,27 @@
 .desk[data-focus='program'] .copystand,
 .desk[data-focus='program'] .pen,
 .desk[data-focus='program'] .keyboard,
-.desk[data-focus='program'] .paper-layer { display: none; }
+.desk[data-focus='program'] .paper-layer {
+  display: none;
+}
 
-/* The station, against the window.
-
-   Two columns: the program takes everything the preview does not, and
-   the preview is a fixed 360u because its transport strip is moulded
-   hardware in `--u` and does not shrink (see `monitor.css`). The padding
-   and the gap are in `--u` so the view breathes the same amount at every
-   viewport, and `--u` itself is untouched — which is the whole point.
-   The terminal's box grows in pixels and the letters in it do not.
-
-   `align-items: stretch` gives the terminal the height; the feed opts
-   out with `align-self: start`, because a preview stretched to a
-   window's height would be a 360u-wide letterbox of empty case. */
 .desk[data-focus='program'] .station {
-  position: fixed; inset: 0; z-index: 5;
-  display: grid; grid-template-columns: minmax(0, 1fr) calc(360 * var(--u));
-  gap: calc(26 * var(--u)); padding: calc(26 * var(--u));
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) calc(360 * var(--u));
+  gap: calc(26 * var(--u));
+  padding: calc(26 * var(--u));
   align-items: stretch;
 }
 
-/* ============================== MOTION ============================ */
-
 @media (prefers-reduced-motion: reduce) {
-  .desk *, .desk *::before, .desk *::after {
-    animation-duration: .001ms !important;
+  .desk *,
+  .desk *::before,
+  .desk *::after {
+    animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: .001ms !important;
+    transition-duration: 0.001ms !important;
   }
 }

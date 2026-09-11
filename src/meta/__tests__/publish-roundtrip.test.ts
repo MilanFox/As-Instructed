@@ -5,24 +5,11 @@ import { LIBRARY_EMPTY_STARTER, PUBLISH, REGRESSION } from '../copy.ts';
 import type { Declaration } from '../publish.ts';
 import { closureOf, planPublication, publishableDeclarations } from '../publish.ts';
 
-/**
- * The corpus. One entry per shape a player can write, and the contract is the same for all of them:
- * publish it, and the Repository holds a file that parses and a subroutine that still does what it
- * did before it moved.
- *
- * The specific defect — an expression-bodied arrow whose body is on the next line, cut to its first
- * line and committed as a syntax error — is one row in this table. It was never a bug about arrows.
- * The extractor decided where a declaration ended by looking for a newline, so every shape that
- * carries an expression across one was cut in the same place. Adding rows is how this stops being
- * true one shape at a time.
- */
-
 const TARGET: ts.CompilerOptions = {
   target: ts.ScriptTarget.ESNext,
   module: ts.ModuleKind.ESNext,
 };
 
-/** Emitted JavaScript, and the syntax errors the compiler found on the way. */
 function compile(source: string): { js: string; errors: string[] } {
   const output = ts.transpileModule(source, {
     compilerOptions: TARGET,
@@ -36,7 +23,6 @@ function compile(source: string): { js: string; errors: string[] } {
   };
 }
 
-/** Runs a work order against a library and returns everything `record()` was handed. */
 function run(programJs: string, libraryJs: string): { log: unknown[]; exports: string[] } {
   const log: unknown[] = [];
   const linked = linkProgram({
@@ -51,9 +37,7 @@ function run(programJs: string, libraryJs: string): { log: unknown[]; exports: s
 
 interface Shape {
   title: string;
-  /** The routine the player would tick. */
   publish: string;
-  /** The whole work order, exactly as it would sit in the editor. */
   source: string;
 }
 
@@ -292,7 +276,6 @@ describe('every declaration shape round-trips through a publish', () => {
       expect(plan.refusals).toEqual([]);
       expect(plan.published).toContain(shape.publish);
 
-      /* The declaration arrived whole: its last line came with its first. */
       const tail = (declaration as Declaration).text.trimEnd().split('\n').pop() as string;
       expect(plan.librarySource).toContain(tail.trim());
       expect(plan.levelSource).toContain(`from 'lib'`);
@@ -482,6 +465,8 @@ describe('the Regression tab is not part of any of this', () => {
     );
     expect(REGRESSION.revert).toBe('RESTORE LAST KNOWN GOOD');
     expect(REGRESSION.accept).toBe('ACCEPT THE NEW RESULT');
-    expect(REGRESSION.footnote).toBe('a degraded state is still a state. the form has a box for it');
+    expect(REGRESSION.footnote).toBe(
+      'a degraded state is still a state. the form has a box for it',
+    );
   });
 });

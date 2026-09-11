@@ -7,20 +7,6 @@ import type { RunRequest, RunResponse } from './protocol.ts';
 import { runSeed, wrapperOffset } from './run-level.ts';
 import type { SeedRun } from './run-level.ts';
 
-/**
- * Turning one `RunRequest` into one `RunResponse`.
- *
- * This is everything the worker does apart from `postMessage`, and it lives here rather than in
- * `sim.worker.ts` so a test can drive the real path — compile, bind, execute, aggregate — without
- * a `Worker` and without `self`. The transport is the one layer worth stubbing; the layer under it
- * is exactly where a missing binding hides.
- */
-
-/**
- * A spec entry with no implementation is a build-time mistake, so it is reported the moment this
- * module loads rather than when some player finally reaches that level. Every run then fails with
- * the same message instead of `undefined is not a function`.
- */
 let bootFailure: string | undefined;
 try {
   assertApiComplete();
@@ -29,7 +15,6 @@ try {
   bootFailure = error instanceof Error ? error.message : String(error);
 }
 
-/** The boot check's complaint, or undefined when the API surface is whole. */
 export function apiBootFailure(): string | undefined {
   return bootFailure;
 }

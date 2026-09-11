@@ -1,10 +1,3 @@
-/**
- * Demo scenes for the renderer harness. Dev-only: nothing here is reachable from `src/main.tsx`.
- *
- * Every scene produces a *real* Trace by driving the real `Sim`, because a renderer verified
- * against a hand-written fake trace is a renderer verified against nothing.
- */
-
 import {
   Dir,
   Sim,
@@ -28,7 +21,6 @@ export interface Scene {
   label: string;
   world: number;
   trace: Trace;
-  /** Cells the objective is about, for `Renderer.setHighlights`. */
   highlights: { x: number; y: number }[];
 }
 
@@ -42,23 +34,25 @@ function finish(world: World, drive: (sim: Sim) => void): Trace {
   return sim.finish();
 }
 
-/** The real tutorial level, run through its real reference solution. */
 export function sceneW101(): Scene {
   const world = w1_01.build(1);
   const trace = finish(world, (sim) => {
     const botId = sim.world.bots[0]?.id ?? 0;
     w1_01_solution.run(sim, botId);
-    // A deliberate wall bump after the solution, so the harness always shows the blocked-move
-    // treatment required by DESIGN.md §8.
     sim.move(botId, Dir.East);
     sim.move(botId, Dir.East);
     sim.move(botId, Dir.North);
     sim.move(botId, Dir.West);
   });
-  return { id: 'w1-01', label: 'w1-01 · reference solution', world: 1, trace, highlights: [vec(5, 2)] };
+  return {
+    id: 'w1-01',
+    label: 'w1-01 · reference solution',
+    world: 1,
+    trace,
+    highlights: [vec(5, 2)],
+  };
 }
 
-/** Every `MachineKind`, each in the state a level most often parks it in. */
 const MACHINE_ROW: readonly (readonly [MachineKind, string])[] = [
   ['door', 'closed'],
   ['lever', 'off'],
@@ -72,7 +66,6 @@ const MACHINE_ROW: readonly (readonly [MachineKind, string])[] = [
   ['router', 'idle'],
 ];
 
-/** Every `ItemKind`. */
 const ITEM_ROW: readonly ItemKind[] = [
   'regolith',
   'stone',
@@ -99,11 +92,6 @@ const SHOWCASE_MAP = [
   '##############',
 ];
 
-/**
- * Everything the renderer can draw, on one grid: growth stages, mining chips, ground items, a
- * machine, a cable run, a fuel depot, three bots on independent clocks, and a bot that spends
- * its whole life bumping into a wall.
- */
 export function sceneShowcase(): Scene {
   const world = createWorld({ w: 14, h: 9, seed: 7, fill: Terrain.Floor });
   paintAscii(world, SHOWCASE_MAP, {
@@ -117,8 +105,6 @@ export function sceneShowcase(): Scene {
     p: Terrain.Pad,
   });
 
-  // Six crops planted at staggered ticks, so the whole maturity ladder is on screen at once and
-  // visibly advances as the playhead moves (ENGINE.md §6.4: growth is derived, not scheduled).
   const plantedAt = [0, 4, 8, 12, 16, 20];
   const cells = [vec(2, 2), vec(3, 2), vec(4, 2), vec(2, 3), vec(3, 3), vec(4, 3)];
   cells.forEach((at, i) => {
@@ -163,7 +149,6 @@ export function sceneShowcase(): Scene {
     const [a, b, c] = sim.world.bots;
     if (!a || !b || !c) return;
 
-    // Bot A: farm the plot, then run into the wall it cannot pass.
     sim.move(a.id, Dir.South);
     sim.move(a.id, Dir.East);
     for (let i = 0; i < 3; i++) sim.move(a.id, Dir.East);
@@ -173,7 +158,6 @@ export function sceneShowcase(): Scene {
     for (let i = 0; i < 4; i++) sim.move(a.id, Dir.East);
     for (let i = 0; i < 3; i++) sim.move(a.id, Dir.North);
 
-    // Bot B: refuel, cross the map, mine the ore vein.
     sim.move(b.id, Dir.North);
     sim.move(b.id, Dir.North);
     sim.move(b.id, Dir.North);
@@ -189,7 +173,6 @@ export function sceneShowcase(): Scene {
     sim.move(b.id, Dir.East);
     sim.mine(b.id, Dir.East);
 
-    // Bot C: collect the ground items, then spend the rest of the run failing to walk East.
     sim.move(c.id, Dir.West);
     sim.pickup(c.id);
     sim.move(c.id, Dir.West);
@@ -202,7 +185,6 @@ export function sceneShowcase(): Scene {
     sim.use(a.id, Dir.East);
     sim.send(a.id, b.id, 'plot cleared');
     sim.send(a.id, 999, 'nobody home');
-    // `sync` emits one event per bot that actually idled, which is what drives the idle tell.
     sim.sync();
     sim.print(a.id, 'showcase complete');
   });
@@ -216,10 +198,6 @@ export function sceneShowcase(): Scene {
   };
 }
 
-/**
- * The performance target from the brief: 30x30, 20 bots, particles active. Each bot walks its own
- * loop, so every bot is on a different clock and the animation state genuinely differs per bot.
- */
 export function sceneStress(): Scene {
   const size = 30;
   const world = createWorld({ w: size, h: size, seed: 3, fill: Terrain.Regolith });
@@ -265,7 +243,6 @@ export function sceneStress(): Scene {
   return { id: 'stress', label: 'stress · 30x30, 20 bots', world: 7, trace, highlights: [] };
 }
 
-/** A biome contact sheet: every terrain, drawn under one world's palette. */
 export function sceneBiome(world: number, label: string): Scene {
   const terrains: Terrain[] = [
     Terrain.Floor,
@@ -297,12 +274,6 @@ export function sceneBiome(world: number, label: string): Scene {
   return { id: `biome-${world}`, label, world, trace, highlights: [] };
 }
 
-/**
- * The legibility case: a 21x21 maze, which in the real viewport panel lands around 13 CSS px per
- * tile. Everything the renderer has to stay readable at that size is on this grid — a pit, ore,
- * a machine, crops, ground items — and the highlights are scattered rather than adjacent, which
- * is what `highlightsAt` actually feeds the renderer during a run.
- */
 export function sceneMaze(): Scene {
   const size = 21;
   const world = createWorld({ w: size, h: size, seed: 11, fill: Terrain.Regolith });
@@ -312,7 +283,6 @@ export function sceneMaze(): Scene {
     setTile(world, vec(0, i), { terrain: Terrain.Wall });
     setTile(world, vec(size - 1, i), { terrain: Terrain.Wall });
   }
-  // A pillared maze: walls on every other cell, with a deterministic stub hanging off each one.
   for (let y = 2; y < size - 1; y += 2) {
     for (let x = 2; x < size - 1; x += 2) {
       setTile(world, vec(x, y), { terrain: Terrain.Wall });
@@ -374,24 +344,10 @@ export function sceneMaze(): Scene {
     label: 'maze21 · 21x21, the small-tile case',
     world: 4,
     trace,
-    // Scattered the way an objective's remaining work is scattered, not a neat block.
     highlights: [vec(1, 11), vec(11, 15), vec(17, 3), vec(9, 5), vec(5, 17)],
   };
 }
 
-/**
- * The identity case: every machine kind, the whole maturity ladder and every item kind at once.
- *
- * This is the grid built to catch three failure modes. Two of
- * them only fail in company — a furnace and a press are each fine on their own board and converge
- * the moment they are side by side, and ripe reads perfectly against bare soil and stops reading
- * against a crop one bucket short of it. So the ten kinds sit in one row and the crops alternate
- * ripe with unripe rather than running the ladder in order.
- *
- * Static on purpose: no `plantedAt`, so `maturity` returns the authored `growth` and the row means
- * the same thing at every tick (`sim.ts:102`). A shot of this scene can be compared against a shot
- * of it taken a month later.
- */
 export function sceneSprites(): Scene {
   const world = createWorld({ w: 13, h: 8, seed: 5, fill: Terrain.Floor });
   for (let x = 0; x < 13; x++) {
@@ -415,8 +371,6 @@ export function sceneSprites(): Scene {
     });
   });
 
-  // Alternating, so every ripe tile has an unripe neighbour on both sides. The unripe values walk
-  // the ladder from bare to one tick short of ready, which is the reading w2-02 is lost on.
   const unripe = [0, 2, 4, 6, 7];
   for (let i = 0; i < 5; i++) {
     setTile(world, vec(1 + i * 2, 3), {
@@ -432,7 +386,6 @@ export function sceneSprites(): Scene {
       maxGrowth: 8,
     });
   }
-  // The ladder in order underneath it, so a reader can name which bucket an alternating tile is in.
   for (let i = 0; i < 6; i++) {
     setTile(world, vec(1 + i, 5), {
       terrain: Terrain.Soil,

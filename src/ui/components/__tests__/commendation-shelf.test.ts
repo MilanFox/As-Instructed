@@ -1,12 +1,3 @@
-/**
- * The shelf, rendered as a value.
- *
- * `CommendationShelf` takes one prop and holds no state, so there is nothing here that needs the
- * hand-cranked React in `src/ui/__tests__/react-driver.ts`: calling it returns an element tree and
- * the tree is the assertion. What is being guarded is the hidden/listed split — a retrospective
- * commendation that leaked onto the shelf before it fired would be a requirement the player is
- * invited to chase, which is the exact thing rule 2 splits the list to avoid.
- */
 import type { ReactElement } from 'react';
 import { describe, expect, it } from 'vitest';
 import { ACHIEVEMENTS } from '../../../game/achievements.ts';
@@ -69,7 +60,6 @@ describe('the commendation shelf', () => {
     expect(texts(tree, 'commend__when numeric')).toHaveLength(ACHIEVEMENTS.length);
   });
 
-  /* An unearned one reads its requirement; an earned one reads its note. Both, side by side. */
   it('swaps the requirement for the note on the ones that fired', () => {
     const one = listed[0] as { id: string; requirement: string; note: string };
     const cold = texts(CommendationShelf({ achievements: {} }), 'commend__note');

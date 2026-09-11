@@ -29,8 +29,6 @@ describe('the voice pool', () => {
     expect(play(engine, 'medalGold', 0.01, 0)).not.toBeNull();
     expect(engine.stats.stolen).toBe(1);
 
-    // Once the pool is full of important sounds, an unimportant one is refused outright rather
-    // than cutting one of them short.
     for (let i = 0; i < MAX_VOICES; i++) play(engine, 'medalGold', 0.01, i);
     const stolen = engine.stats.stolen;
     expect(play(engine, 'move', 0.01, 99)).toBeNull();
@@ -81,7 +79,6 @@ describe('the mixer', () => {
     ctx.advanceTo(0.05);
     engine.applySettings({ ...UNITY, master: 0 });
     const buffer = ctx.render(0.4);
-    // A stepped gain would produce a discontinuity; the ramp reaches zero over 30ms.
     expect(peakBetween(buffer, ctx.sampleRate, 0.09, 0.4)).toBeLessThan(1e-3);
     expect(peakBetween(buffer, ctx.sampleRate, 0.02, 0.05)).toBeGreaterThan(1e-3);
   });

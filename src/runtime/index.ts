@@ -1,18 +1,3 @@
-/**
- * Public surface of the runtime sandbox.
- *
- * `src/ui` imports from here and nothing deeper. The shape of a session is:
- *
- * ```ts
- * configurePlayerLanguage(monaco, { levelId });     // once per level
- * const compiled = await compilePlayerCode(monaco, model);
- * if (!compiled.ok) return showFailure(compiled.error);
- * const response = await runner.run({ code, js: compiled.js, lineMap: compiled.lineMap, levelId, seeds });
- * ```
- *
- * `sim.worker.ts` is not exported: it is loaded by `Runner`, never imported directly.
- */
-
 export type {
   ApiCategory,
   LibraryRequest,

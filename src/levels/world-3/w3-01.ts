@@ -49,15 +49,6 @@ const pads = (world: World): Vec[] => {
 const loadedPads = (ctx: ObjectiveContext): number =>
   pads(ctx.initialWorld).filter((at) => countItemsAt(ctx.world, at, 'crate') > 0).length;
 
-/**
- * How many of this shift's trips can be run without ever changing row.
- *
- * A crate in row `y` can be carried to a pad in row `y` on a straight run east, so the most such
- * trips a shift allows is `min(crates, pads)` summed over the rows — the flat part of the job,
- * fixed by where the yard put things and not by the route anyone drives. Nothing about loading the
- * pads depends on it, which is exactly why it is the star: the run has to read both sidings and
- * match them up rather than just fetch and carry.
- */
 function straightRuns(world: World): number {
   const crates = new Map<number, number>();
   const pads = new Map<number, number>();
@@ -77,42 +68,21 @@ function straightRuns(world: World): number {
 const rowsOf = (tiles: readonly Vec[]): string =>
   [1, 2, 3].map((row) => tiles.filter((tile) => tile.y === row).length).join(',');
 
-/**
- * Whether the shift would let every crate run flat.
- *
- * The two sidings are shuffled independently, so nothing stops them landing on the same row
- * histogram — and when they do, `straightRuns` equals the crate count and the star falls out of
- * `print(\`straight ${crates.length}\`)`. A board that answers the bonus without anyone pairing a
- * row teaches the wrong rule, so `build` redraws the pads until the rows disagree. Six crates
- * fills both sidings and can only ever be 2-2-2, which is why the count stops at five.
- */
 const rowsMatch = (crates: readonly Vec[], pads: readonly Vec[]): boolean =>
   rowsOf(crates) === rowsOf(pads);
 
-/** Every line the run filed about the shift, in the order it filed them. */
 const filed = (ctx: ObjectiveContext): string[] =>
   ctx.trace.events
     .filter((event) => event.kind === 'print')
     .map((event) => (event.kind === 'print' ? event.text : ''))
     .filter((line) => line.startsWith('straight '));
 
-/**
- * The first pad the run left bare. Which rows the pads sit in changes between shifts, so a run
- * that loaded five of six has no way of telling from its own source which one it walked past.
- */
 const barePad = (ctx: ObjectiveContext): Divergence | undefined => {
   const bare = pads(ctx.initialWorld).find((pad) => countItemsAt(ctx.world, pad, 'crate') === 0);
   if (bare === undefined) return undefined;
   return { where: at(bare), expected: 'a crate', received: NOTHING };
 };
 
-/**
- * What the shift report said, against the fact that it is the wrong answer — never the number.
- *
- * Giving the figure back would be the whole bonus, so a wrong line comes back as the run's own
- * line and the word "different". A run that filed nothing is told which line is missing and what
- * it is a line about, because "no star" on its own does not say a report was even wanted.
- */
 const misfiled = (ctx: ObjectiveContext): Divergence | undefined => {
   const lines = filed(ctx);
   const said = lines[0];
@@ -133,11 +103,6 @@ const misfiled = (ctx: ObjectiveContext): Divergence | undefined => {
   return { where: 'the shift report', expected: 'a different figure', received: clipValue(said) };
 };
 
-/**
- * The whole level is one clamp and two sidings. Capacity is 1, so the obvious "load everything,
- * then unload everything" shape burns a tick per crate on a pickup that takes nothing — which is
- * visible in the trace as a run of failed pickups, and is the only thing this level teaches.
- */
 export const w3_01: LevelDef = {
   id: 'w3-01',
   world: 3,
@@ -151,22 +116,6 @@ export const w3_01: LevelDef = {
     '',
     'Every pad on the east side of the shed must end the shift holding a crate.',
   ].join('\n'),
-  /**
-   * DESIGN.md §11.10, and the level the clause was written about.
-   *
-   * "Is it always a three-high corridor?" was asked of this board by a player who had one seed in
-   * front of them. It is — `build` fixes 14x5 on every seed, so the interior is rows 1 to 3
-   * forever — and the answer changes the program: a run that knows it can index the three rows
-   * directly, and a run that surveys for a wall it will never find, are different programs and the
-   * second one is longer for nothing. Meanwhile the rows the crates *sit* in are redrawn, and on
-   * one board the two facts look identical. Both halves are stated because the player cannot get
-   * either from the board alone.
-   *
-   * The row-histogram line earns its place on the sheet: the star grades a number that is smaller
-   * than the crate count on every shipped seed, and the reason is the `rowsMatch` redraw below. A
-   * player who did not know the sidings never agree row-for-row could reasonably read
-   * `straight <n>` as "count the crates" and be right on a board that does not exist.
-   */
   board: {
     fixed: [
       'the shed is 12 wide and 3 deep inside its wall',
@@ -235,34 +184,6 @@ export const w3_01: LevelDef = {
     ),
   ],
   bonus: [
-    /*
-     * The budget this replaced was `endTick <= PAR_TICKS && failedPickups === 0` — par restated,
-     * with a no-error conjunct bolted on. Gold already asks the first half, and the exhaustive
-     * pairing measurement shows the only slack left on this board is the
-     * survey sweep, so no tighter number was available that was not a tax on walking.
-     *
-     * The shift's flat trips are the one fact about the yard nothing else grades. Loading the pads
-     * needs a crate and a pad; counting the straight runs needs both sidings read *by row* and
-     * matched, which is the shape of thinking the level is for.
-     *
-     * The wording is on its third pass, and both earlier ones lost a player to the same word.
-     * "How many trips need no change of row" graded the route. "The most trips this shift could
-     * run without changing row" fixed that and was then read as one unbroken run — the player
-     * filed the largest single row instead of the sum, because "the most X without Y" is a streak
-     * in English whatever the rest of the sentence says. The fact card's "not about the route you
-     * drive" did not overturn it; a frame set by the sentence you read first is not undone by a
-     * denial further down.
-     *
-     * So the graded quantity is now described as a pairing rather than as a run: pair crates to
-     * pads in their own row, one to one, and `n` is the total. A pairing has no streak reading,
-     * "one crate to one pad" is what stops two crates and one pad in a row counting twice, and
-     * "the total across all three rows" is the sum stated outright instead of left to hint 5.
-     *
-     * The word "flat" is gone from every player-facing string. `straight <n>` is already the token
-     * the player types, so "flat" was a second name for the same idea that had to be defined
-     * wherever it appeared — and it appeared on the fact card, in the missing-report divergence and
-     * in hint 5. It survives in this file only as internal vocabulary.
-     */
     Objectives.custom(
       'straight-runs',
       'Report how many crates can be paired with a pad in their own row',

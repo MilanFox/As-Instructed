@@ -6,13 +6,6 @@ import type { MetaHost } from '../store.ts';
 import type { SuiteResult } from '../regression.ts';
 import type { LevelFacts, LevelProfile, LibrarySave } from '../types.ts';
 
-/**
- * The store is read from React selectors, so anything it derives has to be *the same value* until
- * its inputs change. A derivation that allocates on every read is a snapshot that never compares
- * equal, and React answers that by re-rendering the subscriber until it tears the tree down — which
- * is what the Cost tab did.
- */
-
 const FACTS: LevelFacts[] = [
   { id: 'w4-01', title: 'Regolith survey', world: 4, parTicks: 90, seeds: [1] },
 ];
@@ -61,7 +54,6 @@ describe('the Cost tab reads a stable value', () => {
   test('reports() hands back the same array on every read', () => {
     const first = useLibrary.getState().reports();
     expect(first.map((each) => each.name)).toEqual(['pathTo']);
-    /* Exactly what a selector does: read the snapshot again and compare it with the last one. */
     expect(useLibrary.getState().reports()).toBe(first);
     expect(useLibrary.getState().reports()).toBe(first);
   });

@@ -1,34 +1,15 @@
-/**
- * Mixer state, persisted to localStorage.
- *
- * `enabled: false` is a hard off-switch, not a volume: with it clear nothing in `src/audio`
- * ever constructs an `AudioContext`, so a player who does not want sound pays no CPU, no
- * autoplay prompt and no memory for the noise buffers.
- *
- * Reads are deliberately paranoid. A settings blob is not worth a crash, so anything that is not
- * understood falls back to the default for that field alone.
- */
-
 export const AUDIO_SETTINGS_KEY = 'bootstrap.audio';
 
 export type Bus = 'sfx' | 'ui' | 'ambience';
 
 export interface AudioSettings {
-  /** Master off-switch. When false the engine holds no audio resources at all. */
   enabled: boolean;
-  /** Temporary silence that keeps the context alive. Survives a reload. */
   muted: boolean;
-  /** 0..1, applied after the per-bus gains and before the limiter. */
   master: number;
   sfx: number;
   ui: number;
   ambience: number;
-  /**
-   * The per-world drone bed. Off by default: it is the one sound the player cannot choose not to
-   * hear, so it opts in rather than out.
-   */
   ambienceEnabled: boolean;
-  /** A very quiet tick as the playhead crosses events while scrubbing. */
   scrubTicks: boolean;
 }
 
@@ -52,7 +33,6 @@ function bool(value: unknown, fallback: boolean): boolean {
   return typeof value === 'boolean' ? value : fallback;
 }
 
-/** Narrows anything at all into a complete, in-range `AudioSettings`. Never throws. */
 export function normalizeSettings(raw: unknown): AudioSettings {
   const source = (typeof raw === 'object' && raw !== null ? raw : {}) as Partial<
     Record<keyof AudioSettings, unknown>
@@ -100,13 +80,11 @@ export function saveSettings(settings: AudioSettings): void {
   }
 }
 
-/** Gain for one bus node. Mute and master live on the master node, one level down the chain. */
 export function busGain(settings: AudioSettings, bus: Bus): number {
   if (bus === 'ambience' && !settings.ambienceEnabled) return 0;
   return settings[bus];
 }
 
-/** Gain for the master node, which is where mute is applied. */
 export function masterGain(settings: AudioSettings): number {
   if (!settings.enabled || settings.muted) return 0;
   return settings.master;

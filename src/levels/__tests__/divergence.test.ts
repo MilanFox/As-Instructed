@@ -1,12 +1,3 @@
-/**
- * What a failing objective says about *where* it failed.
- *
- * A beginner playtester lost fifty-five minutes to this: four plausible answers and an empty
- * program produced the identical `0 of 5 — 5 short`.
- * Every test here is a program that is wrong in a specific way, asserting that the report now
- * names that way. The printed-text shape the playtest hit lives in
- * `src/engine/__tests__/divergence.test.ts`; the work order it was found on has been withdrawn.
- */
 import { describe, expect, test } from 'vitest';
 import type { Machine, Objective, ObjectiveContext, Sim, Trace, Vec } from '../../engine/index.ts';
 import { ALL_DIRS, Dir, Terrain, cloneWorld, step, tileAt, vec } from '../../engine/index.ts';
@@ -25,10 +16,6 @@ function objectiveIn(level: LevelDef, id: string): Objective {
     `objective ${id}`,
   );
 }
-
-// ---------------------------------------------------------------------------
-// w6-03 — stay on route
-// ---------------------------------------------------------------------------
 
 describe('w6-03 names the tick and the cell the bot left the route on', () => {
   test('a bot driven off the first tile reports the pit it fell into', () => {
@@ -84,23 +71,10 @@ describe('w6-03 names the tick and the cell the bot left the route on', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// w8-03 / w8-05 — precedence
-// ---------------------------------------------------------------------------
-
-/** The number a station id carries, so `sub-10` sorts after `sub-9` rather than after `sub-1`. */
 function idNumber(id: string): number {
   return Number(id.slice('sub-'.length));
 }
 
-/**
- * The first station in the grid that hangs off exactly one root, and the root it hangs off.
- *
- * A two-feeder station is in breach the moment a test energises it having driven only the first of
- * them, and a feeder that is itself fed is in breach on its own account — either way the report
- * would be about a station these cases never meant to name. One station, one feeder, and the
- * feeder waits for nothing: then the only thing on the board is the tick arithmetic being pinned.
- */
 function pickChain(machines: readonly Machine[]): { station: Machine; feeder: Machine } {
   for (const station of machines) {
     const feeders = dependenciesOf(station);
@@ -142,15 +116,6 @@ describe('w8-03 names the station that jumped its feeder', () => {
     expect(report.divergence).toBeUndefined();
   });
 
-  /**
-   * `build` can only point a station at a feeder in the band above it, so before `relabel` the ids
-   * were themselves a topological order and `for (i = 0; i < n; i++) use("sub-" + i)` passed the
-   * one objective the level is about without ever reading `vars.deps`. The names are permuted
-   * after the DAG is drawn now, and this is the assertion from the losing side.
-   *
-   * The loop is a *correct-looking* program, not an idle one — `grid-live` is met, every station
-   * ends on — which is what makes it the answer worth refusing.
-   */
   test('a bare ascending loop over the ids breaches precedence on every seed', () => {
     for (const seed of w8_03.seeds) {
       const inIdOrder = machinesWithPrefix(w8_03.build(seed), 'sub-').sort(
@@ -178,11 +143,6 @@ describe('w8-03 names the station that jumped its feeder', () => {
   });
 });
 
-/**
- * `w8-05`'s grid is twenty bots and a crate haul wide, and the precedence rule reads only the
- * `use` log. Driving a whole shift to provoke one out-of-order start would test the pathfinding
- * in the test, so the log is written directly and the level's own objective reads it.
- */
 function traceOfUses(
   initialWorld: ReturnType<LevelDef['build']>,
   uses: readonly { t: number; machineId: string }[],
@@ -249,13 +209,6 @@ describe('w8-05 names the station that jumped its feeder', () => {
     expect(objective.divergence?.(ctx)).toBeUndefined();
   });
 
-  /**
-   * The finale's headline mechanic, held from the losing side. `deps` is only ever drawn from an
-   * already-numbered station, so before `relabel` the ids were a topological order of themselves
-   * and `for (i = 0; i < n; i++) use("sub-" + i)` cleared `precedence` on every seed with the
-   * graph unread. Permuting the names after the DAG is drawn costs the geometry nothing and makes
-   * the loop wrong; `w8-03` carries the same test for the same reason.
-   */
   test('a bare ascending loop over the ids breaches precedence on every seed', () => {
     for (const seed of w8_05.seeds) {
       const world = w8_05.build(seed);
@@ -273,7 +226,6 @@ describe('w8-05 names the station that jumped its feeder', () => {
   });
 });
 
-/** An L-walk across `w8-03`'s open plain: clear of the crew rows first, then across, then down. */
 function walkTo(sim: Sim, botId: number, to: Vec): void {
   sim.move(botId, Dir.North);
   for (let guard = 0; guard < 64 && sim.pos(botId).x !== to.x; guard++) {

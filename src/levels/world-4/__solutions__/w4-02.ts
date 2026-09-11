@@ -2,18 +2,6 @@ import type { Dir, Sim, Vec } from '../../../engine/index.ts';
 import { ALL_DIRS, Terrain, opposite } from '../../../engine/index.ts';
 import type { ReferenceSolution } from '../../types.ts';
 
-/**
- * TEST FIXTURE. Never imported from src/main.tsx — vite.config.ts fails the build if it is.
- *
- * Depth-first walk with the visited set stored in the world. Every tile gets one breadcrumb the
- * first time the bot stands on it; a neighbour whose mark is already set is not worth entering,
- * which is what turns the cave's loops back into a tree. The stack holds the direction home from
- * each tile, so a finished branch is unwound rather than searched again.
- *
- * The breadcrumb is the tile the bot arrived from rather than a bare "seen", which costs nothing
- * — the same one mark per tile — and leaves the cave carrying a route home for whoever finds it.
- * That is the star, and it is the one thing a visited `Set` cannot be swapped in for.
- */
 export const solution: ReferenceSolution = {
   levelId: 'w4-02',
   run(sim: Sim, botId: number): void {

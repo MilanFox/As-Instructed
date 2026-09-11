@@ -43,11 +43,6 @@ const depotsWorked = (world: World): number => {
   return stencilledDepots(world).filter((depot) => stocked.has(depot.kind)).length;
 };
 
-/**
- * Times the round left one depot for another. A round that reads the table as a route plan — one
- * class collected and delivered, then the next — leaves each depot once and never returns; a round
- * that takes whichever crate is nearest walks back to a pad it has already used again and again.
- */
 const depotSwitches = (ctx: ObjectiveContext): number => {
   const pads = new Set(stencilledDepots(ctx.initialWorld).map((depot) => key(depot.at)));
   let switches = 0;
@@ -62,13 +57,6 @@ const depotSwitches = (ctx: ObjectiveContext): number => {
   return switches;
 };
 
-/**
- * The first depot that ended the shift short, counted against everything of its class in the yard.
- *
- * The pad is named by tile and not by class. The class is stencilled on it and `scan` reads that
- * for nothing, so the tile costs the player one look; printing the class here would hand back a
- * row of the very table the level exists to make them build.
- */
 const shortDepot = (ctx: ObjectiveContext): Divergence | undefined => {
   for (const depot of stencilledDepots(ctx.initialWorld)) {
     const want = groundTotal(ctx.initialWorld, depot.kind);
@@ -87,12 +75,6 @@ const shortDepot = (ctx: ObjectiveContext): Divergence | undefined => {
   return undefined;
 };
 
-/**
- * The first drop that came back to a depot the round had already walked away from.
- *
- * Both ticks are reported. A round that works the yard by proximity crosses its own path dozens of
- * times and the count alone never says which crossing was the one that broke the rule.
- */
 const cameBack = (ctx: ObjectiveContext): Divergence => {
   const pads = new Set(stencilledDepots(ctx.initialWorld).map((depot) => key(depot.at)));
   const leftAt = new Map<string, number>();
@@ -125,11 +107,6 @@ const cameBack = (ctx: ObjectiveContext): Divergence => {
   };
 };
 
-/**
- * The randomized axis is the mapping, not the geometry. Depot positions are drawn first and the
- * classes are stencilled onto them afterwards, so no relationship survives between a class and a
- * corner of the yard — and the number of classes moves too, which is what kills a fixed if-chain.
- */
 export const w3_02: LevelDef = {
   id: 'w3-02',
   world: 3,
@@ -149,23 +126,6 @@ export const w3_02: LevelDef = {
     '',
     'Every crate on the yard floor belongs on the depot pad stencilled with its class.',
   ].join('\n'),
-  /**
-   * DESIGN.md §11.10.
-   *
-   * Everything this level redraws is a mapping, and the facts already say so. What they do not say
-   * is that the mapping is the *only* thing redrawn: the yard is the same open rectangle every
-   * shift, and every class on the floor has a pad waiting for it. Both matter to the shape of the
-   * program. A run that cannot rely on "there is a depot for this class" has to carry a fallback
-   * branch for a crate that belongs nowhere — a branch that will never fire on any shift the
-   * generator can draw — and a run that cannot rely on the open floor has to walk around walls
-   * the shed does not contain. `yard.ts` states the second guarantee for the whole world in its
-   * header; the player has never been told it once.
-   *
-   * The class count is on the redrawn side because it is the axis rule 2 names: a fixed if-chain
-   * passes seed 1 at four classes and misses the fifth. That is exactly hint 3, said before the
-   * run rather than after it, which is the difference between catching a lazy answer and taxing a
-   * reasonable guess.
-   */
   board: {
     fixed: [
       'the yard is 14 wide and 10 deep inside its wall',

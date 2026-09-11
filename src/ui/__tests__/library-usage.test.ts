@@ -1,20 +1,3 @@
-/**
- * `LibraryUsage`, spent at last — and paying nothing.
- *
- * The measurement rode on every run that linked `lib.ts` and was thrown away unread.
- * It now surfaces twice: a line on the run report saying how many
- * Repository routines the run called and how many ticks were spent inside them, and a `Work orders`
- * column on the Structure tab saying how many work orders import each published routine.
- *
- * **Neither buys anything, and that is the feature.** The veteran playtester used the Repository
- * heavily for no extrinsic reward at all; the honest number was already being computed and the
- * right thing to do with it was show it, not price it. So half of this file asserts the numbers are
- * the real ones and the other half asserts that nothing on any scoreboard moves when they change.
- *
- * Both halves live here rather than in two files because they are one feature and they read one
- * render. The renderer itself is `src/ui/__tests__/react-driver.ts`, shared with every other UI
- * test.
- */
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type * as ReactModule from 'react';
 import { reactDriver as driver } from './react-driver.ts';
@@ -54,11 +37,6 @@ const { Medal } = await import('../../game/score.ts');
 const { buildRows, campaignTally } = await import('../screens/LevelSelect.tsx');
 const { reportFor } = await import('../screens/review.ts');
 
-/**
- * The run report as the desk draws it: a snapshot, on a certificate of closure or a HALT notice.
- * `Results` was a modal that destroyed itself; the sheet is the same
- * report on paper, and it is read off `snapshotReport` exactly as `usePaperwork` reads it.
- */
 function Results(): unknown {
   const report = snapshotReport(useGame.getState() as never);
   return report ? ReportSheet({ report } as never) : null;
@@ -89,7 +67,6 @@ interface Usage {
   calls: Record<string, { calls: number; ticks: number }>;
 }
 
-/** A run of `w1-05` that linked the Repository, with whatever it did inside it. */
 function reportRun(usage: Usage | null, seed = 2): void {
   useGame.setState({
     save: emptySave(),
@@ -118,7 +95,6 @@ function reportRun(usage: Usage | null, seed = 2): void {
   });
 }
 
-/** The other seed's numbers, so a report that reads seed one is caught saying so. */
 function decoy(): Usage {
   return { ticks: 999, calls: { decoyRoutine: { calls: 7, ticks: 999 } } };
 }
@@ -202,7 +178,6 @@ describe('the line is a fact, not a scoreline', () => {
     reportRun({ ticks: 400, calls: { pathTo: { calls: 40, ticks: 400 } } });
     const used = screen(Results);
 
-    /** The score grid: the clock, par, the medal and the points, as one run of words. */
     const scoreline = (text: string): string =>
       /ticks \d+.*?(?= seeds )/.exec(text)?.[0] ?? 'no scoreline';
 
@@ -211,7 +186,6 @@ describe('the line is a fact, not a scoreline', () => {
   });
 });
 
-/** `key`, `at` and `parTicks` are required by `LevelProfile` and say nothing about reuse. */
 function profile(levelId: string, imports: string[], usage: Usage): Record<string, unknown> {
   return {
     levelId,
@@ -242,13 +216,6 @@ const SPEND: Usage = {
   calls: { follow: { calls: 3, ticks: 30 }, step: { calls: 5, ticks: 20 } },
 };
 
-/**
- * Three work orders import `follow`; none imports `step`, which they all run anyway.
- *
- * The reuse count and the call count are deliberately different numbers — 3 against 9 — so a row
- * that prints the reuse count in the wrong column, or does not print it at all, is caught by
- * position rather than by the presence of a `3` somewhere on the screen.
- */
 function reusedLibrary(): void {
   const save = emptyLibrary();
   save.source = LIBRARY_SOURCE;

@@ -2,13 +2,6 @@ import type { Sim } from '../../../engine/index.ts';
 import type { ReferenceSolution } from '../../types.ts';
 import { playerApi } from './_api.ts';
 
-/**
- * TEST FIXTURE. Never imported from src/main.tsx — vite.config.ts fails the build if it is.
- *
- * Recompute both sums, relay what agrees, and name the altered byte in what does not. The bonus
- * falls out of the two differences: the plain one is the size of the change, the weighted one is
- * that change multiplied by its position.
- */
 export const solution: ReferenceSolution = {
   levelId: 'w6-02',
   run(sim: Sim, botId: number): void {
@@ -19,7 +12,10 @@ export const solution: ReferenceSolution = {
     while (packet !== null) {
       const star = packet.indexOf('*');
       const bytes = packet.slice(0, star).split(',').map(Number);
-      const claimed = packet.slice(star + 1).split(',').map(Number);
+      const claimed = packet
+        .slice(star + 1)
+        .split(',')
+        .map(Number);
       let sum = salt;
       let skew = salt;
       bytes.forEach((byte, i) => {

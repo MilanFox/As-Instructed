@@ -4,12 +4,6 @@ import { FailureCode } from '../../engine/index.ts';
 import { aggregate } from '../aggregate.ts';
 import type { SeedRun } from '../run-level.ts';
 
-/**
- * DESIGN.md §5: every seed must pass. The bug this file exists to prevent is handing the UI the
- * first seed's trace after a later seed failed — the player then watches a run that worked and has
- * nothing at all to debug.
- */
-
 function seedRun(options: {
   seed: number;
   passed: boolean;
@@ -125,7 +119,7 @@ describe('aggregate', () => {
     expect(response.verdict.failure?.message).toContain('Seed 1 of 2 (seed 5) failed.');
   });
 
-  test('spend is merged worst-case per resource (DESIGN.md §4.6)', () => {
+  test('spend is merged worst-case per resource', () => {
     const response = aggregate([
       seedRun({ seed: 1, passed: true, spend: { cable: 12, cell: 1 } }),
       seedRun({ seed: 2, passed: true, spend: { cable: 20 } }),

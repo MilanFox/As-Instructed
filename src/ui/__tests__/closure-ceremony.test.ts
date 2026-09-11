@@ -1,16 +1,3 @@
-/**
- * Closing a work order, end to end, on a real passing run.
- *
- * This is the ceremony the desk exists for. The run report used to be a
- * modal destroyed by a stray backdrop click with no reopen path, so the medal, the cause, the
- * objectives, the record and the seeds were one misclick from gone. On the desk it is a
- * **certificate of closure** that lies there until the player stamps it, and stamping files it
- * into the Repository rather than deleting it.
- *
- * Driven from a reference solution rather than from a browser, so the assertion is about the
- * mechanism and not about a screenshot: run the real level, snapshot the real verdict, issue the
- * paper, stamp it, and check where it went.
- */
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { runReference } from '../../levels/harness.ts';
@@ -54,7 +41,6 @@ describe('closing a work order', () => {
     expect(report, 'a passing run produces a report').not.toBeNull();
     if (!report) return;
 
-    // The certificate says the work order closed, and it carries the run rather than a promise.
     expect(report.passed).toBe(true);
     expect(report.levelId).toBe(level.id);
     expect(report.ticks).toBe(verdict.stats.ticks);
@@ -69,12 +55,10 @@ describe('closing a work order', () => {
       payload: { kind: 'certificate', report },
     });
 
-    // It is on the desk, unstamped. Nothing has destroyed it and nothing can dismiss it.
     const loose = looseDocs(usePapers.getState());
     expect(loose.map((doc) => doc.id)).toContain(id);
     expect(loose.find((doc) => doc.id === id)?.mark).toBeNull();
 
-    // The player picks up the CLOSED die and presses it. That is the whole of filing.
     usePapers.getState().file(id, 'closed');
 
     const after = usePapers.getState();
@@ -106,11 +90,6 @@ describe('closing a work order', () => {
       payload: { kind: 'certificate', report },
     });
 
-    /*
-     * The snapshot is the point. A later run overwrites `verdict`, `failureCursor` and
-     * `personalBest` in the store; a certificate that changed when you ran again would not be a
-     * record of anything.
-     */
     useGame.setState({ verdict: null, trace: null, showResults: false });
 
     const kept = looseDocs(usePapers.getState()).find((doc) => doc.id === 'certificate:reopen');

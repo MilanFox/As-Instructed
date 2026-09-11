@@ -10,12 +10,6 @@ import {
 } from '../publish.ts';
 import { LIBRARY_EMPTY_STARTER } from '../copy.ts';
 
-/**
- * Publishing rewrites the player's own two files. The tests that matter are the ones that prove
- * nothing was lost on the way: a declaration that leaves the work order must arrive in `lib.ts`,
- * and a rename must not touch a word inside a string.
- */
-
 const LEVEL = `import { Dir } from 'nothing';
 
 const START = 3;

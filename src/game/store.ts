@@ -1,12 +1,3 @@
-/**
- * The single store the shell reads from. Zustand, one flat slice — the panels are all views of
- * the same run, and splitting them apart would only invent synchronisation bugs.
- *
- * The run state machine is the part that matters. It is `idle -> running -> idle`, and every
- * transition out of `running` is driven by a token comparison rather than by trusting the host:
- * a cancelled or superseded run is dropped whatever its promise eventually does, which is what
- * makes a wedged worker survivable (DESIGN.md §10.6).
- */
 import { create } from 'zustand';
 import type { PrintEvent, Trace, TraceEvent, Verdict } from '../engine/index.ts';
 import { Medal, usesFuel } from '../engine/index.ts';
@@ -26,21 +17,8 @@ export type Screen = 'levels' | 'workspace';
 export type RunState = 'idle' | 'running';
 export type ConsoleKind = 'print' | 'system' | 'error' | 'success' | 'notice';
 
-/**
- * Layouts a work order has to close on that are not in its own `seeds`, and the line that says why.
- *
- * The campaign does not know who puts one here and must not find out: the write is one-directional
- * (`setAuditSeeds`), the read happens once inside `run()`, and nothing here imports the system that
- * raises them. That is the whole of the seam — `src/game/store.ts` importing `src/meta` would
- * invert the dependency and make the Repository non-optional.
- *
- * `note` travels with the seeds because the console line is the one place this is guaranteed to be
- * legible whatever the screens look like, and the campaign has no vocabulary for *why* an extra
- * layout is on the schedule.
- */
 export interface AuditSeeds {
   seeds: readonly number[];
-  /** One line, already in the raiser's voice. Printed to the console when the run starts. */
   note: string;
 }
 
@@ -49,17 +27,13 @@ export interface ConsoleLine {
   t: number;
   kind: ConsoleKind;
   text: string;
-  /** Source line, for print events that carry one. */
   line?: number;
 }
 
-/** Playback speeds the timeline offers. `Infinity` is "instant" — jump to the end. */
 export const SPEEDS: readonly number[] = [0.25, 0.5, 1, 2, 4, 8, 16, 32, 64, Infinity];
 
-/** Ticks per second at 1x. Matches the renderer's own default, so 1x means what it draws. */
 export const BASE_TICKS_PER_SECOND = 4;
 
-/** The shell's own watchdog. The runtime has one too; this one only catches a host that never answers. */
 const UI_WATCHDOG_MS = WORKER_TIMEOUT_MS + 2000;
 
 export interface GameState {
@@ -69,46 +43,21 @@ export interface GameState {
   code: string;
 
   runState: RunState;
-  /** Incremented on every run and on every cancel. Stale responses compare unequal and are dropped. */
   runToken: number;
-  /** What the currently loaded `trace`/`verdict` came from — a real dispatch or a one-seed preview. */
   runMode: 'dispatch' | 'preview' | null;
-  /** `preview()`'s own in-flight flag, apart from `runState` so a preview never lights up DISPATCH. */
   previewState: RunState;
   trace: Trace | null;
   verdict: Verdict | null;
   seedResults: PerSeedResult[];
-  /** Which seed the loaded trace came from — the first failing one when there is one. */
   traceSeed: number | null;
-  /** The first seed that failed, when any did. Generalization failures hinge on this. */
   failedSeed: number | null;
   failure: RuntimeFailure | null;
-  /** Result of the most recent completed run, gating the results overlay. */
   showResults: boolean;
-  /**
-   * Bumped every time a report is raised. The report's flavour line is picked from this rather
-   * than re-picked on render, so the wording holds still while it is being read.
-   */
   resultId: number;
-  /** How many runs have failed this session. Rotates the failure copy so it never repeats. */
   failureCursor: number;
-  /** Commendations this run earned for the first time. Shown once, in the report. */
   freshCommendations: string[];
-  /** Set when the run beat the player's own recorded tick count on this work order. */
   personalBest: { previous: number; now: number } | null;
-  /**
-   * Hardware delivered with the open work order that the player has not signed for yet.
-   *
-   * Getting `scan()` is a bigger moment than closing the work order that grants it, and it used to
-   * be a line in a brief. It is now a delivery, and it waits until the workspace is actually open.
-   */
   requisition: { levelId: string; hardware: string[] } | null;
-  /**
-   * Extra layouts, by work order id. Empty for a player who never opens the Repository.
-   *
-   * Kept in the store rather than read through a port so that a screen can say "this run includes
-   * one you were not shown" without asking anybody who raised it.
-   */
   auditSeeds: Readonly<Record<string, AuditSeeds>>;
 
   tick: number;
@@ -118,7 +67,6 @@ export interface GameState {
 
   console: ConsoleLine[];
   consoleFilter: 'all' | 'print' | 'system';
-  /** Prints dropped because the run exceeded the console cap. */
   suppressed: number;
 
   docsOpen: boolean;
@@ -137,22 +85,17 @@ export interface GameState {
   setPanel(panel: 'brief' | 'console' | 'docs'): void;
   setDocsOpen(open: boolean): void;
   setLayout(patch: Partial<SaveFile['settings']['layout']>): void;
-  /** Replaces the whole map. Written from outside; see `AuditSeeds`. */
   setAuditSeeds(seeds: Readonly<Record<string, AuditSeeds>>): void;
 
   run(): void;
   cancel(): void;
-  /** Runs the program against the work order's first seed only, and autoplays it. No save side effects. */
   preview(): void;
-  /** Clears whatever `run()` or `preview()` loaded, back to blank. Leaves `code` and `save` untouched. */
   resetPreview(): void;
   dismissResults(): void;
   advanceToNextLevel(): void;
   signRequisition(): void;
-  /** Marks a Performance Review tier as read. A memo is delivered once per tier, ever. */
   fileReview(rank: number): void;
   setCelebrations(on: boolean): void;
-  /** Records a commendation raised outside a run — the Repository's, mostly. Idempotent. */
   award(id: string): void;
 
   seek(tick: number): void;
@@ -170,15 +113,6 @@ export interface GameState {
   replaceSave(save: SaveFile): void;
 }
 
-/**
- * The layouts one run has to close on: the work order's own, then any audit layout it does not
- * already contain.
- *
- * The order is the design. The runtime reports the *first* failing seed, so the work order's own
- * schedule is always answered first and an audit layout can only become the reported failure once
- * everything the level always asked for already passes. The player is never shown a layout they
- * were not told about while they still have an ordinary bug.
- */
 export function runSeeds(own: readonly number[], audit?: AuditSeeds): number[] {
   if (!audit) return [...own];
   return [...own, ...audit.seeds.filter((seed) => !own.includes(seed))];
@@ -187,49 +121,22 @@ export function runSeeds(own: readonly number[], audit?: AuditSeeds): number[] {
 let lineId = 0;
 let watchdog: ReturnType<typeof setTimeout> | null = null;
 
-/**
- * The last program dispatched, for the one commendation that asks whether anything changed.
- *
- * Deliberately not in the save and not in the state: `save.levels[id].code` is rewritten on every
- * keystroke, so it always equals what is in the editor and can never answer "is this the same
- * program you sent last time". A session-scoped copy can, and losing it on reload costs nothing —
- * a commendation this build does not award today it awards tomorrow.
- *
- * `attempt` is what keeps it honest. It has to match the run count the order is *about* to leave
- * behind, so the record only ever describes the immediately preceding dispatch; a save that has
- * been replaced underneath it breaks the chain instead of speaking for a run it never saw.
- */
 let lastDispatched: { levelId: string; attempt: number; source: string } | null = null;
 
 function firstLevelId(): string | null {
   return campaignOrder()[0]?.id ?? null;
 }
 
-/**
- * Line and block comments, near enough.
- *
- * Not a lexer: a `//` inside a string literal reads as a comment here. Nothing is scored on the
- * result and the worst case is a fist-bump the player did not strictly earn, which is a better
- * failure than carrying a second tokeniser around for it.
- */
 const COMMENT = /\/\*[\s\S]*?\*\/|\/\/[^\n]*/g;
 
 function commentsIn(source: string): string[] {
   return (source.match(COMMENT) ?? []).map((text) => text.trim());
 }
 
-/** True when the program is whitespace, comments, or nothing at all. */
 function dispatchedNothing(source: string): boolean {
   return source.replace(COMMENT, '').trim().length === 0;
 }
 
-/**
- * The handful of things a commendation asks of a trace, counted in one pass.
- *
- * All six are shapes rather than scores: nothing here is a budget, nothing is compared against par,
- * and none of it is shown anywhere. They exist so that the game can notice what a program did
- * rather than only whether it worked.
- */
 interface TraceShape {
   moves: number;
   waited: number;
@@ -301,7 +208,6 @@ function traceShape(trace: Trace | null): TraceShape {
   return shape;
 }
 
-/** Published subroutines this run actually ran, across every layout. An import is not a call. */
 function routinesCalled(results: readonly PerSeedResult[]): string[] {
   const names = new Set<string>();
   for (const result of results) {
@@ -312,17 +218,10 @@ function routinesCalled(results: readonly PerSeedResult[]): string[] {
   return [...names];
 }
 
-/** Every work order in a group is closed. */
 function allClosed(group: readonly LevelDef[], levels: Record<string, LevelProgress>): boolean {
   return group.length > 0 && group.every((level) => levels[level.id]?.completed === true);
 }
 
-/**
- * Every bonus objective in a group has been met, and every order in it is closed.
- *
- * The close is part of the test rather than an extra: a group whose only bonus-bearing order is
- * starred would otherwise report "nothing left open" over two orders nobody has touched.
- */
 function allStarred(group: readonly LevelDef[], levels: Record<string, LevelProgress>): boolean {
   if (!allClosed(group, levels)) return false;
   return group.every((level) => {
@@ -361,14 +260,12 @@ export const useGame = create<GameState>((set, get) => {
     set({ runState: 'idle', ...patch });
   }
 
-  /** `finishRun`'s twin for `preview()` — the same token discipline, but idles `previewState` only. */
   function finishPreview(token: number, patch: Partial<GameState>): void {
     if (get().runToken !== token) return;
     clearWatchdog();
     set({ previewState: 'idle', ...patch });
   }
 
-  /** Bumps past whatever `preview()` has in flight. Shared by `preview()`'s own toggle and `resetPreview()`. */
   function cancelPreview(): void {
     const state = get();
     clearWatchdog();
@@ -380,12 +277,6 @@ export const useGame = create<GameState>((set, get) => {
     }
   }
 
-  /**
-   * The state a report raised by a run that never produced a verdict carries.
-   *
-   * `failureCursor` advances on every failure and nothing else, which is what stops the flavour
-   * line repeating while somebody debugs the same loop for the ninth time.
-   */
   function failedReport(): Partial<GameState> {
     const save = get().save;
     persist({
@@ -401,11 +292,6 @@ export const useGame = create<GameState>((set, get) => {
     };
   }
 
-  /**
-   * `openLevel`'s own quiet run, so the step buttons work before the player has pressed anything.
-   * Same one-seed shape as `preview()`, but nothing about it is visible: no console line, no play,
-   * and a failure — compile or runtime — just leaves the board exactly as `openLevel` set it.
-   */
   function primeTrace(levelId: string, code: string): void {
     const level = getLevel(levelId);
     if (!level) return;
@@ -473,8 +359,6 @@ export const useGame = create<GameState>((set, get) => {
       unsubscribeRenderer?.();
       renderer?.dispose();
       renderer = next;
-      // The renderer owns the frame loop, so the shell mirrors its position rather than keeping
-      // a second clock that would drift against the interpolation.
       unsubscribeRenderer = next.onTick((tick, playing) => set({ tick, playing }));
       const level = currentLevel(get());
       if (level) next.setWorld(level.world);
@@ -507,10 +391,6 @@ export const useGame = create<GameState>((set, get) => {
       get().renderer().setTrace(null);
       get().runner().prepare(levelId);
       clearWatchdog();
-      /* Everything this order's API surface holds that has not been signed for, not just what this
-         order adds. Two orders are open at once now, so a player can arrive here having skipped
-         the one that granted `scan` — and the scope they run against is cumulative either way.
-         Delivering only `level.hardware` would hand them a command nobody announced. */
       const undelivered = hardwareUnlockedBy(levelId).filter(
         (name) => !get().save.seenRequisitions.includes(name),
       );
@@ -543,13 +423,6 @@ export const useGame = create<GameState>((set, get) => {
 
     setCode(code) {
       const id = get().currentLevelId;
-      /*
-       * A trace on the board is a recording of the code as it stood the moment `preview()` or
-       * `run()` last read it. The instant that code changes underneath it, the recording is of a
-       * program that no longer exists, and `togglePlay()` would resume it rather than trying the
-       * edit — so an edit quietly clears it, the same clearing the player's own Reset (↺) does on
-       * purpose, but fired automatically and without Reset's own visual say-so.
-       */
       if (code !== get().code && get().trace !== null) get().resetPreview();
       set({ code });
       if (!id) return;
@@ -652,7 +525,6 @@ export const useGame = create<GameState>((set, get) => {
         .then((response) => {
           if (get().runToken !== token) return;
           if (!response.ok) {
-            // A cancelled run is not a failure; the player already knows they stopped it.
             if (response.error.kind === 'cancelled') {
               finishRun(token, {});
               return;
@@ -711,8 +583,6 @@ export const useGame = create<GameState>((set, get) => {
           },
         ]);
 
-        // Land on the end of the trace: that is the world the program actually left behind, so
-        // the objective rail reads true the moment the report is dismissed. Play rewinds.
         get().renderer().setTrace(trace);
         get().renderer().seek(trace.endTick);
         set({
@@ -729,13 +599,6 @@ export const useGame = create<GameState>((set, get) => {
         recordResult(levelDef, verdict, medal, results);
       }
 
-      /**
-       * Folds the run into the save, and works out what the player should be told about it.
-       *
-       * Everything read from `previous` is read before the merge, because the personal-best
-       * callout and the commendations are comparisons against the record *as it was* — a merge
-       * that has already lowered `bestTicks` cannot tell you that you lowered it.
-       */
       function recordResult(
         levelDef: LevelDef,
         verdict: Verdict,
@@ -751,8 +614,6 @@ export const useGame = create<GameState>((set, get) => {
           .map((objective) => objective.id);
         const attempt = previous.attempts + 1;
 
-        /* Banked whether the run passed or not. A failed run costs nothing (DESIGN.md §7.1), and
-           an objective that held on every layout is closed work even when its neighbour is not. */
         const closed = objectivesOnEverySeed(
           results,
           levelDef.objectives.map((objective) => objective.id),
@@ -762,9 +623,6 @@ export const useGame = create<GameState>((set, get) => {
           ...previous,
           attempts: attempt,
           completed: previous.completed || verdict.passed,
-          /* An ungraded work order stores no medal, ever. The save is where the site map, the
-             Performance Review and the sector commendations all read from, so keeping `none`
-             there is what makes every one of them ignore the level without knowing why. */
           medal: verdict.passed ? (medal ?? Medal.None) : previous.medal,
           stars: verdict.passed ? [...previous.stars, ...earned] : previous.stars,
           objectives: [...(previous.objectives ?? []), ...closed],
@@ -775,11 +633,6 @@ export const useGame = create<GameState>((set, get) => {
         next.attempts = attempt;
         levels[levelDef.id] = next;
 
-        /*
-         * A failed run costs nothing. It does not touch the medal, the best time, the stars, or a
-         * single commendation already earned. That is the whole penalty model of this game and it
-         * is deliberate: the loop this game is made of is run, watch it fail, fix it.
-         */
         const stats = { ...state.save.stats, runs: state.save.stats.runs + 1 };
         if (verdict.passed) {
           stats.passes += 1;
@@ -795,9 +648,6 @@ export const useGame = create<GameState>((set, get) => {
           lastDispatched.source === source;
         lastDispatched = { levelId: levelDef.id, attempt, source };
 
-        /* Append-only per routine, like `stars`: a subroutine used on an order has been used on it
-           whatever any later run does. Recorded on a dispatch rather than on a close, because the
-           question is what the program called, not whether it worked. */
         const routineOrders = { ...state.save.routineOrders };
         const called = routinesCalled(results);
         for (const name of called) {
@@ -821,8 +671,6 @@ export const useGame = create<GameState>((set, get) => {
           world: levelDef.world,
           ticks: verdict.stats.ticks,
           ops: verdict.stats.ops,
-          /* `null` is A7's "no medal ever", and it is the one honest reading of par on a work
-             order that carries no ladder. `medal` is not passed on: nothing below reads one. */
           parTicks: medal === null ? null : levelDef.par.ticks,
           seeds: results.length,
           seedsPassed: results.filter((result) => result.passed).length,
@@ -881,7 +729,6 @@ export const useGame = create<GameState>((set, get) => {
     cancel() {
       const state = get();
       clearWatchdog();
-      // Bump the token first: whatever the host does next is already stale.
       set({ runToken: state.runToken + 1, runState: 'idle' });
       try {
         state.runner().cancel();
@@ -891,12 +738,6 @@ export const useGame = create<GameState>((set, get) => {
       pushLines([{ t: 0, kind: 'system', text: 'run cancelled' }]);
     },
 
-    /**
-     * "Try it" — the one-seed roundtrip the playtest asked for, kept apart from `run()` so trying
-     * something never touches the record. Only the level's first seed runs, never the audit
-     * layouts (`AuditSeeds` is a dispatch-only concept), and success never calls `recordResult` or
-     * `failedReport`: no medal, no attempt, no stat, no achievement is at stake here, on purpose.
-     */
     preview() {
       const state = get();
       if (state.runState === 'running') return;
@@ -944,7 +785,6 @@ export const useGame = create<GameState>((set, get) => {
         .then((response) => {
           if (get().runToken !== token) return;
           if (!response.ok) {
-            // A cancelled preview is not a failure; the player already knows they stopped it.
             if (response.error.kind === 'cancelled') {
               finishPreview(token, {});
               return;
@@ -983,8 +823,6 @@ export const useGame = create<GameState>((set, get) => {
             },
           ]);
 
-          // Unlike a dispatch, which lands on the end so the objective rail reads the finished
-          // state, a preview loads at the start and plays — the point is watching it happen.
           get().renderer().setTrace(trace);
           get().renderer().seek(0);
           set({
@@ -1064,9 +902,6 @@ export const useGame = create<GameState>((set, get) => {
 
     award(id) {
       const save = get().save;
-      /* A commendation this build does not issue is not recorded. The call sites live outside this
-         module, so a retired id raised by one of them must stop here rather than be written and
-         then dropped by the next load. */
       if (getAchievement(id) === undefined) return;
       if (save.achievements[id] !== undefined) return;
       persist({ ...save, achievements: { ...save.achievements, [id]: Date.now() } });
@@ -1153,10 +988,6 @@ export const useGame = create<GameState>((set, get) => {
   };
 });
 
-// ---------------------------------------------------------------------------
-// Selectors
-// ---------------------------------------------------------------------------
-
 export function currentLevel(state: GameState): LevelDef | undefined {
   return state.currentLevelId ? getLevel(state.currentLevelId) : undefined;
 }
@@ -1165,23 +996,8 @@ export function progressFor(state: GameState, levelId: string): LevelProgress {
   return state.save.levels[levelId] ?? emptyProgress();
 }
 
-/** Closing one work order opens the next two. DESIGN.md §6. */
 export const LEVELS_OPENED_BY_A_CLOSE = 2;
 
-/**
- * Whether a work order is on the board.
- *
- * Two live at a time rather than one, and closing a world puts the whole of the next world up.
- *
- * Strictly N−1 made every join in the campaign a single point of failure: a stuck player's only
- * legal move was to keep grinding the same order, and the hint ladder — which is finite and ends —
- * was the only other way out. This genre's answer to *stuck* is lateral movement, and the gate
- * removed it. Two open orders means being stuck is somewhere you leave and come back to.
- *
- * The teaching order survives, because the entitlement is bought with closes: reaching World 5
- * still means closing most of World 4. What does not survive is *not yet succeeding* closing a
- * door, which it never should have been able to do.
- */
 export function isLevelUnlocked(save: SaveFile, levelId: string): boolean {
   const order = campaignOrder();
   const index = order.findIndex((level) => level.id === levelId);
@@ -1204,7 +1020,6 @@ export function unlockedHardware(levelId: string): string[] {
   return hardwareUnlockedBy(levelId);
 }
 
-/** Whether the level's world uses the fuel mechanic, which is the only time the gauge appears. */
 export function levelUsesFuel(level: LevelDef): boolean {
   try {
     return usesFuel(level.build(level.seeds[0] ?? 1));
@@ -1213,12 +1028,6 @@ export function levelUsesFuel(level: LevelDef): boolean {
   }
 }
 
-/**
- * Console lines as of a playback position. Prints appear at the tick they happened, so scrubbing
- * the trace scrubs the log with it.
- *
- * Not a store selector: it allocates, and a zustand selector that allocates re-renders forever.
- */
 export function visibleConsole(
   lines: readonly ConsoleLine[],
   filter: GameState['consoleFilter'],
@@ -1227,17 +1036,11 @@ export function visibleConsole(
   return lines.filter((line) => {
     if (filter === 'print' && line.kind !== 'print') return false;
     if (filter === 'system' && line.kind === 'print') return false;
-    // Notices are host-authored, not the player's own print() output, so 'print' filters them
-    // out — but they reveal on the same tick-by-tick schedule as prints do.
     const gated = line.kind === 'print' || line.kind === 'notice';
     return !gated || line.t <= upToTick;
   });
 }
 
-/**
- * Host-authored console lines for action failures worth flagging beyond the return value.
- * One case today (`harvest` on a full hopper); the next one is a new `case`, not a rewrite.
- */
 export function actionNotice(event: TraceEvent): string | null {
   switch (event.kind) {
     case 'harvest':

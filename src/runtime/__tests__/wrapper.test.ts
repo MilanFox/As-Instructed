@@ -11,14 +11,6 @@ import {
   wrapProgram,
 } from '../wrapper.ts';
 
-/**
- * The off-by-one that would silently degrade every error message in the game.
- *
- * These tests do not assert against a hard-coded offset — they *run* a program that throws on a
- * known line and check the answer comes back as that line. If a JS engine ever changes how it
- * builds a `new Function` body, this fails instead of quietly pointing players one line off.
- */
-
 const offset = measureWrapperOffset(topFrameLine);
 
 function lineOfThrow(source: string): number | undefined {

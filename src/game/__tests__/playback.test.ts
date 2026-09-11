@@ -22,11 +22,6 @@ import {
   segments,
 } from '../playback.ts';
 
-/**
- * A six-wide corridor and a bot that drives the length of it. Two objectives that close at known,
- * different ticks and both hold to the end — which is the whole thing `src/game/playback.ts`
- * exists to find, given that nothing in the engine records it.
- */
 function corridor(): { level: LevelDef; trace: Trace } {
   const world = createWorld({ w: 6, h: 1, fill: Terrain.Floor });
   setTerrain(world, { x: 5, y: 0 }, Terrain.Pad);
@@ -186,7 +181,6 @@ describe('progress', () => {
     expect(track).toBeDefined();
     if (!track) return;
     expect(progressAt(track, trace.endTick)).toEqual([2, 4]);
-    // Nothing ever floors a tile here, so there is one flat reading and no steps to mark.
     expect(progressMarks(playback)).toHaveLength(0);
   });
 });

@@ -1,13 +1,3 @@
-/**
- * Public surface of the deterministic simulation core.
- *
- * Every other domain (`src/levels`, `src/runtime`, `src/render`, `src/ui`, `src/game`) imports
- * from `src/engine` and nothing deeper. Nothing in here touches a browser API — the whole module
- * runs unchanged in Node under Vitest.
- *
- * See docs/ENGINE.md for the integration guide.
- */
-
 export type {
   Vec,
   Tile,
@@ -154,10 +144,6 @@ export {
   evaluateObjectives,
   hasTerrain,
 } from './objectives.ts';
-/**
- * Objective builders live behind a namespace on purpose: `Objectives.botAt(pad)` is the objective,
- * `botAt(world, pos)` is the world query, and having both flat would be a trap.
- */
 export * as Objectives from './objectives.ts';
 
 export type { Verdict, VerdictInput } from './verdict.ts';

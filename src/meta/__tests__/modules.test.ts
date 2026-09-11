@@ -14,15 +14,6 @@ import {
 import { measureWrapperOffset, topFrameLine } from '../../runtime/index.ts';
 import { runKey } from '../hash.ts';
 
-/**
- * The linker, and the one property everything else rests on: a rewrite never changes how many
- * lines a file has, so an error reported at emitted line N is still the player's line N.
- *
- * The line-number tests do not assert against a hand-written stack string. They throw for real,
- * inside a real `new Function`, and read the engine's own stack back — which is the only way to
- * catch the wrapper drifting by a line.
- */
-
 const offset = measureWrapperOffset(topFrameLine);
 const scope = { api: {}, values: {} };
 
@@ -191,7 +182,6 @@ describe('linking', () => {
 });
 
 describe('line numbers across two files', () => {
-  /** File and line only. The column is engine-dependent and is not what these tests are about. */
   function locate(options: {
     programJs: string;
     libraryJs?: string;
@@ -234,8 +224,6 @@ describe('line numbers across two files', () => {
   });
 
   test('a line map moves the library line the way the emitter erased it', () => {
-    /* `lineMap[emitted - 1]` is the source line. Emitted line 2 came from source line 5, which is
-       what an erased `interface` above it does. */
     const found = locate({
       programJs: `import { boom } from 'lib';\nboom();`,
       libraryJs: 'export function boom() {\n  throw new Error("inside");\n}',
@@ -278,7 +266,6 @@ describe('tick attribution', () => {
       libraryJs,
       scope: {
         api: {
-          /* Each move costs one tick, exactly as the Sim charges it. */
           move: () => {
             clock += 1;
           },
@@ -297,7 +284,6 @@ describe('tick attribution', () => {
       `import { walk } from 'lib';\nwalk(4);\nmove();`,
     );
     expect(linked.usage.calls['walk']).toEqual({ calls: 1, ticks: 4 });
-    /* The bare `move()` in the level is not the library's cost. */
     expect(linked.usage.ticks).toBe(4);
   });
 

@@ -3,15 +3,6 @@ import { Dir } from '../../../engine/index.ts';
 import type { ReferenceSolution } from '../../types.ts';
 import { playerApi } from './_api.ts';
 
-/**
- * TEST FIXTURE. Never imported from src/main.tsx — vite.config.ts fails the build if it is.
- *
- * Three passes and no movement until the last one. Sort the band by what its checks say — sound,
- * shifted, or altered — then expand `main` by recursion, because a call produces whatever the
- * block it names produces, which is the same sentence one level down. The repair falls out of
- * the two checks: their differences give the size of the alteration and the size multiplied by
- * where it happened.
- */
 const HEADING: Record<string, Dir> = {
   N: Dir.North,
   E: Dir.East,
@@ -39,7 +30,10 @@ export const solution: ReferenceSolution = {
       const star = packet.lastIndexOf('*');
       return {
         body: packet.slice(0, star),
-        claimed: packet.slice(star + 1).split(',').map(Number),
+        claimed: packet
+          .slice(star + 1)
+          .split(',')
+          .map(Number),
       };
     };
     const sound = (packet: string): boolean => {

@@ -6,19 +6,6 @@ import { aggregate } from '../aggregate.ts';
 import { runSeed } from '../run-level.ts';
 import type { SeedRun } from '../run-level.ts';
 
-/**
- * A bonus is a level objective and is graded on the same conjunction as every other objective.
- *
- * It was not. The medal read the worst seed while the star was re-derived on the main thread from
- * the single trace the response carries, which is seed one whenever every seed passed. `w3-02`
- * reported `TICKS 332` — seed two — under a star earned on the 218-tick seed one, and the star was
- * the last reward in the game that a program which had memorised one layout could still take.
- *
- * The overfit program below is that program, written down: it groups its round by class only when
- * the yard it surveyed looks like seed one's, and works the crates in survey order everywhere
- * else. Seed one earns the star on its own; no other seed does.
- */
-
 const OVERFIT_TEST = 'crates.length === 8 && depots.size === 4';
 
 function sortingProgram(groupWhen: string): string {
@@ -125,10 +112,8 @@ describe('w3-02: the bonus star is graded on every seed', () => {
   test('a round that only groups on seed one is refused it', () => {
     const runs = runEverySeed(level, sortingProgram(OVERFIT_TEST));
 
-    // The program is a real solution everywhere; the only thing it overfits is the bonus.
     expect(runs.every((run) => run.result.passed)).toBe(true);
 
-    // Seed one earns it on its own, which is exactly what the old grading looked at.
     const [first, ...rest] = runs;
     if (!first) throw new Error('no seeds ran');
     expect(first.result.bonus?.[0]?.met).toBe(true);
@@ -142,8 +127,6 @@ describe('w3-02: the bonus star is graded on every seed', () => {
     const response = aggregate(runs);
     if (!response.ok) throw new Error('the run did not come back');
 
-    /* The screen used to read `TICKS <worst seed>` over a star earned on the best. Both numbers
-       are now the worst seed's, so the two halves of the report cannot disagree. */
     const worst = Math.max(...runs.map((run) => run.result.ticks));
     expect(response.verdict.stats.ticks).toBe(worst);
 
@@ -158,9 +141,7 @@ describe('w3-02: the bonus star is graded on every seed', () => {
     if (!response.ok) throw new Error('the run did not come back');
 
     const row = response.verdict.objectives.find((objective) => objective.id === bonusId);
-    const missed = runs
-      .map((run) => run.result.bonus?.[0])
-      .find((report) => report && !report.met);
+    const missed = runs.map((run) => run.result.bonus?.[0]).find((report) => report && !report.met);
     expect(row).toEqual(missed);
   });
 
@@ -202,7 +183,6 @@ describe('the per-seed bonus report', () => {
     expect(run.result.bonus?.map((objective) => objective.id)).toEqual(
       (level.bonus ?? []).map((objective) => objective.id),
     );
-    // `passed` is derived from the required list alone; an idle run fails on that, not on the star.
     expect(run.result.passed).toBe(false);
   });
 });

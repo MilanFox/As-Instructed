@@ -4,11 +4,6 @@ import { bestProjection, buildReports, projectSavings, upgradeSummary } from '..
 import { emptyLibrary } from '../save.ts';
 import type { LevelFacts, LevelProfile, LibrarySave } from '../types.ts';
 
-/**
- * The Refactor screen is only worth having if its numbers are true, so these tests are about where
- * a number is allowed to come from: a measured run, under the current library, and nowhere else.
- */
-
 function profile(overrides: Partial<LevelProfile> & { levelId: string }): LevelProfile {
   return {
     key: `key-${overrides.levelId}`,
@@ -103,7 +98,6 @@ describe('attribution across levels', () => {
 describe('projection', () => {
   const report = buildReports({
     save: saveWith(
-      /* 100 ticks against par 90: silver. Four calls, so 3 ticks a call reaches gold. */
       profile({
         levelId: 'w4-05',
         ticks: 100,
@@ -112,7 +106,6 @@ describe('projection', () => {
         imports: ['pathTo'],
         usage: { ticks: 40, calls: { pathTo: { calls: 4, ticks: 40 } } },
       }),
-      /* 200 against par 90 with two calls: bronze, and out of reach. */
       profile({
         levelId: 'w5-01',
         ticks: 200,

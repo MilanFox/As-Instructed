@@ -497,7 +497,6 @@ describe('machines', () => {
 describe('rebuildOccupancy', () => {
   test('recomputes every occupant from world.bots', () => {
     const world = openWorld(3, 3, 2);
-    // Hand-edit the world the way a level builder might, leaving occupancy stale.
     must(world.bots[0]).at = vec(2, 2);
     must(tileAt(world, vec(0, 1))).occupant = 42;
 
@@ -632,7 +631,6 @@ describe('cloneWorld is a genuine deep copy', () => {
     const before = cloneWorld(world);
     const copy = cloneWorld(world);
 
-    // tiles + tile.meta
     must(copy.tiles[0]).terrain = Terrain.Ore;
     const field = must(tileAt(copy, vec(1, 1)));
     field.growth = 99;
@@ -641,7 +639,6 @@ describe('cloneWorld is a genuine deep copy', () => {
     must(field.meta)['label'] = 'nope';
     copy.tiles.push({ terrain: Terrain.Void });
 
-    // bots
     const clonedBot = must(copy.bots[0]);
     clonedBot.at.x = 9;
     clonedBot.at.y = 9;
@@ -654,13 +651,11 @@ describe('cloneWorld is a genuine deep copy', () => {
     clonedBot.vars['mode'] = 99;
     copy.bots.push(cloneBot(clonedBot));
 
-    // ground items
     const stack = must(copy.items[0]);
     stack.count = 99;
     stack.at.x = 9;
     copy.items.push({ kind: ItemKind.Chip, count: 1, at: vec(0, 0) });
 
-    // machines
     const clonedMachine = must(copy.machines[0]);
     clonedMachine.state = 'open';
     clonedMachine.at.y = 9;
@@ -670,12 +665,10 @@ describe('cloneWorld is a genuine deep copy', () => {
     must(clonedMachine.inventory[0]).count = 99;
     copy.machines.push(cloneMachine(clonedMachine));
 
-    // world scalars + vars
     copy.tick = 99;
     copy.vars['quota'] = 99;
     copy.vars['extra'] = 1;
 
-    // rng
     copy.rng.next();
 
     expect(world).toEqual(before);

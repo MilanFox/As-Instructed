@@ -21,7 +21,6 @@ function sensesIn(events: readonly TraceEvent[]): SenseEvent[] {
   return events.filter((e): e is SenseEvent => e.kind === 'sense');
 }
 
-/** Every sensing call the player can reach, driven once against a rig that satisfies all of them. */
 const SENSING_CALLS: { name: string; call: (sim: Sim, botId: number) => void }[] = [
   { name: 'pos', call: (sim, id) => void sim.pos(id) },
   { name: 'facing', call: (sim, id) => void sim.facing(id) },
@@ -150,7 +149,6 @@ describe('sensing is free in ticks but counted', () => {
     const sim = new Sim(openWorld(3, 3, 1), { maxOps: 4 });
     for (let i = 0; i < 4; i++) sim.pos(0);
     expect(() => sim.pos(0)).toThrow(OpLimitError);
-    /* The op budget is checked before the read happens, so the refused call is not tallied. */
     expect(sim.senseTotals()['pos']).toBe(4);
   });
 });

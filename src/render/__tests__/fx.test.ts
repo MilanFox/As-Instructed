@@ -21,7 +21,6 @@ const ALL_FX: FxName[] = [
   'objective',
 ];
 
-/** The pool is private by design, so liveness is read through the public counter. */
 function drain(system: ParticleSystem): void {
   for (let i = 0; i < 200; i++) system.update(0.1);
 }
@@ -125,11 +124,6 @@ describe('particle pool', () => {
 });
 
 describe('pool pressure', () => {
-  /**
-   * A twenty-bot mining tick fires hundreds of particles in one frame. With a linear scan for a
-   * free slot that is O(capacity) per particle and shows up as a dropped frame, so this guards the
-   * free-list behaviour rather than just the counts.
-   */
   it('stays responsive when a whole swarm acts on the same tick', () => {
     const system = new ParticleSystem(900);
     for (let round = 0; round < 12; round++) {
@@ -154,18 +148,12 @@ describe('pool pressure', () => {
 });
 
 describe('scheduled particles', () => {
-  /**
-   * The arrival puff, the second ring of a flourish and every beat of a medal figure are one emit
-   * with staggered delays. A timer would survive a scrub; a delay does not, which is the whole
-   * reason it is built this way.
-   */
   it('holds a delayed burst back and then runs it', () => {
     const system = new ParticleSystem(64);
     system.emit('medal', 1, 1, { strength: 4, delay: 0.5, seed: 1 });
     expect(system.live).toBeGreaterThan(0);
     const scheduled = system.live;
 
-    // Nothing has aged yet, so nothing has died: the whole burst is still pending.
     for (let i = 0; i < 20; i++) system.update(1 / 60);
     expect(system.live).toBe(scheduled);
 

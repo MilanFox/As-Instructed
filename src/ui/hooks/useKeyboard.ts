@@ -18,34 +18,13 @@ function isTypingTarget(target: EventTarget | null): boolean {
   return isEditorTarget(target);
 }
 
-/** The browser's own "Save Page As" shortcut, on any platform, in any case the modifier leaves `key` in. */
 export function isNativeSaveShortcut(event: KeyboardEvent): boolean {
   return (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's';
 }
 
-/**
- * Global shortcuts. DESIGN.md §10.5 — the game is playable without a mouse.
- *
- * The bindings themselves are `src/ui/desk/terminal/keys.ts`, which is also what the REFERENCE
- * manual prints: a key the manual announces and a key the listener binds cannot be two different
- * facts. This file owns only what each one *does*, and the
- * `Record<KeyId, …>` below is what makes the two lists the same length — an unbound listed key and
- * an unlisted bound key are both compile errors.
- *
- * Anything that would steal a character from a text field is gated behind `isTypingTarget`; the
- * two bindings marked `always` deliberately are not, because Run and the way out must work from
- * anywhere including the editor.
- */
 export function useKeyboard(): void {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
-      /*
-       * Ctrl+S/Cmd+S is muscle memory from every other editor, and left alone the browser answers
-       * it with its own "Save Page As" dialog. Every keystroke already writes to the save file, so
-       * there is nothing here for a native save to do — the key is only eaten before that dialog
-       * fires. Deliberately not a `KeyId`: `KEY_LIST` is what the REFERENCE manual prints, and this
-       * is not a feature to announce, just quiet around a browser shortcut that has no work to do.
-       */
       if (isNativeSaveShortcut(event)) {
         event.preventDefault();
         return;
@@ -58,19 +37,6 @@ export function useKeyboard(): void {
           state.run();
         },
 
-        /*
-         * The way out, innermost thing first — and it destroys nothing on the way.
-         *
-         * A sheet held up to the lamp goes back on the desk. The publish offer is a real modal and
-         * closes as one. Then the open book. Then `~/lib.ts`, which is the terminal's other file
-         * rather than an overlay, so leaving it puts the work order back on the screen. Then the
-         * work order itself.
-         *
-         * It deliberately does not dismiss the run report. On the desk the report is paper and it
-         * lies there until it is filed: a key that made a player's
-         * grade unreachable would be the same data loss the desk exists to remove, with a keyboard
-         * instead of a stray click.
-         */
         escape: () => {
           const papers = usePapers.getState();
           if (papers.lifted) papers.putDown();
@@ -80,12 +46,6 @@ export function useKeyboard(): void {
           else if (state.screen !== 'levels' && !isEditorTarget(event.target)) state.goto('levels');
         },
 
-        /*
-         * The same throw the switch on the bezel makes, from the keyboard, without moving the
-         * caret. It is deliberately not gated on `state.screen`: the desk is the only screen the
-         * composition exists on, and a key that silently did nothing on the site map would be a
-         * key the player learns not to trust.
-         */
         focus: () => {
           toggleDeskFocus();
         },

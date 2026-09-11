@@ -1,23 +1,3 @@
-/**
- * The catalogue. One entry per thing the game can tell you about.
- *
- * Brief, from DESIGN.md §8: industrial, restrained, slightly cheap-corporate. The player will
- * hear this for hours while reading their own code, so the design rules are subtractive:
- *
- * - **Short.** No action sound is longer than 200ms; the longest thing in the file is the gold
- *   stinger, under a second.
- * - **Band-limited and low.** Almost nothing lives above 3kHz, because sibilant clicks are what
- *   makes a repeated sound become a headache.
- * - **Quiet by default.** Peak voice gains sit around 0.1. Loudness is reserved for the three
- *   sounds that mean something: blocked, failed, and gold.
- * - **Varied.** Every voice detunes itself from `seed`, which the conductor derives from the
- *   trace event, so a hundred moves are a hundred slightly different ticks and a scrub back over
- *   the same tick is bit-identical.
- *
- * The reward family is deliberately quartal — D, A, D, A. Stacked fourths read as a machine
- * acknowledging a form rather than as a fanfare, which is the register the game wants.
- */
-
 import type { AudioEngine, Voice } from './engine.ts';
 import type { Bus } from './settings.ts';
 import {
@@ -36,7 +16,6 @@ import {
   tick,
 } from './synth.ts';
 
-/** An oscillator with no scheduled stop: LFOs and drone partials, which the bed stops by hand. */
 function drone(
   ctx: BaseAudioContext,
   type: OscillatorType,
@@ -86,22 +65,13 @@ export type SoundName = ActionSound | OutcomeSound | UiSound;
 
 export interface SoundSpec {
   bus: Bus;
-  /** Contested pool slots go to the higher number. See `AudioEngine.voice`. */
   priority: number;
-  /** Worst-case seconds until silent. The conductor and the tests both trust this number. */
   duration: number;
-  /** Floor between two of these at 1x speed. The conductor stretches it as density rises. */
   minIntervalMs: number;
-  /** Peak voice level before bus and master gain. */
   gain: number;
   render(engine: AudioEngine, voice: Voice, at: number, seed: number): void;
 }
 
-// ---------------------------------------------------------------------------
-// Actions
-// ---------------------------------------------------------------------------
-
-/** The workhorse. Heard more than every other sound in the game combined, so: almost nothing. */
 function renderMove(engine: AudioEngine, voice: Voice, at: number, seed: number): void {
   const r = hash01(seed);
   const ctx = engine.ctx;
@@ -109,10 +79,6 @@ function renderMove(engine: AudioEngine, voice: Voice, at: number, seed: number)
   blip(ctx, voice.out, at, 'triangle', 560 * spread(hash01(seed + 1), 0.1), 500, 0.16, 0.002, 0.04);
 }
 
-/**
- * A blocked move is a puzzle signal, not an error (World 7 is built on reading them), so it is
- * the same gesture as `move` dropped two octaves and given a body: dull, dark, unmistakable.
- */
 function renderBlocked(engine: AudioEngine, voice: Voice, at: number, seed: number): void {
   const ctx = engine.ctx;
   const r = hash01(seed);
@@ -155,7 +121,6 @@ function renderDrop(engine: AudioEngine, voice: Voice, at: number, seed: number)
   tick(engine.ctx, voice.out, at, 400, 1, 0.35, 0.035, seed);
 }
 
-/** Two clicks and a relay: the sound of a machine agreeing to do something. */
 function renderUse(engine: AudioEngine, voice: Voice, at: number, seed: number): void {
   const ctx = engine.ctx;
   tick(ctx, voice.out, at, 1800, 4, 0.4, 0.012, seed);
@@ -163,14 +128,6 @@ function renderUse(engine: AudioEngine, voice: Voice, at: number, seed: number):
   blip(ctx, voice.out, at + 0.045, 'square', 180, 150, 0.12, 0.002, 0.06);
 }
 
-/**
- * A tank filling and a nozzle latching.
- *
- * The first version was a wide bandpass sweeping across pink noise, which is a whoosh: it says
- * "something moved", not "the level went up". What makes a fill legible is *resonance* climbing —
- * a narrow band rising is the sound of the air column in a tank getting shorter — so the Q is
- * high and the sweep is the whole event. The latch on the end is what says it finished.
- */
 function renderRefuel(engine: AudioEngine, voice: Voice, at: number, seed: number): void {
   const ctx = engine.ctx;
   tick(ctx, voice.out, at, 220, 0.9, 0.5, 0.05, seed);
@@ -192,7 +149,6 @@ function renderMark(engine: AudioEngine, voice: Voice, at: number, seed: number)
   blip(engine.ctx, voice.out, at, 'square', 700, 700, 0.06, 0.002, 0.03);
 }
 
-/** Data chirps: two gated squares. Up for send, down for recv, sour for a send that failed. */
 function chirp(engine: AudioEngine, voice: Voice, at: number, first: number, second: number): void {
   const ctx = engine.ctx;
   const band = filterNode(ctx, 'bandpass', 1400, 1.6);
@@ -217,13 +173,6 @@ function renderSendFail(engine: AudioEngine, voice: Voice, at: number, seed: num
   tick(ctx, voice.out, at, 300, 1, 0.3, 0.04, seed);
 }
 
-/**
- * A relay closing and a chassis coming up.
- *
- * The two stacked triangles this used to end on were a fifth, which is a *reward* interval, and a
- * World 7 trace spawning twenty bots therefore congratulated itself twenty times. It is now one
- * rising body under a resonant spin-up: a machine starting, said once.
- */
 function renderSpawn(engine: AudioEngine, voice: Voice, at: number, seed: number): void {
   const ctx = engine.ctx;
   tick(ctx, voice.out, at, 700, 1.2, 0.5, 0.03, seed);
@@ -252,7 +201,6 @@ function renderDie(engine: AudioEngine, voice: Voice, at: number, seed: number):
   tick(ctx, voice.out, at, 220, 0.8, 0.4, 0.08, seed);
 }
 
-/** A barrier release: everything that was waiting lets go at once. Detuned unison, then gone. */
 function renderSync(engine: AudioEngine, voice: Voice, at: number, seed: number): void {
   const ctx = engine.ctx;
   const low = filterNode(ctx, 'lowpass', 1600, 0.8);
@@ -268,16 +216,10 @@ function renderSync(engine: AudioEngine, voice: Voice, at: number, seed: number)
   tick(ctx, voice.out, at, 1200, 3, 0.25, 0.02, seed);
 }
 
-/** Playhead feedback while dragging the scrubber. Barely there on purpose. */
 function renderScrub(engine: AudioEngine, voice: Voice, at: number, seed: number): void {
   tick(engine.ctx, voice.out, at, 2600 * spread(hash01(seed), 0.15), 8, 0.3, 0.012, seed);
 }
 
-// ---------------------------------------------------------------------------
-// Outcomes
-// ---------------------------------------------------------------------------
-
-/** D5 to A5. The smallest possible "noted." */
 function renderObjective(engine: AudioEngine, voice: Voice, at: number): void {
   blip(engine.ctx, voice.out, at, 'triangle', 587.33, 587.33, 0.3, 0.004, 0.09);
   blip(engine.ctx, voice.out, at + 0.07, 'triangle', 880, 880, 0.26, 0.004, 0.11);
@@ -290,10 +232,6 @@ function renderObjectiveLost(engine: AudioEngine, voice: Voice, at: number): voi
   blip(engine.ctx, low, at + 0.07, 'triangle', 440, 415.3, 0.26, 0.004, 0.13);
 }
 
-/**
- * "Run complete, verdict good", an octave below the medals so the two layer into one chord when
- * they fire together rather than fighting.
- */
 function renderPassed(engine: AudioEngine, voice: Voice, at: number): void {
   const ctx = engine.ctx;
   blip(ctx, voice.out, at, 'sine', 146.83, 146.83, 0.4, 0.008, 0.18);
@@ -301,7 +239,6 @@ function renderPassed(engine: AudioEngine, voice: Voice, at: number): void {
   voice.sendTo(engine.space, 0.15);
 }
 
-/** Deadpan, not a buzzer. The company is disappointed, but it is disappointed quietly. */
 function renderFailed(engine: AudioEngine, voice: Voice, at: number, seed: number): void {
   const ctx = engine.ctx;
   const low = filterNode(ctx, 'lowpass', 500, 0.9);
@@ -318,20 +255,11 @@ function renderFailed(engine: AudioEngine, voice: Voice, at: number, seed: numbe
 interface MedalShape {
   notes: readonly number[];
   step: number;
-  /** Level of the octave-up sine doubling each note. */
   octave: number;
-  /**
-   * How much the figure grows across its notes, 0..1. Zero is a flat arpeggio; at 0.35 the top
-   * note is nearly twice the level of the first. This is the difference between a stinger that
-   * *arrives* and one that trails off after its own downbeat, which is what gold used to do.
-   */
   rise: number;
-  /** Corner of the lowpass over the figure. Brighter is bigger, and it is the cheapest tier tell. */
   bright: number;
-  /** Bandpassed noise tail. The "plate" of the stamp. */
   shimmer: number;
   shimmerDecay: number;
-  /** Low root under the figure. Gold only. */
   stamp: number;
   space: number;
 }
@@ -370,15 +298,6 @@ const GOLD: MedalShape = {
   space: 0.28,
 };
 
-/**
- * One gesture, three sizes. Bronze is the figure; silver adds a note, an octave and a little
- * air; gold adds the fourth note, a low stamp under the downbeat and a real tail. They have to
- * be recognisably the same object or the escalation reads as three unrelated jingles.
- *
- * The escalation runs *inside* each one as well as between them: the notes get louder and the
- * lowpass opens as the tier goes up, so gold is four notes climbing into their own brightest
- * moment rather than a thump followed by three quieter ones.
- */
 function renderMedal(engine: AudioEngine, voice: Voice, at: number, shape: MedalShape): void {
   const ctx = engine.ctx;
   const body = filterNode(ctx, 'lowpass', shape.bright, 0.7);
@@ -411,23 +330,8 @@ function renderMedal(engine: AudioEngine, voice: Voice, at: number, shape: Medal
   voice.sendTo(engine.space, shape.space);
 }
 
-/**
- * The quartal ladder the whole reward family is built from. `commend` walks up it.
- */
 const LADDER: readonly number[] = [293.66, 440, 587.33, 880, 1174.66];
 
-/**
- * One commendation landing.
- *
- * The results screen lands these one at a time, and there can be a lot of them, so this is the
- * smallest possible member of the reward family: a single note off the same ladder the medals
- * use, climbing one rung per commendation and then holding at the top. A run of them reads as one
- * ascending phrase rather than as the same ping fifteen times, and it cannot outstay its welcome
- * because there is only ever one note.
- *
- * `seed` is the commendation's index, not a jitter source — this is the one sound in the file that
- * is deliberately *not* varied, because the variation is the melody.
- */
 function renderCommend(engine: AudioEngine, voice: Voice, at: number, seed: number): void {
   const ctx = engine.ctx;
   const step = Math.max(0, Math.min(LADDER.length - 1, Math.round(seed)));
@@ -438,10 +342,6 @@ function renderCommend(engine: AudioEngine, voice: Voice, at: number, seed: numb
   blip(ctx, body, at, 'sine', note * 2, note * 2, 0.07, 0.006, 0.1);
   voice.sendTo(engine.space, 0.12);
 }
-
-// ---------------------------------------------------------------------------
-// UI — quiet and dry, no tail, no space send
-// ---------------------------------------------------------------------------
 
 function renderRunStart(engine: AudioEngine, voice: Voice, at: number, seed: number): void {
   const ctx = engine.ctx;
@@ -456,7 +356,6 @@ function renderRunStart(engine: AudioEngine, voice: Voice, at: number, seed: num
   voice.own(source);
 }
 
-/** A rejected form, not an alarm. Two dull knocks and a lid closing. */
 function renderCompileError(engine: AudioEngine, voice: Voice, at: number, seed: number): void {
   const ctx = engine.ctx;
   const low = filterNode(ctx, 'lowpass', 700, 0.9);
@@ -491,8 +390,6 @@ function renderPanel(
 function renderButton(engine: AudioEngine, voice: Voice, at: number, seed: number): void {
   tick(engine.ctx, voice.out, at, 2200 * spread(hash01(seed), 0.1), 7, 0.3, 0.012, seed);
 }
-
-// ---------------------------------------------------------------------------
 
 export const SOUNDS: Readonly<Record<SoundName, SoundSpec>> = {
   move: {
@@ -604,8 +501,6 @@ export const SOUNDS: Readonly<Record<SoundName, SoundSpec>> = {
     priority: 3,
     duration: 0.26,
     minIntervalMs: 90,
-    // A World 7 trace spawns twenty of these. Loud enough to notice once, quiet enough that
-    // twenty in a second is a factory starting up rather than an alarm.
     gain: 0.24,
     render: renderSpawn,
   },
@@ -685,8 +580,6 @@ export const SOUNDS: Readonly<Record<SoundName, SoundSpec>> = {
   medalGold: {
     bus: 'sfx',
     priority: 7,
-    // Measured silence at 0.63s. The old 0.95 held a pool slot a third of a second past the end
-    // of the sound, and "short and bright" is the whole brief for this one.
     duration: 0.78,
     minIntervalMs: 400,
     gain: 0.72,
@@ -754,10 +647,6 @@ export const SOUNDS: Readonly<Record<SoundName, SoundSpec>> = {
 
 export const SOUND_NAMES = Object.keys(SOUNDS) as SoundName[];
 
-/**
- * Allocates a voice and renders one sound into it. Returns `null` when the pool refused, which
- * is normal and is never an error.
- */
 export function play(
   engine: AudioEngine,
   name: SoundName,
@@ -778,16 +667,6 @@ export function play(
   return voice;
 }
 
-// ---------------------------------------------------------------------------
-// Beds: long-lived, not pooled
-// ---------------------------------------------------------------------------
-
-/**
- * The 64x fallback. Past a few dozen events per second individual sounds stop being information
- * and start being a machine gun, so the conductor fades this in underneath and thins the
- * one-shots out. It is the sound of a lot of machinery working, deliberately without a rhythm —
- * a rhythm would beat against the frame rate.
- */
 export class SwarmTexture {
   private readonly level: GainNode;
   private readonly band: BiquadFilterNode;
@@ -811,7 +690,6 @@ export class SwarmTexture {
     chain(this.hum, humLevel, this.level);
   }
 
-  /** `amount` is 0..1. Ramps are slow enough that speed changes glide instead of stepping. */
   set(amount: number, brightness = 0.5): void {
     if (this.stopped) return;
     const at = this.engine.now();
@@ -839,13 +717,10 @@ export type AmbienceBiome =
   'hangar' | 'regolith' | 'yard' | 'cave' | 'grid' | 'signal' | 'swarm' | 'finale';
 
 interface BedShape {
-  /** Fundamental, plus an optional companion a fifth or an octave away. */
   roots: readonly number[];
   band: number;
   q: number;
-  /** How far the bandpass wanders, in Hz. */
   sway: number;
-  /** Sway rate in Hz. All well under 0.1: this must never sound like a pulse. */
   rate: number;
   colour: 'white' | 'pink';
   air: number;
@@ -935,13 +810,6 @@ const BEDS: Readonly<Record<AmbienceBiome, BedShape>> = {
   },
 };
 
-/**
- * A per-world drone bed: filtered noise, a couple of detuned low oscillators, and two very slow
- * LFOs that never line up. It is closer to room tone than to music by construction — there is no
- * event in it faster than 0.067Hz.
- *
- * Off by default all the same (`AudioSettings.ambienceEnabled`).
- */
 export class AmbienceBed {
   private readonly level: GainNode;
   private readonly sources: AudioScheduledSourceNode[] = [];

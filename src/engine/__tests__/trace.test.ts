@@ -16,10 +16,6 @@ import {
 } from '../index.ts';
 import { asciiWorld, must } from './helpers.ts';
 
-/**
- * Long enough to cross a keyframe boundary, wide enough to exercise every event kind that edits
- * the world: crops, terrain, ground items, marks, inboxes, machines-by-proxy and a spawn.
- */
 const ROWS = ['SG......', '........', '...R....'];
 
 function buildWorld(): World {
@@ -46,8 +42,6 @@ function drive(sim: Sim): void {
   sim.drop(2, ItemKind.Stone, 1);
   sim.pickup(2, ItemKind.Stone, 1);
 
-  // Deliberately receives while bot #1 still lags bot #0 by a thousand ticks: the live run and
-  // the replay have to agree that the message has not arrived yet.
   sim.send(0, 1, 'ready');
   sim.recv(1);
   sim.sync();
@@ -69,7 +63,6 @@ function run(): Run {
   return { sim, trace: sim.finish() };
 }
 
-/** The reference implementation `replayTo` has to match: no keyframes, no shortcuts. */
 function replayNaively(trace: Trace, tick: number): World {
   const world = cloneWorld(trace.initialWorld);
   for (const event of trace.events) {
@@ -219,8 +212,6 @@ describe('trace readers', () => {
 
   test('every bot-scoped event carries the dt replay needs to restore the clock', () => {
     const { sim, trace } = run();
-    // A spawned bot's clock arrives on the `bot` payload of its spawn event instead, since that
-    // event is scoped to the parent that paid for it.
     const original = new Set(trace.initialWorld.bots.map((b) => b.id));
     const clocks = new Map<number, number>();
     for (const event of trace.events) {

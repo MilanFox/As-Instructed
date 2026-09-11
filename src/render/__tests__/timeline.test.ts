@@ -26,7 +26,6 @@ import {
   settleCurve,
 } from '../timeline.ts';
 
-/** One bot, one wall to the East of (3,1), so a run of moves ends in a blocked one. */
 function walkTrace(): Trace {
   const world = createWorld({ w: 6, h: 4, seed: 1, fill: Terrain.Floor });
   setTile(world, vec(4, 1), { terrain: Terrain.Wall });
@@ -47,7 +46,6 @@ function twoBotTrace(): Trace {
   rebuildOccupancy(world);
   const sim = new Sim(world);
   const [a, b] = world.bots;
-  // A moves once (cost 1); B waits 4 then moves. Their clocks diverge on purpose.
   sim.move(a!.id, Dir.East);
   sim.wait(b!.id, 4);
   sim.move(b!.id, Dir.East);
@@ -89,12 +87,6 @@ describe('interpolation at fractional ticks', () => {
     }
   });
 
-  /**
-   * `replayTo(trace, t)` stamps an action's *outcome* at the tick the action **started**, because
-   * that is what the event carries. The renderer instead animates the action across `[t, t + dt)`.
-   * So the pose at tick T corresponds to every action that had completed by T — here, with unit
-   * move costs, `replayTo(T - 1)`. Both endpoints must still agree exactly.
-   */
   it('agrees with replayTo on completed actions', () => {
     for (let t = 0; t <= trace.endTick; t++) {
       const world = replayTo(trace, t - 1);
@@ -138,7 +130,6 @@ describe('blocked moves look different from successful ones', () => {
   it('never leaves the origin cell', () => {
     for (let t = 2; t <= 3; t += 0.05) {
       bot.poseAt(t, pose);
-      // The recoil is allowed to overshoot backwards, but never by a whole cell.
       expect(pose.x).toBeLessThan(3 + BUMP_DISTANCE + 1e-6);
       expect(pose.x).toBeGreaterThan(3 - BUMP_DISTANCE - 1e-6);
     }
@@ -173,7 +164,6 @@ describe('blocked moves look different from successful ones', () => {
     expect(bumpCurve(1.5)).toBe(0);
     expect(blockedFlash(0)).toBe(0);
     expect(blockedFlash(0.28)).toBeCloseTo(1, 5);
-    // Continuous at the impact point; a step there would strobe.
     expect(blockedFlash(0.279)).toBeCloseTo(1, 2);
     expect(blockedFlash(2)).toBeLessThan(0.05);
   });
@@ -201,7 +191,6 @@ describe('per-bot virtual clocks', () => {
     const pb = createPose();
     a.poseAt(0.5, pa);
     b.poseAt(0.5, pb);
-    // A is mid-move; B is a third of the way through a four-tick wait.
     expect(pa.travel).toBeGreaterThan(0);
     expect(pb.travel).toBe(0);
     expect(pb.idle).toBeGreaterThan(0);
@@ -263,7 +252,6 @@ describe('bot character', () => {
   it('crouches before it launches and is neutral at both ends', () => {
     expect(moveStretch(0)).toBe(0);
     expect(moveStretch(1)).toBe(0);
-    // Squash through the wind-up, stretch through the travel.
     expect(moveStretch(ANTICIPATION / 2)).toBeLessThan(-0.05);
     expect(moveStretch(0.6)).toBeGreaterThan(0.1);
     expect(anticipationAt(0)).toBe(0);
@@ -275,7 +263,6 @@ describe('bot character', () => {
     const trace = walkTrace();
     const bot = new TraceTimeline(trace).timelineFor(0)!;
     const pose = createPose();
-    // Anticipation is a squash, never a retreat: the agreement with `replayTo` depends on it.
     let previous = -Infinity;
     for (let t = 0; t <= 1; t += 0.02) {
       bot.poseAt(t, pose);

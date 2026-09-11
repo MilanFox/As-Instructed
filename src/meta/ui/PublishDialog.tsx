@@ -5,23 +5,6 @@ import { closureOf, isValidName, libraryExportNames, planPublication } from '../
 import { useLibrary } from '../store.ts';
 import './library.css';
 
-/**
- * Offered once, after a work order closes. Skippable, and skippable forever.
- *
- * Nothing here is a gate. "Not this time" costs one click and is remembered for that work order;
- * "Stop offering" turns the whole prompt off for the rest of the game and is reversible from the
- * Repository panel. A player who never publishes anything finishes the campaign with the same
- * medals as one who does.
- *
- * The list is routines, not declarations. A tile map or a best-so-far counter is not something a
- * later work order imports and calls, and offering nineteen of them turns the dialog into a wall
- * that gets dismissed unread. Ticking a routine takes the helpers and the state it closes over
- * with it, so one click publishes something that actually runs.
- *
- * What is ticked stays here, in component state, and reaches the store exactly once — as the
- * argument to `confirmPublish`. It must never be written back into `offer`: `selection` is derived
- * from `offer`, and a derivation that replaces the thing it derives from cannot settle.
- */
 export function PublishDialog(): React.JSX.Element | null {
   const offer = useLibrary((state) => state.offer);
   const source = useLibrary((state) => state.source);

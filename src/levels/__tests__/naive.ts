@@ -3,24 +3,9 @@ import { Dir, ItemKind, Terrain, step } from '../../engine/index.ts';
 import type { ReferenceSolution } from '../types.ts';
 import { KEY_SPACE, KnownMap, drainAntenna, follow, readPacket } from '../world-8/shared.ts';
 
-/** Every World 8 site is 30 x 30, and `look` is free, so a ray is never worth capping short. */
 const SITE = 30;
 
-/** Except the finale, which is 48 x 40. */
 const FINALE = { w: 48, h: 40 };
-
-/**
- * TEST FIXTURES. The first honest idea a player has on each of these levels, written out so the
- * suite can measure what the level does to it.
- *
- * None of these are the reference solution. Most are the *wrong* answers the level blocks say a
- * player will reach for first, and prove CURRICULUM.md §2 rule 2's claim that the randomization kills
- * them: each is expected to fail on at least one shipped seed.
- *
- * The last two are a different instrument and are marked as such. They are *correct* — they pass
- * every seed — and they exist so the suite can prove what medal a level hands to a program that
- * solved it without using the hardware it was issued for.
- */
 
 const HEADING: Record<string, Dir> = {
   N: Dir.North,
@@ -29,7 +14,6 @@ const HEADING: Record<string, Dir> = {
   W: Dir.West,
 };
 
-/** w6-04: relay the band exactly as it arrives, on the assumption that it is already plain. */
 export const rawRelay: ReferenceSolution = {
   levelId: 'w6-04',
   run(sim: Sim, botId: number): void {
@@ -48,11 +32,6 @@ export const rawRelay: ReferenceSolution = {
   source: '',
 };
 
-/**
- * w6-05: a reader that handles one level of nesting and no more. It sorts the band correctly and
- * expands every move group it meets, but a call to another block is a token it does not know, so
- * it walks a truncated route.
- */
 export const flatReader: ReferenceSolution = {
   levelId: 'w6-05',
   run(sim: Sim, botId: number): void {
@@ -69,7 +48,10 @@ export const flatReader: ReferenceSolution = {
     const sound = (packet: string): boolean => {
       const star = packet.lastIndexOf('*');
       if (star < 0) return false;
-      const claimed = packet.slice(star + 1).split(',').map(Number);
+      const claimed = packet
+        .slice(star + 1)
+        .split(',')
+        .map(Number);
       const [plain, skew] = sums(packet.slice(0, star));
       return plain === claimed[0] && skew === claimed[1];
     };
@@ -110,10 +92,6 @@ export const flatReader: ReferenceSolution = {
   source: '',
 };
 
-/**
- * w7-04: deal the board out in advance, one job to each bot in turn. Correct on a flat cost
- * distribution and disastrous on a skewed one, which is the whole level.
- */
 export const roundRobinDispatch: ReferenceSolution = {
   levelId: 'w7-04',
   run(sim: Sim): void {
@@ -146,7 +124,6 @@ export const roundRobinDispatch: ReferenceSolution = {
   source: '',
 };
 
-/** w8-04: decode the filed plan and drive it, on the assumption that it is still true. */
 export const literalPlanFollower: ReferenceSolution = {
   levelId: 'w8-04',
   run(sim: Sim, botId: number): void {
@@ -196,13 +173,6 @@ export const literalPlanFollower: ReferenceSolution = {
   source: '',
 };
 
-/**
- * w8-01: the World 2 answer, on a World 8 work order. Sweep every row of the field, scan the tile
- * underfoot, harvest whatever is ripe, and run the load back to the silo whenever the arms fill.
- *
- * It is correct, it never wastes a beam because it never casts one, and it is exactly what the
- * two budgets exist to reject: the walk alone is longer than the shift.
- */
 export const fieldSweep: ReferenceSolution = {
   levelId: 'w8-01',
   run(sim: Sim, botId: number): void {
@@ -250,18 +220,6 @@ export const fieldSweep: ReferenceSolution = {
   source: '',
 };
 
-// ---------------------------------------------------------------------------
-// Correct, and issued the hardware anyway.
-// ---------------------------------------------------------------------------
-
-/**
- * w1-03: ask before every single step.
- *
- * The answer with no idea in it, and it is *tick-optimal* — sensing is free, so polling the wall
- * before each tile costs exactly the tiles. Kept so the suite can say why w1-03's par cannot be
- * lowered: there is nothing below it. The stride the bonus asks for is strictly more expensive,
- * because it pays for the tiles the corridor turned out not to have.
- */
 export const corridorPoll: ReferenceSolution = {
   levelId: 'w1-03',
   run(sim: Sim, botId: number): void {
@@ -270,15 +228,6 @@ export const corridorPoll: ReferenceSolution = {
   source: '',
 };
 
-/**
- * w2-05: serpentine the field reading only the tile under the wheels, and stop when the hopper
- * refuses a crop.
- *
- * It filters ice properly, which is the level's stated ask, and it would fill the hopper on every
- * seed given the time. It costs 58-68 because it drives all six rows of a field the sensor can
- * survey from two of them, and the shift is 62, so on three seeds of five it is powered down with
- * the hopper still open. That is the level's whole subject: the ground you decline to cover.
- */
 export const serpentineHarvest: ReferenceSolution = {
   levelId: 'w2-05',
   run(sim: Sim, botId: number): void {
@@ -309,11 +258,6 @@ export const serpentineHarvest: ReferenceSolution = {
   source: '',
 };
 
-/**
- * w8-04, the answer that never turns the radio on: walk the workings until the form is in view,
- * then go and lift it. Correct on every seed, and it is the program the level's par exists to
- * rank.
- */
 export const frontierScavenger: ReferenceSolution = {
   levelId: 'w8-04',
   run(sim: Sim, botId: number): void {
@@ -338,13 +282,6 @@ export const frontierScavenger: ReferenceSolution = {
   source: '',
 };
 
-/**
- * w8-04, the same refusal played better. `probe(id)` reaches any machine on the site for nothing,
- * so this one asks every locker where it is before it takes a step, and walks the list nearest
- * first. It is the strongest program that ignores the plan, and it is the reason the lockers are
- * numbered the way they are: the coordinates all come back, and not one of them says which locker
- * holds the form.
- */
 export const lockerCanvasser: ReferenceSolution = {
   levelId: 'w8-04',
   run(sim: Sim, botId: number): void {
@@ -393,21 +330,6 @@ export const lockerCanvasser: ReferenceSolution = {
   source: '',
 };
 
-/**
- * w8-05, the form leg on its own: survey with the fleet, lift KD-0001-T, pay the airlock toll,
- * file it. **It never energises a substation, and it never looks at one.**
- *
- * This is the veteran's third specific written as a program. Their complaint was that the form leg
- * *"depends on nothing else"* — that deleting the grid from a solution changes no other line of it
- * — and the only honest way to answer that is to delete the grid from a solution and see whether
- * the form still gets filed. It did. The suite runs this against the same
- * seeds with and without the door's `fed:` key, which is the one difference between the two
- * worlds, and the star it is here to earn is the one it now cannot: `file-form`.
- *
- * It is deliberately not a good program. It fails `grid-online` and `quota` by construction and it
- * spends far more of the shift than the reference does, because efficiency is not what is on
- * trial — reachability is.
- */
 export const formErrandOnly: ReferenceSolution = {
   levelId: 'w8-05',
   run(sim: Sim): void {
@@ -440,7 +362,6 @@ export const formErrandOnly: ReferenceSolution = {
         if (!follow(sim, clerk, map, pump, { onStep: look })) return;
       }
     };
-    /** One step of survey, chosen for being on the way to `to` rather than merely nearest. */
     const towards = (to: Vec): boolean => {
       if (sim.fuel(clerk) < 60) fill();
       const from = sim.pos(clerk);
@@ -454,16 +375,14 @@ export const formErrandOnly: ReferenceSolution = {
       }
       return false;
     };
-    /**
-     * Walk there, buying map when the ground between is unseen, and give up when buying map stops
-     * buying anything. Ground behind a sealed door is not a survey problem and no amount of
-     * walking turns it into one.
-     */
     const reach = (to: Vec): boolean => {
       let stalls = 0;
       for (let attempt = 0; attempt < 80 && stalls < 3; attempt++) {
         if (sim.fuel(clerk) < 60) fill();
-        if (map.pathTo(sim.pos(clerk), to) !== null && follow(sim, clerk, map, to, { onStep: look })) {
+        if (
+          map.pathTo(sim.pos(clerk), to) !== null &&
+          follow(sim, clerk, map, to, { onStep: look })
+        ) {
           return true;
         }
         const before = map.size();

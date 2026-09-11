@@ -53,59 +53,55 @@ import { solution as w8_03 } from '../../levels/world-8/__solutions__/w8-03.ts';
 import { solution as w8_04 } from '../../levels/world-8/__solutions__/w8-04.ts';
 import { solution as w8_05 } from '../../levels/world-8/__solutions__/w8-05.ts';
 
-/**
- * Every reference solution, executed the way a player executes one.
- *
- * `src/levels/__tests__/levels.test.ts` proves the campaign solvable by driving `Sim` directly.
- * That says nothing about the API the player actually types: `ReferenceSolution.source` is the
- * same solution written as player TypeScript, and until this file existed nothing ever ran it.
- * The gap that hid in there was the whole of World 7 — `bot(id)` did not exist in `src/runtime/`,
- * so every multi-bot level threw `ReferenceError` on Run while its tests stayed green.
- *
- * So this suite goes through the real path — transpile, then `runSeed`, which is what the worker
- * calls — and the last describe block goes further and drives `Runner` over a stubbed transport
- * so the request envelope, the aggregate and the verdict are exercised too.
- */
-
 const SOLUTIONS: Record<string, ReferenceSolution> = {
-  'w1-01': w1_01, 'w1-03': w1_03, 'w1-05': w1_05,
-  'w2-02': w2_02, 'w2-04': w2_04, 'w2-05': w2_05,
-  'w3-01': w3_01, 'w3-02': w3_02, 'w3-04': w3_04,
-  'w4-01': w4_01, 'w4-02': w4_02, 'w4-04': w4_04, 'w4-05': w4_05,
-  'w5-01': w5_01, 'w5-02': w5_02, 'w5-03': w5_03, 'w5-04': w5_04, 'w5-05': w5_05,
-  'w6-01': w6_01, 'w6-02': w6_02, 'w6-03': w6_03, 'w6-04': w6_04, 'w6-05': w6_05,
-  'w7-01': w7_01, 'w7-02': w7_02, 'w7-03': w7_03, 'w7-04': w7_04, 'w7-05': w7_05,
-  'w8-01': w8_01, 'w8-02': w8_02, 'w8-03': w8_03, 'w8-04': w8_04, 'w8-05': w8_05,
+  'w1-01': w1_01,
+  'w1-03': w1_03,
+  'w1-05': w1_05,
+  'w2-02': w2_02,
+  'w2-04': w2_04,
+  'w2-05': w2_05,
+  'w3-01': w3_01,
+  'w3-02': w3_02,
+  'w3-04': w3_04,
+  'w4-01': w4_01,
+  'w4-02': w4_02,
+  'w4-04': w4_04,
+  'w4-05': w4_05,
+  'w5-01': w5_01,
+  'w5-02': w5_02,
+  'w5-03': w5_03,
+  'w5-04': w5_04,
+  'w5-05': w5_05,
+  'w6-01': w6_01,
+  'w6-02': w6_02,
+  'w6-03': w6_03,
+  'w6-04': w6_04,
+  'w6-05': w6_05,
+  'w7-01': w7_01,
+  'w7-02': w7_02,
+  'w7-03': w7_03,
+  'w7-04': w7_04,
+  'w7-05': w7_05,
+  'w8-01': w8_01,
+  'w8-02': w8_02,
+  'w8-03': w8_03,
+  'w8-04': w8_04,
+  'w8-05': w8_05,
 };
 
-/**
- * Sources that are still sketches rather than programs, with the reason and with every name they
- * invent. CONTENT owns these; the list is asserted in both directions, so fixing one turns this
- * suite red until the entry is removed. Empty, and meant to stay that way.
- */
 const NOT_YET_A_PROGRAM: Record<string, { why: string; invents: string[] }> = {};
 
-/**
- * Levels the `bot(id)` handle exists for: the whole of World 7, plus any later level that puts
- * more than one bot on the site. World 7 counts entire because `w7-02` starts alone and builds
- * its own fleet with `spawn`, which is exactly the surface under test.
- */
 function isMultiBot(level: LevelDef): boolean {
   return level.world === 7 || level.build(level.seeds[0] as number).bots.length > 1;
 }
 
 const MULTI_BOT = LEVELS.filter(isMultiBot).map((level) => level.id);
 
-// ---------------------------------------------------------------------------
-// Compiling the way the editor compiles
-// ---------------------------------------------------------------------------
-
 interface Compiled {
   js: string;
   lineMap: number[];
 }
 
-/** The emit half of `compilePlayerCode`, with Monaco's compiler options. */
 function transpile(source: string): Compiled {
   const output = ts.transpileModule(source, {
     compilerOptions: {
@@ -123,13 +119,6 @@ function transpile(source: string): Compiled {
   };
 }
 
-/**
- * The editor, as the player has it: one language service, reconfigured per level.
- *
- * `configurePlayerLanguage` is what decides which names exist and how strictly what the player
- * wrote is judged, so every check below goes through it rather than through a second set of
- * compiler options that could drift away from the real ones.
- */
 const editor = createFakeMonaco();
 
 function playerModel(levelId: string, source: string) {
@@ -137,7 +126,6 @@ function playerModel(levelId: string, source: string) {
   return editor.model(PLAYER_FILE_PATH, source);
 }
 
-/** `error TS2304: Cannot find name 'bot'` — the shape of a missing binding. */
 async function unknownNames(levelId: string, program: string): Promise<string[]> {
   const names = new Set<string>();
   for (const diagnostic of await getPlayerDiagnostics(
@@ -149,10 +137,6 @@ async function unknownNames(levelId: string, program: string): Promise<string[]>
   }
   return [...names].sort();
 }
-
-// ---------------------------------------------------------------------------
-// Running the way the worker runs
-// ---------------------------------------------------------------------------
 
 interface Outcome {
   seed: number;
@@ -214,30 +198,24 @@ describe('the reference sources are real programs', () => {
       expect(missing, known?.why ?? level.id).toEqual(known?.invents ?? []);
     });
 
-    test(
-      `${level.id} passes every seed through the runtime`,
-      { timeout: 120_000 },
-      () => {
-        /* One seed is enough to keep a known-broken source honest, and running the rest of them
-           is minutes of work that proves nothing. */
-        if (known !== undefined) {
-          const first = runSource(level, level.seeds[0] as number);
-          expect(
-            first.passed,
-            `${level.id} now passes. Remove it from NOT_YET_A_PROGRAM. (${known.why})`,
-          ).toBe(false);
-          return;
-        }
+    test(`${level.id} passes every seed through the runtime`, { timeout: 120_000 }, () => {
+      if (known !== undefined) {
+        const first = runSource(level, level.seeds[0] as number);
+        expect(
+          first.passed,
+          `${level.id} now passes. Remove it from NOT_YET_A_PROGRAM. (${known.why})`,
+        ).toBe(false);
+        return;
+      }
 
-        const outcomes = level.seeds.map((seed) => runSource(level, seed));
+      const outcomes = level.seeds.map((seed) => runSource(level, seed));
 
-        for (const outcome of outcomes) {
-          expect(outcome.failure, `${level.id} seed ${String(outcome.seed)}`).toBeUndefined();
-          expect(outcome.unmet, `${level.id} seed ${String(outcome.seed)}`).toEqual([]);
-          expect(outcome.passed, `${level.id} seed ${String(outcome.seed)}`).toBe(true);
-        }
-      },
-    );
+      for (const outcome of outcomes) {
+        expect(outcome.failure, `${level.id} seed ${String(outcome.seed)}`).toBeUndefined();
+        expect(outcome.unmet, `${level.id} seed ${String(outcome.seed)}`).toEqual([]);
+        expect(outcome.passed, `${level.id} seed ${String(outcome.seed)}`).toBe(true);
+      }
+    });
   }
 
   test('every multi-bot level is playable through the player API', { timeout: 120_000 }, () => {
@@ -254,19 +232,6 @@ describe('the reference sources are real programs', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Compiling the way the player compiles
-// ---------------------------------------------------------------------------
-
-/**
- * `compilePlayerCode` on every reference source, which is the gate a player hits on Run.
- *
- * The sources are written the way a person writes JavaScript — arrow parameters without
- * annotations, a `Map.get` used without a null guard — and under `noImplicitAny` most of them
- * were rejected before a tick was simulated. The player-facing options relax exactly those two
- * flags, so the checks that mean something still mean something: hardware you have not installed
- * is still `Cannot find name`, and a `Dir` that is really a string is still an error.
- */
 describe('the player-facing compiler accepts ordinary JavaScript', () => {
   test('every reference source compiles cleanly', { timeout: 120_000 }, async () => {
     const rejected: string[] = [];
@@ -275,8 +240,6 @@ describe('the player-facing compiler accepts ordinary JavaScript', () => {
       const result = await compilePlayerCode(editor.monaco, playerModel(level.id, source));
       if (!result.ok) rejected.push(`${level.id}: ${result.error.message}`);
       else if (result.js !== compiledSource(level.id).js) {
-        /* The suite runs the `transpileModule` emit above, so it is only the real path as long as
-           the editor's own emit is the same text. */
         rejected.push(`${level.id}: the editor emits different JavaScript`);
       }
     }
@@ -331,17 +294,6 @@ describe('the player-facing compiler accepts ordinary JavaScript', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// The whole path, transport and all
-// ---------------------------------------------------------------------------
-
-/**
- * A `Worker` that runs the real handler in-process.
- *
- * Vitest has no `Worker` that can load `sim.worker.ts`, and the `postMessage` hop is the one part
- * of the path with nothing in it. Everything below it — the request envelope, `serveRunRequest`,
- * the per-seed runs, the aggregate verdict — is the real code.
- */
 class InProcessWorker implements WorkerLike {
   onmessage: ((event: MessageEvent) => void) | null = null;
   onerror: ((event: ErrorEvent) => void) | null = null;

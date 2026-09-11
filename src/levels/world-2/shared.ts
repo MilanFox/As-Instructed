@@ -19,35 +19,22 @@ import {
   tileAt,
 } from '../../engine/index.ts';
 
-/**
- * Objective helpers for the Regolith Fields.
- *
- * Two things force every objective here to be derived rather than declared. The layout is drawn
- * per seed, so no coordinate may be baked in; and a rotated field ends the run *planted*, so
- * "was this tile harvested?" cannot be answered by looking at the final world at all — it is a
- * question about the trace.
- */
-
 const key = (at: Vec): string => `${at.x},${at.y}`;
 
-/** A coordinate, written the way the brief and the facts tables write one. */
 export function at(pos: Vec): string {
   return `(${String(pos.x)}, ${String(pos.y)})`;
 }
 
-/** `1 swing` / `3 swings`, so no report ever reads "1 swings". */
 function swings(n: number): string {
   return `${String(n)} swing${n === 1 ? '' : 's'}`;
 }
 
-/** Swings of the named arm that came down on this tile and found nothing. */
 function wastedSwingsAt(ctx: ObjectiveContext, kind: 'harvest' | 'plant', pos: Vec): number {
   return ctx.trace.events.filter(
     (event) => event.kind === kind && !event.ok && key(event.at) === key(pos),
   ).length;
 }
 
-/** How a tile read to the sensor at tick 0, in the words `scan()` puts it in. */
 function readingAt(world: World, pos: Vec): string {
   const tile = tileAt(world, pos);
   if (!tile || tile.crop === undefined) return 'bare soil';
@@ -63,7 +50,6 @@ export function soilTiles(world: World): Vec[] {
   return out;
 }
 
-/** Tiles carrying a crop that is already mature at tick 0, i.e. ripe the moment the shift starts. */
 export function ripeAtStart(world: World): Vec[] {
   return soilTiles(world).filter((at) => {
     const tile = tileAt(world, at);
@@ -95,7 +81,6 @@ export function harvestCalls(ctx: ObjectiveContext): { ok: number; failed: numbe
   return { ok, failed };
 }
 
-/** The tick and tile of the first swing that came back with nothing. */
 function firstEmptySwing(ctx: ObjectiveContext): Divergence | undefined {
   const swing = ctx.trace.events.find(
     (event): event is HarvestEvent => event.kind === 'harvest' && !event.ok,
@@ -119,7 +104,6 @@ function botTile(world: World): Vec | undefined {
   return bot?.alive ? bot.at : undefined;
 }
 
-/** Whichever crop the seed made the furthest along at tick 0. */
 export function ripestCrop(world: World): Vec | undefined {
   let best: Vec | undefined;
   let bestGrowth = -1;
@@ -134,14 +118,6 @@ export function ripestCrop(world: World): Vec | undefined {
   return best;
 }
 
-/**
- * The two readings, and the tile the run chose — never the tile it should have chosen.
- *
- * The level is "find the highest reading in the row", so its coordinate is the answer and does not
- * appear. What the run gets back is the reading under its own wheels against the reading it was
- * looking for, which the facts table already gives as the top of the scale. That is enough to say
- * *this is not it* without saying which tile is.
- */
 function parkedOnReading(ctx: ObjectiveContext): Divergence | undefined {
   const goal = ripestCrop(ctx.initialWorld);
   if (goal === undefined) return undefined;
@@ -160,7 +136,6 @@ function parkedOnReading(ctx: ObjectiveContext): Divergence | undefined {
   };
 }
 
-/** The bot finished parked on whichever crop the seed made the furthest along. */
 export function parkedOnRipestCrop(label = 'Park on the crop that is furthest along'): Objective {
   return Objectives.custom(
     'park-ripest',
@@ -174,7 +149,6 @@ export function parkedOnRipestCrop(label = 'Park on the crop that is furthest al
   );
 }
 
-/** Every tile that was ripe when the shift started is bare by the end of it. */
 export function clearedEveryRipeTile(label = 'Harvest every ripe crop'): Objective {
   const done = (ctx: ObjectiveContext): number =>
     ripeAtStart(ctx.initialWorld).filter((at) => tileAt(ctx.world, at)?.crop === undefined).length;
@@ -195,7 +169,6 @@ export function clearedEveryRipeTile(label = 'Harvest every ripe crop'): Objecti
   );
 }
 
-/** Nothing that was standing unripe was taken. */
 export function leftUnripeStanding(label = 'Leave every unripe crop where it is'): Objective {
   const unripe = (world: World): Vec[] => {
     const ripe = new Set(ripeAtStart(world).map(key));
@@ -214,13 +187,16 @@ export function leftUnripeStanding(label = 'Leave every unripe crop where it is'
           (spot) => tileAt(ctx.world, spot)?.crop === undefined,
         );
         if (taken === undefined) return undefined;
-        return { where: at(taken), expected: 'left standing', received: 'taken, and it was unripe' };
+        return {
+          where: at(taken),
+          expected: 'left standing',
+          received: 'taken, and it was unripe',
+        };
       },
     },
   );
 }
 
-/** Every soil tile in the field carries a crop at the end of the shift. */
 export function everyTilePlanted(label = 'Leave every soil tile planted'): Objective {
   const done = (ctx: ObjectiveContext): number =>
     soilTiles(ctx.initialWorld).filter((at) => tileAt(ctx.world, at)?.crop !== undefined).length;
@@ -246,12 +222,6 @@ export function everyTilePlanted(label = 'Leave every soil tile planted'): Objec
   );
 }
 
-/**
- * Every tile selected by `pick` was harvested at some point in the run.
- *
- * A rotated tile is replanted before the run ends, so the final world cannot answer this. The
- * trace can.
- */
 export function harvestedEvery(
   pick: (world: World) => Vec[],
   label: string,
@@ -261,28 +231,22 @@ export function harvestedEvery(
     const taken = harvestedPositions(ctx);
     return pick(ctx.initialWorld).filter((at) => taken.has(key(at))).length;
   };
-  return Objectives.custom(
-    id,
-    label,
-    (ctx) => done(ctx) === pick(ctx.initialWorld).length,
-    {
-      progress: (ctx) => [done(ctx), pick(ctx.initialWorld).length],
-      divergence: (ctx) => {
-        const taken = harvestedPositions(ctx);
-        const left = pick(ctx.initialWorld).find((tile) => !taken.has(key(tile)));
-        if (left === undefined) return undefined;
-        const wasted = wastedSwingsAt(ctx, 'harvest', left);
-        return {
-          where: at(left),
-          expected: 'harvested',
-          received: wasted === 0 ? 'never harvested' : `${swings(wasted)}, nothing taken`,
-        };
-      },
+  return Objectives.custom(id, label, (ctx) => done(ctx) === pick(ctx.initialWorld).length, {
+    progress: (ctx) => [done(ctx), pick(ctx.initialWorld).length],
+    divergence: (ctx) => {
+      const taken = harvestedPositions(ctx);
+      const left = pick(ctx.initialWorld).find((tile) => !taken.has(key(tile)));
+      if (left === undefined) return undefined;
+      const wasted = wastedSwingsAt(ctx, 'harvest', left);
+      return {
+        where: at(left),
+        expected: 'harvested',
+        received: wasted === 0 ? 'never harvested' : `${swings(wasted)}, nothing taken`,
+      };
     },
-  );
+  });
 }
 
-/** The hopper came back full of `kind`. Capacity is drawn per seed, so it is read off the world. */
 export function hopperFullOf(kind: ItemKind, label: string): Objective {
   const capacity = (world: World): number => botById(world, 0)?.capacity ?? 0;
   const held = (world: World): number => {
@@ -320,13 +284,6 @@ export function hopperFullOf(kind: ItemKind, label: string): Objective {
   );
 }
 
-/**
- * The first swing of either arm that came back with nothing, and how many followed it.
- *
- * The objective reads as a yes-or-no, and it is not one: the run knows the tick, the tile and
- * which arm, and a sweep that swings at everything wastes a dozen of these without being able to
- * see one of them. The tile is the useful half — it is where scanning first would have paid.
- */
 function firstWastedSwing(ctx: ObjectiveContext): Divergence | undefined {
   const first = ctx.trace.events.find(
     (event): event is HarvestEvent | PlantEvent =>
@@ -342,14 +299,12 @@ function firstWastedSwing(ctx: ObjectiveContext): Divergence | undefined {
   };
 }
 
-/** Bonus: no harvest and no plant call came back empty-handed. */
 export function noWastedFieldwork(label = 'Waste no harvest and no planting'): Objective {
   return Objectives.custom('no-wasted-fieldwork', label, (ctx) => failedFieldwork(ctx) === 0, {
     divergence: firstWastedSwing,
   });
 }
 
-/** Bonus: the arm never came down on a tile the hopper had no room for. */
 export function noFailedHarvests(
   label = 'Never swing at a hopper that is already full',
 ): Objective {
@@ -358,7 +313,6 @@ export function noFailedHarvests(
   });
 }
 
-/** Bonus: exactly one successful harvest per ripe tile, and not one failed attempt. */
 export function harvestedNothingTwice(label = 'One harvest per ripe crop, no misses'): Objective {
   return Objectives.custom(
     'exact-harvests',
@@ -382,14 +336,6 @@ export function harvestedNothingTwice(label = 'One harvest per ripe crop, no mis
   );
 }
 
-/**
- * Bonus: the run spent nothing beyond the drive to the ripest crop.
- *
- * The allowance is the distance from the bot's start tile to the target, so the star is only there
- * for a run that stopped the moment it had the answer rather than reading to the end of the row and
- * walking back. A seed that puts the target under the bot allows nothing at all, which is right:
- * the answer was already on the screen.
- */
 export function parkedWithoutOvershoot(
   label = 'Park on the ripest crop without driving one move past it',
 ): Objective {
@@ -427,18 +373,11 @@ export function parkedWithoutOvershoot(
   );
 }
 
-/** What one crop owed the freshness ledger: the ticks it stood mature with nobody on it. */
 interface SpoilageEntry {
   at: Vec;
   owed: number;
 }
 
-/**
- * The freshness ledger, one row per crop the seed sowed rather than one total.
- *
- * The sum is what the objective grades; the rows are what makes a miss legible, because a plot
- * that owes twenty-four owes most of it to one tile and the player has no way to see which.
- */
 function spoilageLedger(ctx: ObjectiveContext): SpoilageEntry[] {
   const taken = firstHarvestTicks(ctx);
   const rows: SpoilageEntry[] = [];
@@ -458,7 +397,6 @@ function spoilageLedger(ctx: ObjectiveContext): SpoilageEntry[] {
   return rows;
 }
 
-/** The tick of the first successful harvest at each position the run took something from. */
 export function firstHarvestTicks(ctx: ObjectiveContext): Map<string, number> {
   const out = new Map<string, number>();
   for (const event of ctx.trace.events) {
@@ -469,13 +407,6 @@ export function firstHarvestTicks(ctx: ObjectiveContext): Map<string, number> {
   return out;
 }
 
-/**
- * Bonus: the depot's freshness ledger — one unit for every tick a crop stood mature and unpicked,
- * summed over the crops the seed sowed. A crop never taken is charged to the end of the run.
- *
- * A total rather than a worst case, because the hopper starts full: nothing can be harvested until
- * something has been planted, and that opening debt is the same whatever the player writes.
- */
 export function withinSpoilage(limit: number, label: string): Objective {
   const spoilage = (ctx: ObjectiveContext): number =>
     spoilageLedger(ctx).reduce((sum, entry) => sum + entry.owed, 0);
@@ -516,12 +447,6 @@ export function withinSpoilage(limit: number, label: string): Objective {
   );
 }
 
-/**
- * Bonus: how much of the field the bot actually entered, its start tile included.
- *
- * A budget on the wheels rather than on the clock. The sensor reaches tiles the bot never stands
- * on, so a run that reads more can walk less; a sweep that crosses every tile it surveys cannot.
- */
 export function withinFootprint(limit: number, label: string): Objective {
   const entered = (ctx: ObjectiveContext): number => {
     const seen = new Set<string>();
@@ -532,29 +457,24 @@ export function withinFootprint(limit: number, label: string): Objective {
     }
     return seen.size;
   };
-  return Objectives.custom(
-    'tile-footprint',
-    label,
-    (ctx) => entered(ctx) <= limit,
-    {
-      progress: (ctx) => [entered(ctx), limit],
-      divergence: (ctx) => {
-        const seen = new Set<string>();
-        const bot = botById(ctx.initialWorld, 0);
-        if (bot) seen.add(key(bot.at));
-        for (const event of ctx.trace.events) {
-          if (event.kind !== 'move' || !event.ok || seen.has(key(event.to))) continue;
-          seen.add(key(event.to));
-          if (seen.size > limit) {
-            return {
-              where: `tick ${String(event.t)} · ${at(event.to)}`,
-              expected: `${String(limit)} tiles`,
-              received: `tile ${String(seen.size)} of ${String(entered(ctx))}`,
-            };
-          }
+  return Objectives.custom('tile-footprint', label, (ctx) => entered(ctx) <= limit, {
+    progress: (ctx) => [entered(ctx), limit],
+    divergence: (ctx) => {
+      const seen = new Set<string>();
+      const bot = botById(ctx.initialWorld, 0);
+      if (bot) seen.add(key(bot.at));
+      for (const event of ctx.trace.events) {
+        if (event.kind !== 'move' || !event.ok || seen.has(key(event.to))) continue;
+        seen.add(key(event.to));
+        if (seen.size > limit) {
+          return {
+            where: `tick ${String(event.t)} · ${at(event.to)}`,
+            expected: `${String(limit)} tiles`,
+            received: `tile ${String(seen.size)} of ${String(entered(ctx))}`,
+          };
         }
-        return undefined;
-      },
+      }
+      return undefined;
     },
-  );
+  });
 }

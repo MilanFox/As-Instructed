@@ -1,22 +1,3 @@
-/**
- * Two tick numbers, and a player who can tell them apart.
- *
- * `w8-01` asks the run to close inside 215 ticks and pars at 165. Both were printed as "ticks"
- * with nothing to say which one ends the work order and which one moves the medal, and a player
- * who reads the wrong one either rewrites a passing program or watches a good one fail.
- * The fix gave each its own word.
- *
- * Nothing here hardcodes 215 or 165. The numbers are read off the level, so a par repair moves the
- * expectation with it; what is pinned is that the two numbers are different, that each is printed
- * under its own word, and that one line on the screen says which does what.
- *
- * The last section is the other end of the same defect: an ungraded work order has no par, so the
- * run report must not print one. That was the last place the two numbers could still read as one
- * kind of thing.
- *
- * The renderer is `src/ui/__tests__/react-driver.ts`, one hand-cranked React shared by every UI
- * test.
- */
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type * as ReactModule from 'react';
 import { reactDriver as driver } from './react-driver.ts';
@@ -55,11 +36,6 @@ const { isGraded } = await import('../../game/score.ts');
 type LevelDef = NonNullable<ReturnType<typeof getLevel>>;
 type Objective = LevelDef['objectives'][number];
 
-/**
- * The run report as the desk draws it: a snapshot, on a certificate of closure or a HALT notice.
- * `Results` was a modal that destroyed itself; the sheet is the same
- * report on paper, and it is read off `snapshotReport` exactly as `usePaperwork` reads it.
- */
 function Results(): unknown {
   const report = snapshotReport(useGame.getState() as never);
   return report ? ReportSheet({ report } as never) : null;
@@ -67,7 +43,6 @@ function Results(): unknown {
 
 type Props = Record<string, unknown>;
 
-/** The words a player reads, in order, from a component rendered with its children. */
 function words(node: unknown): string {
   if (node === null || node === undefined || typeof node === 'boolean') return '';
   if (typeof node === 'string' || typeof node === 'number') return String(node);
@@ -82,7 +57,6 @@ function words(node: unknown): string {
   return words(props['children']);
 }
 
-/** Renders one screen and flattens it to the text on it, with single spaces between runs. */
 function screen(component: () => unknown): string {
   driver.reset();
   return words(component()).replace(/\s+/g, ' ').trim();
@@ -91,19 +65,12 @@ function screen(component: () => unknown): string {
 const GRADED_WITH_A_LIMIT = 'w8-01';
 const UNGRADED = 'w1-01';
 
-/** The rail's own rule for "this level is scored on the clock as well as against par". */
 function tickObjectiveOf(level: LevelDef): Objective | undefined {
   return level.objectives.find(
     (objective) => objective.meter?.kind === 'ticks' || /\bticks?\b/i.test(objective.label),
   );
 }
 
-/**
- * The deadline the level set, asked of the objective rather than read off a copy of it.
- *
- * A tick budget's `progress()` reports `[spent, deadline]`, so sampling it at tick zero is the
- * objective naming its own limit. Nothing here has to know that `w8-01` says 215.
- */
 function limitOf(level: LevelDef): number | undefined {
   const objective = tickObjectiveOf(level);
   const at = objective?.progress?.({ trace: { endTick: 0 } } as never);

@@ -1,21 +1,3 @@
-/**
- * The site feed — a K&D asset from 2207, and the company's window onto the planet.
- *
- * It is its own physical screen, not a panel inside the terminal: pale grey-beige, thick housing,
- * transport keys screwed to the case, an inventory tag somebody stuck on and nobody removed. The
- * joke is meant to be visible in the object — the firm bought you a good machine to write on and a
- * twenty-year-old monitor to look at the planet through.
- *
- * Two rules shape everything below, and both of them are older than the desk:
- *
- * 1. **Nothing is drawn over the board.** The canvas is inset by `FEED_INSET` and every readout on
- *    this screen lives in the strip that inset created; the rest of the furniture is deliberately
- *    left unreserved. There is no chrome over the picture, so there is nothing for a guard to have
- *    to protect — see `src/ui/__tests__/monitor-margin.test.ts`.
- * 2. **The board is never non-rectilinear.** DESIGN §8's "no curvature" is a gameplay rule wearing
- *    an aesthetic hat and it applies to the chrome too, so the glass is a flat sheen and the mode
- *    change is a change of light, never of geometry.
- */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { World } from '../../../engine/index.ts';
@@ -38,7 +20,6 @@ import {
 import type { FeedRenderer } from './feed.ts';
 import { readoutLine } from './feed.ts';
 
-/** Reused, never rebuilt: the graticule reads it once a frame. */
 const VIEW: BoardView = { originX: 0, originY: 0, tilePx: 0, cols: 0, rows: 0 };
 
 export function Monitor(): React.ReactElement {
@@ -59,11 +40,6 @@ export function Monitor(): React.ReactElement {
 
   const [readout, setReadout] = useState<TileReadout | null>(null);
 
-  /*
-   * The board before the first run. Memoised because `setPreview` guards on the world's identity
-   * and re-fits the camera when it changes — a world rebuilt per render re-fits every frame and
-   * cancels any lean with it.
-   */
   const world = useMemo<World | null>(
     () => trace?.initialWorld ?? (level ? level.build(level.seeds[0] as number) : null),
     [level, trace],
@@ -74,16 +50,6 @@ export function Monitor(): React.ReactElement {
   const active = activeTrack(playback, flooredTick);
   const highlights = useMemo(() => highlightsAt(playback, flooredTick), [playback, flooredTick]);
 
-  /*
-   * Where the run went wrong, kept after the report is put down.
-   *
-   * The certificate is paper and stays on the desk, so the sentence already outlives the ceremony;
-   * this is the other half of the requirement — the two coordinates, on the site view, where they
-   * are. It replaces the objective brackets only while the playhead is parked at the end of the
-   * run, which is where a finished run leaves it: scrub back into the trace and the brackets go
-   * back to following the objective, because during the replay the question is what the bot is
-   * doing rather than how it ended.
-   */
   const cause = useMemo(() => {
     if (!level) return null;
     for (let i = docs.length - 1; i >= 0; i--) {
@@ -99,17 +65,11 @@ export function Monitor(): React.ReactElement {
   const cells = marking ? failure : highlights.cells;
   const met = marking ? false : highlights.met;
 
-  /*
-   * The brackets follow the objective in progress, and move on as it closes. The signature keeps
-   * this to one call per actual change rather than one per frame — the playhead ticks at 60Hz and
-   * the objective it is working on does not, and `setHighlights` leans the camera.
-   */
   const signature = `${marking ? 'diverged' : (active?.id ?? 'done')}:${met ? 'met' : 'open'}:${cells
     .map((cell) => `${String(cell.x)},${String(cell.y)}`)
     .join(' ')}`;
   useEffect(() => {
     renderer().setHighlights(cells, met);
-    // The signature is the dependency on purpose: `highlights` is a fresh object every frame.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [renderer, signature]);
 
@@ -133,23 +93,6 @@ export function Monitor(): React.ReactElement {
     (renderer() as FeedRenderer).setPreview?.(world);
   }, [renderer, world]);
 
-  /*
-   * The board opens at the largest legible rung, not at whatever fits — and the camera is handed
-   * back the moment the player asks for it.
-   *
-   * Eight of the campaign's thirty-three grids cannot fit this picture above
-   * `LEGIBLE_DEVICE_TILE_PX`, and five of them could not fit a full-bleed one either. Opening them
-   * small is the reachability failure that runs through the whole audit: the capability to enlarge
-   * exists, nothing tells the player about it, and a first-time player on `w4-05` concludes the
-   * game is like that. So the camera climbs to the floor even when that crops the grid, and `FIT`
-   * on the transport is the way back to the whole board — a key on the case, not a shortcut nobody
-   * finds.
-   *
-   * `held` is the whole of the arbitration. The renderer re-fits on mount, on every resize and on
-   * every `setTrace`, so the floor cannot be applied once and left; it is re-asserted on the frame
-   * loop instead, and stops the instant the player touches the zoom or the wheel. Without that,
-   * pressing `−` would be a control the desk immediately undid.
-   */
   const held = useRef(false);
   useEffect(() => {
     held.current = false;
@@ -167,27 +110,16 @@ export function Monitor(): React.ReactElement {
     [renderer],
   );
 
-  /* The tile under the pointer, named in the header strip. */
   useEffect(() => {
     return (renderer() as FeedRenderer).onHover?.(setReadout);
   }, [renderer]);
 
-  /*
-   * The readout goes stale when the playhead moves under a still pointer — maturity is read at the
-   * current tick — and `onHover` only fires on a change of cell. This is why `readoutAt` exists.
-   */
   useEffect(() => {
     const at = pointer.current;
     if (!at) return;
     setReadout((renderer() as FeedRenderer).readoutAt?.(at.x, at.y) ?? null);
   }, [renderer, flooredTick]);
 
-  /*
-   * The graticule follows the camera by three custom properties, written only when they change.
-   *
-   * The renderer's frame loop is the heartbeat, so this adds no second clock. It is O(1) per frame
-   * in the size of the grid: every tick mark positions itself off `--gx0`/`--gy0`/`--gt` in CSS.
-   */
   useEffect(() => {
     const port = renderer() as FeedRenderer;
     if (!port.readView) return;
@@ -202,11 +134,6 @@ export function Monitor(): React.ReactElement {
         const climb = floor - ladderIndex(port.deviceTilePx?.() ?? LEGIBLE_DEVICE_TILE_PX);
         if (climb > 0) {
           port.zoomBy?.(climb);
-          /*
-           * A cropped replay the player cannot follow off the edge of the picture would be a worse
-           * answer than the small board it replaced, so the camera takes the bot while the grid is
-           * bigger than the screen. Everything that fits is left alone.
-           */
           port.setFollow?.(trace ? (world?.bots[0]?.id ?? null) : null);
         }
       }
@@ -233,7 +160,6 @@ export function Monitor(): React.ReactElement {
     pointer.current = null;
   }, []);
 
-  /* The renderer's own wheel handler zooms the camera; this is how the desk hears about it. */
   const onWheel = useCallback((): void => {
     held.current = true;
   }, []);
@@ -241,10 +167,6 @@ export function Monitor(): React.ReactElement {
   const site = level ? (worldMeta(level.world)?.name ?? 'SITE').toUpperCase() : 'NO SITE';
   const grid = world ? `${String(world.w)}×${String(world.h)}` : '—';
 
-  /*
-   * A tile with a machine, a stack and a mark on it outruns the gap between the two static notes,
-   * and the composition only grows. When it does, the strip belongs to the readout.
-   */
   const line = readoutLine(readout);
   const wide = line.length > READOUT_CHARS_IN_THE_GAP;
 
@@ -283,11 +205,6 @@ export function Monitor(): React.ReactElement {
             onWheel={onWheel}
           />
 
-          {/*
-           * The empty state and the playhead timecode both live in the strip below the picture,
-           * because anything placed over the board would reopen the overlap collision the guard
-           * exists to prevent.
-           */}
           {trace ? (
             <span className="feed-tick">{String(flooredTick).padStart(4, '0')}</span>
           ) : (

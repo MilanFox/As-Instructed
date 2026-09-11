@@ -49,7 +49,10 @@ function parsePacket(text: string): Packet | null {
   const star = text.indexOf('*');
   if (star < 0) return null;
   const bytes = text.slice(0, star).split(',').map(Number);
-  const claimed = text.slice(star + 1).split(',').map(Number);
+  const claimed = text
+    .slice(star + 1)
+    .split(',')
+    .map(Number);
   if (claimed.length !== 2) return null;
   return { text, bytes, sum: claimed[0] ?? -1, weight: claimed[1] ?? -1 };
 }
@@ -69,11 +72,6 @@ const cleanTraffic = (world: World): string[] => {
     .map((packet) => packet.text);
 };
 
-/**
- * Which byte was altered. One byte moved by an odd delta, so the plain difference is invertible
- * mod 256 and the weighted difference names the position uniquely — which is what makes the
- * bonus solvable at all. The `A corrupt packet` fact card states the odd delta (DESIGN.md §11).
- */
 const faultReports = (world: World): string[] => {
   const salt = postVar(world, 'salt');
   const out: string[] = [];
@@ -96,14 +94,6 @@ const reported = (ctx: ObjectiveContext): string[] =>
     .map((event) => (event.kind === 'print' ? event.text : ''))
     .filter((line) => line.startsWith('bad '));
 
-/**
- * The first packet the run handled differently from the band did.
- *
- * Walking the band rather than the outgoing stream is what lets the report name *which* packet
- * went the wrong way, and in which direction, rather than which slot of the relay disagreed. It
- * gives back the level's verdict on one packet out of twenty to forty; the rule that produces
- * that verdict is still the player's to write.
- */
 function firstMishandled(ctx: ObjectiveContext): Divergence | undefined {
   const salt = postVar(ctx.initialWorld, 'salt');
   const sent = relayed(ctx);
@@ -138,7 +128,6 @@ function firstMishandled(ctx: ObjectiveContext): Divergence | undefined {
   };
 }
 
-/** `bad <packet> <byte>` split back into its two numbers, or null when it is not that shape. */
 function readFault(line: string): { packet: number; byte: number } | null {
   const parts = line.split(' ');
   if (parts.length !== 3) return null;
@@ -148,13 +137,6 @@ function readFault(line: string): { packet: number; byte: number } | null {
   return { packet, byte };
 }
 
-/**
- * Where the fault report and the band part company, without ever saying which byte was altered.
- *
- * Naming the byte would be the whole bonus, so what comes back instead is the run's own answer
- * for one packet and the fact that it is the wrong one. That rules out a single byte of the four
- * to ten in that packet and leaves the arithmetic that finds the rest exactly where it was.
- */
 function firstFault(ctx: ObjectiveContext): Divergence | undefined {
   const wanted = faultReports(ctx.initialWorld);
   const said = reported(ctx);
@@ -193,14 +175,6 @@ function firstFault(ctx: ObjectiveContext): Divergence | undefined {
   };
 }
 
-/**
- * The salt is the anti-hardcode axis alongside the corruption pattern: it is drawn per seed and
- * only readable from the antenna, so a memorised check fails on the next shift.
- *
- * Par: the reference transmits every clean packet and nothing else, so its tick count is the
- * clean-packet count. Seed 2 has no corruption and costs 37 ticks, the most of any seed; that is
- * `par.ticks`. No shave is available — a packet cannot be relayed for less than one transmit.
- */
 export const w6_02: LevelDef = {
   id: 'w6-02',
   world: 6,
@@ -216,25 +190,6 @@ export const w6_02: LevelDef = {
     '',
     'Relay every packet whose check values match, unchanged and in order. Relay nothing else.',
   ].join('\n'),
-  /**
-   * DESIGN.md §11.10.
-   *
-   * The salt is the axis and the level's own header comment already says so to the next author:
-   * drawn per shift, readable only from the antenna, so a check with a number written into it
-   * passes once and never again. Saying it on the sheet is the same claim made to the player, and
-   * it costs nothing — the salt is a free `probe` and the facts publish both check formulas.
-   *
-   * The corruption rate belongs beside it, because it is the axis that decides whether a run's
-   * *structure* is right rather than its arithmetic. A shift with nothing wrong on it and a shift
-   * whose very first packet is wrong both exist, and hint 3 is currently the only place either is
-   * mentioned — which §11.3 says is one place too few for something the objective grades. A run
-   * that quietly assumes at least one clean packet, or at least one corrupt one, is a run that
-   * passes the shift in front of it and fails a sibling.
-   *
-   * The two check values are computed over the payload *before* `build` spoils a byte and are
-   * never touched afterwards, so they are always the truth about what was sent. That is what makes
-   * the star's arithmetic possible at all, and it is not visible from a packet.
-   */
   board: {
     fixed: [
       'the post is a 12 by 6 shack; RIG-06 stays on the antenna',
@@ -283,7 +238,6 @@ export const w6_02: LevelDef = {
     const rng = new Rng(seed * 7919 + 62);
     const salt = rng.int(0, 255);
     const count = rng.int(20, 40);
-    // Seed 2 is the clean band; seed 3 corrupts packet 0. CURRICULUM.md §8.
     const rate = seed === 2 ? 0 : rng.int(10, 30) / 100;
     const packets: string[] = [];
     let corrupted = 0;

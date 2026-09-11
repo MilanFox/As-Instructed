@@ -1,5 +1,3 @@
-/* Self-hosted per DESIGN.md §8. Both files are variable fonts, latin subset. */
-
 @font-face {
   font-family: 'Inter';
   src: url('/fonts/Inter-latin-var.woff2') format('woff2-variations');

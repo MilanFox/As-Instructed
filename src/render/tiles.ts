@@ -1,38 +1,9 @@
-/**
- * Tile vocabulary and the runtime atlas.
- *
- * `public/assets/tiles/` ships a curated 48 px atlas (`bootstrap_tiles_48.png` + `.json`) drawn
- * from several Kenney source packs, plus a list of names it deliberately does not cover — flat
- * geometric or animated things that Canvas2D draws better than a bitmap would. This module
- * resolves *both* kinds behind one lookup, so the rest of the renderer only ever asks for a
- * semantic name.
- *
- * Every source pack ships at a 64 px grid and is upscaled into the atlas, except the `tanks` pack:
- * it is Kenney's *retina* (2x) sheet, with sprites ranging 56-139 px, and is deliberately
- * downscaled instead. That inconsistency is intentional — leave it alone.
- *
- * Two decisions worth knowing about:
- *
- * 1. **Everything is re-packed into one runtime atlas canvas with a 2 px extrusion border.**
- *    The shipped atlas is tightly packed. `drawImage` with a source rect samples across rect
- *    edges once the destination is not 1:1, which produces hairline seams between floor tiles at
- *    any zoom other than 100%. Extruding each frame's border pixels makes the bleed sample the
- *    frame's own edge instead, and the seams disappear. Code-drawn tiles are baked into the same
- *    canvas so there is exactly one texture source at draw time.
- *
- * 2. **Name resolution is pure and testable.** `TILE_VOCABULARY`, `CODE_TILE_NAMES`,
- *    `parseAtlas` and `terrainArt` never touch a canvas, so a typo'd semantic name fails in
- *    Vitest under Node rather than as a silently missing tile at runtime.
- */
-
 import { Terrain } from '../engine/index.ts';
 import type { Tile } from '../engine/index.ts';
 import { palette } from './theme.ts';
 
-/** DESIGN.md §8. Non-negotiable. */
 export const TILE_PX = 48;
 
-/** Extrusion border, in atlas pixels, around every frame. See the note above. */
 export const ATLAS_PAD = 2;
 
 const CELL = TILE_PX + ATLAS_PAD * 2;
@@ -50,15 +21,6 @@ export interface AtlasJson {
   frames: Record<string, AtlasFrame>;
 }
 
-// ---------------------------------------------------------------------------
-// Vocabulary
-// ---------------------------------------------------------------------------
-
-/**
- * Names the renderer draws itself: flat geometric things Canvas2D draws better than a bitmap
- * would. The one extra beyond that base set is `feature.fuel_depot`, which DESIGN.md §4.4 needs
- * and no Kenney pack has as a top-down tile.
- */
 export const CODE_TILE_NAMES: readonly string[] = [
   'floor.grating',
   'floor.tilled',
@@ -71,13 +33,7 @@ export const CODE_TILE_NAMES: readonly string[] = [
   'item.battery',
 ];
 
-/**
- * The full set of names any renderer code path may ask for, atlas-backed or code-drawn. The test
- * suite asserts every entry resolves; that is the whole point of keeping the list explicit rather
- * than deriving it from the atlas JSON.
- */
 export const TILE_VOCABULARY: readonly string[] = [
-  // floors
   'floor.metal',
   'floor.metal.dot',
   'floor.metal.bolt',
@@ -113,7 +69,6 @@ export const TILE_VOCABULARY: readonly string[] = [
   'floor.hazard',
   'floor.water',
   'floor.grass',
-  // walls and blockers
   'wall.metal',
   'wall.metal.b',
   'wall.metal.c',
@@ -139,7 +94,6 @@ export const TILE_VOCABULARY: readonly string[] = [
   'blocker.barricade_wood',
   'blocker.sandbag',
   'blocker.sandbag.brown',
-  // features
   'feature.landing_pad',
   'feature.landing_pad.w',
   'feature.door',
@@ -168,7 +122,6 @@ export const TILE_VOCABULARY: readonly string[] = [
   'feature.coolant',
   'feature.coolant.b',
   'feature.lava',
-  // ore, rock, plants
   'ore.stage1',
   'ore.stage2',
   'ore.stage3',
@@ -192,7 +145,6 @@ export const TILE_VOCABULARY: readonly string[] = [
   'plant.bush.dead',
   'plant.tree',
   'plant.tree.dead',
-  // items
   'item.crate.brown',
   'item.crate.red',
   'item.crate.blue',
@@ -216,7 +168,6 @@ export const TILE_VOCABULARY: readonly string[] = [
   'item.coin',
   'item.seed',
   'item.battery',
-  // overlays
   'overlay.goal',
   'overlay.goal.brown',
   'overlay.goal.red',
@@ -228,11 +179,6 @@ export const TILE_VOCABULARY: readonly string[] = [
   'overlay.tracks.large',
 ];
 
-/**
- * `PLANT_STAGES[i]` is the sprite for maturity bucket `i` of `PLANT_STAGES.length`. DESIGN.md
- * §8 requires the stages to be *visually* distinct — w2-02 is unsolvable if a player cannot
- * read maturity at a glance — so this is a six-step ladder, not a tint ramp.
- */
 export const PLANT_STAGES: readonly string[] = [
   'plant.stage0',
   'plant.stage1',
@@ -242,7 +188,6 @@ export const PLANT_STAGES: readonly string[] = [
   'plant.mature',
 ];
 
-/** Maturity 0..max mapped onto `PLANT_STAGES`. `max <= 0` means "authored fully grown". */
 export function plantStageIndex(growth: number, max: number): number {
   const last = PLANT_STAGES.length - 1;
   if (max <= 0) return last;
@@ -255,33 +200,18 @@ export function plantStageName(growth: number, max: number): string {
   return PLANT_STAGES[plantStageIndex(growth, max)] as string;
 }
 
-// ---------------------------------------------------------------------------
-// Biomes
-// ---------------------------------------------------------------------------
-
 export type Biome =
-  | 'hangar'
-  | 'regolith'
-  | 'yard'
-  | 'cave'
-  | 'grid'
-  | 'signal'
-  | 'swarm'
-  | 'finale';
+  'hangar' | 'regolith' | 'yard' | 'cave' | 'grid' | 'signal' | 'swarm' | 'finale';
 
 export interface BiomeArt {
-  /** Full-bleed floor variants, chosen deterministically per cell. */
   floors: readonly string[];
-  /** Rare marking tiles sprinkled over `floors`, e.g. the hangar's painted bay lines. */
   accents: readonly string[];
-  /** How often an accent replaces the base floor, 0..1. */
   accentRate: number;
   wall: readonly string[];
   pad: string;
   regolith: readonly string[];
   soil: readonly string[];
   rockFloor: string;
-  /** Multiply the whole terrain layer by this, for the cave's "turn the lights off" look. */
   dim: number;
 }
 
@@ -401,7 +331,6 @@ export function biomeArt(biome: Biome): BiomeArt {
   return BIOMES[biome];
 }
 
-/** Stable per-cell noise. Deterministic across reloads so a level always looks the same. */
 export function cellHash(x: number, y: number, salt = 0): number {
   let h = (x * 374761393 + y * 668265263 + salt * 2147483647) | 0;
   h = (h ^ (h >>> 13)) * 1274126177;
@@ -412,24 +341,21 @@ function pick(list: readonly string[], r: number): string {
   return list[Math.min(list.length - 1, Math.floor(r * list.length))] as string;
 }
 
-/**
- * How one tile is drawn. `base` is a full-bleed floor and always exists; `prop` is a
- * transparent-background sprite composited on top.
- */
 export interface TerrainArt {
   base: string;
   prop: string | null;
-  /** Terrain the player cannot walk into. Drives the wall drop-shadow pass. */
   solid: boolean;
 }
 
 const EMPTY_ART: TerrainArt = { base: 'floor.metal', prop: null, solid: true };
 
-/**
- * Semantic terrain -> art. Pure: no canvas, no atlas, so the mapping is unit-testable and every
- * `Terrain` member is provably covered.
- */
-export function terrainArt(terrain: Terrain, tile: Tile, biome: Biome, x: number, y: number): TerrainArt {
+export function terrainArt(
+  terrain: Terrain,
+  tile: Tile,
+  biome: Biome,
+  x: number,
+  y: number,
+): TerrainArt {
   const art = BIOMES[biome] ?? BIOMES.hangar;
   const r = cellHash(x, y);
   const groundFloor = art.floors[0] as string;
@@ -438,10 +364,6 @@ export function terrainArt(terrain: Terrain, tile: Tile, biome: Biome, x: number
   switch (terrain) {
     case Terrain.Void:
       return { base: 'floor.metal', prop: null, solid: true };
-    // Conveyor rides with plain floor. `Terrain.Conveyor` promises `facing` in tile meta, the sim
-    // implements nothing, no level places one, and `TileView` has no `meta` for the facing to
-    // arrive through — so the four-phase scroll this used to animate said "something is moving
-    // here" about a mechanic that does not exist. DESIGN.md §11.2: explain it or cut it.
     case Terrain.Floor:
     case Terrain.Conveyor:
       return { base: baseFloor, prop: null, solid: false };
@@ -453,10 +375,6 @@ export function terrainArt(terrain: Terrain, tile: Tile, biome: Biome, x: number
       return { base: pick(art.regolith, r), prop: null, solid: false };
     case Terrain.Soil:
       return { base: pick(art.soil, r), prop: null, solid: false };
-    // Rock, ore and rubble sit on the biome's *canonical* floor rather than a stone plate or a
-    // random variant. Swapping the floor punches a visible hole in the ground plane, and letting
-    // the variant roll makes every obstacle a differently-coloured square. The prop, the solid
-    // tint and the drop shadow are what say "you cannot walk here".
     case Terrain.Rock:
       return { base: groundFloor, prop: pick(['rock.large', 'rock.boulder'], r), solid: true };
     case Terrain.Ore:
@@ -484,7 +402,6 @@ export function terrainArt(terrain: Terrain, tile: Tile, biome: Biome, x: number
   }
 }
 
-/** Machine kind -> sprite. Machines are landmarks, so they anchor bottom-centre. */
 export function machineTileName(kind: string, state: string): string {
   switch (kind) {
     case 'door':
@@ -512,7 +429,6 @@ export function machineTileName(kind: string, state: string): string {
   }
 }
 
-/** Item kind -> sprite. */
 export function itemTileName(kind: string): string {
   switch (kind) {
     case 'regolith':
@@ -542,10 +458,6 @@ export function itemTileName(kind: string): string {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Atlas parsing (pure)
-// ---------------------------------------------------------------------------
-
 export function parseAtlas(source: unknown): Map<string, AtlasFrame> {
   const frames = new Map<string, AtlasFrame>();
   if (typeof source !== 'object' || source === null) return frames;
@@ -567,7 +479,6 @@ export function parseAtlas(source: unknown): Map<string, AtlasFrame> {
   return frames;
 }
 
-/** Vocabulary entries that neither the atlas nor the code-tile list can satisfy. */
 export function missingFrames(
   vocabulary: readonly string[],
   atlas: ReadonlyMap<string, AtlasFrame>,
@@ -576,10 +487,6 @@ export function missingFrames(
   const code = new Set(codeNames);
   return vocabulary.filter((name) => !atlas.has(name) && !code.has(name));
 }
-
-// ---------------------------------------------------------------------------
-// Code-drawn tiles
-// ---------------------------------------------------------------------------
 
 type CodeTilePainter = (ctx: CanvasRenderingContext2D) => void;
 
@@ -609,9 +516,6 @@ function tilled(rotate: boolean): CodeTilePainter {
       ctx.translate(TILE_PX, 0);
       ctx.rotate(Math.PI / 2);
     }
-    // Broken ridges, not floorboards. Straight full-width lines at even spacing read as decking
-    // the moment the tile repeats across a plot, so each furrow is a run of short offset dashes
-    // at an uneven pitch, and the clod speckle carries most of the texture.
     const pitch = [0, 11, 21, 32, 41];
     for (let i = 0; i < pitch.length; i++) {
       const y = 4 + (pitch[i] as number);
@@ -662,8 +566,6 @@ function circuit(variant: number): CodeTilePainter {
 function hazard(ctx: CanvasRenderingContext2D): void {
   fill(ctx, '#2a2a2a');
   ctx.fillStyle = palette.accent2;
-  // 45 degree stripes, 8 px on / 8 px off. At 48 px the pattern closes exactly, so the tile
-  // repeats seamlessly against itself in both axes.
   for (let i = -TILE_PX; i < TILE_PX * 2; i += 16) {
     ctx.beginPath();
     ctx.moveTo(i, 0);
@@ -677,7 +579,6 @@ function hazard(ctx: CanvasRenderingContext2D): void {
   ctx.fillRect(0, 0, TILE_PX, 2);
   ctx.fillRect(0, TILE_PX - 2, TILE_PX, 2);
 }
-
 
 function solarPanel(ctx: CanvasRenderingContext2D): void {
   fill(ctx, '#2b3644');
@@ -763,10 +664,6 @@ const CODE_PAINTERS: Readonly<Record<string, CodeTilePainter>> = {
   'item.battery': battery,
 };
 
-// ---------------------------------------------------------------------------
-// Runtime atlas
-// ---------------------------------------------------------------------------
-
 function createCanvas(w: number, h: number): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
   canvas.width = w;
@@ -780,10 +677,6 @@ function context2d(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
   return ctx;
 }
 
-/**
- * Copies one 48x48 frame into the runtime atlas and extrudes its border by `ATLAS_PAD`, so that
- * bilinear sampling at non-1:1 zoom can never pull in a neighbouring frame's pixels.
- */
 function blitExtruded(
   ctx: CanvasRenderingContext2D,
   source: CanvasImageSource,
@@ -806,18 +699,12 @@ function blitExtruded(
 }
 
 export interface TileSetOptions {
-  /** Directory holding `bootstrap_tiles_48.json` and its PNG. */
   baseUrl?: string;
 }
 
-/**
- * One texture source for the whole renderer. Resolve a semantic name to a frame with `frame()`,
- * or draw straight to a context with `draw()`.
- */
 export class TileSet {
   readonly canvas: HTMLCanvasElement;
   private readonly frames = new Map<string, AtlasFrame>();
-  /** Names present in the shipped atlas JSON but absent from `TILE_VOCABULARY`. Diagnostics only. */
   readonly extraNames: readonly string[];
 
   private constructor(canvas: HTMLCanvasElement, frames: Map<string, AtlasFrame>, extra: string[]) {
@@ -881,15 +768,10 @@ export class TileSet {
     return this.frames.get(name);
   }
 
-  /** Every resolvable name. Used by the dev harness's contact sheet. */
   names(): string[] {
     return [...this.frames.keys()];
   }
 
-  /**
-   * Draws one tile. Silently no-ops on an unknown name — a missing tile must never take the RAF
-   * loop down mid-frame; the Vitest vocabulary check is where a typo is meant to fail.
-   */
   draw(ctx: CanvasRenderingContext2D, name: string, dx: number, dy: number, size: number): void {
     const f = this.frames.get(name);
     if (!f) return;

@@ -1,34 +1,3 @@
-/**
- * The rail and the report say the same thing about the same objective, on every work order.
- *
- * `ReportObjective`'s own docstring is the claim: *"a budget that read as a gauge while the run
- * played and as a tick-box in the report is two different claims about the same number."* It was
- * not true. `ObjectiveRail` built its rows without the objective's declared `meter` and `unit`, so
- * `budgetFor` saw `undefined`, fell back to parsing the label, and DESIGN.md §5 — *prefer a
- * declaration over the label* — held in the report and nowhere else. `w5-02`'s `eight-probes` was
- * reachable: a failed run drew a probe gauge in the report and a plain counter on the rail.
- *
- * So the assertion is not the three objectives that were broken. Those were
- * symptoms of one missing pair of fields, and the next objective to declare a meter would have
- * joined them silently. The invariant is the whole campaign, and it is asserted twice over: once on
- * a run that did nothing, and once on the reference solution.
- *
- * **Both halves are real runs.** `runLevel` builds the world, drives it and grades it exactly as
- * the worker does, and the bonus objectives are evaluated the same second pass `src/game/ports.ts`
- * makes — so the store holds a verdict the game could have produced, not a fixture shaped to make
- * a point. The playhead sits at `trace.endTick`, which is where the rail is when the report opens
- * over it: the same run, described twice, on one screen.
- *
- * A do-nothing program is the shape that matters. It is what a player's first Run does on a level
- * they have not solved, and it is the state where a declared budget is neither underspent nor
- * overrun — the two shapes `budgetFor` can recognise without a declaration. An objective that has
- * declared its meter is a gauge there; an objective the rail forgot to hand over is not.
- *
- * What is compared is the four things both components claim about a row: whether it is drawn as a
- * gauge, whether it is over, whether it carries the `limit` tag that says this number ends the work
- * order, and the readout itself — `21 / 16 beams` against `16/16`. Nothing here names a level, a
- * number or a unit; both sides are read off the same render.
- */
 import { describe, expect, test, vi } from 'vitest';
 import type * as ReactModule from 'react';
 import { reactDriver as driver } from './react-driver.ts';
@@ -68,11 +37,6 @@ const { SOLUTIONS } = await import('../../levels/__tests__/solutions.ts');
 
 type LevelDef = ReturnType<typeof campaignOrder>[number];
 type RunResult = ReturnType<typeof runLevel>;
-/**
- * The run report as the desk draws it: a snapshot, on a certificate of closure or a HALT notice.
- * `Results` was a modal that destroyed itself; the sheet is the same
- * report on paper, and it is read off `snapshotReport` exactly as `usePaperwork` reads it.
- */
 function Results(): unknown {
   const report = snapshotReport(useGame.getState() as never);
   return report ? ReportSheet({ report } as never) : null;
@@ -86,7 +50,6 @@ interface Drawn {
   children: Drawn[];
 }
 
-/** The component tree as marks and words, with function components called where they appear. */
 function draw(node: unknown): Drawn[] {
   if (node === null || node === undefined || typeof node === 'boolean') return [];
   if (typeof node === 'string' || typeof node === 'number') {
@@ -127,15 +90,11 @@ function within(nodes: Drawn[], match: (node: Drawn) => boolean): Drawn[] {
   return found;
 }
 
-/** One objective as a screen draws it. Everything both screens claim, and nothing either adds. */
 interface Row {
   label: string;
-  /** A gauge rather than a tick-box: the two shapes mean opposite things. */
   gauge: boolean;
   over: boolean;
-  /** The word that says this number ends the work order rather than moving the medal. */
   limit: boolean;
-  /** `21 / 16 beams`, or `16/16`, or nothing. */
   readout: string;
 }
 
@@ -154,12 +113,6 @@ function rowsOf(component: () => unknown): Row[] {
   }));
 }
 
-/**
- * The store as it stands the moment the report opens over the rail.
- *
- * The bonus pass is `src/game/ports.ts`': `buildVerdict` derives `passed` from every objective it
- * is handed and a missed bonus is not a failed run, so bonuses are graded separately and appended.
- */
 function show(level: LevelDef, run: RunResult): void {
   const bonus = evaluateObjectives(level.bonus ?? [], {
     world: run.world,
@@ -191,7 +144,6 @@ interface Disagreement {
   report: Row;
 }
 
-/** Every row of every work order, rail against report, for one way of driving the campaign. */
 function sweep(drive: (level: LevelDef) => RunResult): { rows: number; found: Disagreement[] } {
   const found: Disagreement[] = [];
   let rows = 0;
@@ -235,11 +187,6 @@ describe('one objective, two screens', () => {
     expect(rows).toBeGreaterThan(campaignOrder().length);
   });
 
-  /*
-   * Without this the pair above could agree by drawing no gauge anywhere, which is exactly the
-   * failure they exist to catch — the rail's answer before the fix. The declared budgets have to be
-   * on the screen for "the same" to mean anything.
-   */
   test('and the agreement is not the agreement of two empty screens', () => {
     const gauges = campaignOrder().flatMap((level) => {
       show(level, idle(level));
@@ -250,13 +197,6 @@ describe('one objective, two screens', () => {
     expect(gauges.some((row) => /\d+ \/ \d+ \w/.test(row.readout))).toBe(true);
   });
 
-  /*
-   * The one reachable case, and the reference solution is what reaches it: it spends its eighth
-   * probe locating the break, so the bonus is met with its
-   * progress exactly full — neither underspent nor overrun, the two shapes `budgetFor` can read
-   * without a declaration. Before the fix the report drew `8 / 8 probes` as a gauge and the rail
-   * drew `8 / 8` as a tick-box, which is the two-claims-about-one-number defect stated in full.
-   */
   test('a bonus that declares its meter is a gauge on the rail too', () => {
     const level = campaignOrder().find((each) => each.id === 'w5-02') as LevelDef;
     show(level, reference(level));

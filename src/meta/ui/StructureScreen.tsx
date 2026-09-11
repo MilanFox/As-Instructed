@@ -4,20 +4,6 @@ import type { LibraryFunction, StructureRow } from '../structure.ts';
 import { useLibrary } from '../store.ts';
 import './library.css';
 
-/**
- * What the Repository is made of.
- *
- * The Cost screen is a ledger; this one is a bill of materials. It exists because a player who has
- * published four subroutines has usually built *one* thing out of them and has never been shown
- * that, and a drawer of parts and a machine feel completely different to own.
- *
- * An indented call tree, not a node-link graph. Twenty-five functions in a panel column is a
- * hairball whichever way it is laid out, and the tree is the form every profiler settled on for the
- * same information: one line per call site, deeper means called-by, and the numbers stay in a
- * column where they can be compared. Two unrelated functions degrade to two roots and no branches,
- * which is the truth rather than an apology.
- */
-
 const INDENT = 16;
 
 function Row({ row, node }: { row: StructureRow; node: LibraryFunction }): React.JSX.Element {

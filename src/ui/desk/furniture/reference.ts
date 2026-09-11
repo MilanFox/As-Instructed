@@ -1,11 +1,3 @@
-/**
- * What is printed in `K&D FORM 12 · REV 9` — the wire-bound reference on the desk.
- *
- * The prose was `src/ui/panels/DocsPanel.tsx`, which was reachable only through a 10px dim
- * uppercase chip in the corner of the board. The manual is the same words behind a door that
- * weighs what is behind it. The content is separated from the book so the guard
- * in `src/__tests__/confessed-invariants.test.ts` has one file to read for the silver rule.
- */
 import type { CostOverrides } from '../../../engine/index.ts';
 import type { ApiFunctionSpec } from '../../../runtime/protocol.ts';
 import { ApiCategory } from '../../../runtime/protocol.ts';
@@ -31,14 +23,6 @@ export interface GuidePage {
   caption?: string;
 }
 
-/**
- * Required reading, and the only page in the manual that is.
- *
- * DESIGN.md §5: several World 4 work orders are unsolvable until the player believes that an
- * ordinary `Set` survives the whole run and that only `mark` writes to the world. A player who
- * thinks their variables are wiped between ticks will reach for `mark` for everything and pay a
- * tick for each write, and the level will look impossible rather than unlearned.
- */
 export const MEMORY: GuidePage = {
   id: 'memory',
   aliases: ['state', 'set', 'map', 'variables', 'remember'],
@@ -143,15 +127,6 @@ console.log('same channel, same tick');`,
   },
 ];
 
-/**
- * What this function costs *on the level the player is looking at*.
- *
- * `api-spec` carries the campaign-wide price, but a level may override any entry in the
- * `CostTable` and three do — `w7-02` halves `spawn`, `w7-04` and `w8-05` halve `use`. Showing the
- * flat number there told the finale's player that working a manual station costs twice what it
- * does, which is enough to make its deadline look unreachable. `wait` is left alone: its cost is
- * the string `'n'`, a multiplier rather than a price.
- */
 export function levelCost(fn: ApiFunctionSpec, costs: CostOverrides | undefined): number | string {
   if (typeof fn.cost !== 'number') return fn.cost;
   return costs?.[fn.name as keyof CostOverrides] ?? fn.cost;

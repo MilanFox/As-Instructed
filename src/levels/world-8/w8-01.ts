@@ -24,7 +24,6 @@ const FIELD_W = 14;
 const FIELD_H = 10;
 const RIPENESS = 4;
 
-/** The silo moves corner to corner between shifts, so the sweep has to start from `probe`. */
 const CORNERS: readonly Vec[] = [
   vec(0, 0),
   vec(FIELD_W - 1, 0),
@@ -35,7 +34,6 @@ const CORNERS: readonly Vec[] = [
 const CAPACITIES: readonly number[] = [4, 4, 3, 5];
 const RIPE_COUNTS: readonly number[] = [12, 13, 11, 11];
 
-/** Crops never sit in the silo's own column, so one ray per row reports the whole row. */
 const PLANTABLE_X = { min: 1, max: FIELD_W - 2 };
 
 const shift = (seed: number): { corner: Vec; capacity: number; ripe: number; far: boolean } => {
@@ -101,7 +99,6 @@ function build(seed: number): World {
 
 const siloTile = (world: World): Vec => machineById(world, 'silo')?.at ?? vec(0, 0);
 
-/** Every tile carrying a crop at full growth, in row-major order. */
 const ripeTiles = (world: World): Vec[] => {
   const out: Vec[] = [];
   world.tiles.forEach((tile, index) => {
@@ -123,20 +120,12 @@ const carried = (ctx: ObjectiveContext): number => {
   return bot === undefined ? 0 : inventoryCount(bot, ItemKind.Crop);
 };
 
-/** The first crop that was ripe when the shift opened and is still in the ground at the end. */
 const stillStanding = (ctx: ObjectiveContext): Vec | undefined =>
   ripeTiles(ctx.initialWorld).find((at) => {
     const tile = tileAt(ctx.world, at);
     return tile?.crop !== undefined && (tile.growth ?? 0) >= (tile.maxGrowth ?? 1);
   });
 
-/**
- * Where the load fell short.
- *
- * A crop left in the ground and a crop left in the arms are different mistakes — one is a route
- * that missed a tile, the other is a last trip nobody made — and the count they share cannot tell
- * them apart. The tile is named first because it is the one the shift clock cannot explain.
- */
 function harvestMiss(ctx: ObjectiveContext): Divergence {
   const standing = stillStanding(ctx);
   if (standing !== undefined) {
@@ -155,14 +144,6 @@ function harvestMiss(ctx: ObjectiveContext): Divergence {
   };
 }
 
-/**
- * Ticks and readings are both gates. These four numbers are the whole level.
- *
- * `SHIFT_TICKS` is the hard one and `PAR_TICKS` is where gold sits, so the medal band underneath
- * it — silver to 206, bronze to 215 — survives having a failing condition on the same axis. The
- * shift is set just under the honest World 2 answer: sweeping every row of the field and
- * harvesting what is underfoot costs 220 ticks on the kindest seed.
- */
 const PAR_TICKS = 165;
 const SHIFT_TICKS = 215;
 const SURVEY_BUDGET = 16;
@@ -170,14 +151,12 @@ const TIGHT_SURVEY = FIELD_H;
 
 const AUDIT_KEYWORD = 'row';
 
-/** How much ripe crop each row of the field carried when the shift opened. */
 function ripePerRow(world: World): number[] {
   const rows = new Array<number>(world.h).fill(0);
   for (const at of ripeTiles(world)) rows[at.y] = (rows[at.y] ?? 0) + 1;
   return rows;
 }
 
-/** The rows that carried the most of it, and how much that was. Ties are all correct answers. */
 function heaviestRows(world: World): { count: number; rows: Set<number> } {
   const rows = ripePerRow(world);
   const count = Math.max(0, ...rows);
@@ -188,7 +167,6 @@ function heaviestRows(world: World): { count: number; rows: Set<number> } {
   return { count, rows: winners };
 }
 
-/** The lines the run filed as its audit note, in the order it printed them. */
 function auditLines(ctx: ObjectiveContext): string[] {
   const prefix = `${AUDIT_KEYWORD} `;
   return ctx.trace.events
@@ -196,7 +174,6 @@ function auditLines(ctx: ObjectiveContext): string[] {
     .map((event) => (event.kind === 'print' ? event.text : ''));
 }
 
-/** `row <y> <n>` split back into its two halves, or null when it is not that shape. */
 function readAudit(line: string): { row: number; count: number } | null {
   const parts = line.split(' ');
   if (parts.length !== 3) return null;
@@ -215,13 +192,6 @@ function auditFiled(ctx: ObjectiveContext): boolean {
   return count > 0 && rows.has(claim.row) && claim.count === count;
 }
 
-/**
- * Where the audit note and the field part company, without naming the row.
- *
- * Naming it is the whole bonus, so a wrong claim comes back priced against itself: the row the
- * note named, and what that row actually carried. That rules one row out and leaves the survey
- * that would find the right one exactly where it was.
- */
 function misreadAudit(ctx: ObjectiveContext): Divergence {
   const said = auditLines(ctx);
   const line = said[0];
@@ -262,15 +232,6 @@ function misreadAudit(ctx: ObjectiveContext): Divergence {
   };
 }
 
-/**
- * A World 2 job on a World 2 field, priced by Finance rather than by Field Engineering.
- *
- * The two budgets pull against each other, which is the whole level. The field is open, so one
- * ray per row reports that row and the bot never has to walk to find out what is growing — but
- * the survey rig is rated for sixteen beams a shift, so the answer has to be *remembered* rather
- * than re-read. Refusing to look at all is legal and walks the field, which is what the tick
- * budget is priced against.
- */
 export const w8_01: LevelDef = {
   id: 'w8-01',
   world: 8,
@@ -333,17 +294,11 @@ export const w8_01: LevelDef = {
       id: 'shift-budget',
       label: `Close the shift within ${String(SHIFT_TICKS)} ticks`,
     }),
-    /* Id left as `withinSenses` mints it — `within-<n>-<command>` is the shape
-       `game/achievements.ts` recognises an information budget by. */
     Objectives.withinSenses('look', SURVEY_BUDGET, {
       label: `Survey the field on at most ${String(SURVEY_BUDGET)} beams`,
     }),
   ],
   bonus: [
-    /* No `progress()` on purpose. What this counts is one row's share of the field, which is not
-       any run-wide total, so `budgetFor` would have had to guess a meter for the bar and would
-       have drawn the wrong one. A star with no honest meter to show gets no bar rather than a
-       dishonest one. */
     Objectives.custom('name-the-row', 'Name the row that held the most ripe crop', auditFiled, {
       divergence: misreadAudit,
     }),

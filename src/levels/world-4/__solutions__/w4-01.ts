@@ -2,19 +2,6 @@ import type { Dir, Sim } from '../../../engine/index.ts';
 import { ALL_DIRS, Terrain, opposite } from '../../../engine/index.ts';
 import type { ReferenceSolution } from '../../types.ts';
 
-/**
- * TEST FIXTURE. Never imported from src/main.tsx — vite.config.ts fails the build if it is.
- *
- * Follow the tunnel. The corridor is one tile wide with no branches, so from any tile exactly one
- * opening is not the one we arrived through; take it, and remember the way back so the next
- * iteration can rule it out. Optimal by construction: the route is forced.
- *
- * The ray is read as a ray. `look(dir, RANGE)` reports the whole straight stretch of corridor in
- * one call, so the bot drives all of it before looking again and only pays for a ray where the
- * tunnel bends. Same route, same ticks — 48, 52, 50 — on a third of the rays.
- */
-
-/** A ray cannot outrun the widest tunnel this level builds, and stops at the first wall anyway. */
 const RANGE = 8;
 
 export const solution: ReferenceSolution = {

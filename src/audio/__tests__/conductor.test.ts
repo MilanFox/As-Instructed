@@ -11,10 +11,6 @@ import { MiniContext, peakBetween } from './offline.ts';
 const UNITY: AudioSettings = { ...DEFAULT_SETTINGS, master: 1, sfx: 1, ui: 1, ambience: 1 };
 const FRAME = 1 / 60;
 
-/**
- * The conductor reads `trace.events` and nothing else — `initialWorld` and `keyframes` belong to
- * the renderer — so a test trace is just a sorted event list.
- */
 function traceOf(events: TraceEvent[]): Trace {
   return {
     initialWorld: null,
@@ -41,7 +37,6 @@ interface Rig {
   ctx: MiniContext;
   engine: AudioEngine;
   conductor: Conductor;
-  /** Runs one frame: advances the audio clock, then reports the playhead. */
   frame(tick: number, playing?: boolean, seconds?: number): void;
 }
 
@@ -92,12 +87,10 @@ describe('event mapping', () => {
     for (const event of events) expect(() => soundFor(event)).not.toThrow();
     expect(soundFor(move(1))?.name).toBe('move');
     expect(soundFor(move(1, 0, false))?.name).toBe('blocked');
-    // Free, constant or already-audible-elsewhere events stay silent on purpose.
     expect(soundFor(events[2] as TraceEvent)).toBeNull();
     expect(soundFor(events[11] as TraceEvent)).toBeNull();
     expect(soundFor(events[19] as TraceEvent)).toBeNull();
     expect(soundFor(events[21] as TraceEvent)).toBeNull();
-    // A sync that released nobody cost no ticks and says nothing.
     expect(soundFor({ ...base, kind: 'sync', to: 1, dt: 0 } as TraceEvent)).toBeNull();
   });
 });
@@ -108,7 +101,6 @@ describe('ordinary playback', () => {
     test.conductor.setSpeed(4);
     test.frame(0);
     for (let i = 1; i <= 3; i++) {
-      // 4 ticks per second: a tick is 15 frames apart, well clear of the 45ms move gate.
       for (let f = 0; f < 15; f++) test.frame(i - 1 + f / 15);
       test.frame(i);
     }
@@ -160,7 +152,6 @@ describe('ordinary playback', () => {
 });
 
 describe('64x', () => {
-  /** 20 events per tick for 300 ticks, played at 64x (256 ticks/second). */
   function storm(): Rig {
     const events: TraceEvent[] = [];
     for (let t = 0; t < 300; t++) {
@@ -182,7 +173,6 @@ describe('64x', () => {
 
     const seconds = 70 * FRAME;
     expect(peakVoices).toBeLessThanOrEqual(MAX_VOICES);
-    // 6000 events in 1.2 seconds. Anything close to that many voices is a machine gun.
     expect(test.engine.stats.created).toBeLessThan(30);
     expect(test.engine.stats.created / seconds).toBeLessThan(25);
     expect(test.engine.stats.created).toBeGreaterThan(0);
@@ -196,7 +186,6 @@ describe('64x', () => {
     expect(test.conductor.textureAmount).toBeGreaterThan(0.9);
 
     const buffer = test.ctx.render(test.ctx.currentTime);
-    // The bed is real audio, not a stub: it has to be making sound at the end of the storm.
     expect(
       peakBetween(buffer, 44100, test.ctx.currentTime - 0.1, test.ctx.currentTime),
     ).toBeGreaterThan(1e-3);
@@ -234,7 +223,6 @@ describe('scrubbing', () => {
     const test = rig(scrubbable());
     test.frame(0, false);
     for (let i = 1; i <= 60; i++) test.frame(i * 8, false);
-    // One scrub tick per 90ms of dragging, no matter how fast the pointer moves.
     expect(test.engine.stats.created).toBeLessThanOrEqual(13);
   });
 
@@ -298,7 +286,6 @@ describe('transport and settings', () => {
     test.frame(0);
     for (let i = 1; i <= 20; i++) test.frame(i);
     expect(test.engine.stats.created).toBe(0);
-    // The frozen clock must not leave a garbage event rate behind for the resumed context.
     expect(test.conductor.eventsPerSecond).toBe(0);
 
     test.ctx.state = 'running';
@@ -312,7 +299,6 @@ describe('transport and settings', () => {
     const test = rig(Array.from({ length: 200 }, (_, i) => move(i)));
     test.conductor.setSpeed(null);
     test.frame(0);
-    // 64x with no `setSpeed` call: inferred from the playhead, and not mistaken for a scrub.
     for (let frame = 1; frame <= 30; frame++) test.frame(frame * (256 / 60));
     expect(test.engine.stats.created).toBeGreaterThan(1);
     expect(test.conductor.eventsPerSecond).toBeGreaterThan(TEXTURE_ON);
@@ -340,7 +326,6 @@ describe('the end-of-run arc, staged', () => {
 
   it('lets commendations through even while a storm is thinning everything else', () => {
     const { conductor, engine } = rig([]);
-    // Commendations are protected, so the density stretch that thins `move` cannot drop them.
     for (let i = 0; i < 4; i++) conductor.commend(i, i * 0.12);
     expect(engine.activeVoices).toBeGreaterThan(1);
   });

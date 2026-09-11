@@ -9,11 +9,6 @@ import {
 } from '../ambient.ts';
 import { implementedApiNames } from '../api-bindings.ts';
 
-/**
- * The `.d.ts` is the gate. A function the player has not unlocked must not be declared, because
- * "not declared" is what makes calling it a type error instead of a runtime surprise (DESIGN.md §6).
- */
-
 const W1_01 = ['move', 'pos', 'print', 'wait'];
 const W2_02 = unlockedApiNames('w2-02');
 

@@ -1,38 +1,9 @@
-/*
- * Site Map chrome, plus the Vance memo's body type. Palette and type come from tokens.css
- * (DESIGN.md §8); nothing here may introduce a colour that a token already names. Everything is
- * scoped under `.sitemap` so it cannot leak into the workspace shell — except the `.memo__*`
- * rules, which are deliberately unscoped because the requisition note borrows the dot aside and
- * the delivered review borrows the rest.
- */
-
 .sitemap {
   --screen-gutter: clamp(20px, 3.2vw, 56px);
-  /*
-   * The content column, defined once for the whole screen. The gutter holds it off the window
-   * edges until the column reaches its cap; past that the surplus is split evenly. Both the header
-   * band and the scrolling body take this inset, which is the whole point: the header used to take
-   * `--screen-gutter` alone while the rows were additionally capped and centred, so on a window
-   * wider than the cap plus two gutters the header's right-hand group drifted 37px past the rows
-   * it sits above. Percentages here resolve against `.sitemap`, so both users measure the same box.
-   */
   --content-max: 1680px;
   --content-inset: max(var(--screen-gutter), calc((100% - var(--content-max)) / 2));
   --world-accent: var(--accent);
 
-  /*
-   * The world numeral's plate, measured from the type it holds instead of guessed at. Two digits
-   * of a monospace face advance 0.6em each and carry 0.02em of tracking, so the glyph is exactly
-   * 1.24 times the type size wide; the plate is that, even padding either side, and its own
-   * border. It was a flat 42px while the deepsite direction set the numeral at 46px, so `08` ran
-   * 16px out through the right-hand border and touched THE KESSLER CONTRACT beside it. A
-   * direction that wants a bigger numeral now moves `--num-size` and the plate follows.
-   *
-   * 42px stays as the floor rather than the answer: at the base direction's 13px the plate is a
-   * marker whose size is a decision, not a consequence of the type. Everything that has to line
-   * up with the plate — the meta column's indent, the route spine that runs through its centre —
-   * reads `--num-box` rather than restating it.
-   */
   --num-size: 13px;
   --num-glyph: calc(1.24 * var(--num-size));
   --num-pad: calc(0.14 * var(--num-size));
@@ -54,8 +25,6 @@
     var(--bg-void);
   color: var(--ink);
 }
-
-/* ---------------------------------------------------------------- shared */
 
 .sitemap .screen-title {
   margin: 0;
@@ -112,8 +81,6 @@
   color: var(--bronze);
 }
 
-/* ------------------------------------------------------------- site map */
-
 .sitemap__header {
   display: flex;
   flex: none;
@@ -153,17 +120,6 @@
   gap: var(--space-6);
 }
 
-/*
- * The eight worlds, and only them. The spine hangs off this rather than off `.sitemap__route`,
- * and the container earns its place even now that the route holds nothing but the worlds: what
- * the rule measures is stated in the markup instead of in a number. The failure it was written
- * against was a spine spanning the route's full height and running on past the last world down
- * the side of the commendation shelf, which was a sibling of the worlds and not a stop on the
- * route. The shelf has since moved into the commendation book, so the bug cannot recur from that
- * direction — but the next panel added to the route would bring it straight back, and a
- * `bottom:` tuned to clear whatever is below only holds until that thing changes height. Giving
- * the worlds a container of their own is what makes `top`/`bottom` mean "the run of track".
- */
 .sitemap__worlds {
   display: flex;
   position: relative;
@@ -171,7 +127,6 @@
   gap: var(--space-6);
 }
 
-/* The spine that makes eight sections read as one route. */
 .sitemap__worlds::before {
   content: '';
   position: absolute;
@@ -355,15 +310,6 @@
   opacity: 0.42;
 }
 
-/*
- * Four weights, four silhouettes, no hue.
- *
- * These three used to differ by `border-color` and a tint, which is one channel across 33 discs at
- * 44px, and under Deep Site the tint is overridden by the direction's own bevel so only the hue
- * survived (AUDIT-UI F1). `signal` had already solved it — gold is the only inverted disc on the
- * screen, silver is a struck rule, bronze is a dotted one — so the answer is lifted into the base
- * rule where every direction gets it, and the board can be sorted into three piles in greyscale.
- */
 .node--gold .node__disc {
   border-color: var(--gold);
   background: var(--gold);
@@ -386,7 +332,6 @@
   color: var(--bronze);
 }
 
-/* The grade as a glyph next to the word, so the row reads without the disc at all. */
 .node__medal {
   display: inline-flex;
   margin-right: 5px;
@@ -467,8 +412,6 @@
 .status--open {
   color: var(--world-accent);
 }
-
-/* ---------------------------------------------- the Vance memo, as delivered */
 
 .memo__grade {
   margin: 6px 0 0;
@@ -555,8 +498,6 @@
   margin-top: 4px;
 }
 
-/* --------------------------------------------------------------- narrow */
-
 @media (width <= 900px) {
   .world {
     grid-template-columns: minmax(0, 1fr);
@@ -595,8 +536,6 @@
   }
 }
 
-/* ------------------------------------------------- site map: accumulation */
-
 .sitemap__progress {
   display: flex;
   flex-direction: column;
@@ -634,12 +573,6 @@
   color: var(--gold);
 }
 
-/*
- * The key sits with the medal tallies it explains, and reuses `.node` so it is drawn by whatever
- * the loaded direction does to a disc — a ring, a fill, a dotted edge. Scaled down here rather
- * than given marks of its own, because a legend drawn differently from the thing it keys is not a
- * legend.
- */
 .medal-key {
   display: flex;
   flex-wrap: wrap;
@@ -664,12 +597,6 @@
   height: 22px;
 }
 
-/*
- * Scaled, not resized. Each direction sets the disc's own geometry — Signal's is a 46px square
- * where the shipped look draws a 44px circle — so a legend that hardcoded a size would be drawn
- * in marks the board does not use, under whichever direction the user picks. A transform shrinks
- * whatever is there, and the overflowing layout box is what keeps the row 22px tall.
- */
 .medal-key__sample .node {
   flex: none;
   background: none;
@@ -715,8 +642,6 @@
   border-color: color-mix(in srgb, var(--gold) 55%, var(--border));
   color: var(--gold);
 }
-
-/* ------------------------------------------------------- commendation shelf */
 
 .shelf {
   scroll-margin-top: var(--space-4);

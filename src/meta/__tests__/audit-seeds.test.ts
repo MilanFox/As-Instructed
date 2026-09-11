@@ -10,14 +10,6 @@ import { useLibrary } from '../store.ts';
 import type { MetaHost } from '../store.ts';
 import type { Discrepancy, LibrarySave } from '../types.ts';
 
-/**
- * Finding 10: the player has to be able to *run* the layout they are told failed.
- *
- * The chain under test is the whole of the fix — an open discrepancy becomes an entry in
- * `useGame.auditSeeds`, and `run()` puts that layout on the schedule behind the work order's own.
- * Every link is asserted here because each one on its own looks like it does nothing.
- */
-
 class ScriptedRunner implements RunnerPort {
   requests: RunSubmission[] = [];
   prepare(): void {}
@@ -59,7 +51,6 @@ describe('auditSeedsOf', () => {
     expect(auditSeedsOf(saveWith(entry))['w4-05']?.note).toContain(entry.id);
   });
 
-  /* Both halves of the promise the card makes: settling it and walking away both end the run set. */
   test('a resolved discrepancy takes its layout back off', () => {
     const save = saveWith(discrepancy('w4-05', 617));
     const resolved = patchDiscrepancy(save, 'DISCREPANCY 4471-w4-05', { resolved: true });
@@ -129,7 +120,6 @@ describe('the wire from the incident list to the run', () => {
     useGame.getState().openLevel(level.id);
     useGame.getState().run();
 
-    // Index 1: request 0 is the silent prime `openLevel` fires on its own way in.
     expect(runner.requests[1]?.seeds).toEqual([...level.seeds, 4471]);
   });
 
@@ -157,7 +147,6 @@ describe('the wire from the incident list to the run', () => {
     useGame.getState().openLevel(level.id);
     useGame.getState().run();
 
-    // Index 1: request 0 is the silent prime `openLevel` fires on its own way in.
     expect(runner.requests[1]?.seeds).toEqual([...level.seeds]);
   });
 });

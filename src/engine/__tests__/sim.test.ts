@@ -75,10 +75,6 @@ describe('Sim construction', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// move
-// ---------------------------------------------------------------------------
-
 describe('move', () => {
   test('succeeds, costs costs.move, and moves occupancy with the bot', () => {
     const world = openWorld(3, 3, 1);
@@ -178,10 +174,6 @@ describe('move', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// turn / wait
-// ---------------------------------------------------------------------------
-
 describe('turn', () => {
   test('rotates in place, is free by default, and is traced', () => {
     const world = openWorld(3, 3, 1);
@@ -243,10 +235,6 @@ describe('wait', () => {
     expect(bot(world).clock).toBe(12);
   });
 });
-
-// ---------------------------------------------------------------------------
-// harvest / plant
-// ---------------------------------------------------------------------------
 
 function farmWorld(): ReturnType<typeof openWorld> {
   const world = asciiWorld(['S..'], { bots: [vec(0, 0)] });
@@ -337,7 +325,6 @@ describe('plant', () => {
     expect(sim.inventory(0, ItemKind.Seed)).toBe(1);
     expect(bot(world).clock).toBe(3 + DEFAULT_COSTS.plant);
 
-    // The seed is in the soil when planting *finishes*, so growth starts from t + costs.plant.
     const sown = 3 + DEFAULT_COSTS.plant;
     const tile = must(tileAt(world, vec(0, 0)));
     expect(tile.crop).toBe(ItemKind.Crop);
@@ -406,11 +393,6 @@ describe('plant', () => {
     expect(must(eventsOfKind(empty.finish().events, 'plant')[0]).reason).toBe('seed');
   });
 
-  /*
-   * The player never sees the trace. What they get back is one bit, so the thing that has to be
-   * true is that free calls — the only non-fatal channel there is — separate the three causes the
-   * bit collapses. This walks the three worlds a player would actually be standing in.
-   */
   test('free calls tell the three refusals apart without spending a tick', () => {
     function diagnose(sim: Sim): string {
       const here = sim.scan(0);
@@ -452,10 +434,6 @@ describe('plant', () => {
     expect(sim.harvest(0)).toBe(ItemKind.Crop);
   });
 });
-
-// ---------------------------------------------------------------------------
-// mine
-// ---------------------------------------------------------------------------
 
 describe('mine', () => {
   test('mines the adjacent tile in dir, yielding the item and leaving minesTo terrain', () => {
@@ -519,10 +497,6 @@ describe('mine', () => {
     expect(bot(world).clock).toBe(DEFAULT_COSTS.mine);
   });
 });
-
-// ---------------------------------------------------------------------------
-// pickup / drop
-// ---------------------------------------------------------------------------
 
 describe('pickup', () => {
   test('takes one of whatever is underfoot when no kind is given', () => {
@@ -598,11 +572,6 @@ describe('pickup', () => {
     expect(bot(world).clock).toBe(DEFAULT_COSTS.pickup);
   });
 
-  /*
-   * A `0` folds four different worlds together. As with `plant`, what has to be true is that free
-   * calls pull them back apart — `scan().items` for the tile, `inventory()` against `capacity()`
-   * for the bot — and that the reason the engine recorded is the one those calls arrive at.
-   */
   test('free calls tell the four zeroes apart, and match the recorded reason', () => {
     function diagnose(sim: Sim, kind: ItemKind, requested: number): string {
       if (requested <= 0) return 'count';
@@ -728,10 +697,6 @@ describe('drop', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// use / power
-// ---------------------------------------------------------------------------
-
 describe('use', () => {
   test('advances a machine through its cycle and wraps around', () => {
     const world = openWorld(3, 1, 1);
@@ -797,12 +762,6 @@ describe('use', () => {
     expect(eventsOfKind(sim.finish().events, 'tileChange')).toHaveLength(2);
   });
 
-  /*
-   * This used to return true and do nothing. A mute failure is at least a value to branch on; a
-   * mute success asserts the machine was operated, so the player goes looking at the objective.
-   * It stays a false rather than a throw because `use` names a direction, never a machine: the
-   * identical call one tile over works.
-   */
   test('a machine with no cycle is refused, not silently agreed to', () => {
     const world = openWorld(3, 1, 1);
     placeMachine(world, { id: 'sink', kind: MachineKind.Sink, at: vec(0, 0), state: 'idle' });
@@ -815,9 +774,7 @@ describe('use', () => {
     const trace = sim.finish();
     const uses = eventsOfKind(trace.events, 'use') as UseEvent[];
     expect(must(uses[0]).ok).toBe(false);
-    // The machine is still named, so the trace says which one refused rather than "nothing here".
     expect(must(uses[0]).machineId).toBe('sink');
-    // Nothing changed, so nothing claims it did.
     expect(eventsOfKind(trace.events, 'machineChange')).toHaveLength(0);
     expect(eventsOfKind(trace.events, 'fx')).toHaveLength(0);
   });
@@ -968,10 +925,6 @@ describe('power', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// mark / readMark / print
-// ---------------------------------------------------------------------------
-
 describe('mark and readMark', () => {
   test('mark writes a breadcrumb and costs costs.mark; readMark is free', () => {
     const world = openWorld(3, 1, 1);
@@ -1027,10 +980,6 @@ describe('print', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// send / recv
-// ---------------------------------------------------------------------------
-
 describe('send and recv', () => {
   test('send queues a message and costs costs.send; recv pops it and is free', () => {
     const world = openWorld(3, 3, 2);
@@ -1073,9 +1022,6 @@ describe('send and recv', () => {
     sim.wait(0, 40);
     sim.send(0, 1, 'from the future');
 
-    // Bot #1 is still back at t = 0 and cannot have heard this yet, whatever order the player
-    // happened to issue the calls in. Anything else desyncs the replay, which only knows about
-    // the sends it has already applied.
     expect(sim.recv(1)).toBeNull();
     sim.wait(1, 41);
     expect(must(sim.recv(1)).body).toBe('from the future');
@@ -1123,10 +1069,6 @@ describe('send and recv', () => {
     expect(error.at).toEqual(vec(2, 0));
   });
 });
-
-// ---------------------------------------------------------------------------
-// spawn / sync
-// ---------------------------------------------------------------------------
 
 describe('spawn', () => {
   test('creates a bot on the adjacent tile with the next free id', () => {
@@ -1181,11 +1123,6 @@ describe('spawn', () => {
     expect(sim.spawn(0, Dir.North)).toBe(-1);
   });
 
-  /*
-   * The reason was already computed and then dropped on the floor, so a refused spawn and a
-   * refused move told the trace different amounts about the same decision. `describeBlock` turns
-   * either into the sentence a player reads, which is only possible once the reason survives.
-   */
   test('a refused spawn records the same reason a refused move would, and it renders', () => {
     const walled = new Sim(asciiWorld(['.#.'], { bots: [vec(0, 0)] }));
     expect(walled.spawn(0, Dir.East)).toBe(-1);
@@ -1229,8 +1166,6 @@ describe('sync', () => {
     expect(bot(world, 2).clock).toBe(11);
     expect(world.tick).toBe(11);
 
-    // One event per bot that idled, stamped at that bot's own clock. A finished trace is sorted
-    // by `t`, so bot #2 (idle from 0) precedes bot #0 (idle from 3).
     const syncs = eventsOfKind(sim.finish().events, 'sync');
     expect(syncs.map((s) => ({ botId: s.botId, t: s.t, dt: s.dt, to: s.to }))).toEqual([
       { botId: 2, t: 0, dt: 11, to: 11 },
@@ -1255,10 +1190,6 @@ describe('sync', () => {
     expect(bot(world, 0).clock).toBe(10);
   });
 });
-
-// ---------------------------------------------------------------------------
-// sensing
-// ---------------------------------------------------------------------------
 
 describe('sensing', () => {
   test('pos reports a copy of the bot position', () => {
@@ -1344,8 +1275,6 @@ describe('sensing', () => {
     const sim = new Sim(world);
     expect(sim.look(0, Dir.East, 3)).toHaveLength(3);
     expect(sim.look(0, Dir.East, 0)).toHaveLength(0);
-    // `range` caps the number of views returned, and the terminating out-of-bounds view counts
-    // against it: seven floor tiles ahead plus the void at x = 8 fills the default range of 8.
     const ray = sim.look(0, Dir.East);
     expect(ray).toHaveLength(8);
     expect(ray.filter((v) => v.inBounds)).toHaveLength(7);
@@ -1476,10 +1405,6 @@ describe('sensing', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// budgets
-// ---------------------------------------------------------------------------
-
 describe('budgets', () => {
   test('exceeding maxTicks throws HaltError', () => {
     const world = openWorld(10, 1, 1);
@@ -1602,10 +1527,6 @@ describe('budgets', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// fuel (DESIGN.md §4.4)
-// ---------------------------------------------------------------------------
-
 describe('fuel', () => {
   test('defaults to Infinity, so a level that ignores the mechanic never sees it', () => {
     const world = openWorld(4, 1, 1);
@@ -1722,10 +1643,6 @@ describe('fuel', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// livelock (DESIGN.md §4.6)
-// ---------------------------------------------------------------------------
-
 describe('livelock', () => {
   test('two bots blocking each other forever throw LivelockError naming them', () => {
     const world = asciiWorld(['..'], { bots: [vec(0, 0), vec(1, 0)] });
@@ -1766,10 +1683,6 @@ describe('livelock', () => {
     }).toThrow(HaltError);
   });
 });
-
-// ---------------------------------------------------------------------------
-// spend (DESIGN.md §4.6)
-// ---------------------------------------------------------------------------
 
 describe('spend', () => {
   test('accumulates per resource and traces each call', () => {
@@ -1821,10 +1734,6 @@ describe('spend', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// multi-bot clocks and collisions
-// ---------------------------------------------------------------------------
-
 describe('virtual clocks and collisions', () => {
   test('sim.ticks is the makespan, not the sum of the bot clocks', () => {
     const world = openWorld(4, 4, 2);
@@ -1855,18 +1764,15 @@ describe('virtual clocks and collisions', () => {
     const world = asciiWorld(['...', '...', '...'], { bots: [vec(1, 1), vec(1, 0)] });
     const sim = new Sim(world);
 
-    // Bot #0 squats on (1,1) until t = 50, then leaves East.
     sim.wait(0, 50);
     expect(sim.move(0, Dir.East)).toBe(true);
     expect(bot(world, 0).at).toEqual({ x: 2, y: 1 });
     expect(must(tileAt(world, vec(1, 1))).occupant).toBeUndefined();
 
-    // Bot #1 is still back at t = 0, so from its point of view (1,1) is very much taken.
     expect(sim.move(1, Dir.South)).toBe(false);
     expect(bot(world, 1).at).toEqual({ x: 1, y: 0 });
     expect(bot(world, 1).clock).toBe(DEFAULT_COSTS.moveBlocked);
 
-    // Once its clock passes the moment bot #0 vacated, the same move succeeds.
     sim.wait(1, 50);
     expect(sim.move(1, Dir.South)).toBe(true);
     expect(bot(world, 1).at).toEqual({ x: 1, y: 1 });
@@ -1917,10 +1823,6 @@ describe('virtual clocks and collisions', () => {
     expect(simB.ops).toBe(simA.ops);
   });
 });
-
-// ---------------------------------------------------------------------------
-// extension points
-// ---------------------------------------------------------------------------
 
 describe('extension points', () => {
   test('applyMachineChange mutates and traces, and stops the run on an unknown machine', () => {
@@ -2038,7 +1940,6 @@ describe('bot identity', () => {
   });
 });
 
-/** Trace events double as the failure-reporting channel, so their shape is part of the contract. */
 describe('trace event shapes', () => {
   test('bot actions carry botId and dt so replay can restore the clock', () => {
     const world = openWorld(3, 3, 1);

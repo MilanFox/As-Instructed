@@ -30,7 +30,6 @@ const DEPOT_W = 34;
 const DEPOT_H = 26;
 const DEPOT_PREFIX = 'depot-';
 
-/** The class pool. A shift draws four to six of these and maps them to bays at random. */
 const CLASSES: readonly ItemKind[] = ['ore', 'ice', 'scrap', 'part', 'cell', 'chip'];
 
 interface Shift {
@@ -38,7 +37,6 @@ interface Shift {
   crates: number;
   capacity: number;
   rooms: number;
-  /** Crates in the far quarter of the depot, bays in the near third: the long-haul layout. */
   clustered: boolean;
 }
 
@@ -55,7 +53,6 @@ const shiftFor = (seed: number): Shift =>
 
 const depotId = (kind: ItemKind): string => `${DEPOT_PREFIX}${kind}`;
 
-/** Bays are spread so no two share a room; that is what makes the mapping worth exploring for. */
 function pickBays(candidates: readonly Vec[], wanted: number, spacing: number): Vec[] {
   const chosen: Vec[] = [];
   for (let slack = spacing; slack >= 0 && chosen.length < wanted; slack -= 2) {
@@ -136,7 +133,6 @@ function sorted(ctx: ObjectiveContext): [number, number] {
   return [done, total];
 }
 
-/** A crate lying on a bay that does not take its class: the run's own drop, read back. */
 function onTheWrongBay(ctx: ObjectiveContext): Divergence | undefined {
   for (const machine of ctx.initialWorld.machines) {
     if (!machine.id.startsWith(DEPOT_PREFIX)) continue;
@@ -153,7 +149,6 @@ function onTheWrongBay(ctx: ObjectiveContext): Divergence | undefined {
   return undefined;
 }
 
-/** The first class the manifest is short of, and where its crates got to instead. */
 function shortClass(ctx: ObjectiveContext): Divergence | undefined {
   for (const [kind, wanted] of manifest(ctx.initialWorld)) {
     const bay = machineById(ctx.initialWorld, depotId(kind));
@@ -170,18 +165,10 @@ function shortClass(ctx: ObjectiveContext): Divergence | undefined {
   return undefined;
 }
 
-/**
- * What the sort got wrong, in the order the two mistakes are worth hearing about.
- *
- * A crate on the wrong bay is named first because it is the only one of the two that is invisible
- * from the manifest: the count is right, the class is right, and the tile is one the run chose.
- * Nothing here names a bay the run has not already stood on, or a crate it has not already moved.
- */
 function sortingMiss(ctx: ObjectiveContext): Divergence | undefined {
   return onTheWrongBay(ctx) ?? shortClass(ctx);
 }
 
-/** Crate tiles and bay tiles as they stood at the start: the things that had to be found. */
 function landmarks(world: World): Vec[] {
   const out: Vec[] = world.items.map((stack) => stack.at);
   for (const machine of world.machines) out.push(machine.at);
@@ -199,31 +186,8 @@ function deliveredBeforeSurveyDone(ctx: ObjectiveContext): number {
   return early;
 }
 
-/* Par is the reference heuristic — explore, route and deliver interleaved — on the seed it costs
-   the most, measured 319 / 518 / 632 / 465 / 450. The medal is taken from the worst seed of the
-   run (`runtime/aggregate.ts`), so 632 is the tightest par under which a program of the
-   reference's quality still golds, and every tick above it is a rung handed out for nothing: at
-   700 a run 10% worse than the reference everywhere was gold, and the ladder said nothing.
-
-   Not the median (465) that CURRICULUM §2 rule 4 nominates. A par below 632 gives this level no
-   attainable gold at all, and it would not rank the thing it looks like it ranks either: the
-   full-survey-then-deliver program the level's own copy used to call unaffordable costs
-   448 / 555 / 581 / 449 / 519, so it is *cheaper* than the reference at the worst seed and outlives
-   any par that refuses it. What separates the two is the star, `ship-while-you-look`, and the
-   fact cards now say so. */
 const PAR_TICKS = 632;
 
-/**
- * Explore, route and deliver, with no seam between them.
- *
- * Every piece here is something World 3 and World 4 already taught. What is new is the seam, and
- * the thing that grades it is the star rather than the clock: `ship-while-you-look` deadlines
- * every bay on the tick it was first in view, so a crate that is already on board when its bay
- * comes into view has to be dropped then, not later. A full survey followed by a separate
- * delivery round is affordable in ticks — measured, it golds — and loses the star, which is the
- * honest shape of the lesson. The map, the crate census and the class-to-bay mapping are all
- * unknown at write time.
- */
 export const w8_02: LevelDef = {
   id: 'w8-02',
   world: 8,
@@ -239,22 +203,6 @@ export const w8_02: LevelDef = {
     'Every crate on the floor belongs to a class, and every class has one bay. Carry each crate',
     'to its bay and drop it there.',
   ].join('\n'),
-  /**
-   * DESIGN.md §11.10, on an order whose whole premise is an unmapped depot.
-   *
-   * Nothing here names a tile, and the crate count is named as an axis with no range on it: the
-   * required objective is every crate on its bay and the star is half of them shipped early, so a
-   * number would be the graded figure and a bound would quietly answer "have I seen the whole
-   * floor yet" — the question the fact table has already told the player to take themselves.
-   *
-   * What is stated is the structure, because it is what makes the search terminate honestly.
-   * `build` draws bays and crates from the tiles reachable from the room the bot wakes in, so
-   * nothing is ever walled off; there is one bay per class and no two share a room; and the arms
-   * hold the same number all shift even though the shift decides what that number is. That last
-   * pair is the line a player cannot see from one board — a gauge-less hold that never changes
-   * mid-shift is a constant to be measured once, and measuring it once is cheap only if you know
-   * it is safe.
-   */
   board: {
     fixed: [
       'the depot is 34 by 26 of rock with caves cut through it, and none of it is mapped',
@@ -340,8 +288,6 @@ export const w8_02: LevelDef = {
           const half = Math.ceil(sorted(ctx)[1] / 2);
           return [Math.min(deliveredBeforeSurveyDone(ctx), half), half];
         },
-        /* Ticks and counts only. The bonus is about *when* the run shipped, so naming a crate or
-           a bay here would answer the level's other question for free. */
         divergence: (ctx) => {
           const complete = sightingTick(ctx, landmarks(ctx.initialWorld));
           if (!Number.isFinite(complete)) {

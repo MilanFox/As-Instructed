@@ -1,68 +1,13 @@
-/**
- * The visited-tile trail: how often the bots have stood on each cell, drawn on the floor.
- *
- * DESIGN.md §8 makes RENDER responsible for the visuals a level's *failure* is argued
- * through. `w4-02` is the case that named this one: the cave loops, the w4-01 rule rides the
- * loop until the tick budget halts it, and until now the replay drew a bot moving around with
- * nothing to say it had been there twenty-five times already. CURRICULUM.md §6 asks for exactly
- * this — the replay must show the bot going round and round.
- *
- * Two decisions are load-bearing and both come from measuring real traces:
- *
- * - **Heat is a count, not a flag.** `w4-02` solved correctly touches its worst tile 3 times;
- *   `w4-02` failed touches it 25 to 113 times. A trail that saturated on the first visit would
- *   paint the two runs identically, which is the whole defect restated.
- * - **Only revisits draw.** One visit is free and invisible. That makes the feature always-on
- *   without a per-level opt-in: on `w4-01`, `w2-02`, `w2-05` and every other level whose solution
- *   never doubles back, nothing is drawn at all, so there is nothing to switch off.
- *
- * Everything here is derived from `TraceTimeline` — the arrival ticks the replay already draws.
- * No trace field, no engine change.
- */
-
 import { alpha, artVersion, mix, trailRamp } from './theme.ts';
 import type { TraceTimeline } from './timeline.ts';
 import type { ViewRange } from './camera.ts';
 
-/** Visits below this draw nothing. Standing somewhere once is not information. */
 export const TRAIL_MIN_VISITS = 2;
 
-/**
- * Visits at which the ramp saturates.
- *
- * Chosen from the census, not from taste: the hottest *correct* solution in the campaign reaches
- * 6 (`w4-04`, `w3-01`), so a ceiling of 10 leaves working play in the lower half of the ramp and
- * hands the top of it to runs that are genuinely stuck.
- */
 export const TRAIL_MAX_VISITS = 10;
 
-/** Visits by which the wash has finished turning red. Alpha keeps climbing past it. */
 const TRAIL_HOT_VISITS = 6;
 
-/**
- * Cold-to-hot fill for each visit count, for the current art direction.
- *
- * The cold end must be legible against the floor it is painted on. A ramp starting at `inkDim`
- * (`#6a7a8c`) is within a few points of the World 4 cave floor's own grey, so two visits rendered
- * as nothing at all on the one level this exists for. Luminance first, hue second.
- *
- * "The cold end is a darkening" is the correct fix for a board with a mid-value floor and is
- * still what `standard` and `deepsite` do. It is not the general rule: `signal` paints a
- * near-black phosphor floor, where a darkening fails for exactly the reason `inkDim` did, and has
- * to brighten instead. So each direction declares its own cold and hot ends and the *contrast*
- * against `referenceFloor` is what the test enforces.
- *
- * The ramp deliberately does not pass through `accent2`, which would read as a smoother heat
- * gradient but is also `overlay.goal`; a mid-heat floor the colour of the objective brackets is
- * the one confusion `w4-02` cannot afford.
- *
- * Hue and alpha are on separate curves on purpose. The hot hue arrives by `TRAIL_HOT_VISITS`, so
- * the second lap of a loop reads as trouble while the player is still watching; alpha goes on
- * deepening to `TRAIL_MAX_VISITS`, so a run that is well past trouble keeps saying so.
- *
- * Rebuilt only when the direction changes — a single integer compare in `draw()`, not per cell.
- * `alpha()` memoises per hue, so each rebuild is nine short strings and no per-frame allocation.
- */
 let RAMP: string[] = [];
 let rampVersion = -1;
 
@@ -95,12 +40,10 @@ export class VisitTrail {
   readonly w: number;
   readonly h: number;
 
-  /** Arrival ticks, ascending. Parallel to `cells`. */
   private readonly ticks: Float64Array;
   private readonly cells: Int32Array;
 
   private readonly counts: Uint16Array;
-  /** Cells at or past `TRAIL_MIN_VISITS`, in the order they crossed it. The draw list. */
   private readonly hot: number[] = [];
 
   private cursor = 0;
@@ -128,7 +71,9 @@ export class VisitTrail {
       }
     }
 
-    const order = ticks.map((_, i) => i).sort((a, b) => (ticks[a] as number) - (ticks[b] as number));
+    const order = ticks
+      .map((_, i) => i)
+      .sort((a, b) => (ticks[a] as number) - (ticks[b] as number));
     this.ticks = new Float64Array(order.length);
     this.cells = new Int32Array(order.length);
     for (let i = 0; i < order.length; i++) {
@@ -138,14 +83,6 @@ export class VisitTrail {
     }
   }
 
-  /**
-   * Brings the heat map up to `tick`.
-   *
-   * Forwards is an incremental walk of the arrival list. Backwards rebuilds from zero, which is
-   * the same bargain `refreshSnapshot` already makes and for the same reason: the alternative is
-   * a per-cell undo stack to make scrubbing back cheaper than it already is. The whole rebuild is
-   * one `Uint16Array.fill` plus at most one increment per tick in the trace.
-   */
   sync(tick: number): void {
     if (tick < this.syncedTo) {
       this.counts.fill(0);
@@ -162,21 +99,15 @@ export class VisitTrail {
     this.syncedTo = tick;
   }
 
-  /** Times the bots have stood on this cell at or before the last `sync`. */
   visitsAt(x: number, y: number): number {
     if (x < 0 || y < 0 || x >= this.w || y >= this.h) return 0;
     return this.counts[y * this.w + x] as number;
   }
 
-  /** Cells currently drawing. Bounded by the grid, not by the tick budget. */
   get hotCount(): number {
     return this.hot.length;
   }
 
-  /**
-   * Fills every revisited cell in view. Runs after the terrain blit and before the grid, so the
-   * grid lines stay on top and a run of hot tiles reads as a chain of tiles rather than a blob.
-   */
   draw(ctx: CanvasRenderingContext2D, tilePx: number, range: ViewRange): void {
     if (this.hot.length === 0) return;
     syncRamp();

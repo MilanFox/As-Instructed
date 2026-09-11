@@ -17,7 +17,6 @@ import { at, packPos } from './shared.ts';
 
 const WIDTH = 24;
 const HEIGHT = 16;
-/** Bot 0 stands here; the rest of the fleet is raised East of it along the apron. */
 const ORIGIN = vec(2, 1);
 const DEPOT = vec(1, 1);
 export const SPAWN_COST = 2;
@@ -34,11 +33,6 @@ interface Layout {
   patches: Rect[];
 }
 
-/**
- * Seed 2 is the one-bot requisition. Seed 3 is the honestly uniform field, where an equal-area
- * split happens to be an equal-work split. Seeds 1 and 4 put the whole crop inside a single
- * column band, which is what makes area a bad proxy for work.
- */
 const LAYOUTS: Record<number, Layout> = {
   1: { fleet: 4, patches: [{ x: 3, y: 3, w: 4, h: 8 }] },
   2: { fleet: 1, patches: [{ x: 5, y: 4, w: 2, h: 5 }] },
@@ -64,12 +58,6 @@ function ripeCrops(world: World): number {
   return world.tiles.filter((tile) => tile.crop !== undefined).length;
 }
 
-/**
- * The first crop the run left standing, and how many are behind it.
- *
- * The tile is not a secret to keep: the depot publishes every crop position as `vars.c0` upward
- * before anything moves, so the coordinate is the player's own input read back at them.
- */
 function standingCrop(ctx: ObjectiveContext): Divergence | undefined {
   for (let i = 0; i < ctx.world.tiles.length; i++) {
     if (ctx.world.tiles[i]?.crop === undefined) continue;
@@ -82,7 +70,6 @@ function standingCrop(ctx: ObjectiveContext): Divergence | undefined {
   return undefined;
 }
 
-/** Crops each bot actually pulled, keyed by bot id. A bot that pulled none is absent. */
 function harvestsPerBot(ctx: ObjectiveContext): Map<number, number> {
   const tally = new Map<number, number>();
   for (const event of ctx.trace.events) {
@@ -92,13 +79,6 @@ function harvestsPerBot(ctx: ObjectiveContext): Map<number, number> {
   return tally;
 }
 
-/**
- * The most crops any one bot may pull: the field divided by the fleet that was actually on it.
- *
- * `requisition` is the floor of that divisor rather than the whole of it, so the cap tightens as
- * bots are added. That is what makes one number do two jobs — raise fewer bots than Finance
- * approved and the share is impossible; raise more and every extra one has to earn its place.
- */
 function fairShare(ctx: ObjectiveContext): number {
   const requisition = Math.max(1, machineById(ctx.initialWorld, 'depot')?.vars['requisition'] ?? 1);
   const raised = Math.max(requisition, ctx.world.bots.length);
@@ -109,13 +89,6 @@ function heaviestShare(ctx: ObjectiveContext): number {
   return Math.max(0, ...harvestsPerBot(ctx).values());
 }
 
-/**
- * The bot that came back heaviest, and what its share was allowed to be.
- *
- * The cap is not a secret worth keeping: the depot publishes the crop count and the requisition
- * before anything moves, so both halves of the division are the player's own input read back.
- * What the report does not say is which crops should have gone to whom.
- */
 function overShare(ctx: ObjectiveContext): Divergence | undefined {
   const cap = fairShare(ctx);
   let worst = -1;
@@ -151,17 +124,6 @@ export const w7_02: LevelDef = {
     '',
     'Harvest every crop in the field.',
   ].join('\n'),
-  /**
-   * DESIGN.md §11.10, and the inverse of `w7-01`.
-   *
-   * There the fleet was the constant; here it is the whole redrawn axis, and the memo says so in
-   * its own voice ("please do not write the number down") without ever saying what a player *may*
-   * write down. The field does not move: the same walled 22 by 14 of open floor, one bot on the
-   * apron, a hopper nobody has to haul to, and a crop that is ripe when the shift opens and stays
-   * that way. The requisition and the shape of the patch move, and the star turns on the second
-   * one — on the uniform field an equal-area cut is also an equal-work cut, and on the others it
-   * is not. That was in the hint budget and nowhere else, which §11.3 rules out.
-   */
   board: {
     fixed: [
       'the field is 22 by 14 inside its wall, open floor except where a crop stands on soil',

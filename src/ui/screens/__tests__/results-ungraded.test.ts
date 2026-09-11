@@ -1,10 +1,3 @@
-/**
- * The certificate of closure on an ungraded work order (DESIGN.md §7).
- *
- * The one thing this must not get wrong: ungrading removes the grade, not the reward. A close on
- * `w1-01` is the same work as a gold on `w1-05` and is paid the same three points, so the
- * certificate has to stop calling it a gold without starting to call it a consolation.
- */
 import { describe, expect, test } from 'vitest';
 import { Medal, levelPoints, medalForLevel } from '../../../game/score.ts';
 import { getLevel } from '../../../levels/index.ts';
@@ -12,7 +5,6 @@ import { personalBestLine } from '../../copy.ts';
 import { MedalBadge } from '../../components/MedalBadge.tsx';
 import { celebrationFor, reportedMedal, resultWord } from '../../desk/paper/report.ts';
 
-/** The pair the browser was driven with: both finish at exactly 78 ticks, one graded, one not. */
 const UNGRADED = getLevel('w1-01');
 const GRADED = getLevel('w1-05');
 const TICKS = 78;

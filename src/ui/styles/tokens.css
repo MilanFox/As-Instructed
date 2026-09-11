@@ -1,42 +1,20 @@
-/*
- * Design tokens. DESIGN.md §8 is the source of truth for the palette; change it there first.
- * Owned by the UI agent from here on — FOUNDATION only seeded it.
- */
-
 :root {
-  /* Surfaces */
   --bg-void: #0a0e14;
   --bg-panel: #121820;
   --bg-raised: #1b2430;
 
-  /* Text */
   --ink: #c9d5e3;
   --ink-dim: #6a7a8c;
 
-  /* Signal */
   --accent: #35e0c8;
   --accent-2: #ffb020;
   --danger: #ff5d5d;
   --ok: #7ee06a;
 
-  /* Medals */
   --gold: #ffd166;
   --silver: #c0cbd8;
   --bronze: #cd8b52;
 
-  /*
-   * The eight worlds, as a sequence rather than as eight brands.
-   *
-   * `src/levels/index.ts` carries eight literal accents; three are absent from this file despite
-   * a comment claiming otherwise, and two are reserved semantic tokens — World 7 *is* `--danger`
-   * and World 8 *is* `--gold`. A palette where the failure colour is also the name of a world has
-   * stopped meaning anything (AUDIT-UI F1), and on `w8-05` it makes the world and the medal being
-   * chased indistinguishable.
-   *
-   * The campaign is linear, so these run as one hue cooling into another across the eight rather
-   * than as unrelated decoration: position in the sequence is the thing worth encoding, and it is
-   * information the old set threw away. Each art direction overrides all eight.
-   */
   --world-1: #35e0c8;
   --world-2: #4fd8b0;
   --world-3: #6fcf94;
@@ -46,7 +24,6 @@
   --world-7: #dd935c;
   --world-8: #e87d66;
 
-  /* Chrome */
   --border: #223041;
   --border-strong: #2f4157;
   --radius: 3px;
@@ -99,7 +76,6 @@ pre,
   outline-offset: 2px;
 }
 
-/* Very subtle. It must never make text harder to read (DESIGN.md §8). */
 .scanlines::after {
   content: '';
   position: absolute;

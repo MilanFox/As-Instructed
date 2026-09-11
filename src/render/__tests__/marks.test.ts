@@ -1,28 +1,3 @@
-/**
- * Every machine kind, every crop maturity and every item kind draws a different mark, in every
- * art direction, down to the tile size the biggest board is played at.
- *
- * This is the guard against the thing that used to break: terrain became
- * per-direction and machines, crops and items did not, so a board was half atlas and half
- * authored. Closing that gap means four independent sets of sprites, and four sets is exactly the
- * shape where "the furnace and the press ended up as the same shape" ships without anyone noticing
- * — it is one direction out of four, on one board, at one zoom.
- *
- * **What is asserted is behaviour, not markup.** No test here names a colour, a radius or a
- * function. Each painter is run against a context that records the call stream, and the assertion
- * is that two different things produce two different streams. Any of these directions may be
- * rebuilt from scratch tomorrow and this file still says the right thing about the rebuild.
- *
- * Three properties, in the order they matter:
- *
- * 1. **Ripe reads.** `w2-02` is a field of crops at three maturities and cannot be solved by a
- *    player who cannot see which ones are ready. Checked at every rung down to `SMALLEST_TILE_PX`.
- * 2. **Machine identity reads.** `link`, `power` and `transmit` address one machine; two kinds
- *    that converge turn the level into guesswork.
- * 3. **Neither of the above is done with hue.** `signal` is a single phosphor. A distinction that
- *    survives only in colour is not a distinction there, so the streams are compared a second time
- *    with every colour collapsed to its luminance — value and alpha kept, hue thrown away.
- */
 import { describe, expect, it } from 'vitest';
 
 import { Dir, ItemKind, MachineKind } from '../../engine/index.ts';
@@ -44,11 +19,6 @@ import { createPose, dirVectorX, dirVectorY } from '../timeline.ts';
 import { PLANT_STAGES, itemTileName, machineTileName, plantStageIndex } from '../tiles.ts';
 import type { TileSet } from '../tiles.ts';
 
-// ---------------------------------------------------------------------------
-// A context that draws nothing and remembers everything
-// ---------------------------------------------------------------------------
-
-/** Rounded, so a 0.001 px difference in a control point is not read as a different mark. */
 function num(value: number): string {
   return Number.isFinite(value) ? value.toFixed(2) : String(value);
 }
@@ -62,13 +32,6 @@ function format(value: unknown): string {
   return typeof value;
 }
 
-/**
- * Stand-in for the objects a context hands back — gradients and patterns.
- *
- * A painter that builds a gradient goes on to call `addColorStop` on it, and a plain object would
- * throw. The stops land in the same stream as everything else, which is what makes a direction
- * that separates two kinds by gradient still measurable here.
- */
 function stub(tag: string, ops: string[]): unknown {
   return new Proxy(
     { tag },
@@ -155,10 +118,6 @@ function recording(): Recording {
   return { ctx, ops };
 }
 
-// ---------------------------------------------------------------------------
-// Hue removal
-// ---------------------------------------------------------------------------
-
 function channel(v: number): number {
   const c = v / 255;
   return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
@@ -171,7 +130,6 @@ function luma(r: number, g: number, b: number): number {
 const HEX = /#([0-9a-f]{6})\b/gi;
 const RGBA = /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)/gi;
 
-/** Every colour in a call stream collapsed to its luminance. Value and alpha survive; hue does not. */
 function grey(stream: string): string {
   return stream
     .replace(HEX, (_all, hex: string) => {
@@ -186,41 +144,12 @@ function grey(stream: string): string {
 
 const LABEL = /(?:fill|stroke|measure)Text\([^|]*\)\|?|font=[^|]*\|?/g;
 
-/**
- * Every op that puts type on the board, removed.
- *
- * The hole this closes: a painter that stamps the kind's initial on each machine passes the
- * distinctness check at every size, because the call stream carries the letter even where the
- * letter is four CSS pixels tall on a retina panel and reads as a smudge. Type is a perfectly good
- * second-level mark at 48 px and is not a mark at all at 16, so identity at the floor has to
- * survive without it. Applied at `SMALLEST_TILE_PX` only — a direction is welcome to label things
- * once there is room for the label.
- */
 function unlabelled(stream: string): string {
   return stream.replace(LABEL, '');
 }
 
-// ---------------------------------------------------------------------------
-// Fixtures
-// ---------------------------------------------------------------------------
-
-/**
- * The floor these properties are held to, in device pixels per tile.
- *
- * Measured rather than guessed. `fit()` picks the largest `ZOOM_LADDER` rung the board fits in;
- * driving the real app and running the real `fit` arithmetic over the board panel gives 48 for the
- * biggest campaign board (25x14), 36 for the 21x21 maze and 24 for the 30x30 stress grid. Squeeze
- * the panel to 420x260 CSS on a 2x display — smaller than the game is playable at — and the 25x14
- * board still lands on 32.
- *
- * So 16 is two rungs under anything the campaign fits to, and it is the bar on purpose: below it
- * the ladder only continues because the player asked for an overview, and at 6 px a tile the board
- * is a minimap where no sprite in any direction, the shipped one included, is meant to be
- * identifiable. A property that holds at 16 holds everywhere a level is actually played.
- */
 const SMALLEST_TILE_PX = 16;
 
-/** The floor, the rungs the campaign actually fits to, and the atlas's own size. */
 const TILE_SIZES: readonly number[] = [SMALLEST_TILE_PX, 20, 24, 32, 48];
 
 const FACINGS: readonly Dir[] = [Dir.North, Dir.East, Dir.South, Dir.West];
@@ -234,23 +163,10 @@ const FACING_NAMES: Readonly<Record<number, string>> = {
 const MACHINE_KINDS: readonly string[] = Object.values(MachineKind);
 const ITEM_KINDS: readonly string[] = Object.values(ItemKind);
 
-/**
- * The directions that author their own crop.
- *
- * `standard` takes one plant out of the tile atlas and there is no second frame there to reach
- * for, so the crop-against-scrub property is asked of the two directions a player can actually
- * pick. That is the line the cost section already draws, and it is drawn here for the same reason.
- */
 const AUTHORED_CROP: readonly ArtId[] = ART_IDS.filter(
   (id) => DIRECTIONS[id].drawCrop !== undefined,
 );
 
-/**
- * The state each kind is shown in, and its opposite.
- *
- * Kinds are compared against each other in the same state, because a player looking at a board of
- * idle machines has to tell them apart before anything is switched on.
- */
 const RESTING: Readonly<Record<string, string>> = {
   door: 'closed',
   lever: 'off',
@@ -271,15 +187,6 @@ function runningState(kind: string): string {
   return RUNNING[kind] ?? 'busy';
 }
 
-/**
- * An atlas that draws its own name.
- *
- * The fallback path is measured through the *real* `sprites.ts` rather than by comparing the frame
- * names it would have asked for, because half the shipped machine tells are not in the name — a
- * furnace is `feature.refinery` whether it is running or not, and the thing that says it is
- * running is the glow `drawMachine` puts over the frame. Comparing names would have reported that
- * `standard` cannot show a busy machine, which is false.
- */
 const atlas = {
   draw(ctx: CanvasRenderingContext2D, name: string, dx: number, dy: number, size: number): void {
     (ctx as unknown as { drawFrame: (...args: unknown[]) => void }).drawFrame(name, dx, dy, size);
@@ -388,17 +295,6 @@ function itemStream(
   return ops.join('|');
 }
 
-/**
- * Which way a bot points is gameplay, not decoration.
- *
- * A player reads a bot's facing before every `move`, `mine` and `use`, and reads it off the board
- * rather than off the HUD. So the four facings have to be four different pictures at the size the
- * board is actually played at, and the difference cannot be a hue — which is the same bar every
- * other mark in this file is held to.
- *
- * The pose is built at rest deliberately: mid-move the travel offset alone would separate the four
- * streams and the test would pass on the bot's *position* rather than on anything about the bot.
- */
 function botStream(
   art: ArtDirection,
   facing: Dir,
@@ -436,7 +332,6 @@ function botStream(
   return ops.join('|');
 }
 
-/** Reports the colliding pair rather than a bare `false`, because a bare `false` is not a lead. */
 function collisions(entries: readonly (readonly [string, string])[]): string[] {
   const seen = new Map<string, string>();
   const clashes: string[] = [];
@@ -447,10 +342,6 @@ function collisions(entries: readonly (readonly [string, string])[]): string[] {
   }
   return clashes;
 }
-
-// ---------------------------------------------------------------------------
-// The properties
-// ---------------------------------------------------------------------------
 
 describe.each(ART_IDS)('%s', (id) => {
   const art = DIRECTIONS[id];
@@ -482,7 +373,6 @@ describe.each(ART_IDS)('%s', (id) => {
   });
 
   it.each(TILE_SIZES)('tells every crop maturity apart at %ipx', (tilePx) => {
-    // `max = last * 2` puts `growth = i * 2` in the middle of bucket `i` for every rung.
     const last = PLANT_STAGES.length - 1;
     const max = last * 2;
     const entries = PLANT_STAGES.map(
@@ -503,20 +393,10 @@ describe.each(ART_IDS)('%s', (id) => {
   });
 
   it.each(TILE_SIZES)('tells every item kind apart without hue at %ipx', (tilePx) => {
-    const entries = ITEM_KINDS.map(
-      (kind) => [kind, grey(itemStream(art, kind, tilePx))] as const,
-    );
+    const entries = ITEM_KINDS.map((kind) => [kind, grey(itemStream(art, kind, tilePx))] as const);
     expect(collisions(entries)).toEqual([]);
   });
 
-  /**
-   * A tell that only exists in motion is not a tell.
-   *
-   * `reduced` reaches all three painters, and each layer has an obvious animation a direction would
-   * reach for — the busy lamp, the ripe pulse, the item bob. A player who has asked the system for
-   * stillness still has to be able to see which machine is running and which crop is ready, so the
-   * whole battery runs again with the flag set and hue removed.
-   */
   it('keeps every tell when motion is off', () => {
     const machines = MACHINE_KINDS.map(
       (kind) =>
@@ -589,27 +469,9 @@ describe.each(ART_IDS)('%s', (id) => {
   });
 });
 
-/**
- * Two things grow on the same soil and only one of them is the harvest.
- *
- * `w2-05` is entirely this reading — a field of crop mixed with ice-scrub, a sensor that tells
- * them apart for free, an arm that does not, and a shift too short to visit everything. The kind
- * used to never reach a painter at all: `CropPaint` did not carry it, so the two were one plant
- * drawn twice and the level could not be solved by looking at it.
- *
- * Asserted as a collision check over the **union of the two ladders** rather than kind against
- * kind at the same rung. A scrub tile that draws what a crop three rungs down the ladder draws is
- * the same defect wearing a different number, and it is exactly the shape a "make the weed
- * smaller" fix produces.
- *
- * Hue is removed for every case here, not only at the floor. `signal` is one phosphor and Deep
- * Site holds the scrub at the leaf's own luminance on purpose, so a distinction that leaned on
- * colour would have nothing left to stand on in either of them.
- */
 describe.each(AUTHORED_CROP)('crop against scrub: %s', (id) => {
   const art = DIRECTIONS[id];
 
-  /** `max = last * 2` puts `growth = i * 2` in the middle of bucket `i` at every rung. */
   const LADDER_MAX = (PLANT_STAGES.length - 1) * 2;
 
   function ladder(
@@ -637,14 +499,6 @@ describe.each(AUTHORED_CROP)('crop against scrub: %s', (id) => {
     expect(collisions(ladder(SMALLEST_TILE_PX, true, unlabelled))).toEqual([]);
   });
 
-  /**
-   * Ripeness is the crop's, and separating the two kinds may not cost it.
-   *
-   * `w2-02` is a field of one kind at three maturities and is unsolvable if ripe cannot be told
-   * from unripe, so the ripe crop is checked against every unripe crop **and** against every rung
-   * of scrub in the same breath. The second half is the one that matters here: a weed wearing the
-   * harvest mark would pass the first check and still send the arm to the wrong tile.
-   */
   it.each(TILE_SIZES)('keeps ripe crop apart from every scrub rung at %ipx', (tilePx) => {
     const ripe = grey(cropStream(art, LADDER_MAX, LADDER_MAX, tilePx));
     for (let i = 0; i < PLANT_STAGES.length; i++) {
@@ -656,14 +510,6 @@ describe.each(AUTHORED_CROP)('crop against scrub: %s', (id) => {
   });
 });
 
-/**
- * The three authored directions answer all three layers, or they are still half atlas.
- *
- * Written as a set rather than as three assertions so that a direction added later shows up here
- * as a failure that names it, instead of quietly shipping with the shared tile atlas standing on
- * its terrain. `standard` is the baseline the others are judged against and implements none of
- * them on purpose — that is what makes it the definition of the fallback path.
- */
 it('every direction either authors all three live layers or none of them', () => {
   const answered = ART_IDS.map((id) => {
     const art = DIRECTIONS[id];
@@ -673,36 +519,6 @@ it('every direction either authors all three live layers or none of them', () =>
   expect(answered).toEqual(['standard:0', 'signal:3', 'deepsite:3']);
 });
 
-// ---------------------------------------------------------------------------
-// Cost
-// ---------------------------------------------------------------------------
-
-/**
- * The draw-cost rule, made mechanical: **a smaller board must be cheaper to draw.**
- *
- * The defect this guards is a construct whose draw-call count is *decoupled from the device-pixel
- * area it covers* — a dither whose cell floors at one device pixel while its extent scales with
- * the tile, or a stepped line whose weight is a small fraction of a large span. Both were found on
- * live paths and fixed; the class outlived the instances, which is why it is pinned here rather
- * than described.
- *
- * The recording context the distinctness properties already use is counted rather than compared,
- * so there is one stand-in for the canvas in this file and not two.
- *
- * Both halves of the rule run, and they answer different questions:
- *
- * - **per element** — does one mark get cheaper as the tile shrinks;
- * - **per frame, whole board** — does the *frame* get cheaper, given that zooming out also pulls
- *   more of the board into view. A construct can pass the first and fail the second, and the
- *   second is the one a player's frame rate depends on.
- *
- * Both run at `dpr` 1 and 2, and that is not ceremony. Every detail rung in this renderer is
- * written as `tilePx >= K * dpr` — a *screen*-pixel threshold, deliberately, so a mark appears at
- * the same apparent size on every panel; `overlays.ts` states the argument. The consequence is
- * that on a 1x panel the rungs sit at half the device-pixel budget they do on a 2x one, so a
- * measurement taken only at `dpr: 2` says nothing about the machines most likely to need the
- * headroom.
- */
 const DRAW_OPS =
   /^(?:fillRect|strokeRect|fill|stroke|fillText|strokeText|drawImage|putImageData|drawFrame)\(/;
 
@@ -712,38 +528,15 @@ function drawCalls(stream: string): number {
   return n;
 }
 
-/** The rung the biggest campaign board fits to, and the one every far form is measured against. */
 const NEAR_TILE_PX = 48;
 
-/** The directions a player can pick. `standard` is the atlas control, not a player's cost. */
 const SHIPPING: readonly ArtId[] = ART_IDS.filter((id) => id !== 'standard');
 
 const DPRS: readonly number[] = [1, 2];
 
-/**
- * Marks that cost more at the floor than at the near rung, and are not the defect.
- *
- * One entry, kept as an entry rather than as a loosened bound, so the next reader sees the shape
- * instead of inheriting a tolerance. `signal` builds every glyph out of a fixed eight rows of at
- * most two spans, so its cost is bounded by a *part count* and not by a tile fraction — safe by
- * shape. Its far form is one `fillRect` per span, which is the cheapest a span
- * can be drawn; the near form perforates that span against a cell grid, and where the cell happens
- * to swallow a short span whole it emits fewer rectangles than the solid one did. Measured across
- * the ladder at `dpr: 2` the count runs 15, 15, 10, 9, 13 — wobble around a bound of sixteen,
- * not a trend, and sixteen is sixteen at every zoom.
- */
 const BOUNDED_BY_PART_COUNT: readonly string[] = ['signal machine antenna/idle @2x'];
 
 describe('cost', () => {
-  /**
-   * No mark may cost more at the floor than it costs at the rung the board is played at.
-   *
-   * Stated per kind as "not more" rather than "strictly less" on purpose. A healthy ratio of
-   * far ÷ near ≈ 0.5 was measured over a whole layer and is asserted over a whole layer below.
-   * Per *kind* the honest bar is that nothing gets more expensive as it gets smaller: a mark built
-   * from a fixed number of parts is flat by shape and cannot be tuned into a fall without changing
-   * what it looks like, and cost work is not allowed a readability surface.
-   */
   it.each(SHIPPING)('%s draws no mark more expensively at the floor', (id) => {
     const art = DIRECTIONS[id];
     const risen: string[] = [];
@@ -791,13 +584,6 @@ describe('cost', () => {
     expect(risen).toEqual([]);
   });
 
-  /**
-   * A whole layer must not get dearer as it gets smaller.
-   *
-   * This is the assertion the `far ÷ near` ratio belongs to, and the one that catches a mark
-   * made cheap in one kind and paid for in the next. The bot is held to it with the rest: there
-   * is one of it, but it is redrawn on every frame of every replay.
-   */
   it.each(SHIPPING)('%s draws no layer more expensively at the floor', (id) => {
     const art = DIRECTIONS[id];
     const risen: string[] = [];
@@ -822,7 +608,10 @@ describe('cost', () => {
             0,
           ),
         items: (t) =>
-          ITEM_KINDS.reduce((sum, kind) => sum + drawCalls(itemStream(art, kind, t, false, dpr)), 0),
+          ITEM_KINDS.reduce(
+            (sum, kind) => sum + drawCalls(itemStream(art, kind, t, false, dpr)),
+            0,
+          ),
         bot: (t) =>
           FACINGS.reduce<number>(
             (sum, facing) => sum + drawCalls(botStream(art, facing, t, false, dpr)),
@@ -840,43 +629,19 @@ describe('cost', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Cost, per frame, over the whole campaign
-// ---------------------------------------------------------------------------
-
-/**
- * The other half of the draw-cost rule: **a per-element count can fall while the per-frame
- * total does not.**
- *
- * Zooming out shrinks every mark and pulls more of the board into view at the same time, and the
- * two move against each other. So the number that decides a player's frame rate is not a ratio —
- * a ratio can always be satisfied by making the near rung worse. It is the largest number of draw
- * calls any shipped level asks for at any rung it can be played at, and that is what is pinned.
- *
- * Every level in the campaign is built and drawn, so a level added later is measured without
- * anyone remembering to add it, and because the shape being hunted only appears on the big boards.
- * `w5-02` is where both directions peak, and it peaks at **24** device px rather than at the
- * floor — not a rung anyone would have thought to sample by hand. The measured peak is 4,661
- * calls (`signal`, `w5-02`, 24 px, 1x); the ceiling sits about a quarter above it.
- */
 const PER_FRAME_CALL_CEILING = 6000;
 
-/** A fixed panel, in device pixels. The tile shrinks; the window does not. */
 const VIEWPORT_W = 1280;
 const VIEWPORT_H = 720;
 
-/** One frame of every live layer, for one level, at one tile size. */
 function boardStream(art: ArtDirection, world: World, tilePx: number, dpr: number): string {
   setArtDirection(art.id);
   const { ctx, ops } = recording();
   const cols = Math.min(world.w, Math.ceil(VIEWPORT_W / tilePx));
   const rows = Math.min(world.h, Math.ceil(VIEWPORT_H / tilePx));
 
-  /* Terrain is one blit whatever the tile size — that is what the cache buys, and counting it as
-   * one is the point of the comparison rather than a simplification of it. */
   ctx.drawImage({} as CanvasImageSource, 0, 0);
-  if (art.backdrop)
-    art.backdrop({ ctx, width: VIEWPORT_W, height: VIEWPORT_H, dpr, time: 1.5 });
+  if (art.backdrop) art.backdrop({ ctx, width: VIEWPORT_W, height: VIEWPORT_H, dpr, time: 1.5 });
   drawGrid(ctx, tilePx, { x0: 0, y0: 0, x1: cols - 1, y1: rows - 1 }, 5, dpr);
 
   for (let y = 0; y < rows; y++)

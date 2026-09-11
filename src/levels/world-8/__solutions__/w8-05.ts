@@ -3,43 +3,9 @@ import { ALL_DIRS, ItemKind, Terrain, manhattan, step } from '../../../engine/in
 import type { ReferenceSolution } from '../../types.ts';
 import { KnownMap, distancesOn, drainAntenna, key, pathOn, readPacket } from '../shared.ts';
 
-/**
- * TEST FIXTURE. Never imported from src/main.tsx — vite.config.ts fails the build if it is.
- *
- * The shift, run by a fleet with roles.
- *
- * The manifest on the band turns the site from a search into a list of coordinates. Walking the
- * workings is then the single most expensive thing left, so nobody does it alone: the whole fleet
- * spreads out until every coordinate the band handed over is joined to the bay, and only then
- * does anybody start work.
- *
- * After that the shift runs as three interleaved streams. The grid is taken one dependency rank
- * at a time with a `sync` either side of the rank, which makes precedence true by construction
- * rather than by scheduling and still lets whichever bots are nearest throw the switches. The
- * form is one errand carried a step at a time by whoever was going that way, because the toll at
- * the airlock is the same size whoever pays it. Everybody else hauls.
- *
- * Three things keep it from seizing up, and each of them was a way it seized up:
- *  - the crew is terrain. A parked bot holds its tile for good, so a route goes around the fleet
- *    where it can and shoves it where it cannot, and shoving is recursive because a queue in a
- *    one-wide passage clears from the front.
- *  - nobody stops on a working tile. A bot parked on a pad, a station or — fatally — the
- *    airlock's approach is a wall there for the rest of the shift.
- *  - fuel is priced into every leg rather than checked when it runs out. A bot only takes a
- *    route it can come back from, tops up at the pump nearest wherever it is going next, and
- *    picks that pump so that being interrupted half way still leaves it able to move.
- *
- * Deliberately not the fastest shape available. A player who batches crates by class into a
- * six-slot hold and sends the clerk out with a hauler's load will beat it, which is the room par
- * leaves. That room was where the twenty-percent bonus lived; the bonus was withdrawn along with
- * two others, and the room is still there.
- */
-
 const WIDTH = 48;
 const HEIGHT = 40;
-/** Spare ticks of fuel kept in hand on top of the trip home. */
 const RESERVE = 18;
-/** Fuel a bot keeps back when it picks which pump to fill at. */
 const MARGIN = 8;
 
 interface Station {
@@ -57,15 +23,12 @@ export const solution: ReferenceSolution = {
   levelId: 'w8-05',
   run(sim: Sim): void {
     const fleet = sim.botIds();
-    /* Every bot starts full, and `fuelMax` is not part of the player's hardware, so the size of
-       a full tank is simply what the first bot has before anybody has moved. */
     const tank = sim.fuel(fleet[0] as number);
     const map = new KnownMap({ w: WIDTH, h: HEIGHT });
     const index = (at: Vec): number => at.y * WIDTH + at.x;
     const passable = (at: Vec): boolean => map.passable(at);
     for (const id of fleet) map.observe(sim, id, WIDTH);
 
-    // ---- the manifest ----------------------------------------------------
     const raw = drainAntenna(sim, fleet[0] as number);
     const crates: Crate[] = [];
     let form: Vec | null = null;
@@ -77,7 +40,6 @@ export const solution: ReferenceSolution = {
       else if (fields[0] === 'FORM') form = at;
     }
 
-    // ---- the site --------------------------------------------------------
     const anyBot = fleet[0] as number;
     const desk = sim.probe(anyBot, 'desk');
     const stations: Station[] = [];
@@ -99,19 +61,12 @@ export const solution: ReferenceSolution = {
     const airlock = sim.probe(anyBot, 'airlock');
     const charter = sim.probe(anyBot, 'slot-charter');
 
-    /* The gate draws off the grid, and says which substation it draws from before anybody has
-       walked anywhere: `vars` carries one `fed:<id>` key. Until that station reads `on`, every
-       `use()` at the gate costs its tick and moves nothing, so the errand east is not a thing
-       this program may start whenever it likes — it is queued behind a rank of the grid. */
     const gateFeeder = Object.keys(airlock?.vars ?? {})
       .find((name) => name.startsWith('fed:'))
       ?.slice('fed:'.length);
     const gatePowered = (): boolean =>
       gateFeeder === undefined || sim.probe(anyBot, gateFeeder)?.state === 'on';
 
-    // ---- the crew is terrain --------------------------------------------
-    // A bot that has stopped holds its tile for good, so a route goes around the rest of the
-    // fleet where it can and asks them to shift where it cannot.
     const spot = (id: number): Vec => sim.pos(id);
     const who = (at: Vec): number => {
       for (const other of fleet) {
@@ -129,12 +84,6 @@ export const solution: ReferenceSolution = {
       return taken;
     };
 
-    /**
-     * Tiles nobody may stop on: every crate, pad and station, and the airlock's approach.
-     *
-     * The approach earns its place by shape. It is a dead end with walls on three sides, so one
-     * bot that stops in it corks the only bottle on the site and the form never gets out.
-     */
     const precious = new Set<string>(stations.map((station) => key(station.at)));
     for (const at of sinks.values()) precious.add(key(at));
     for (const crate of crates) precious.add(key(crate.at));
@@ -147,14 +96,11 @@ export const solution: ReferenceSolution = {
       }
     }
 
-    /** A queue in a one-wide passage clears from the front, so shoving is recursive. */
     const aside = (id: number, depth = 0): boolean => {
       if (sim.fuel(id) <= 1) return false;
       const here = spot(id);
       const options = ALL_DIRS.filter((dir) => map.passable(step(here, dir)));
-      const order = options
-        .filter((dir) => !precious.has(key(step(here, dir))))
-        .concat(options);
+      const order = options.filter((dir) => !precious.has(key(step(here, dir)))).concat(options);
       for (const dir of order) {
         if (!sim.canMove(id, dir)) continue;
         sim.move(id, dir);
@@ -171,11 +117,9 @@ export const solution: ReferenceSolution = {
       return false;
     };
 
-    // ---- fuel ------------------------------------------------------------
     const pumps = (): Vec[] =>
       map.where((view) => view.terrain === Terrain.Depot).map((view) => view.at);
 
-    /** Hops from the nearest pump to everywhere seen: the price of a leg is the trip back. */
     const homeward = (): Map<number, number> => {
       const out = new Map<number, number>();
       const queue: Vec[] = pumps();
@@ -193,7 +137,6 @@ export const solution: ReferenceSolution = {
       return out;
     };
 
-    /** Steps actually taken. A short answer means somebody was in the way and it is time to re-plan. */
     const drive = (id: number, path: readonly Dir[]): number => {
       let taken = 0;
       for (const dir of path) {
@@ -211,16 +154,6 @@ export const solution: ReferenceSolution = {
       return taken;
     };
 
-    /**
-     * Fills at the pump nearest wherever the bot is going next, and keeps trying from wherever
-     * the walk actually got to.
-     *
-     * Which pump is the whole of the fuel decision: the cheapest round trip to anywhere is out
-     * from its closest pump and back to the same one. The two margins are the other half — a
-     * pump the tank can reach with something in hand, and only if there is none, the nearest
-     * pump on a way that is clear of the crew right now. Arriving dry is survivable; stopping
-     * dry in a passage is not, because the bot is then a wall for the rest of the shift.
-     */
     const fill = (id: number, to: Vec | null): boolean => {
       if (!Number.isFinite(sim.fuel(id))) return true;
       for (let attempt = 0; attempt < 5; attempt++) {
@@ -254,7 +187,6 @@ export const solution: ReferenceSolution = {
       return sim.refuel(id);
     };
 
-    /** Walks to a place already on the map, filling up first when the return trip needs it. */
     const goTo = (id: number, to: Vec): boolean => {
       const back = homeward();
       let stalled = 0;
@@ -266,7 +198,6 @@ export const solution: ReferenceSolution = {
         if (sitting >= 0 && sitting !== id) aside(sitting);
         const path = route(from, to, crewAt(id, to)) ?? route(from, to, null);
         if (path === null) return false;
-        // A full tank is as good as it gets: refusing the leg then would refuse it for ever.
         const need = path.length + (back.get(index(to)) ?? path.length) + RESERVE;
         if (sim.fuel(id) < need && sim.fuel(id) < tank) {
           if (!fill(id, to)) return false;
@@ -287,35 +218,23 @@ export const solution: ReferenceSolution = {
       return false;
     };
 
-    /** One step out to the edge of the known map, chosen for being on the way to `to`. */
     const hop = (id: number, to: Vec): boolean => {
       const out = distancesOn(map, passable, spot(id));
       const edges: { at: Vec; score: number }[] = [];
       for (const view of map.where((tile) => map.isFrontier(tile.at))) {
         const there = out.get(index(view.at));
         if (there === undefined || there === 0) continue;
-        // Never stop on a working tile unless it is the one this bot is going to.
         if (precious.has(key(view.at)) && manhattan(view.at, to) > 2) continue;
         edges.push({ at: view.at, score: there + manhattan(view.at, to) });
       }
       edges.sort((a, b) => a.score - b.score);
-      // The best edge is often the one somebody else is already standing on. Try a few.
       for (const edge of edges.slice(0, 5)) if (goTo(id, edge.at)) return true;
       return false;
     };
 
-    /**
-     * `goTo`, but willing to buy more map when the ground between is still unseen.
-     *
-     * Ground the fleet has seen is a routing problem, and the answer to a routing problem is to
-     * try it again once the traffic has moved. Ground it has not seen is a survey problem, and
-     * only that is worth walking away from the destination for.
-     */
     const reach = (id: number, to: Vec): boolean => {
       if (sim.fuel(id) < tank * 0.3) fill(id, to);
       for (let attempt = 0; attempt < 20; attempt++) {
-        // Falling behind is itself a reason a route fails, so catch the fleet up before deciding
-        // the ground is impassable.
         if (attempt > 0) sim.sync();
         if (goTo(id, to)) return true;
         if (route(spot(id), to, null) !== null) continue;
@@ -324,16 +243,12 @@ export const solution: ReferenceSolution = {
       return false;
     };
 
-    /** A bot needs something in the tank to work when it arrives, not merely to get there. */
     const ready = (id: number): boolean => {
       if (sim.fuel(id) > 20) return true;
       fill(id, null);
       return sim.fuel(id) > 1;
     };
 
-    // ---- survey, with everybody -----------------------------------------
-    // The airlock is deliberately not on this list. Its approach is the one place on the site
-    // where a parked bot cannot be walked around, and the carrier finds it for itself.
     const marks: Vec[] = [
       ...stations.map((station) => station.at),
       ...sinks.values(),
@@ -366,20 +281,14 @@ export const solution: ReferenceSolution = {
       stalledRounds = moved ? 0 : stalledRounds + 1;
     }
 
-    // Everybody starts the shift proper full, and nobody starts it standing on a working tile.
     sim.sync();
     for (const id of fleet) fill(id, null);
     for (const id of fleet) if (precious.has(key(spot(id)))) aside(id);
 
-    // ---- roles -----------------------------------------------------------
     const electrician = fleet[0] as number;
     const clerk = fleet.length > 1 ? (fleet[1] as number) : electrician;
     const haulers = fleet.length > 2 ? fleet.slice(2) : fleet;
 
-    // Ranked by how deep into the graph each station sits. A rank is fenced by a sync either
-    // side of it, so everything a station feeds off has finished before any of it starts — which
-    // makes precedence true by construction rather than by scheduling, and still lets the rank
-    // itself be thrown by whichever bots are nearest.
     const rank = new Map<string, number>();
     const byId = new Map(stations.map((station) => [station.id, station]));
     const depthOf = (station: Station, guard: number): number => {
@@ -401,11 +310,7 @@ export const solution: ReferenceSolution = {
       (ranks[deep] as Station[]).push(station);
     }
 
-    /** The cycle wraps, so a station that is already on is left alone: using it twice is off. */
-    const lit = (station: Station): boolean =>
-      sim.probe(anyBot, station.id)?.state === 'on';
-    // The tick each station was thrown on, read off the thrower's own clock before the use.
-    // Nothing else in the run remembers it and the final world cannot reconstruct it.
+    const lit = (station: Station): boolean => sim.probe(anyBot, station.id)?.state === 'on';
     const thrown = new Map<string, number>();
     const light = (station: Station): boolean => {
       if (lit(station)) return true;
@@ -424,24 +329,17 @@ export const solution: ReferenceSolution = {
       return false;
     };
 
-    // ---- the form --------------------------------------------------------
-    // The toll at the airlock is the same size whoever pays it and whenever it is paid, so it is
-    // paid once, by whoever was going that way. One step per pass, alongside everything else.
     let carrier = clerk;
     let stage = 0;
     let fumbled = 0;
     let errandTries = 0;
-    /* The tick the gate first moved, off the clock of whoever moved it. Nothing in the final world
-       remembers it, and the gate note is a fact about that instant rather than about the door. */
     let gateAt: number | null = null;
 
     const errandStep = (): boolean => {
       if (!form || !airlock || !charter || stage >= 3 || errandTries >= 40) return false;
-      // Nothing to do at the gate while the gate is dark, and nothing spent finding that out.
       if (stage === 1 && !gatePowered()) return true;
       errandTries++;
       if (stage === 0) {
-        // Whoever is nearest with a tank worth the trip, and never the bot holding the grid.
         let score = Number.POSITIVE_INFINITY;
         for (const id of fleet) {
           if (id === electrician || sim.fuel(id) <= 30) continue;
@@ -465,8 +363,6 @@ export const solution: ReferenceSolution = {
       }
       if (reach(carrier, target) && ready(carrier)) {
         if (stage === 1) {
-          // The cycle wraps here too, so ask the door what state it is in rather than counting
-          // on having been the one who started it.
           const stages = airlock.vars['stages'] ?? 0;
           for (let i = 0; i <= stages && sim.fuel(carrier) > 1; i++) {
             const was = sim.probe(carrier, 'airlock')?.state;
@@ -476,7 +372,6 @@ export const solution: ReferenceSolution = {
             if (gateAt === null && sim.probe(carrier, 'airlock')?.state !== was) gateAt = at;
           }
           map.observe(sim, carrier, WIDTH);
-          // The toll is only paid when the door says so. Anything else and it is paid again.
           if (sim.probe(carrier, 'airlock')?.state !== 'open') return true;
         } else {
           sim.drop(carrier, ItemKind.Chip);
@@ -486,7 +381,6 @@ export const solution: ReferenceSolution = {
         return true;
       }
       if (++fumbled >= 3 && sim.fuel(carrier) > 1) {
-        // Boxed in with the form in hand. Put it down here and let somebody else carry it.
         sim.drop(carrier, ItemKind.Chip);
         form = spot(carrier);
         aside(carrier);
@@ -496,14 +390,8 @@ export const solution: ReferenceSolution = {
       return true;
     };
 
-    // The tunnels are never emptier than they are right now, and the airlock stand is one tile
-    // wide. Get the form moving before the hauling starts.
     for (let i = 0; i < 8 && stage < 3; i++) errandStep();
 
-    // ---- the shift -------------------------------------------------------
-    // The three streams run interleaved rather than one after another. A bot standing still is a
-    // wall to everybody else, so the cheapest way to keep the site passable is to keep the whole
-    // fleet in motion at once.
     const outstanding = crates.slice();
     const working = haulers.slice();
     const strikes = new Map<number, number>();
@@ -512,11 +400,6 @@ export const solution: ReferenceSolution = {
     let gridTries = 0;
 
     for (let guard = 0; guard < 800; guard++) {
-      // Pull the fleet back onto one clock every few passes. A bot holds a tile from the moment
-      // it arrives until its next move completes, so a bot a long way behind in virtual time
-      // cannot walk through ground the rest of the crew was standing on at that moment — the
-      // site turns into other people's history. Syncing every pass would fix that and hand the
-      // whole fleet the slowest bot's clock, which is the thing being scored.
       if (guard % 3 === 0) sim.sync();
       let acted = false;
 
@@ -564,8 +447,6 @@ export const solution: ReferenceSolution = {
           const fumble = (): void => {
             const missed = (strikes.get(pick) ?? 0) + 1;
             strikes.set(pick, missed);
-            // Four failed errands and the bot is boxed in or dry for good. Until then it is
-            // just unlucky, and the crate goes back on the board for somebody else.
             if (missed >= 4) working.splice(working.indexOf(pick), 1);
             fill(pick, null);
           };
@@ -579,8 +460,6 @@ export const solution: ReferenceSolution = {
               aside(pick);
               strikes.set(pick, 0);
             } else if (sim.fuel(pick) > 1) {
-              // Never end a shift holding a crate. Put it down where the bot got stuck and
-              // book it back onto the board at its new address.
               sim.drop(pick, crate.kind as ItemKind);
               outstanding.push({ at: spot(pick), kind: crate.kind });
               fumble();
@@ -595,8 +474,6 @@ export const solution: ReferenceSolution = {
       if (!acted) break;
     }
 
-    // Last sweep. Anything still on the board gets offered to the whole fleet, one bot at a time,
-    // because at this point the only thing left to optimise is whether the job is finished.
     let stubborn = 0;
     while (grid < ranks.length && stubborn < 4) {
       sim.sync();
@@ -611,8 +488,6 @@ export const solution: ReferenceSolution = {
       }
     }
 
-    // Run off the map rather than off the plan: anything the fleet has seen lying on the ground
-    // that is not already on a pad is a crate somebody dropped or never reached.
     const pads = [...sinks.values()];
     for (let round = 0; round < 4; round++) {
       sim.sync();
@@ -661,7 +536,6 @@ export const solution: ReferenceSolution = {
     }
     if (heldId !== '') sim.print(anyBot, `held ${heldId} ${String(heldFor)}`);
 
-    // How long the gate stood powered and shut: the walk east, priced against the grid's clock.
     const poweredAt = gateFeeder === undefined ? undefined : thrown.get(gateFeeder);
     if (gateAt !== null && gateFeeder !== undefined && poweredAt !== undefined) {
       sim.print(anyBot, `gate ${gateFeeder} ${String(gateAt - poweredAt)}`);
@@ -969,7 +843,7 @@ export const solution: ReferenceSolution = {
     '',
     '// A station is thrown by whoever is nearest and can still get there. The cycle wraps, so a',
     '// station that is already on is left alone: using it twice would turn it back off.',
-    '// The tick a station was thrown on, off the thrower\'s own clock. Nothing else keeps it.',
+    "// The tick a station was thrown on, off the thrower's own clock. Nothing else keeps it.",
     'const thrown = new Map();',
     'const light = (s) => {',
     "  if (probe(s.id).state === 'on') return true;",

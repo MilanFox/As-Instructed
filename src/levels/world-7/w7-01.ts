@@ -27,15 +27,6 @@ const HEIGHT = 5;
 const MAX_LEN = 9;
 const WIDTH = MAX_LEN + 3;
 
-/**
- * Corridor lengths per seed. Seed 1 is the smallest honest imbalance, seed 2 differs by 3x, and
- * seed 3 is the equal pair.
- *
- * The equal pair is the degenerate one and it sits last on purpose. On two corridors of the same
- * length nobody is behind, so `recv()` works without a `sync()` and every bot's idle is zero — a
- * seed that opens on it hands out a pass to a program that never syncs and to a report that says
- * `0` from memory, and neither is the thing this level asks for.
- */
 const LENGTHS: Record<number, [number, number]> = {
   1: [6, 5],
   2: [3, 9],
@@ -49,7 +40,6 @@ function lengthsFor(seed: number): [number, number] {
   return [rng.int(3, MAX_LEN), rng.int(3, MAX_LEN)];
 }
 
-/** The pad each bot is aiming at sits at the dead end of that bot's own row. */
 function padColumn(world: World, row: number): number {
   for (let x = world.w - 1; x >= 0; x--) {
     if (tileAt(world, vec(x, row))?.terrain === Terrain.Pad) return x;
@@ -57,25 +47,16 @@ function padColumn(world: World, row: number): number {
   return -1;
 }
 
-/**
- * The idle report the run owes, one line per bot, in id order.
- *
- * Idle is read from the trace rather than from the corridor lengths on purpose: it is a fact
- * about the *schedule the player wrote*, not about the site. Two programs that both park both
- * bots can stand still for wildly different amounts of time, and only one of them knows it.
- */
 function idleReport(ctx: ObjectiveContext): string[] {
   return ctx.initialWorld.bots.map(
     (bot) => `idle ${String(bot.id)} ${String(idleTicks(ctx.trace.events, new Set([bot.id])))}`,
   );
 }
 
-/** Which bot line `n` of the report is about, taken from the answer rather than from the run. */
 function botOfLine(line: string): string {
   return line.split(' ')[1] ?? '';
 }
 
-/** The first bot the run did not leave standing on the pad at the end of its own corridor. */
 function unparked(ctx: ObjectiveContext): Divergence | undefined {
   for (const bot of ctx.world.bots) {
     if (bot.alive && tileAt(ctx.world, bot.at)?.terrain === Terrain.Pad) continue;
@@ -90,14 +71,6 @@ function unparked(ctx: ObjectiveContext): Divergence | undefined {
   return undefined;
 }
 
-/**
- * The first bot that never read a message another bot sent it, and whether it asked at all.
- *
- * `recv` handing back `null` until the reader's own clock catches up is the whole difficulty
- * here, so the count of reads that came back empty is exactly the thing the program cannot see
- * and the trace can. A bot that never asked and a bot that asked forty times too early are the
- * two different mistakes that `1 of 2` was hiding.
- */
 function unheard(ctx: ObjectiveContext): Divergence | undefined {
   for (const bot of ctx.world.bots) {
     if (heardFromAnother(ctx.trace.events, bot.id)) continue;
@@ -119,13 +92,6 @@ function unheard(ctx: ObjectiveContext): Divergence | undefined {
   return undefined;
 }
 
-/**
- * Where the idle report and the run part company, without ever handing over an idle count.
- *
- * The number is the whole bonus, so a wrong figure is answered with the run's own figure and the
- * fact that it is wrong. That still tells the player which bot they mis-read, which is the thing
- * a bare `not met` on a two-line report cannot.
- */
 function misreportedIdle(ctx: ObjectiveContext): Divergence | undefined {
   const wanted = idleReport(ctx);
   const said = reportedLines(ctx.trace.events, 'idle');
@@ -178,18 +144,6 @@ export const w7_01: LevelDef = {
     'Park each bot on the pad at the end of its own corridor, and have each one hear from',
     'the other.',
   ].join('\n'),
-  /**
-   * DESIGN.md §11.10.
-   *
-   * World 7 is scored on the finish time of the last bot, and the first thing a player needs to
-   * know about a fleet is how big it is. Here it is two, on every shift, and nothing in the brief
-   * or the facts said so — a run that reads `bots()` and a run that writes `bot(0)` and `bot(1)`
-   * are the same program on this order and only one of them knows it. What moves is the pair of
-   * walks, including the draw where they are the same length: on that board nobody is behind,
-   * `recv()` lands without a `sync()` and every idle figure is zero, so a report that carries a
-   * remembered zero passes one shift and fails the other two. Both halves are stated because the
-   * one corridor in front of the player looks identical either way.
-   */
   board: {
     fixed: [
       'two bots, one to a corridor, on every shift',

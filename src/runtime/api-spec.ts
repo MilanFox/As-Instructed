@@ -1,28 +1,5 @@
 import type { ApiFunctionSpec, ApiTypeSpec, PlayerApiSpec } from './protocol.ts';
 
-/**
- * The player-callable API surface, as data.
- *
- * Three consumers read this file: RUNTIME binds one real implementation per entry, UI renders the
- * docs panel, and Monaco concatenates every `types[].declaration` into one ambient `.d.ts` before
- * transpiling the player's source. Nothing here is executable — this module holds no logic beyond
- * four lookup helpers.
- *
- * Bindings: the spec describes the SINGLE-BOT binding, where the acting bot id is already bound
- * away by the runtime. Player code never passes a bot id. World 7 additionally exposes the same
- * functions on the per-bot handle `bot(id)` returns; `FLEET_WIDE` below is the only thing that
- * decides which entries appear there, and the `Bot` interface the editor sees is generated from
- * that same list, so the handle cannot drift from the free functions.
- *
- * Specified, not yet implemented in `Sim`: `link`, `receive`, `buffered`, `transmit`, `decode`.
- * World 5 and 6 semantics are deliberately open in DESIGN.md, so these five are contracts for the
- * RUNTIME and CONTENT agents to satisfy on top of `Sim.applyMachineChange`; each `doc` says so.
- *
- * Unlock ordering: `functions` is stored in unlock order, and level ids (`w<world>-<index>`, both
- * single-digit world and zero-padded index) sort lexicographically in that same order, which is
- * what `apiUnlockedBy` relies on.
- */
-
 const TYPES: ApiTypeSpec[] = [
   {
     name: 'Vec',
@@ -136,10 +113,6 @@ declare const ItemKind: {
   },
   {
     name: 'MachineView',
-    /* Mirrors `MachineView` in `src/engine/sim.ts`. Every declaration in this file is a string, so
-       `tsc` compares nothing here and a field added to the engine type and forgotten here is a
-       field the editor refuses to let the player read. Guarded by
-       `src/__tests__/confessed-invariants.test.ts`. */
     declaration: `interface MachineView {
   id: string;
   kind: string;
@@ -642,7 +615,7 @@ if (raw !== null) {
     name: 'clock',
     params: [],
     returns: 'number',
-    doc: "Returns the tick this bot has reached. Every bot keeps its own clock and the level is scored on the highest one at the end, so comparing clocks is how you find the bot that is furthest behind and hand it the next job.",
+    doc: 'Returns the tick this bot has reached. Every bot keeps its own clock and the level is scored on the highest one at the end, so comparing clocks is how you find the bot that is furthest behind and hand it the next job.',
     example: `let idle = bots()[0] as number;
 for (const id of bots()) {
   if (bot(id).clock() < bot(idle).clock()) idle = id;
@@ -736,33 +709,18 @@ if (helper >= 0) {
   },
 ];
 
-/**
- * Calls that address the whole fleet rather than one bot, and so are *not* methods on `Bot`.
- * Everything else is: a bot can do it, therefore `bot(id)` can be asked to do it.
- */
 const FLEET_WIDE = new Set<string>(['bot', 'bots', 'sync']);
 
-/** The entries `bot(id)` exposes as methods, in unlock order. */
-export function perBotApi(
-  functions: readonly ApiFunctionSpec[] = FUNCTIONS,
-): ApiFunctionSpec[] {
+export function perBotApi(functions: readonly ApiFunctionSpec[] = FUNCTIONS): ApiFunctionSpec[] {
   return functions.filter((fn) => !FLEET_WIDE.has(fn.name));
 }
 
-/** `dir: Dir, range?: number` — shared by the free-function and the `Bot` member renderers. */
 export function renderParams(fn: ApiFunctionSpec): string {
   return fn.params
     .map((param) => `${param.name}${param.optional ? '?' : ''}: ${param.type}`)
     .join(', ');
 }
 
-/**
- * The `Bot` interface, generated from the specs that also bind the implementations.
- *
- * `members` is the unlocked subset, which is what makes the handle obey the same hardware gate as
- * the free functions: `bot(id).spawn(...)` must not type-check before the level that installs the
- * fabricator. `docFor` renders the JSDoc block above each member when the caller wants one.
- */
 export function botHandleDeclaration(
   members: readonly ApiFunctionSpec[],
   docFor?: (fn: ApiFunctionSpec) => string,
@@ -800,12 +758,10 @@ export function apiForWorld(world: number): ApiFunctionSpec[] {
   return PLAYER_API.functions.filter((fn) => fn.world === world);
 }
 
-/** Every function unlocked at or before the given level id, in unlock order. */
 export function apiUnlockedBy(levelId: string): ApiFunctionSpec[] {
   return PLAYER_API.functions.filter((fn) => fn.unlockedBy <= levelId);
 }
 
-/** Names unlocked exactly at this level id — feeds LevelDef.hardware. */
 export function apiUnlockedAt(levelId: string): string[] {
   return PLAYER_API.functions.filter((fn) => fn.unlockedBy === levelId).map((fn) => fn.name);
 }

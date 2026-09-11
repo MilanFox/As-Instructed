@@ -13,24 +13,6 @@ import { solution as w2_04Solution } from '../__solutions__/w2-04.ts';
 import { solution as w2_05Solution } from '../__solutions__/w2-05.ts';
 import { serpentineHarvest } from '../../__tests__/naive.ts';
 
-/**
- * The Regolith Fields, and specifically its reworked bonus objectives.
- *
- * Every bonus here is proved in both directions: a driver that earns the star on every declared
- * seed, and the obvious correct answer missing it. A bonus only one of those is true of is either
- * confetti or impossible, and both have shipped before.
- *
- * That obvious answer used to be the level's own reference solution. Not anymore:
- * on w2-05 par moved onto the route that uses the level's hardware, so the reference had to
- * move with it, and the lazier route lives in `src/levels/__tests__/naive.ts` as
- * `serpentineHarvest`. It is still correct, still passes every seed, and now takes silver rather
- * than gold.
- *
- * The readouts are proved too. `src/game/budgets.ts` decides what number the player sees by
- * matching words in the label against the meters a run actually produced, so a label is a piece of
- * behaviour and is asserted like one.
- */
-
 const SOLUTIONS: Record<string, ReferenceSolution> = {
   'w2-02': w2_02Solution,
   'w2-04': w2_04Solution,
@@ -62,7 +44,6 @@ const scoreBonus = (
 
 const starred = (level: LevelDef, run: LevelRunResult): boolean => scoreBonus(level, run).met;
 
-/** Exactly what `ObjectiveRail` hands `budgetFor`, so the assertions are about what a player sees. */
 const readout = (level: LevelDef, run: LevelRunResult): Budget | null => {
   const objective = bonusOf(level);
   const scored = scoreBonus(level, run);
@@ -96,16 +77,6 @@ const goTo = (sim: Sim, botId: number, to: Vec): void => {
 
 const stayPut = (): void => undefined;
 
-// ---------------------------------------------------------------------------
-// Drivers
-// ---------------------------------------------------------------------------
-
-/**
- * w2-04, the star: poll the plot for whatever ripens next and be standing on it when it does.
- *
- * A tile that has not started growing reads 0 of 8 and stays there, so the timetable arrives a
- * piece at a time and the plan is remade after every look rather than sorted once at the start.
- */
 function standOnEachCropAsItRipens(sim: Sim, botId: number): void {
   const pending = new Map<string, Vec>();
   const ready = new Map<string, number>();
@@ -197,10 +168,6 @@ function standOnEachCropAsItRipens(sim: Sim, botId: number): void {
   }
 }
 
-/**
- * w2-04, the answer that is correct and never looks: plant whatever is bare, then stand on each
- * remaining tile long enough that it must be ripe by now.
- */
 function waitLongEnoughOnEverything(sim: Sim, botId: number): void {
   const plot: Vec[] = [
     { x: 1, y: 1 },
@@ -223,10 +190,6 @@ function waitLongEnoughOnEverything(sim: Sim, botId: number): void {
   }
 }
 
-/**
- * w2-05, the star: walk two lanes, reading the row above and the row below for free, and step off
- * the lane only for crop the survey already picked out.
- */
 function surveyTwoLanesThenStrike(sim: Sim, botId: number): void {
   const capacity = sim.capacity(botId);
   const ripe = new Map<string, Vec>();
@@ -277,10 +240,6 @@ function surveyTwoLanesThenStrike(sim: Sim, botId: number): void {
   }
 }
 
-// ---------------------------------------------------------------------------
-// The world still works
-// ---------------------------------------------------------------------------
-
 describe('world 2 shape', () => {
   test('three levels, in order, each with exactly one bonus star', () => {
     expect(WORLD_2_LEVELS.map((level) => level.id)).toEqual(['w2-02', 'w2-04', 'w2-05']);
@@ -310,10 +269,6 @@ describe('world 2 shape', () => {
     }
   });
 });
-
-// ---------------------------------------------------------------------------
-// w2-04 — the freshness ledger
-// ---------------------------------------------------------------------------
 
 describe('w2-04 bonus — spoilage', () => {
   test('standing on each crop as it ripens earns the star on every seed', () => {
@@ -363,30 +318,17 @@ describe('w2-04 bonus — spoilage', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// w2-05 — the footprint budget
-// ---------------------------------------------------------------------------
-
 describe('w2-05 bonus — footprint', () => {
   test('surveying two lanes and striking earns the star inside the shift on every seed', () => {
     for (const seed of w2_05.seeds) {
       const run = runLevel(w2_05, seed, surveyTwoLanesThenStrike);
       expect(run.verdict.passed, `seed ${String(seed)}`).toBe(true);
-      expect(run.ticks, `seed ${String(seed)}`).toBeLessThanOrEqual(
-        w2_05.budget?.maxTicks ?? 0,
-      );
+      expect(run.ticks, `seed ${String(seed)}`).toBeLessThanOrEqual(w2_05.budget?.maxTicks ?? 0);
       expect(footprintOf(run), `seed ${String(seed)}`).toBeLessThanOrEqual(32);
       expect(starred(w2_05, run), `seed ${String(seed)}`).toBe(true);
     }
   });
 
-  /**
-   * The sweep used to come home on all five seeds and lose only
-   * the star; the shift is 62 now, so on three of them it is powered down mid-row with the hopper
-   * still open. Where it does come home it still walks too much ground to have the star, which is
-   * the half of the old assertion worth keeping: the footprint budget is not the deadline wearing
-   * a different label.
-   */
   test('the serpentine sweep runs out of shift, and misses the star where it does not', () => {
     const closed: number[] = [];
     for (const seed of w2_05.seeds) {

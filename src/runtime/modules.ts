@@ -1,27 +1,3 @@
-/**
- * Linking two files together: the player's program and their shared library.
- *
- * The player writes `import { pathTo } from 'lib';` and expects it to work. There is no module
- * loader in a `new Function` sandbox, so the link is done by rewriting text:
- *
- *  - `lib.ts` is emitted, its `export` keywords are stripped, and the whole body is evaluated
- *    inside its own `new Function`, which returns an object of its named exports.
- *  - the program's `import ... from 'lib'` statements are rewritten into destructuring bindings
- *    against that object, and the program is evaluated in a second `new Function`.
- *
- * **Every rewrite preserves the number of newlines it replaces.** That is the whole contract of
- * this module. `sourcemap.ts` maps emitted line -> player line, and a rewrite that added or removed
- * a line would silently poison every error message below it. Columns are allowed to move; they are
- * already discarded by `errors.ts` whenever a line map is present.
- *
- * The two `new Function` bodies each carry a `//# sourceURL=` trailer, which is what makes a stack
- * frame say *which file* it came from. Without it both compile to `<anonymous>` and an error inside
- * a library function is indistinguishable from one in the level — see `resolveModuleLocation`.
- * Measured, not assumed: the trailer does not shift the line numbers the engine reports.
- *
- * Pure. No DOM, no Monaco, no `Sim`.
- */
-
 import { parseStackFrames } from './errors.ts';
 import type { LibraryUsage } from './protocol.ts';
 import { toSourceLine } from './sourcemap.ts';
@@ -32,28 +8,17 @@ import {
   toPlayerLine,
 } from './wrapper.ts';
 
-/** The module specifier the player types. There is exactly one. */
 export const LIB_SPECIFIER = 'lib';
 
-/** The binding the rewritten imports destructure from. Reserved; the linter rejects it in player code. */
 export const LIB_BINDING = '__lib__';
 
-/**
- * The binding the library's own footer calls to install its meters. Reserved, like `LIB_BINDING`.
- *
- * It exists because attribution has to survive a library function calling another one. Wrapping
- * only the exports handed to the level would leave a shared inner helper reporting zero calls, and
- * the Refactor screen would then tell the player that making it faster changes nothing.
- */
 export const METER_BINDING = '__meter__';
 
-/** Frame name for the library's top-level body, mirroring `PLAYER_FRAME_NAME`. */
 export const LIBRARY_FRAME_NAME = '__library__';
 
 export const PROGRAM_SOURCE_URL = 'bootstrap:///program.ts';
 export const LIBRARY_SOURCE_URL = 'bootstrap:///lib.ts';
 
-/** Which of the two files a line number belongs to. */
 export type SourceFile = 'program' | 'lib';
 
 export const SOURCE_URLS: Readonly<Record<SourceFile, string>> = {
@@ -61,15 +26,10 @@ export const SOURCE_URLS: Readonly<Record<SourceFile, string>> = {
   lib: LIBRARY_SOURCE_URL,
 };
 
-/** Player-facing labels. `lib.ts` is what the tab is called, so that is what errors call it. */
 export const SOURCE_LABELS: Readonly<Record<SourceFile, string>> = {
   program: 'program.ts',
   lib: 'lib.ts',
 };
-
-// ---------------------------------------------------------------------------
-// Scanning
-// ---------------------------------------------------------------------------
 
 type LineState = 'code' | 'block-comment' | 'template';
 
@@ -108,17 +68,9 @@ const REGEX_PRECEDERS = new Set([
   'await',
 ]);
 
-/**
- * The lexical state at the start of every line.
- *
- * `import` and `export` are only ever real statements when the line they open starts in `code`.
- * A template literal spanning lines is the one construct that can otherwise put the word `export`
- * at the start of a line, and a library that builds source strings is not far-fetched in World 6.
- */
 export function lineStates(source: string): LineState[] {
   const states: LineState[] = ['code'];
   let state: LineState = 'code';
-  /** `${` nesting inside a template literal. */
   let substitution = 0;
   let lastSignificant = '';
 
@@ -154,7 +106,6 @@ export function lineStates(source: string): LineState[] {
       continue;
     }
 
-    /* state === 'code' */
     if (ch === '/' && next === '/') {
       while (i < source.length && source[i] !== '\n') i++;
       i -= 1;
@@ -202,7 +153,6 @@ function isRegexStart(lastSignificant: string): boolean {
   return lastSignificant === '' || REGEX_PRECEDERS.has(lastSignificant);
 }
 
-/** Returns the index of the closing delimiter, or the last index consumed. */
 function skipQuoted(source: string, from: number, quote: string): number {
   let i = from + 1;
   while (i < source.length) {
@@ -235,20 +185,12 @@ function skipRegex(source: string, from: number): number {
   return i;
 }
 
-/** Character offset of the first character of each 1-based line. */
 function lineOffsets(source: string): number[] {
   const offsets = [0];
   for (let i = 0; i < source.length; i++) if (source[i] === '\n') offsets.push(i + 1);
   return offsets;
 }
 
-/**
- * The end of a statement that begins at `from`: one past the terminating `;`.
- *
- * The TypeScript printer always terminates an import or export declaration with a semicolon, so
- * this never has to reason about ASI. Strings, comments and templates are skipped so a specifier
- * like `'a;b'` cannot end the statement early.
- */
 function statementEnd(source: string, from: number): number {
   let i = from;
   while (i < source.length) {
@@ -303,16 +245,13 @@ function skipTemplate(source: string, from: number): number {
 }
 
 export interface StatementSpan {
-  /** The keyword that opened it. */
   keyword: 'import' | 'export';
   start: number;
   end: number;
   text: string;
-  /** 1-based line the statement starts on. */
   line: number;
 }
 
-/** Every top-level `import` / `export` statement, in source order. */
 export function findModuleStatements(source: string): StatementSpan[] {
   const states = lineStates(source);
   const offsets = lineOffsets(source);
@@ -340,7 +279,6 @@ export function findModuleStatements(source: string): StatementSpan[] {
   return found;
 }
 
-/** Blanks a span, keeping every newline it contained so line numbers below do not shift. */
 function blank(text: string): string {
   return text.replace(/[^\n]/g, ' ');
 }
@@ -351,40 +289,24 @@ function newlinesIn(text: string): number {
   return count;
 }
 
-/** Replaces a span with `replacement`, then restores the span's newline count. */
 function replacePreservingLines(span: string, replacement: string): string {
   return replacement + '\n'.repeat(newlinesIn(span));
 }
 
-// ---------------------------------------------------------------------------
-// The library side: stripping `export`
-// ---------------------------------------------------------------------------
-
 export interface ModuleProblem {
-  /** 1-based, in the file the problem was found in. */
   line: number;
   message: string;
 }
 
-/** One thing the library publishes. */
 export interface LibraryExport {
-  /** The name a work order imports. */
   name: string;
-  /** The binding inside `lib.ts`. Differs from `name` only for `export { a as b }`. */
   local: string;
-  /**
-   * True when the binding can be reassigned, which is what lets a meter be installed *inside* the
-   * library so calls between library functions are attributed too.
-   */
   mutable: boolean;
 }
 
 export interface LibraryModule {
-  /** Emitted JS with every `export` keyword removed. Line count identical to the input. */
   js: string;
-  /** Exported binding names, in declaration order. */
   exports: string[];
-  /** The same exports with their local bindings, in declaration order. */
   entries: LibraryExport[];
   problems: ModuleProblem[];
 }
@@ -392,7 +314,6 @@ export interface LibraryModule {
 const DECLARATION_HEAD =
   /^(?:(?:async\s+)?function\s*\*?\s*([A-Za-z_$][\w$]*)|class\s+([A-Za-z_$][\w$]*)|(const|let|var)\s+([\s\S]*))/;
 
-/** `a, b = 1, { c, d }` -> the identifiers it introduces. */
 function bindingNames(declarators: string): string[] {
   const names: string[] = [];
   let depth = 0;
@@ -406,7 +327,6 @@ function bindingNames(declarators: string): string[] {
       names.push(head);
       return;
     }
-    /* Destructuring: `{ a, b: c }` / `[a, b]`. Take each binding's local name. */
     for (const part of head.replace(/^[{[]|[}\]]$/g, '').split(',')) {
       const local = part.includes(':') ? part.split(':').pop() : part;
       const cleaned =
@@ -433,7 +353,6 @@ function bindingNames(declarators: string): string[] {
   return names;
 }
 
-/** `{ a, b as c }` -> the local binding and the name the module exposes, per entry. */
 function exportClausePairs(clause: string): { local: string; name: string }[] {
   const pairs: { local: string; name: string }[] = [];
   for (const part of clause.split(',')) {
@@ -450,22 +369,9 @@ function exportClausePairs(clause: string): { local: string; name: string }[] {
 }
 
 export interface StripOptions {
-  /**
-   * Rewrite `export const` to `export let` — same width, same columns, same lines — so the export
-   * can be reassigned to its metered wrapper from inside the library.
-   *
-   * Off by default, because it is a semantic change and only the metered path needs it. TypeScript
-   * still refuses an assignment to a `const` in the editor, so the player never sees the widening.
-   */
   mutableExports?: boolean;
 }
 
-/**
- * Turns emitted library JS into a body that can be evaluated and a list of what it exports.
- *
- * `export ` on a declaration is replaced by spaces of the same width, which keeps columns as well
- * as lines intact. An `export { … }` statement is blanked entirely.
- */
 export function stripLibraryExports(emittedJs: string, options: StripOptions = {}): LibraryModule {
   const statements = findModuleStatements(emittedJs);
   const problems: ModuleProblem[] = [];
@@ -536,8 +442,6 @@ export function stripLibraryExports(emittedJs: string, options: StripOptions = {
     const keyword = head[3];
     const widen = keyword === 'const' && options.mutableExports === true;
     const named = head[1] ?? head[2];
-    /* A `function` or `class` declaration binding is reassignable; so is `let`/`var`; `const` only
-       once it has been widened. */
     const mutable = named !== undefined || keyword !== 'const' || widen;
 
     if (named) entries.push({ name: named, local: named, mutable });
@@ -547,7 +451,6 @@ export function stripLibraryExports(emittedJs: string, options: StripOptions = {
       }
     }
 
-    /* Blank exactly `export` plus the whitespace that followed it: same width, same lines. */
     edits.push({
       start: statement.start,
       end: statement.start + leading,
@@ -595,15 +498,9 @@ function applyEdits(
   return out + source.slice(cursor);
 }
 
-// ---------------------------------------------------------------------------
-// The program side: rewriting `import`
-// ---------------------------------------------------------------------------
-
 export interface ProgramModule {
   js: string;
-  /** Library names the program bound, in import order. */
   imported: string[];
-  /** True when the program pulled in the whole namespace. */
   namespaceImport: boolean;
   problems: ModuleProblem[];
 }
@@ -611,12 +508,6 @@ export interface ProgramModule {
 const IMPORT_SPECIFIER = /from\s*(['"])([^'"]*)\1/;
 const EMPTY_EXPORT = /^export\s*\{\s*\}\s*;?$/;
 
-/**
- * Rewrites `import … from 'lib'` into a destructuring binding on the linked library object.
- *
- * The replacement is shorter than what it replaces, so it never needs to wrap; the trailing
- * newlines restore the statement's line count exactly.
- */
 export function rewriteProgramImports(emittedJs: string): ProgramModule {
   const statements = findModuleStatements(emittedJs);
   const problems: ModuleProblem[] = [];
@@ -626,10 +517,6 @@ export function rewriteProgramImports(emittedJs: string): ProgramModule {
 
   for (const statement of statements) {
     if (statement.keyword === 'export') {
-      /* `export {};` with nothing in it is not the player's: it is the marker the compiler
-         synthesizes for a file with no imports, because `compile.ts` forces every program to be a
-         module so the player's own names shadow the firmware instead of colliding with it. It
-         publishes nothing, so it is blanked rather than reported. */
       if (EMPTY_EXPORT.test(statement.text.trim())) {
         edits.push({ start: statement.start, end: statement.end, text: blank(statement.text) });
         continue;
@@ -723,7 +610,6 @@ function importBinding(
   return undefined;
 }
 
-/** True when the source asks for anything out of `'lib'`. Cheap enough to run on every keystroke. */
 export function importsLibrary(source: string): boolean {
   return findModuleStatements(source).some(
     (statement) =>
@@ -731,14 +617,9 @@ export function importsLibrary(source: string): boolean {
   );
 }
 
-/** The library names a source file imports. Static, so it needs no run. */
 export function importedLibraryNames(source: string): string[] {
   return rewriteProgramImports(source).imported;
 }
-
-// ---------------------------------------------------------------------------
-// Linking
-// ---------------------------------------------------------------------------
 
 export type { LibraryUsage };
 
@@ -746,7 +627,6 @@ export function emptyUsage(): LibraryUsage {
   return { ticks: 0, calls: {} };
 }
 
-/** Reads the sim's clock. Injected so this module never imports the engine. */
 export interface TickMeter {
   now(): number;
 }
@@ -758,17 +638,14 @@ export interface LinkScope {
 
 export interface LinkOptions {
   programJs: string;
-  /** Emitted library JS, or `undefined` when the player has no library yet. */
   libraryJs?: string | undefined;
   scope: LinkScope;
-  /** When supplied, every library export is metered. */
   meter?: TickMeter | undefined;
 }
 
 export interface LinkedProgram {
   run: () => void;
   usage: LibraryUsage;
-  /** Exports the library actually provided. */
   exports: string[];
   problems: { file: SourceFile; problem: ModuleProblem }[];
 }
@@ -804,13 +681,6 @@ function evaluate(body: string, scope: LinkScope, extra: Record<string, unknown>
   return compiled(...args);
 }
 
-/**
- * Wraps one library export so its ticks can be attributed.
- *
- * Only the outermost call adds to `usage.ticks`: a `sweep` that calls `pathTo` twice would
- * otherwise report more library ticks than the level spent in total, which is the kind of number
- * that makes a player stop trusting the profiler.
- */
 function meterExport(
   name: string,
   fn: unknown,
@@ -819,8 +689,6 @@ function meterExport(
   depth: { value: number },
 ): unknown {
   if (typeof fn !== 'function') return fn;
-  /* A class is a function and cannot be wrapped in one: the wrapper would be called without
-     `new` and the constructor would throw. Published classes are handed over unmetered. */
   if (/^class[\s{]/.test(Function.prototype.toString.call(fn))) return fn;
   const target = fn as (...args: unknown[]) => unknown;
   const wrapped = function (this: unknown, ...args: unknown[]): unknown {
@@ -841,12 +709,6 @@ function meterExport(
   return wrapped;
 }
 
-/**
- * Builds the callable program, with the library linked in front of it when there is one.
- *
- * The library body runs first and to completion, exactly like a module's top level. Anything it
- * throws happens before the level's first line, and the stack says `lib.ts`.
- */
 export function linkProgram(options: LinkOptions): LinkedProgram {
   const problems: { file: SourceFile; problem: ModuleProblem }[] = [];
   const usage = emptyUsage();
@@ -858,8 +720,6 @@ export function linkProgram(options: LinkOptions): LinkedProgram {
   const libraryJs = options.libraryJs;
   const hasLibrary = libraryJs !== undefined && libraryJs.trim() !== '';
 
-  /* Stripping is pure, so it happens now: the caller learns what the library publishes, and what
-     is wrong with it, without having to run anything. */
   const library = hasLibrary
     ? stripLibraryExports(libraryJs, { mutableExports: options.meter !== undefined })
     : undefined;
@@ -878,10 +738,6 @@ export function linkProgram(options: LinkOptions): LinkedProgram {
       const install = (name: string, fn: unknown): unknown =>
         meter ? meterExport(name, fn, meter, usage, depth) : fn;
 
-      /* Reassigning the binding inside the library is what makes an intra-library call go through
-         the meter: `sweep` looks `step` up at call time and finds the wrapper. Exports that cannot
-         be reassigned are wrapped on the way out instead, which still attributes every call the
-         *level* makes — it only misses calls the library makes to itself. */
       const installs = meter
         ? library.entries
             .filter((entry) => entry.mutable)
@@ -913,7 +769,6 @@ export function linkProgram(options: LinkOptions): LinkedProgram {
   return { run, usage, exports: library?.exports ?? [], problems };
 }
 
-/** A rewrite the linker refused. Carries the file and line so the editor can point at it. */
 export class ModuleError extends Error {
   readonly file: SourceFile;
   readonly line: number;
@@ -925,7 +780,6 @@ export class ModuleError extends Error {
   }
 }
 
-/** Thrown when a level imports from a library that is not present at all. */
 export class MissingLibraryError extends Error {
   readonly wanted: readonly string[];
   constructor(wanted: readonly string[]) {
@@ -939,13 +793,8 @@ export class MissingLibraryError extends Error {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Locating an error across two files
-// ---------------------------------------------------------------------------
-
 export interface ModuleLocation {
   file: SourceFile;
-  /** 1-based, in that file's own source. */
   line: number;
   column?: number;
 }
@@ -955,13 +804,6 @@ export interface ModuleLineMaps {
   lib?: readonly number[] | undefined;
 }
 
-/**
- * The topmost stack frame that belongs to either player file, in that file's coordinates.
- *
- * This is what makes an error inside `pathTo` say "lib.ts line 12" instead of pointing at the
- * level line that happened to call it. Frames from the game's own bundle have neither source URL
- * and are skipped, so the engine throwing on the player's behalf still resolves to player code.
- */
 export function resolveModuleLocation(
   stack: string | undefined,
   wrapperOffset: number,
@@ -992,7 +834,6 @@ export function resolveModuleLocation(
   return undefined;
 }
 
-/** Player-visible frames across both files, newest first. */
 export function moduleStack(
   stack: string | undefined,
   wrapperOffset: number,
@@ -1021,13 +862,10 @@ export function moduleStack(
       frame.name === '' || frame.name === PLAYER_FRAME_NAME || frame.name === LIBRARY_FRAME_NAME;
     lines.push(anonymous ? where : `${frame.name} — ${where}`);
 
-    /* Everything below the program's own top-level frame is the wrapper calling it — V8 names that
-       frame `eval`, and it shares the source URL. It is ours, not the player's. */
     if (frame.name === PLAYER_FRAME_NAME) break;
   }
 
   return lines.length > 0 ? lines.join('\n') : undefined;
 }
 
-/** Exported so a test can prove the preamble the offset arithmetic assumes has not moved. */
 export const MODULE_PREAMBLE_LINES = WRAPPER_PREAMBLE_LINES;

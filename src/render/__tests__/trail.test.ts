@@ -22,7 +22,6 @@ function trailFor(trace: Trace): VisitTrail {
   return new VisitTrail(new TraceTimeline(trace));
 }
 
-/** Straight line East. Nothing is ever stood on twice — the `w4-01` shape. */
 function straightWalk(): Trace {
   const world = createWorld({ w: 8, h: 4, seed: 1, fill: Terrain.Floor });
   addBot(world, { at: vec(1, 1), facing: Dir.East, name: 'A' });
@@ -33,7 +32,6 @@ function straightWalk(): Trace {
   return sim.finish();
 }
 
-/** East then West then East again over the same two tiles — the `w4-02` shape in miniature. */
 function pacingWalk(laps: number): Trace {
   const world = createWorld({ w: 8, h: 4, seed: 1, fill: Terrain.Floor });
   addBot(world, { at: vec(1, 1), facing: Dir.East, name: 'A' });
@@ -190,24 +188,7 @@ describe('trail ramp', () => {
   });
 });
 
-/**
- * The same guard, held against every art direction rather than against one background colour.
- *
- * The first ramp ran from `inkDim`, which is within a few points of the World 4 cave floor, so
- * the cold end drew nothing at all on the one level the trail is for. The fix was "the cold end
- * is a darkening", and the test above pins the literal that produced.
- *
- * That is the right lesson stated one direction too narrowly. A darkening is correct against a
- * mid-value floor and wrong against a near-black one, where it fails for exactly the reason
- * `inkDim` did. What actually has to hold is luminance first, hue second — so it is checked here
- * as a contrast requirement against the floor each direction paints, in whichever direction that
- * direction needs.
- */
 describe('the cold end survives the floor it is painted on, in every direction', () => {
-  /*
-   * Below about 0.05 separation in relative luminance the step is not reliably visible on a
-   * middling laptop panel, which is the machine the original bug was found and missed on.
-   */
   const MIN_SEPARATION = 0.05;
 
   for (const id of ART_IDS) {
@@ -227,13 +208,6 @@ describe('the cold end survives the floor it is painted on, in every direction',
       expect(separation).toBeGreaterThan(MIN_SEPARATION);
     });
 
-    /*
-     * Both ends being visible is not enough — they also have to be visible *as different things*,
-     * or a hot tile and a cold one read as the same wash and the whole overlay says only "been
-     * here" again. Luminance alone is the wrong measure for that: on paper the cold end is
-     * further from the floor than the hot end is, because there the hue carries the heat and the
-     * luminance carries the depth. Channel distance catches both cases.
-     */
     it(`${id}: the two ends are told apart by more than depth`, () => {
       const cold = Number.parseInt(direction.trail.cold.slice(1), 16);
       const hot = Number.parseInt(direction.trail.hot.slice(1), 16);
@@ -250,10 +224,6 @@ describe('the cold end survives the floor it is painted on, in every direction',
       expect(direction.trail.maxAlpha).toBeLessThanOrEqual(1);
     });
 
-    /*
-     * `accent2` is `overlay.goal`. A mid-heat floor the colour of the objective brackets is the
-     * one confusion `w4-02` cannot afford, so no direction is allowed to route its ramp through it.
-     */
     it(`${id}: the ramp does not pass through the goal colour`, () => {
       for (let t = 0; t <= 10; t++) {
         expect(mix(direction.trail.cold, direction.trail.hot, t / 10)).not.toBe(
@@ -264,11 +234,6 @@ describe('the cold end survives the floor it is painted on, in every direction',
   }
 });
 
-/**
- * The defect this module exists for. `w4-02`'s naive solution and its correct one cover roughly
- * the same cave, so anything that drew *whether* a tile was visited would paint them alike. What
- * separates them is how often, and the gap has to stay wide enough to see.
- */
 describe('w4-02 — the designed failure is visible', () => {
   const level = LEVELS.find((l) => l.id === 'w4-02');
 

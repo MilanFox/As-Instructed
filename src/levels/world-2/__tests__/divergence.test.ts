@@ -1,11 +1,3 @@
-/**
- * What World 2's objectives say when they are missed.
- *
- * The Regolith Fields grade the trace rather than the final world — a rotated tile ends the run
- * planted whatever the run did to it — so a miss here used to be the least readable in the game:
- * the level held a tick, a tile and a swing, and printed a fraction. These tests pin down what it
- * says instead.
- */
 import { describe, expect, test } from 'vitest';
 import type { Objective, Sim, Vec, World } from '../../../engine/index.ts';
 import { DIVERGENCE_VALUE_CHARS, Dir, ItemKind, maturity, tileAt } from '../../../engine/index.ts';
@@ -18,7 +10,12 @@ import { w2_04 } from '../w2-04.ts';
 import { w2_05 } from '../w2-05.ts';
 import { at, ripeAtStart, soilTiles } from '../shared.ts';
 
-function diverge(level: LevelDef, seed: number, id: string, drive: (sim: Sim, bot: number) => void) {
+function diverge(
+  level: LevelDef,
+  seed: number,
+  id: string,
+  drive: (sim: Sim, bot: number) => void,
+) {
   const result = runLevel(level, seed, drive);
   const pool: Objective[] = [...level.objectives, ...(level.bonus ?? [])];
   const objective = must(
@@ -34,7 +31,6 @@ function diverge(level: LevelDef, seed: number, id: string, drive: (sim: Sim, bo
   return { met: objective.evaluate(ctx), divergence: objective.divergence?.(ctx), result };
 }
 
-/** Straight-line drive across an open field, which is every field in this world. */
 function goTo(sim: Sim, botId: number, to: Vec): void {
   while (sim.pos(botId).x < to.x) sim.move(botId, Dir.East);
   while (sim.pos(botId).x > to.x) sim.move(botId, Dir.West);
@@ -42,7 +38,6 @@ function goTo(sim: Sim, botId: number, to: Vec): void {
   while (sim.pos(botId).y > to.y) sim.move(botId, Dir.North);
 }
 
-/** Serpentine over a rectangular field from wherever the mule dropped the bot, walls found free. */
 function sweep(sim: Sim, botId: number, act: (sim: Sim, botId: number) => void): void {
   while (sim.canMove(botId, Dir.North)) sim.move(botId, Dir.North);
   while (sim.canMove(botId, Dir.West)) sim.move(botId, Dir.West);
@@ -59,7 +54,6 @@ function sweep(sim: Sim, botId: number, act: (sim: Sim, botId: number) => void):
   }
 }
 
-/** Tiles carrying a ripe crop of the given kind at tick 0. */
 function ripeOf(world: World, kind: ItemKind): Vec[] {
   return soilTiles(world).filter((tile) => {
     const here = tileAt(world, tile);
@@ -81,10 +75,6 @@ describe('w2-02 names the tile, and says whether the arm ever came down on it', 
     });
   });
 
-  /**
-   * Hint 3's mistake, driven exactly: planting before harvesting leaves the tile empty. The run
-   * did visit the tile and did swing at it, and the report separates that from never going.
-   */
   test('all-planted reports the plant swing that came before the harvest', () => {
     const first = must(ripeAtStart(w2_02.build(1))[0], 'a ripe crop');
     const { met, divergence } = diverge(w2_02, 1, 'all-planted', (sim, botId) => {
@@ -161,10 +151,6 @@ describe('w2-04 separates a swing that found nothing from a tile nobody visited'
     });
   });
 
-  /**
-   * A total says how far off; only the row says which tile carried it. The number the objective
-   * grades is the total, so the tile rides in `where` and the two halves of the sum in `received`.
-   */
   test('a run that picked everything late is told the total and the tile that stood longest', () => {
     const { met, divergence } = diverge(w2_04, 1, 'crop-spoilage', (sim, botId) => {
       sim.wait(botId, 45);
@@ -190,11 +176,6 @@ describe('w2-04 separates a swing that found nothing from a tile nobody visited'
 });
 
 describe('w2-05 reports what the hopper came back with and where the wheels went', () => {
-  /**
-   * The whole level is "the arm cannot tell crop from ice and the sensor can". A hopper that came
-   * back short says so as a count of crop; the slots the ice took are the reason, and they are the
-   * one thing the player has no reading of once the run is over.
-   */
   test('hopper-full-crop names the ice that took the slots', () => {
     const world = w2_05.build(1);
     const ice = ripeOf(world, ItemKind.Ice).slice(0, 3);
@@ -243,11 +224,6 @@ describe('w2-05 reports what the hopper came back with and where the wheels went
   });
 });
 
-/**
- * The world-scoped half of `src/levels/__tests__/legibility.test.ts`, held on every declared seed
- * rather than only the first. The Fields' `AWAITING_A_DIFF` entries can be struck off with this
- * green: nothing in World 2 answers a miss with silence on any shift it ships.
- */
 describe('no objective in World 2 answers a miss with silence', () => {
   for (const level of WORLD_2_LEVELS) {
     for (const seed of level.seeds) {

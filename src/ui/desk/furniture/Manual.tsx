@@ -1,16 +1,3 @@
-/**
- * REFERENCE — `K&D FORM 12 · REV 9`, the wire-bound manual at the bottom-left of the desk.
- *
- * It is a book because the work order, the console, the reference and the commendation book were
- * four 10px dim uppercase chips in the corner of the board, and the reference is the one a player
- * has to read *at length* — a control that summons a reading surface has to be proportionate to
- * the surface. So it is an object on the desk with a cover, a coil and a form number, and it opens as a
- * two-page spread with the command reference set at a size meant to be read.
- *
- * What is on the pages is `src/ui/desk/furniture/reference.ts`, and what is *on this bot* is
- * `unlockedHardware(level.id)`: progression in BOOTSTRAP is hardware (DESIGN.md §6), so the manual
- * prints the commands fitted to the machine you are holding and not the campaign's whole API.
- */
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 
 import { currentLevel, unlockedHardware, useGame } from '../../../game/store.ts';
@@ -22,14 +9,7 @@ import { closeOverlay, openOverlay, useOverlay } from '../../hooks/useOverlay.ts
 import { KEY_LIST } from '../terminal/keys.ts';
 import type { LegendSection } from './legend.ts';
 import { legendFor } from './legend.ts';
-import {
-  CATEGORIES,
-  GUIDES,
-  MEMORY,
-  costLabel,
-  levelCost,
-  matches,
-} from './reference.ts';
+import { CATEGORIES, GUIDES, MEMORY, costLabel, levelCost, matches } from './reference.ts';
 import type { GuidePage } from './reference.ts';
 
 declare global {
@@ -38,7 +18,6 @@ declare global {
   }
 }
 
-/** How long an entry stays lit after being jumped to. */
 const HIGHLIGHT_MS = 1800;
 
 function scrollBehavior(): ScrollBehavior {
@@ -74,15 +53,6 @@ function Signature({ fn }: { fn: ApiFunctionSpec }): React.JSX.Element {
   );
 }
 
-/**
- * WHAT IS ON THIS BOARD — the legend, and the first thing on the left page.
- *
- * It sits above `Memory` because it is the page a player opens the book *for* on their first
- * `w4-04`: the board has grown a tile they have never seen, `refuel()` will not work anywhere else,
- * and until now the only channel that would name it was the hover strip. It is scanned rather than
- * authored, so it is never longer than the board is (`legend.ts` says why), and the names are the
- * API's own so the word in the book is the word a program compares against.
- */
 function Legend({ sections }: { sections: LegendSection[] }): React.JSX.Element | null {
   if (sections.length === 0) return null;
   return (
@@ -129,10 +99,7 @@ function GuideEntry({
   const key = `page:${page.id}`;
   const hit = focused === page.id || focused === key;
   return (
-    <article
-      className={`mo-entry mo-entry--guide${hit ? ' is-focused' : ''}`}
-      ref={register(key)}
-    >
+    <article className={`mo-entry mo-entry--guide${hit ? ' is-focused' : ''}`} ref={register(key)}>
       <div className="mo-entry-head">
         <h3 className="mo-entry-title">{page.title}</h3>
         {required ? <span className="mo-flag">required reading</span> : null}
@@ -162,9 +129,7 @@ function FunctionEntry({
     >
       <div className="mo-entry-head">
         <Signature fn={fn} />
-        <span className={cost === 0 ? 'mo-cost mo-cost--free' : 'mo-cost'}>
-          {costLabel(cost)}
-        </span>
+        <span className={cost === 0 ? 'mo-cost mo-cost--free' : 'mo-cost'}>{costLabel(cost)}</span>
       </div>
       <Markdown source={fn.doc} className="mo-prose" />
       {fn.params.length > 0 ? (
@@ -200,11 +165,6 @@ export function Manual(): React.ReactElement {
   const open = overlay.open === 'docs';
   const needle = query.trim().toLowerCase();
 
-  /*
-   * The work order and the delivery note both point at a named command. They dispatch this event
-   * rather than importing the book, because the sheet that asks and the book that answers are two
-   * lanes and one window event is the whole of the seam.
-   */
   useEffect(() => {
     const onFocus = (event: WindowEventMap['bootstrap:docs-focus']): void => {
       const name = event.detail?.name;
@@ -228,10 +188,6 @@ export function Manual(): React.ReactElement {
     return () => window.clearTimeout(timer);
   }, [focus, open]);
 
-  /*
-   * The board the legend is about. The same expression the feed uses (`Monitor.tsx`), for the same
-   * reason: before a run there is no trace and the first seed is what is on screen.
-   */
   const legend = useMemo(
     () => legendFor(trace?.initialWorld ?? (level ? level.build(level.seeds[0] as number) : null)),
     [level, trace],
@@ -249,11 +205,10 @@ export function Manual(): React.ReactElement {
     [installed],
   );
 
-  /* A type is printed if a fitted command hands it back, or if a printed type names it. */
   const types = useMemo(() => {
     const wanted = new Set<string>();
     for (const fn of functions) for (const name of fn.requiresTypes ?? []) wanted.add(name);
-    for (let grew = true; grew; ) {
+    for (let grew = true; grew;) {
       grew = false;
       for (const type of PLAYER_API.types) {
         if (!wanted.has(type.name)) continue;
@@ -271,7 +226,6 @@ export function Manual(): React.ReactElement {
 
   const referenced = useMemo(() => level?.docs ?? [], [level]);
 
-  /* The pages this work order points at come first; the rest keep their authored order. */
   const guides = useMemo(() => {
     const rank = (page: GuidePage): number => {
       const index = referenced.findIndex((id) => page.id === id || page.aliases.includes(id));
@@ -311,7 +265,6 @@ export function Manual(): React.ReactElement {
       functions.some((fn) => fn.name === id) ||
       [MEMORY, ...GUIDES].some((page) => page.id === id || page.aliases.includes(id)),
   );
-  /* The search narrows the legend the way it narrows everything else on the spread. */
   const shownLegend = useMemo(
     () =>
       legend
@@ -404,12 +357,6 @@ export function Manual(): React.ReactElement {
                 <GuideEntry key={page.id} page={page} focused={focusedName} register={register} />
               ))}
 
-              {/*
-                Ten keys are bound and three were announced, in tooltips (AUDIT-UI F17). `Space`
-                and `Shift+arrow` are what make scrubbing a 700-tick trace bearable and were named
-                nowhere at all. The list is `src/ui/desk/terminal/keys.ts` — the same data the
-                terminal prints its own hint from, so the two cannot drift.
-              */}
               <section className="mo-keys">
                 <h3 className="mo-entry-title">Keys</h3>
                 <dl>

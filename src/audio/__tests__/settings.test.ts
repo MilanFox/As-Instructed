@@ -12,7 +12,6 @@ import {
 } from '../settings.ts';
 import { MiniContext, analyse } from './offline.ts';
 
-/** Node has no localStorage; the settings module has to work with and without one. */
 class MemoryStorage {
   private readonly map = new Map<string, string>();
   get length(): number {
@@ -145,7 +144,6 @@ describe('the mounted surface', () => {
     const bed = analyse(loud.ctx.render(6), loud.ctx.sampleRate);
 
     expect(bed.rms).toBeGreaterThan(1e-4);
-    // Room tone, not music: the bed has to stay far below anything in the catalogue.
     expect(bed.peak).toBeLessThan(0.12);
   });
 

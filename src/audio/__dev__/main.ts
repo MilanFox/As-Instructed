@@ -1,12 +1,3 @@
-/**
- * Standalone audio harness. Open `/src/audio/__dev__/index.html` with `npm run dev`.
- *
- * The offline tests prove the buffers are well-formed; only a human can say whether the sounds
- * are pleasant to sit with for an hour. This page exists so that judgement is one click away:
- * every sound in the catalogue, the mixer, the ambience beds, and a synthetic trace to play at
- * 64x so the rate limiter and the texture bed can be heard doing their job.
- */
-
 import type { Trace, TraceEvent } from '../../engine/index.ts';
 import { Dir } from '../../engine/index.ts';
 import { GameAudio, SOUNDS, SOUND_NAMES } from '../index.ts';
@@ -25,7 +16,6 @@ const BIOMES: readonly AmbienceBiome[] = [
 
 const END_TICK = 600;
 
-/** The harness only feeds the conductor, which reads `events` and nothing else. */
 function syntheticTrace(): Trace {
   const events: TraceEvent[] = [];
   for (let t = 0; t < END_TICK; t++) {

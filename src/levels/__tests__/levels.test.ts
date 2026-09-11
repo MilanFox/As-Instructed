@@ -19,10 +19,6 @@ import {
   serpentineHarvest,
 } from './naive.ts';
 
-/**
- * Reference runs are deterministic, and the finale's is not cheap, so each (level, seed) pair is
- * driven once and the result shared by every assertion that needs it.
- */
 const RUNS = new Map<string, ReturnType<typeof runReference>>();
 
 function runOnce(level: (typeof LEVELS)[number], seed: number) {
@@ -35,12 +31,6 @@ function runOnce(level: (typeof LEVELS)[number], seed: number) {
   return result;
 }
 
-/**
- * Seven work orders were withdrawn (`w1-02`, `w1-04`, `w2-01`, `w2-03`, `w3-03`, `w3-05`, `w4-03`)
- * and the survivors kept their ids, so the campaign is no longer five per world and `index` is no
- * longer contiguous inside one. It is still strictly ascending, which is all `campaignOrder` and
- * the site map need.
- */
 const EXPECTED_INDICES: Readonly<Record<number, number[]>> = {
   1: [1, 3, 5],
   2: [2, 4, 5],
@@ -84,9 +74,10 @@ describe('registry', () => {
     const sections = levelsByWorld();
     expect(sections.map((section) => section.world.id)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     for (const section of sections) {
-      expect(section.levels.map((level) => level.index), `world ${String(section.world.id)}`).toEqual(
-        EXPECTED_INDICES[section.world.id],
-      );
+      expect(
+        section.levels.map((level) => level.index),
+        `world ${String(section.world.id)}`,
+      ).toEqual(EXPECTED_INDICES[section.world.id]);
     }
     expect(sections.flatMap((section) => section.levels).length).toBe(EXPECTED_IDS.length);
   });
@@ -181,13 +172,6 @@ describe('reference solutions', () => {
   }
 });
 
-/**
- * CURRICULUM.md §2 rule 2: every level names the randomization that kills a memorized answer. These
- * are the cases where the claim is checkable — a solution written for one seed, run on the rest.
- *
- * A wrong answer is allowed to fail loudly: walking into a pit throws rather than returning a
- * verdict, and that counts as failing the seed.
- */
 function survives(levelId: string, seed: number, naive: ReferenceSolution): boolean {
   const level = getLevel(levelId);
   if (!level) return false;
@@ -213,11 +197,6 @@ describe('randomization defeats hardcoding', () => {
     }
   });
 
-  /**
-   * DESIGN.md §11.5: the depth-1 seed is the degenerate case and no longer runs first, so the flat
-   * reader is caught on the shift a player starts on rather than on the second one. It still clears
-   * the depth-1 seed, which is what makes it a naive *reader* rather than a broken one.
-   */
   test('w6-05: a flat reader fails the seed that runs first and clears only the depth-1 one', () => {
     const level = getLevel('w6-05') as NonNullable<ReturnType<typeof getLevel>>;
     const outcomes = level.seeds.map((seed) => survives('w6-05', seed, flatReader));
@@ -225,13 +204,17 @@ describe('randomization defeats hardcoding', () => {
     expect(outcomes.filter((passed) => passed)).toEqual([true]);
   });
 
-  test('w7-04: dealing the board out in advance misses par on the skewed seed', { timeout: 30_000 }, () => {
-    const level = getLevel('w7-04') as NonNullable<ReturnType<typeof getLevel>>;
-    const worst = Math.max(
-      ...level.seeds.map((seed) => runReference(level, seed, roundRobinDispatch).ticks),
-    );
-    expect(worst).toBeGreaterThan(level.par.ticks);
-  });
+  test(
+    'w7-04: dealing the board out in advance misses par on the skewed seed',
+    { timeout: 30_000 },
+    () => {
+      const level = getLevel('w7-04') as NonNullable<ReturnType<typeof getLevel>>;
+      const worst = Math.max(
+        ...level.seeds.map((seed) => runReference(level, seed, roundRobinDispatch).ticks),
+      );
+      expect(worst).toBeGreaterThan(level.par.ticks);
+    },
+  );
 
   test('w8-01: the World 2 sweep is correct and still misses the shift budget', () => {
     const level = getLevel('w8-01') as NonNullable<ReturnType<typeof getLevel>>;
@@ -242,18 +225,13 @@ describe('randomization defeats hardcoding', () => {
         result.verdict.objectives.find((objective) => objective.id === 'ripe-to-silo')?.met,
         `seed ${String(seed)}`,
       ).toBe(true);
-      expect(unmet.map((objective) => objective.id), `seed ${String(seed)}`).toEqual([
-        'shift-budget',
-      ]);
+      expect(
+        unmet.map((objective) => objective.id),
+        `seed ${String(seed)}`,
+      ).toEqual(['shift-budget']);
     }
   });
 
-  /**
-   * DESIGN.md §11.5 and CURRICULUM.md §15.3: the zero-drift instance is the degenerate case here —
-   * a run that decodes the plan and follows it without ever looking recovers the form — so it is
-   * no longer the seed that runs first. It still clears exactly one seed, which is what keeps this
-   * a naive *reconciler* rather than a program that never worked.
-   */
   test('w8-04: following the filed plan literally fails first and clears only the zero-drift seed', () => {
     const level = getLevel('w8-04') as NonNullable<ReturnType<typeof getLevel>>;
     const outcomes = level.seeds.map((seed) => survives('w8-04', seed, literalPlanFollower));
@@ -262,15 +240,6 @@ describe('randomization defeats hardcoding', () => {
   });
 });
 
-/**
- * Par is a medal threshold, so the thing to assert about one is a medal — a test
- * that repeats `expect(level.par.ticks).toBe(16)` proves only that a constant was copied twice.
- *
- * Every case here drives a *second* correct program through the level and states what its medal is
- * worth, so each par is pinned from both sides: the reference takes gold (proved on every seed
- * above) and, where the level has a better and a lazier answer, the lazier one does not. The medal
- * is taken from the worst seed, which is how `src/runtime/aggregate.ts` scores a run.
- */
 describe('par calibration', () => {
   function scored(levelId: string, solution: ReferenceSolution) {
     const level = getLevel(levelId) as NonNullable<ReturnType<typeof getLevel>>;
@@ -291,16 +260,6 @@ describe('par calibration', () => {
     expect(polled.medal).toBe('gold');
   });
 
-  /**
-   * The shift was 84 and the serpentine cost 58–68, so the
-   * level's own promise — *you cannot visit everything, so choose* — decided nothing but the
-   * medal. The shift is 62 now, and this is the assertion that says so from the losing side: the
-   * sweep is still a correct program and it still runs out of shift, on three seeds of five.
-   *
-   * Both halves matter. A serpentine that failed everywhere would mean the deadline had eaten the
-   * level rather than sharpened it, and the reference clearing every seed by 7 ticks at its worst
-   * is what says the ground given up is the ground that was never worth covering.
-   */
   test('w2-05: serpentining all six rows runs out of shift on most seeds', () => {
     const level = getLevel('w2-05') as NonNullable<ReturnType<typeof getLevel>>;
     const closed = level.seeds.filter((seed) => survives('w2-05', seed, serpentineHarvest));
@@ -313,17 +272,6 @@ describe('par calibration', () => {
     expect(level.budget?.maxTicks).toBeGreaterThanOrEqual(lanes.worst + 7);
   });
 
-  /**
-   * This par used to be free: the workings held short cuts between
-   * the legs of the filed route, so the answer that never decoded a packet walked to the locker in
-   * a fifth of the ticks the plan costs and golded on every seed by 106 ticks. The repair is the
-   * map, not the number — no two corridors run side by side any more, so the filed route is the
-   * shortest walk there is and refusing to read it can only add ground.
-   *
-   * Both refusals are here because the second one is the better program and it is the one a
-   * player who has met `probe` will actually write. Neither may gold, and the assertion that the
-   * reference is *cheaper on every seed* is the one that would catch the defect coming back.
-   */
   test('w8-04: ignoring the filed plan is correct, and is not gold either way', () => {
     const plan = reference('w8-04');
     for (const refusal of [frontierScavenger, lockerCanvasser]) {
@@ -335,17 +283,6 @@ describe('par calibration', () => {
     expect(plan.medal).toBe('gold');
   });
 
-  /**
-   * Ticks are integers and `par * 1.25` alone holds no integer at all below a par of four:
-   * `floor(3 * 1.25)` is 3. Two levels are there — `w6-01`, whose own comment says its par is 1
-   * only because the registry test requires a positive one, and `w5-02`, whose par is the single
-   * `power` call the level is about. Neither is a design figure, so the band was widened to
-   * `max(par + 1, par * 1.25)` rather than the pars moved.
-   *
-   * The list stays because the arithmetic that made the widening necessary is still worth naming,
-   * and a third level arriving in it is worth knowing about. What it no longer implies is an
-   * unreachable rung — the test below that one is the one that grades the ladder.
-   */
   const SILVER_NEEDS_THE_WIDENING = ['w5-02', 'w6-01'];
 
   test('two pars are small enough that the raw 1.25 band holds no integer', () => {
@@ -364,12 +301,6 @@ describe('par calibration', () => {
     }
   });
 
-  /**
-   * The criterion for "a tick budget cannot grade this level", measured rather than inferred from
-   * how small the par is: the reference costs the *same* number of ticks on every seed, so the
-   * clock is reporting the work rather than the route. This is the set
-   * an `ungraded` flag should be scoped by, and it is not the set par magnitude picks out.
-   */
   const CLOCK_CANNOT_VARY = ['w1-01', 'w5-02', 'w6-01', 'w6-03', 'w6-05'];
 
   test('the levels whose reference costs the same on every seed are the ones on record', () => {
@@ -382,12 +313,6 @@ describe('par calibration', () => {
   });
 });
 
-/**
- * A bonus exists to absorb ambition (CURRICULUM.md §2 rule 8), so a reference solution is not
- * expected to earn every one — `w7-05`'s idle budget in particular is deliberately past it. What
- * is not allowed is a bonus that no run can even be scored against, or a whole campaign of them
- * that nothing can reach.
- */
 describe('bonus objectives', () => {
   const withBonus = LEVELS.filter((level) => (level.bonus ?? []).length > 0);
 
@@ -422,12 +347,6 @@ describe('bonus objectives', () => {
   });
 });
 
-/**
- * The Repository is never a gate (src/meta/unlock.ts). The requisition card on the brief panel
- * lists every routine a work order assumes — signature, one line of what it does, and the import —
- * and says in the same breath that writing it in the work order is fine. The brief carries none of
- * it, because a signature is a fact to look up rather than a sentence to read.
- */
 describe('library requirements', () => {
   const namesLib = LEVELS.filter((level) => requirementsFor(level.id).length > 0);
 

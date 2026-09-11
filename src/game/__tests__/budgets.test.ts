@@ -24,7 +24,6 @@ const mark = (t: number): TraceEvent =>
 
 describe('budgets recover the number the clamp throws away', () => {
   test('a tick booking overrun reports the real makespan and the unit', () => {
-    // `withinTicks(60)` clamps its own progress to 60/60. The row has to say 80.
     const objective: ObjectiveReading = {
       id: 'bay-booking',
       label: 'Clear the bay within 60 ticks',
@@ -101,7 +100,6 @@ describe('budgets recover the number the clamp throws away', () => {
   });
 
   test('a full-but-unmet objective with nothing behind it stays a tick-box', () => {
-    // `printedSequence` looks exactly like an overrun when the run printed extra lines.
     const objective: ObjectiveReading = {
       id: 'printed-sequence',
       label: 'Report 3 lines, in order',
@@ -133,7 +131,6 @@ describe('meters a level never named', () => {
   });
 
   test('are not guessed at when a different total explains the history', () => {
-    // Four steps allowed off the plan; at tick 40 the bot had taken two. The clock is not it.
     const stray: ObjectiveReading = {
       id: 'no-resurvey',
       label: 'Walk almost nothing the plan already described',

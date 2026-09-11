@@ -28,12 +28,6 @@ import { at, botEndsOn, endedOn, tilesWithTerrain } from './objectives.ts';
 const CELLS = 9;
 const SIZE = 20;
 
-/**
- * How many extra connectors get knocked through the spanning tree, and therefore exactly how many
- * loops the cave contains. Zero is in the list on purpose: seed 4 is a plain tree with no loop
- * anywhere in it, so the machinery a player writes for loops is never exercised and they get to
- * find out that breadcrumbs were insurance rather than ceremony.
- */
 const CYCLE_CHOICES = [0, 2, 3, 4] as const;
 
 function build(seed: number): World {
@@ -61,7 +55,6 @@ function build(seed: number): World {
   return world;
 }
 
-/** `"12,7"` split back into the tile it names, or null when the breadcrumb is not one. */
 function crumbTarget(text: string | undefined): Vec | null {
   if (text === undefined) return null;
   const parts = text.split(',');
@@ -79,19 +72,10 @@ const walkableAt = (world: World, where: Vec): boolean => {
 
 interface TrailWalk {
   ok: boolean;
-  /** The tile the trail died on, when it did. */
   stuckAt?: Vec;
-  /** What that tile was carrying, so the report shows the run its own breadcrumb. */
   crumb?: string;
 }
 
-/**
- * Follows one chain of breadcrumbs back from `from`, and says where it stops leading anywhere.
- *
- * A crumb is legible only if it names an orthogonal neighbour that can be stood on and that has
- * not already been passed through — otherwise a bot reading it is worse off than one reading
- * nothing, which is the failure the report has to be able to name.
- */
 function followTrail(world: World, from: Vec, home: Vec): TrailWalk {
   const seen = new Set<string>([keyOf(from)]);
   let here = from;
@@ -121,13 +105,6 @@ const veinAndStart = (world: World): { vein: Vec; home: Vec } | null => {
   return vein === undefined || home === undefined ? null : { vein, home };
 };
 
-/**
- * Whether a bot standing on the vein could get home on the breadcrumbs alone.
- *
- * It starts from a *neighbour* of the vein rather than from the vein itself: arriving is the
- * required objective's business, and charging the star one more tick for a crumb under the bot's
- * own feet would price the star against the medal on the seed the reference runs at par.
- */
 function trailHome(ctx: ObjectiveContext): TrailWalk {
   const ends = veinAndStart(ctx.initialWorld);
   if (ends === null) return { ok: false };
@@ -143,12 +120,6 @@ function trailHome(ctx: ObjectiveContext): TrailWalk {
   return best ?? { ok: false, stuckAt: ends.vein };
 }
 
-/**
- * The point at which the trail stopped being a trail.
- *
- * It gives back the run's own breadcrumb and the tile it was written on — never the tile the bot
- * actually arrived from, which is the whole of what the star is asking the program to keep.
- */
 const trailBroke = (ctx: ObjectiveContext): Divergence | undefined => {
   const walk = trailHome(ctx);
   const stuck = walk.stuckAt;
@@ -164,11 +135,6 @@ const trailBroke = (ctx: ObjectiveContext): Divergence | undefined => {
   };
 };
 
-/**
- * The cave loops. The rule that carried w4-01 — never step back the way you came — becomes a
- * closed circuit here, and the replay shows the bot riding it until the shift ends. What breaks
- * the circuit is knowing which tiles have already been stood on.
- */
 export const w4_02: LevelDef = {
   id: 'w4-02',
   world: 4,
@@ -181,22 +147,6 @@ export const w4_02: LevelDef = {
     '',
     'Reach the ore vein.',
   ].join('\n'),
-  /**
-   * DESIGN.md §11.10.
-   *
-   * Two guarantees here are worth more than the geometry. The cave is carved everywhere — every
-   * chamber in the grid is open and reachable from every other — so a search that has run out of
-   * unvisited openings has finished the cave rather than found a wall it should go around. And the
-   * vein is at the dead end furthest from the start, which says what the level costs: this is a
-   * long walk on every shift, not a lucky one, and a program that gives up on depth is not going
-   * to arrive.
-   *
-   * The loop count is the redrawn axis and its floor is what has to be stated. `CYCLE_CHOICES`
-   * includes zero, so one shift in four hands back a plain tree on which nothing that guards
-   * against a loop ever fires. Left unsaid, a player who drew that shift first concludes the
-   * breadcrumbs were ceremony; the facts say "on most shifts", and this row is where "most" is
-   * given its edge.
-   */
   board: {
     fixed: [
       'the map is 20 tiles square',
@@ -252,15 +202,6 @@ export const w4_02: LevelDef = {
     ),
   ],
   bonus: [
-    /*
-     * The budget this replaced counted breadcrumbs and asked for fewer, which paid a star for
-     * leaving the issued hardware in the crate: a program that keeps its visited set in an
-     * ordinary `Set` — legitimate, and DESIGN.md §5 says so in as many words — walks the
-     * identical route, places zero, and took the star for free.
-     *
-     * A trail is the half of the mechanic a `Set` cannot stand in for. A closure goes home with
-     * the bot; a breadcrumb stays in the cave and can be read by something that did not write it.
-     */
     Objectives.custom(
       'breadcrumb-trail',
       'Leave breadcrumbs a bot at the vein could follow home',

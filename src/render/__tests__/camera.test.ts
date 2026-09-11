@@ -201,7 +201,6 @@ describe('the camera performing', () => {
     expect(rest - kicked).toBeGreaterThan(0);
     expect(rest - kicked).toBeLessThanOrEqual(MAX_KICK_PX + 1e-9);
 
-    // A kick is a push, not a shake: it decays monotonically and is gone inside a few frames.
     let previous = rest - cam.originY();
     for (let i = 0; i < 20; i++) {
       cam.update(1 / 60);

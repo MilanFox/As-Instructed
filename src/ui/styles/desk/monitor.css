@@ -1,341 +1,437 @@
-/* monitor.css — ported from docs/prototypes/desk/desk.css:
-   the site feed subsection (.feed-controls, .asset-tag, .osd-*, .feed-*).
-   .osd-xy is moved here from the source's SETTINGS ARE OBJECTS section —
-   it belongs to the monitor's on-screen display, not the terminal. */
-
-/* ---- the site feed. the company's. older, and it shows. ---------- */
-
-.desk .display--feed { left: calc(50% + 64 * var(--u)); top: calc(50% - 486 * var(--u)); width: calc(700 * var(--u)); --feed-glass-ts: 1; }
+.desk .display--feed {
+  left: calc(50% + 64 * var(--u));
+  top: calc(50% - 486 * var(--u));
+  width: calc(700 * var(--u));
+  --feed-glass-ts: 1;
+}
 .desk .bezel--feed {
   padding: calc(22 * var(--u)) calc(22 * var(--u)) calc(20 * var(--u));
   background: #b0ac9c;
   box-shadow:
-    var(--arris-n), var(--arris-w), var(--arris-e), var(--arris-s),
-    calc(30 * var(--u)) calc(30 * var(--u)) calc(9 * var(--u)) rgb(var(--ink-sh) / .32),
-    calc(3 * var(--u)) calc(3 * var(--u)) 0 rgb(var(--ink-sh) / .30);
+    var(--arris-n),
+    var(--arris-w),
+    var(--arris-e),
+    var(--arris-s),
+    calc(30 * var(--u)) calc(30 * var(--u)) calc(9 * var(--u)) rgb(var(--ink-sh) / 0.32),
+    calc(3 * var(--u)) calc(3 * var(--u)) 0 rgb(var(--ink-sh) / 0.3);
   border-radius: calc(9 * var(--u));
 }
-.desk .bezel--feed .screen { height: calc(438 * var(--u)); }
-.desk .glass--feed { inset: calc(22 * var(--u)) calc(22 * var(--u)) calc(20 * var(--u)); }
-.desk .stand--feed { top: calc(600 * var(--u)); width: calc(136 * var(--u)); height: calc(50 * var(--u)); }
+.desk .bezel--feed .screen {
+  height: calc(438 * var(--u));
+}
+.desk .glass--feed {
+  inset: calc(22 * var(--u)) calc(22 * var(--u)) calc(20 * var(--u));
+}
+.desk .stand--feed {
+  top: calc(600 * var(--u));
+  width: calc(136 * var(--u));
+  height: calc(50 * var(--u));
+}
 
-/*
-   The reserved margin — the hard part of this design to get right.
-
-   The prototype drew its graticule inside the canvas, in a margin the canvas left itself. The real
-   renderer's camera fits whatever box it is given, so a margin that is not taken away from the
-   element is a margin the camera fills with tiles. The canvas is therefore inset by --feed-n/-e/-s/-w,
-   published by Monitor.tsx from src/ui/desk/monitor/geometry.ts, and every readout on this screen
-   lives in the strip that inset created. Nothing is positioned over the picture.
-
-   None of the type inside the screen multiplies by --ts. A type scale that grew these would have to
-   take the room from the board, and the board's answer to "make it bigger" is the zoom ladder on the
-   transport, not the SIZE dial. Type on the *case* — the transport readout, the legends, the asset
-   tag — scales normally.
-
-   They do multiply by --feed-glass-ts, which is 1 here and is not the SIZE dial. It is the FOCUS
-   view's knob and only that view moves it: there the screen is 316u wide instead of 656u, and
-   `SITE · GRID 24x18` beside `SIGNAL DELAY 41 MIN` wants about 319u of that between them, so the
-   header strip's own chrome would overflow the picture it is supposed to stay clear of. The answer
-   cannot be the type scale — the paragraph above is the reason, and it still holds, because the
-   player turning the SIZE dial must never cost the board a rung. So it is a second factor with a
-   different owner: one is the player's, this one is the composition's. `monitor-margin` guards the
-   first of them by reading this file as text and refusing to find the SIZE dial named anywhere
-   above `.feed-controls` — including in this comment, which is why the dial is spelled out in
-   words here and not in the form the stylesheet would consume.
-
-   The width and the height are stated rather than left to the four insets. A canvas is a replaced
-   element: with `width: auto` it takes its *intrinsic* 300x150 and CSS 2.1 §10.3.8 then drops the
-   `right` and `bottom` constraints, so the board draws into a 300x150 box in the corner of the
-   screen and every zoom rung measured off it is measuring that instead of the design. */
-/* Drag pans the board. The tester had to guess that, so the pointer says it. */
 .desk #board {
-  position: absolute; display: block; cursor: grab;
-  top: var(--feed-n); left: var(--feed-w);
+  position: absolute;
+  display: block;
+  cursor: grab;
+  top: var(--feed-n);
+  left: var(--feed-w);
   width: calc(100% - var(--feed-w) - var(--feed-e));
   height: calc(100% - var(--feed-n) - var(--feed-s));
 }
 
 .desk .feed-osd {
-  position: absolute; left: calc(9 * var(--u)); top: calc(7 * var(--u)); right: calc(9 * var(--u));
-  display: flex; justify-content: space-between;
-  font-family: var(--mono); font-size: calc(9.5 * var(--u) * var(--feed-glass-ts));
-  letter-spacing: .18em; color: rgba(196,224,218,.9); pointer-events: none;
+  position: absolute;
+  left: calc(9 * var(--u));
+  top: calc(7 * var(--u));
+  right: calc(9 * var(--u));
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: calc(9.5 * var(--u) * var(--feed-glass-ts));
+  letter-spacing: 0.18em;
+  color: rgba(196, 224, 218, 0.9);
+  pointer-events: none;
   text-shadow: 0 0 calc(6 * var(--u)) #000;
 }
 .desk .osd-xy {
-  font-family: var(--mono); font-size: calc(9.5 * var(--u) * var(--feed-glass-ts));
-  letter-spacing: .16em; color: rgba(120,232,214,.95);
+  font-family: var(--mono);
+  font-size: calc(9.5 * var(--u) * var(--feed-glass-ts));
+  letter-spacing: 0.16em;
+  color: rgba(120, 232, 214, 0.95);
 }
 .desk .feed-tick {
-  position: absolute; right: calc(10 * var(--u)); bottom: calc(2 * var(--u)); line-height: 1;
-  font-family: var(--mono); font-size: calc(26 * var(--u) * var(--feed-glass-ts)); font-weight: 300;
-  color: rgba(53,224,200,.9); letter-spacing: .06em; pointer-events: none;
-  text-shadow: 0 0 calc(12 * var(--u)) rgba(53,224,200,.4), 0 0 calc(4 * var(--u)) #000;
+  position: absolute;
+  right: calc(10 * var(--u));
+  bottom: calc(2 * var(--u));
+  line-height: 1;
+  font-family: var(--mono);
+  font-size: calc(26 * var(--u) * var(--feed-glass-ts));
+  font-weight: 300;
+  color: rgba(53, 224, 200, 0.9);
+  letter-spacing: 0.06em;
+  pointer-events: none;
+  text-shadow:
+    0 0 calc(12 * var(--u)) rgba(53, 224, 200, 0.4),
+    0 0 calc(4 * var(--u)) #000;
 }
 .desk .feed-stamp {
-  position: absolute; left: calc(10 * var(--u)); bottom: calc(8 * var(--u));
-  font-family: var(--mono); font-size: calc(10 * var(--u) * var(--feed-glass-ts)); letter-spacing: .3em;
-  color: rgba(206,220,230,.6); pointer-events: none;
+  position: absolute;
+  left: calc(10 * var(--u));
+  bottom: calc(8 * var(--u));
+  font-family: var(--mono);
+  font-size: calc(10 * var(--u) * var(--feed-glass-ts));
+  letter-spacing: 0.3em;
+  color: rgba(206, 220, 230, 0.6);
+  pointer-events: none;
 }
 
 .desk .feed-controls {
-  display: flex; align-items: center; gap: calc(12 * var(--u));
+  display: flex;
+  align-items: center;
+  gap: calc(12 * var(--u));
   margin-top: calc(8 * var(--u));
   padding: calc(7 * var(--u)) calc(14 * var(--u));
   background: linear-gradient(#a9a69b, #8b887f 55%, #6b685f);
   border-radius: calc(3 * var(--u));
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.45), inset 0 -1px 0 rgba(0,0,0,.3),
-              calc(8 * var(--u)) calc(8 * var(--u)) calc(3 * var(--u)) rgb(var(--ink-sh) / .32);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+    calc(8 * var(--u)) calc(8 * var(--u)) calc(3 * var(--u)) rgb(var(--ink-sh) / 0.32);
 }
-.desk .fc-keys { display: flex; gap: calc(5 * var(--u)); }
+.desk .fc-keys {
+  display: flex;
+  gap: calc(5 * var(--u));
+}
 .desk .fk {
-  width: calc(28 * var(--u)); height: calc(20 * var(--u));
-  border: 0; border-radius: calc(2 * var(--u));
+  width: calc(28 * var(--u));
+  height: calc(20 * var(--u));
+  border: 0;
+  border-radius: calc(2 * var(--u));
   background: linear-gradient(#e3e0d5, #bdbab0 55%, #98958c);
-  box-shadow: 0 calc(2 * var(--u)) 0 #5f5d56, calc(3 * var(--u)) calc(3 * var(--u)) calc(2 * var(--u)) rgb(var(--ink-sh) / .32);
-  color: #37362f; font-size: calc(9 * var(--u) * var(--ts)); cursor: pointer;
-  transition: transform .06s linear, box-shadow .06s linear;
+  box-shadow:
+    0 calc(2 * var(--u)) 0 #5f5d56,
+    calc(3 * var(--u)) calc(3 * var(--u)) calc(2 * var(--u)) rgb(var(--ink-sh) / 0.32);
+  color: #37362f;
+  font-size: calc(9 * var(--u) * var(--ts));
+  cursor: pointer;
+  transition:
+    transform 0.06s linear,
+    box-shadow 0.06s linear;
 }
-.desk .fk-wide { width: calc(42 * var(--u)); }
-.desk .fk:active, .desk .fk.down { transform: translateY(calc(2 * var(--u))); box-shadow: 0 0 0 #5f5d56; }
-.desk .fc-scrub { flex: 1; }
-.desk #scrub { width: 100%; -webkit-appearance: none; appearance: none; background: transparent; height: calc(16 * var(--u)); }
+.desk .fk-wide {
+  width: calc(42 * var(--u));
+}
+.desk .fk:active,
+.desk .fk.down {
+  transform: translateY(calc(2 * var(--u)));
+  box-shadow: 0 0 0 #5f5d56;
+}
+.desk .fc-scrub {
+  flex: 1;
+}
+.desk #scrub {
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  height: calc(16 * var(--u));
+}
 .desk #scrub::-webkit-slider-runnable-track {
-  height: calc(5 * var(--u)); background: #4b4941;
-  box-shadow: inset 0 1px 2px rgba(0,0,0,.7); border-radius: calc(3 * var(--u));
+  height: calc(5 * var(--u));
+  background: #4b4941;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.7);
+  border-radius: calc(3 * var(--u));
 }
 .desk #scrub::-webkit-slider-thumb {
-  -webkit-appearance: none; width: calc(13 * var(--u)); height: calc(17 * var(--u));
-  margin-top: calc(-6 * var(--u)); border-radius: calc(2 * var(--u));
+  -webkit-appearance: none;
+  width: calc(13 * var(--u));
+  height: calc(17 * var(--u));
+  margin-top: calc(-6 * var(--u));
+  border-radius: calc(2 * var(--u));
   background: linear-gradient(#efece1, #b9b6ac 60%, #8c8981);
-  box-shadow: 1px 1px 3px rgb(var(--ink-sh) / .32);
+  box-shadow: 1px 1px 3px rgb(var(--ink-sh) / 0.32);
 }
 .desk .fc-read {
-  font-family: var(--mono); font-size: calc(12 * var(--u) * var(--ts)); color: #2e2d28;
-  letter-spacing: .06em; background: #cfccc0; padding: calc(2 * var(--u)) calc(7 * var(--u));
-  box-shadow: inset 0 1px 2px rgba(0,0,0,.35);
+  font-family: var(--mono);
+  font-size: calc(12 * var(--u) * var(--ts));
+  color: #2e2d28;
+  letter-spacing: 0.06em;
+  background: #cfccc0;
+  padding: calc(2 * var(--u)) calc(7 * var(--u));
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
 }
-.desk .fc-read i { opacity: .45; font-style: normal; padding: 0 calc(3 * var(--u)); }
-.desk .fc-read em { font-style: normal; letter-spacing: .22em; opacity: .55;
-  font-size: calc(8 * var(--u) * var(--ts)); padding-right: calc(6 * var(--u)); }
+.desk .fc-read i {
+  opacity: 0.45;
+  font-style: normal;
+  padding: 0 calc(3 * var(--u));
+}
+.desk .fc-read em {
+  font-style: normal;
+  letter-spacing: 0.22em;
+  opacity: 0.55;
+  font-size: calc(8 * var(--u) * var(--ts));
+  padding-right: calc(6 * var(--u));
+}
 .desk .fc-lamp {
-  width: calc(9 * var(--u)); height: calc(9 * var(--u)); border-radius: 50%;
-  background: #4a4a44; box-shadow: inset 0 0 calc(4 * var(--u)) rgba(0,0,0,.7);
+  width: calc(9 * var(--u));
+  height: calc(9 * var(--u));
+  border-radius: 50%;
+  background: #4a4a44;
+  box-shadow: inset 0 0 calc(4 * var(--u)) rgba(0, 0, 0, 0.7);
 }
-.desk[data-mode='watch'] .fc-lamp { background: #ffb020; box-shadow: 0 0 calc(10 * var(--u)) rgba(255,176,32,.8); }
+.desk[data-mode='watch'] .fc-lamp {
+  background: #ffb020;
+  box-shadow: 0 0 calc(10 * var(--u)) rgba(255, 176, 32, 0.8);
+}
 
 .desk .asset-tag {
-  position: absolute; right: calc(24 * var(--u)); top: calc(-2 * var(--u));
-  display: flex; gap: calc(6 * var(--u)); align-items: baseline;
-  font-family: var(--mono); font-size: calc(7.5 * var(--u) * var(--ts));
-  letter-spacing: .18em; color: #58564f;
-  background: #d7d3c4; padding: calc(2 * var(--u)) calc(6 * var(--u));
+  position: absolute;
+  right: calc(24 * var(--u));
+  top: calc(-2 * var(--u));
+  display: flex;
+  gap: calc(6 * var(--u));
+  align-items: baseline;
+  font-family: var(--mono);
+  font-size: calc(7.5 * var(--u) * var(--ts));
+  letter-spacing: 0.18em;
+  color: #58564f;
+  background: #d7d3c4;
+  padding: calc(2 * var(--u)) calc(6 * var(--u));
   border: 1px solid #a5a094;
-  transform: rotate(-.5deg);
+  transform: rotate(-0.5deg);
 }
-.desk .asset-tag b { color: #2f2e29; letter-spacing: .1em; }
+.desk .asset-tag b {
+  color: #2f2e29;
+  letter-spacing: 0.1em;
+}
 
-/* ---- the graticule. in the strip the canvas gave up, never on a tile. ----
-   This is what gives the player a coordinate system for the coordinates the
-   game hands them. Every mark positions itself off three custom properties the camera writes
-   once a frame — --gx0/--gy0 (the world origin, in CSS px from the canvas's
-   corner) and --gt (CSS px per tile) — so a camera move costs three style
-   writes rather than one draw call per cell. */
-
-/* Above the canvas in paint order, and that is deliberate rather than a lapse. The strip the
-   canvas gave up holds the ruler when the grid fills the picture; when the camera letterboxes a
-   grid it centres, the ruler follows the grid down into the empty band the letterbox left, so a
-   numeral is beside the column it names instead of fifty pixels clear of it. Its far edge is the
-   grid's own edge by construction, so it can reach the board and never a tile. */
 .desk .feed-rule {
-  position: absolute; z-index: 1; pointer-events: none; overflow: hidden;
-  color: rgba(150,178,186,.7);
+  position: absolute;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+  color: rgba(150, 178, 186, 0.7);
 }
-/* Each rule ends where the grid begins. The camera centres a grid that fits, so a ruler pinned to
-   the canvas edge instead would float a hundred pixels clear of the board it is measuring — and
-   `overflow` is hidden because a zoomed-in grid puts most of its rows off the canvas, and a numeral
-   for a row nobody can see must not escape into the picture. */
 .desk .feed-rule--x {
-  left: var(--feed-w); right: var(--feed-e);
-  top: max(calc(var(--feed-n) - 14 * var(--u)),
-           calc(var(--feed-n) + var(--gy0, 0px) - 14 * var(--u)));
+  left: var(--feed-w);
+  right: var(--feed-e);
+  top: max(
+    calc(var(--feed-n) - 14 * var(--u)),
+    calc(var(--feed-n) + var(--gy0, 0px) - 14 * var(--u))
+  );
   height: calc(14 * var(--u));
 }
 .desk .feed-rule--y {
-  top: var(--feed-n); bottom: var(--feed-s);
-  left: 0; width: calc(var(--feed-w) + max(0px, var(--gx0, 0px)));
+  top: var(--feed-n);
+  bottom: var(--feed-s);
+  left: 0;
+  width: calc(var(--feed-w) + max(0px, var(--gx0, 0px)));
 }
-.desk .feed-tick-mark { position: absolute; background: currentColor; }
+.desk .feed-tick-mark {
+  position: absolute;
+  background: currentColor;
+}
 .desk .feed-tick-mark b {
-  position: absolute; font-family: var(--mono); font-weight: 400; line-height: 1;
-  font-size: calc(8.5 * var(--u) * var(--feed-glass-ts)); letter-spacing: .04em; white-space: nowrap;
+  position: absolute;
+  font-family: var(--mono);
+  font-weight: 400;
+  line-height: 1;
+  font-size: calc(8.5 * var(--u) * var(--feed-glass-ts));
+  letter-spacing: 0.04em;
+  white-space: nowrap;
   opacity: var(--gnum, 1);
 }
 .desk .feed-rule--x .feed-tick-mark {
   left: calc(var(--gx0, 0px) + var(--i) * var(--gt, 0px));
-  bottom: 0; width: 1px; height: calc(3 * var(--u));
+  bottom: 0;
+  width: 1px;
+  height: calc(3 * var(--u));
 }
-.desk .feed-rule--x .feed-tick-mark.is-major { height: calc(6 * var(--u)); }
-.desk .feed-rule--x .feed-tick-mark b { left: calc(2 * var(--u)); bottom: calc(4 * var(--u)); }
+.desk .feed-rule--x .feed-tick-mark.is-major {
+  height: calc(6 * var(--u));
+}
+.desk .feed-rule--x .feed-tick-mark b {
+  left: calc(2 * var(--u));
+  bottom: calc(4 * var(--u));
+}
 .desk .feed-rule--y .feed-tick-mark {
   top: calc(var(--gy0, 0px) + var(--i) * var(--gt, 0px));
-  right: 0; height: 1px; width: calc(3 * var(--u));
+  right: 0;
+  height: 1px;
+  width: calc(3 * var(--u));
 }
-.desk .feed-rule--y .feed-tick-mark.is-major { width: calc(6 * var(--u)); }
-/* The width is stated because the anchor is a 1px tick: without it the shrink-to-fit box is the
-   tick's own width, `nowrap` overflows it to the *right*, and the numeral lands on the board and is
-   then clipped away by the rule's own `overflow`. */
+.desk .feed-rule--y .feed-tick-mark.is-major {
+  width: calc(6 * var(--u));
+}
 .desk .feed-rule--y .feed-tick-mark b {
-  right: calc(8 * var(--u)); top: 0; width: calc(15 * var(--u)); text-align: right;
-  transform: translateY(calc(var(--gt, 0px) * .5 - 50%));
+  right: calc(8 * var(--u));
+  top: 0;
+  width: calc(15 * var(--u));
+  text-align: right;
+  transform: translateY(calc(var(--gt, 0px) * 0.5 - 50%));
 }
 .desk .feed-origin {
-  position: absolute; z-index: 1; pointer-events: none;
+  position: absolute;
+  z-index: 1;
+  pointer-events: none;
   left: calc(var(--feed-w) + max(0px, var(--gx0, 0px)) - 7 * var(--u));
   top: calc(var(--feed-n) + max(0px, var(--gy0, 0px)) - 7 * var(--u));
-  width: calc(6 * var(--u)); height: calc(6 * var(--u));
-  border-left: 1px solid rgba(150,178,186,.8);
-  border-top: 1px solid rgba(150,178,186,.8);
+  width: calc(6 * var(--u));
+  height: calc(6 * var(--u));
+  border-left: 1px solid rgba(150, 178, 186, 0.8);
+  border-top: 1px solid rgba(150, 178, 186, 0.8);
 }
 .desk .osd-xy {
-  flex: 1 1 auto; min-width: 0;
-  text-align: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-/* The strip stands its chrome down rather than cropping the tile the player asked about.
-   `READOUT_CHARS_IN_THE_GAP` in geometry.ts is where the two modes are derived and why. */
 .desk .feed-osd--long .osd-id,
-.desk .feed-osd--long .osd-lag { display: none; }
-.desk .feed-osd--long .osd-xy { text-align: left; letter-spacing: .04em; }
+.desk .feed-osd--long .osd-lag {
+  display: none;
+}
+.desk .feed-osd--long .osd-xy {
+  text-align: left;
+  letter-spacing: 0.04em;
+}
 
-/* ---- the transport's track, and the run as acts ------------------- */
-
-.desk .fc-scrub { position: relative; height: calc(24 * var(--u)); }
-.desk #scrub { position: absolute; left: 0; right: 0; top: calc(3 * var(--u)); }
+.desk .fc-scrub {
+  position: relative;
+  height: calc(24 * var(--u));
+}
+.desk #scrub {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(3 * var(--u));
+}
 .desk .fc-acts {
-  position: absolute; left: 0; right: 0; top: 0;
-  height: calc(3 * var(--u)); pointer-events: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: calc(3 * var(--u));
+  pointer-events: none;
 }
-.desk .fc-act { position: absolute; top: 0; height: 100%; background: rgba(88,86,78,.85); }
-.desk .fc-act--alt { background: rgba(126,123,112,.85); }
-.desk .fc-act--current { background: #ffb020; }
-.desk .fc-step { position: absolute; top: 0; width: 1px; height: 100%; background: rgba(24,23,20,.7); }
-.desk .fc-marks { position: absolute; left: 0; right: 0; bottom: 0; height: calc(5 * var(--u)); }
+.desk .fc-act {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: rgba(88, 86, 78, 0.85);
+}
+.desk .fc-act--alt {
+  background: rgba(126, 123, 112, 0.85);
+}
+.desk .fc-act--current {
+  background: #ffb020;
+}
+.desk .fc-step {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  height: 100%;
+  background: rgba(24, 23, 20, 0.7);
+}
+.desk .fc-marks {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(5 * var(--u));
+}
 .desk .fc-mark {
-  position: absolute; bottom: 0; padding: 0; border: 0; cursor: pointer;
-  width: calc(5 * var(--u)); height: calc(5 * var(--u)); border-radius: 50%;
+  position: absolute;
+  bottom: 0;
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+  width: calc(5 * var(--u));
+  height: calc(5 * var(--u));
+  border-radius: 50%;
   transform: translateX(-50%);
-  box-shadow: 1px 1px 0 rgb(var(--ink-sh) / .32);
+  box-shadow: 1px 1px 0 rgb(var(--ink-sh) / 0.32);
 }
-.desk .fc-mark--met { background: #6fd08a; }
-.desk .fc-mark--lost { background: #e2624a; }
-.desk .fc-mark--bonus { border-radius: 0; transform: translateX(-50%) rotate(45deg); }
-
-/* ---- speed, and the zoom ladder as a stepped control on the case ---
-   The doors to everything in this game used to be 10px chips in a
-   corner, and that is the chrome the desk exists to abolish. A board a player
-   cannot enlarge is a board they cannot read, so the camera's own rungs are a
-   key on the housing rather than a shortcut in a tooltip. */
+.desk .fc-mark--met {
+  background: #6fd08a;
+}
+.desk .fc-mark--lost {
+  background: #e2624a;
+}
+.desk .fc-mark--bonus {
+  border-radius: 0;
+  transform: translateX(-50%) rotate(45deg);
+}
 
 .desk .fc-speed {
-  font-family: var(--mono); font-size: calc(9 * var(--u) * var(--ts));
-  color: #2e2d28; background: #cfccc0; border: 0;
+  font-family: var(--mono);
+  font-size: calc(9 * var(--u) * var(--ts));
+  color: #2e2d28;
+  background: #cfccc0;
+  border: 0;
   padding: calc(2 * var(--u)) calc(3 * var(--u));
-  box-shadow: inset 0 1px 2px rgba(0,0,0,.35);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 .desk .fc-zoom {
-  display: grid; grid-template-columns: repeat(3, auto);
+  display: grid;
+  grid-template-columns: repeat(3, auto);
   gap: calc(3 * var(--u)) calc(4 * var(--u));
   padding: calc(4 * var(--u)) calc(6 * var(--u)) calc(5 * var(--u));
   border-radius: calc(3 * var(--u));
   background: linear-gradient(#9c998f, #85827a 55%, #6a675f);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.34), inset 0 -1px 0 rgba(0,0,0,.26);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.34),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.26);
 }
 .desk .fc-legend {
-  grid-column: 1 / -1; text-align: center;
-  font-family: var(--mono); font-size: calc(8.5 * var(--u) * var(--ts));
-  letter-spacing: .28em; color: #2f2e29;
+  grid-column: 1 / -1;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: calc(8.5 * var(--u) * var(--ts));
+  letter-spacing: 0.28em;
+  color: #2f2e29;
 }
 .desk .fk-narrow {
-  width: calc(38 * var(--u)); height: calc(23 * var(--u));
-  font-family: var(--mono); font-size: calc(10.5 * var(--u) * var(--ts)); letter-spacing: .06em;
+  width: calc(38 * var(--u));
+  height: calc(23 * var(--u));
+  font-family: var(--mono);
+  font-size: calc(10.5 * var(--u) * var(--ts));
+  letter-spacing: 0.06em;
 }
-.desk .fk:disabled { opacity: .45; cursor: default; }
-.desk #board:active { cursor: grabbing; }
-
-/* ============================== FOCUS ============================= */
-/* The feed as a preview, which is the other half of `terminal.css`'s
-   FOCUS section.
-
-   In this view there is no desk to put the monitor on, so it is not
-   placed: `desk.css` gives `.station` a two-column grid against the
-   viewport and the feed takes the fixed column. `left` and `top` are
-   handed back, the width comes from the column, and the housing keeps
-   its proportions — 360:226 against the resting 700:438 — so it reads as
-   the same object seen smaller rather than as a squashed one.
-
-   The column is 360u because that is the smallest this housing gets away
-   with. Below it the transport strip's hardware stops fitting: the
-   playback keys are 141u of the row and the zoom ladder another 134u,
-   both drawn in `--u` and neither of them type, so a narrower column
-   costs the player a control rather than a few pixels of tracking. */
+.desk .fk:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.desk #board:active {
+  cursor: grabbing;
+}
 
 .desk[data-focus='program'] .display--feed {
-  position: relative; left: auto; top: auto; width: auto;
+  position: relative;
+  left: auto;
+  top: auto;
+  width: auto;
   align-self: start;
-  --feed-glass-ts: .72;
+  --feed-glass-ts: 0.72;
   --ts: var(--feed-ts);
 }
-.desk[data-focus='program'] .bezel--feed .screen { height: calc(226 * var(--u)); }
+.desk[data-focus='program'] .bezel--feed .screen {
+  height: calc(226 * var(--u));
+}
 
-/* The transport strip, on two rows.
+.desk[data-focus='program'] .feed-controls {
+  flex-wrap: wrap;
+  gap: calc(6 * var(--u)) calc(8 * var(--u));
+}
+.desk[data-focus='program'] .fc-scrub {
+  flex: 1 1 calc(140 * var(--u));
+}
+.desk[data-focus='program'] .fc-lamp {
+  margin-left: auto;
+}
 
-   It does not fit on one and it cannot be made to: 141u of playback keys
-   plus 134u of zoom ladder is 275u of moulded hardware out of the 339u
-   the strip has inside its own padding, and the readout, the speed and
-   the scrub still have to go somewhere. Left to overflow it did the
-   worst available thing — the scrub bar collapsed to nothing and the
-   zoom ladder hung 164u off the right of the case, past the edge of
-   everything.
-
-   So it wraps, in DOM order, with no `order` and no grid placement:
-   keys and scrub on the first row, readout, speed and zoom on the
-   second. Reading order and focus order stay the sequence they are in
-   the markup, which is the reason not to reach for `order` even though
-   it would have laid out identically. The scrub is given a `flex-basis`
-   big enough that it cannot be squeezed onto the first row as a sliver,
-   which is what forces the readout down to the second. */
-.desk[data-focus='program'] .feed-controls { flex-wrap: wrap; gap: calc(6 * var(--u)) calc(8 * var(--u)); }
-.desk[data-focus='program'] .fc-scrub { flex: 1 1 calc(140 * var(--u)); }
-/* The mode lamp lands on a third line of its own, and it is left there.
-   Row two is 240u of readout, speed and zoom ladder in 242u of strip,
-   and the only column gap that pulls a 9u lamp up onto it is 4u —
-   between three pieces of moulded case, which is not a gap, it is a
-   join. So the lamp gets the corner of the plate instead of the crumb of
-   space at the left where the wrap dropped it, which is where a mode
-   lamp lives on a monitor anyway. */
-.desk[data-focus='program'] .fc-lamp { margin-left: auto; }
-
-/* Why this is not a `transform: scale()`, which would have been one line
-   instead of thirty.
-
-   Everything the housing is made of is tuned in `--u` at the size it is
-   drawn: the four bezel arrises are one hard rule plus a row of falloff
-   per DESIGN §8, the graticule's ticks are single physical pixels, and
-   the canvas is a bitmap the renderer sizes to device pixels itself. A
-   `scale(0.51)` puts all of it through a resample — the arris softens
-   into the gradient §8 forbids, the ruler's 1px marks alias in and out,
-   and the board goes blurry, which is the one thing a preview of the
-   board may not be. Relaying out the boxes instead means the renderer's
-   own `ResizeObserver` sees a new canvas box and re-fits the camera to
-   it, so the picture is drawn at the size it is shown at. Measured after
-   a run in this view: a 202x117 backing store in a 202x117 CSS box.
-
-   The type is the part a box change does not solve, so it gets two
-   knobs. `--feed-ts` is the case type — the transport readout, the zoom
-   legends, the asset tag — and it is set from the player's own type
-   scale one level up on `.station`, so it composes with the SIZE dial
-   instead of discarding it. `--feed-glass-ts` is the type on the glass,
-   which has never followed the SIZE dial and still does not. */
-.desk[data-focus='program'] .station { --feed-ts: calc(var(--ts) * .72); }
+.desk[data-focus='program'] .station {
+  --feed-ts: calc(var(--ts) * 0.72);
+}

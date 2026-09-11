@@ -1,33 +1,3 @@
-/**
- * Every ceremony lands as paper, stays until it is filed, and has a route back.
- *
- * This file used to assert five `ModalBoundary`s in `App` and that each one's dismissal really
- * closed the modal underneath it. That was the right test for the interface it was written
- * against, and it is the wrong test now: four of those five modals do not exist. What it was
- * *protecting* still does, and it is bigger than a boundary:
- *
- * > `showResults` is set true by a run and by nothing else, so there is no reopen path. The most
- * > information-dense card in the game — the medal, the cause, the divergence, the objectives, the
- * > record, the seeds — is one stray click from gone, and the player's only route back to any of
- * > it is to run the program again.
- *
- * So the assertion is not "the dismissal closed it". It is the guarantee that makes the desk worth
- * building, in four parts, and each part is a way the old interface lost a player's work:
- *
- *  1. **A run puts paper on the desk** — a certificate on a pass, a HALT notice on a fail — and
- *     the store stops holding the report open, so nothing can raise it a second time.
- *  2. **The paper stays.** Nothing dismisses it. There is no backdrop, so there is no backdrop
- *     click, and the sheet is still there after the next level is opened.
- *  3. **The paper is a snapshot.** Running again issues a *second* sheet; the first still says
- *     what it said. A certificate that changes when you run again is not paper.
- *  4. **Filing does not delete it.** A stamped certificate leaves the desk for the Repository and
- *     is still in the record — that is the route back the audit asked for.
- *
- * The hooks-and-zustand driver is `src/ui/__tests__/react-driver.ts`, and it never flushes
- * effects — which is why the issuing lives in `deliverPaperwork`, a plain function the hook calls,
- * rather than inside the hook. Every issue is idempotent by id, so calling it twice is free and
- * the test can call it exactly where `App`'s effect would have.
- */
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type * as ReactModule from 'react';
 import { reactDriver as driver } from './react-driver.ts';
@@ -37,7 +7,6 @@ vi.mock('react', async (importOriginal) => {
   return { ...actual, ...driver.hooks };
 });
 
-/** zustand's own React binding, over the driver's hooks. The store itself is the real one. */
 vi.mock('zustand', async () => {
   const { createStore } = await import('zustand/vanilla');
   const vanilla = createStore as unknown as (initialiser: unknown) => {
@@ -67,13 +36,11 @@ const { getLevel } = await import('../../levels/index.ts');
 
 type Doc = ReturnType<typeof looseDocs>[number];
 
-/** One pass of the desk's paperwork — what `App`'s effect does whenever the store moves. */
 function deliver(): void {
   driver.reset();
   deliverPaperwork();
 }
 
-/** A finished run sitting in the store the way the worker leaves it. */
 function runFinished(levelId: string, passed: boolean, ticks: number): void {
   const level = getLevel(levelId);
   if (!level) throw new Error(`no level ${levelId}`);
@@ -101,12 +68,6 @@ function runFinished(levelId: string, passed: boolean, ticks: number): void {
   });
 }
 
-/**
- * Everything the company has delivered and not filed — the sheet lying out *and* the ones waiting
- * in the in-tray. Both are on the desk as far as this file's guarantee is concerned: neither is
- * destroyed, and both have a route back. Only one may be lying out at a time; that is asserted
- * separately below rather than folded in here.
- */
 function loose(): Doc[] {
   const state = usePapers.getState();
   return [...looseDocs(state), ...trayDocs(state)];
@@ -228,7 +189,9 @@ describe('the certificate is a snapshot, so the second run cannot rewrite the fi
     const certificates = ofKind('certificate');
     expect(certificates).toHaveLength(2);
     const kept = certificates.find((doc) => doc.id === first?.id);
-    expect(kept?.payload.kind === 'certificate' ? kept.payload.report.ticks : null).toBe(firstTicks);
+    expect(kept?.payload.kind === 'certificate' ? kept.payload.report.ticks : null).toBe(
+      firstTicks,
+    );
     expect(firstTicks).toBe(78);
   });
 
@@ -257,13 +220,13 @@ describe('filing is the only way off the desk, and it is not deletion', () => {
     expect(filed?.mark).toBe('gold');
   });
 
-  test('an ungraded work order is stamped CLOSED and files the same way (DESIGN.md §7)', () => {
+  test('an ungraded work order is stamped CLOSED and files the same way', () => {
     runFinished('w1-01', true, 78);
     deliver();
     const certificate = ofKind('certificate')[0];
-    expect(certificate?.payload.kind === 'certificate' ? certificate.payload.report.medal : 'x').toBe(
-      null,
-    );
+    expect(
+      certificate?.payload.kind === 'certificate' ? certificate.payload.report.medal : 'x',
+    ).toBe(null);
 
     usePapers.getState().file(certificate?.id as string, 'closed');
 
@@ -283,14 +246,6 @@ describe('filing is the only way off the desk, and it is not deletion', () => {
   });
 });
 
-/**
- * The rule that came out of a player opening `w1-03` and being handed five documents at once,
- * stacked over the terminal: *"I literally can't see anything anymore. It used to be one small
- * sheet. Now there is like an explosion of paper."*
- *
- * Ceremonies queue, they do not pile. The program is the largest thing on this desk while it is
- * being written, and the only sheet that lies across it is the one describing the work.
- */
 describe('the desk holds one sheet at a time', () => {
   test('everything the company sends arrives in the tray, not on the desk', () => {
     runFinished('w1-03', false, 900);
@@ -320,11 +275,6 @@ describe('the desk holds one sheet at a time', () => {
   });
 });
 
-/**
- * Playtest, 2026-09-07: "the Sheet spawns silently in the tray and there is nothing obviously
- * showing you that." A requisition now opens on the level that grants it, the one time it is
- * granted — and signing it away is a route back to the tray, not off the desk for good.
- */
 describe('a requisition surfaces once, on the level that grants it', () => {
   test('it lies out rather than landing silently in the tray', () => {
     useGame.setState({

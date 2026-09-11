@@ -43,48 +43,26 @@ import {
 const WIDTH = 48;
 const HEIGHT = 40;
 
-/** Rooms are drawn with this margin, so the carved cave never reaches past x = 40. */
 const CARVE_MARGIN = 6;
 
-/** The muster bay. West of everything, outside the carve box, hand-built so it is always there. */
 const SPAWN = { x: 1, y: 16, w: 5, h: 8 };
 const EXIT_ROW = 20;
 const HOME_DEPOT: Vec = { x: 4, y: EXIT_ROW };
 const DESK_AT: Vec = { x: 2, y: EXIT_ROW };
 
-/** The airlock stands here; its two gate tiles are the next two east. */
 const GATE_X = 40;
 const CHAMBER_X0 = 43;
 const CHAMBER_X1 = WIDTH - 1;
 const CHAMBER_REACH = 3;
 
-/**
- * Ten entries, the first of which is the state the door starts in, so `use()` reaches `open` on
- * the ninth call and not before. `vars.stages` publishes that nine so a program never has to
- * count the list.
- */
 const AIRLOCK_CYCLE = ['sealed', '1', '2', '3', '4', '5', '6', '7', '8', 'open'];
 const AIRLOCK_STAGES = AIRLOCK_CYCLE.length - 1;
 
-/** The five kinds a crate class may be drawn from. Named in the brief. */
 const CLASS_KINDS = [ItemKind.Ore, ItemKind.Ice, ItemKind.Scrap, ItemKind.Part, ItemKind.Cell];
 
 const DEPOT_PREFIX = 'depot-';
 const STATION_PREFIX = 'sub-';
 
-/**
- * One instance per seed. Every axis is drawn independently of the others.
- *
- * Three seeds, and each of them asks a different question. Seed 1 is the general case and the
- * teaching instance: a branching grid, the smallest fleet, the smallest quota, and the shape a
- * player should be able to close first. Seed 4 is a pure chain — the grid cannot be parallelised
- * at all, so a fleet that waits on it wastes the whole shift and the answer is to spend the fleet
- * on the crates instead. Seed 7 is the squeeze: the same six bots against twelve stations and
- * twenty crates, where fuel and not scheduling is what runs out.
- *
- * The four seeds this table used to carry moved the same numbers without moving a decision, and
- * seven randomisations of a 48x40 map is seven times the failure surface for no extra idea.
- */
 interface Instance {
   bots: number;
   stations: number;
@@ -106,20 +84,6 @@ function instanceFor(seed: number): Instance {
   return INSTANCES[0]?.[1] as Instance;
 }
 
-/**
- * The substation the airlock draws from: the one furthest down the grid, and of those the one
- * standing nearest the gate.
- *
- * Furthest down rather than simply nearest. Nearest is a *root* on seed 7 — `sub-6` stands three
- * tiles from the gate with nothing behind it — and an airlock fed by a root is a form leg that
- * depends on one switch rather than on the shift, which is the defect this is here to close. The
- * deepest station drags its whole ancestry along with it, because `precedence` already forbids
- * taking that ancestry out of order, so the door is gated on the grid coming up rather than on a
- * bot detouring past one machine.
- *
- * It buys 2, 9 and 5 feeders on seeds 1, 4 and 7 — on the chain seed the entire grid, which is the
- * seed where the grid is least parallelisable and the errand has the most reason to start early.
- */
 function feederIndex(deps: readonly (readonly number[])[], stationAt: Vec[], gate: Vec): number {
   const depthOf = (i: number): number => {
     let deep = 0;
@@ -140,18 +104,6 @@ function feederIndex(deps: readonly (readonly number[])[], stationAt: Vec[], gat
   return best;
 }
 
-/**
- * Hands the station ids out in an order the feeders do not follow.
- *
- * The draw above can only ever point a station at one built before it, so left alone every seed
- * accepted `sub-0, sub-1, … sub-n` as an energisation order: the finale's headline mechanic —
- * `precedence`, everything at once — was passable by counting, without reading `vars.deps` once.
- * The names are dealt again until ascending id order breaks somewhere. Only the names move; the
- * sites, the edges and the shift are the board the draw already made, so nothing here touches par.
- *
- * Its own generator, because the site draw is a running `take()` off the shared `rng` and pulling
- * a shuffle out of that stream would deal a different board.
- */
 function relabel(seed: number, deps: readonly (readonly number[])[]): number[] {
   const identity = Array.from({ length: deps.length }, (_, i) => i);
   const ascendingWorks = (label: readonly number[]): boolean =>
@@ -166,10 +118,6 @@ function relabel(seed: number, deps: readonly (readonly number[])[]): number[] {
   return identity;
 }
 
-// ---------------------------------------------------------------------------
-// Terrain
-// ---------------------------------------------------------------------------
-
 function carveRect(world: World, box: { x: number; y: number; w: number; h: number }): void {
   for (let y = box.y; y < box.y + box.h; y++) {
     for (let x = box.x; x < box.x + box.w; x++) setTerrain(world, { x, y }, Terrain.Floor);
@@ -182,11 +130,6 @@ function walkableAt(world: World, at: Vec): boolean {
   return tile.terrain === Terrain.Floor || tile.terrain === Terrain.Depot;
 }
 
-/**
- * Corridors come out of `carveCaves` one tile wide, which turns every junction into a place two
- * bots can hold each other still forever. Widening anything with two or fewer floor neighbours
- * leaves the rooms alone and gives every passage somewhere to step aside.
- */
 function widenPassages(world: World): void {
   const before: boolean[] = world.tiles.map((tile) => tile.terrain === Terrain.Floor);
   const solid = (x: number, y: number): boolean =>
@@ -224,7 +167,6 @@ function nearestFloor(world: World, to: Vec, allow: (at: Vec) => boolean): Vec {
   return best;
 }
 
-/** Anything the muster bay cannot reach is filled back in, so the site is one component. */
 function sealStrandedGround(world: World, from: Vec): void {
   const reached = worldDistances(world, from);
   for (let y = 0; y < HEIGHT; y++) {
@@ -238,10 +180,6 @@ function sealStrandedGround(world: World, from: Vec): void {
   }
 }
 
-// ---------------------------------------------------------------------------
-// build
-// ---------------------------------------------------------------------------
-
 function build(seed: number): World {
   const spec = instanceFor(seed);
   const rng = localRng(seed);
@@ -254,7 +192,6 @@ function build(seed: number): World {
     margin: CARVE_MARGIN,
   });
 
-  // A tree of corridors makes every corridor a cut vertex. A few extra joins remove that.
   for (let i = 0; i + 3 < rooms.length; i += 3) {
     const a = rooms[i];
     const b = rooms[i + 3];
@@ -287,7 +224,6 @@ function build(seed: number): World {
   sealStrandedGround(world, bayCentre);
   setTerrain(world, gateStand, Terrain.Floor);
 
-  // The two gate tiles. `links` only repaints on a state change, so build paints them shut.
   const gates: Vec[] = [
     { x: GATE_X + 1, y: gateRow },
     { x: GATE_X + 2, y: gateRow },
@@ -303,8 +239,6 @@ function build(seed: number): World {
 
   const charterAt: Vec = { x: CHAMBER_X1, y: gateRow - CHAMBER_REACH };
   const renewalsAt: Vec = { x: CHAMBER_X1, y: gateRow + CHAMBER_REACH };
-
-  // ---- contents -----------------------------------------------------------
 
   setTerrain(world, HOME_DEPOT, Terrain.Depot);
 
@@ -456,8 +390,6 @@ function build(seed: number): World {
   const renewalsTile = tileAt(world, renewalsAt);
   if (renewalsTile) renewalsTile.mark = 'renewals tray';
 
-  // ---- fleet --------------------------------------------------------------
-
   const bays: Vec[] = [];
   for (let y = SPAWN.y; y < SPAWN.y + SPAWN.h; y++) {
     for (let x = SPAWN.x; x < SPAWN.x + SPAWN.w; x++) {
@@ -479,8 +411,6 @@ function build(seed: number): World {
     });
   }
 
-  // ---- the packet stream --------------------------------------------------
-
   const plain: string[] = [];
   for (const crate of crates) plain.push(sealPacket(['CRATE', crate.at.x, crate.at.y, crate.kind]));
   classes.forEach((kind, i) => {
@@ -493,10 +423,6 @@ function build(seed: number): World {
   rebuildOccupancy(world);
   return world;
 }
-
-// ---------------------------------------------------------------------------
-// Adjudication
-// ---------------------------------------------------------------------------
 
 function classSinks(world: World): Machine[] {
   return world.machines.filter((machine) => machine.id.startsWith(DEPOT_PREFIX));
@@ -520,13 +446,6 @@ function quotaTally(ctx: ObjectiveContext): [number, number] {
   return [done, total];
 }
 
-/**
- * The first class the shift is short of, and where its crates got to instead.
- *
- * Everything here is already on the band: `CRATE` lines give every crate and `DEPOT` lines give
- * every bay, so naming the tile costs the level nothing. What the count adds is which of the two
- * ways to be short this run was — crates never fetched, or crates fetched and still aboard.
- */
 function quotaMiss(ctx: ObjectiveContext): Divergence | undefined {
   const census = groundCensus(ctx.initialWorld, CLASS_KINDS);
   for (const sink of classSinks(ctx.world)) {
@@ -546,13 +465,6 @@ function quotaMiss(ctx: ObjectiveContext): Divergence | undefined {
   return undefined;
 }
 
-/**
- * Stations that finished `on` *and* have somebody's `use` against them in the log.
- *
- * The brief has always said the audit reads the use log, and now it does. A station is only ever
- * `manual`, so the two readings agree today; they are both here so that the promise in the brief
- * stays true whatever a later edit does to the machine flags.
- */
 function gridTally(ctx: ObjectiveContext): [number, number] {
   const switched = new Set(machineUseLog(ctx).map((record) => record.machineId));
   const stations = machinesWithPrefix(ctx.world, STATION_PREFIX);
@@ -562,22 +474,10 @@ function gridTally(ctx: ObjectiveContext): [number, number] {
   return [done, stations.length];
 }
 
-/**
- * A station may not *start* energising before every feeder has *finished*.
- *
- * Read off the use log rather than the final world, because the final world cannot tell the
- * difference between a grid that came up in order and one that came up all at once.
- */
 function precedenceHolds(ctx: ObjectiveContext): boolean {
   return breachesIn(ctx).length === 0;
 }
 
-/**
- * The first station the audit will not sign off, and why.
- *
- * `power()` cannot reach a station on this site, so the only two ways to be short are a station
- * nobody walked to and a station somebody used twice.
- */
 function darkStation(ctx: ObjectiveContext): { id: string; at: Vec; reason: string } | undefined {
   const switched = new Set(machineUseLog(ctx).map((record) => record.machineId));
   for (const station of machinesWithPrefix(ctx.world, STATION_PREFIX)) {
@@ -590,7 +490,6 @@ function darkStation(ctx: ObjectiveContext): { id: string; at: Vec; reason: stri
   return undefined;
 }
 
-/** The substation the door draws from, read back off the door rather than recomputed. */
 function airlockFeeder(world: World): string | null {
   const airlock = machineById(world, 'airlock');
   if (!airlock) return null;
@@ -600,15 +499,6 @@ function airlockFeeder(world: World): string | null {
   return null;
 }
 
-/**
- * The door, when the door is the reason the form is not filed.
- *
- * `file-form` used to answer with the chip's address whatever had gone wrong, which on a run that
- * never got the grid as far as the gate names the symptom and hides the cause: the chip is in
- * somebody's hold because the wall it was carried to never became a door. Naming the feeder is
- * free — `probe("airlock").vars` publishes it before anybody walks anywhere — and it is the one
- * sentence that says the two halves of this level are one shift.
- */
 function sealedAirlock(ctx: ObjectiveContext): Divergence | undefined {
   const airlock = machineById(ctx.world, 'airlock');
   if (!airlock || airlock.state === 'open') return undefined;
@@ -625,7 +515,6 @@ function sealedAirlock(ctx: ObjectiveContext): Divergence | undefined {
   };
 }
 
-/** Where KD-0001-T actually ended the shift, in the words the player can act on. */
 function whereIsTheForm(ctx: ObjectiveContext): string {
   for (const bot of ctx.world.bots) {
     if (bot.inventory.some((stack) => stack.kind === ItemKind.Chip && stack.count > 0)) {
@@ -638,7 +527,6 @@ function whereIsTheForm(ctx: ObjectiveContext): string {
     : 'nowhere on the site';
 }
 
-/** Stations that came up in order, out of every station on the site. */
 function precedenceTally(ctx: ObjectiveContext): [number, number] {
   const stations = machinesWithPrefix(ctx.initialWorld, STATION_PREFIX);
   const early = new Set(breachesIn(ctx).map((breach) => breach.station));
@@ -649,7 +537,6 @@ interface Breach {
   station: string;
   feeder: string;
   started: number;
-  /** The tick the feeder was done, or null when it was never energised at all. */
   fedAt: number | null;
 }
 
@@ -675,12 +562,6 @@ function breachesIn(ctx: ObjectiveContext): Breach[] {
   return breaches;
 }
 
-/**
- * The earliest station started too early, and the feeder it jumped.
- *
- * A grid brought up in the wrong order broke the order once first, and that station is the one
- * worth naming: everything downstream of it is a consequence, not a second mistake.
- */
 function firstBreach(ctx: ObjectiveContext): Breach | undefined {
   return breachesIn(ctx).reduce<Breach | undefined>(
     (earliest, breach) =>
@@ -692,7 +573,6 @@ function firstBreach(ctx: ObjectiveContext): Breach | undefined {
 const HOLD_KEYWORD = 'held';
 const GATE_KEYWORD = 'gate';
 
-/** The lines the run filed under one keyword, in the order it printed them. */
 function filedLines(ctx: ObjectiveContext, keyword: string): string[] {
   const prefix = `${keyword} `;
   return ctx.trace.events
@@ -700,7 +580,6 @@ function filedLines(ctx: ObjectiveContext, keyword: string): string[] {
     .map((event) => (event.kind === 'print' ? event.text : ''));
 }
 
-/** `<keyword> <id> <n>` split back into its two halves, or null when it is not that shape. */
 function readClaim(line: string): { id: string; count: number } | null {
   const parts = line.split(' ');
   if (parts.length !== 3) return null;
@@ -709,14 +588,6 @@ function readClaim(line: string): { id: string; count: number } | null {
   return { id: parts[1] as string, count };
 }
 
-/**
- * How long each fed station stood ready and unstarted.
- *
- * The gap between the last of a station's feeders going quiet and the station's own first use.
- * `precedence` grades one side of this — nobody may start *early* — and nothing on the level has
- * ever looked at the other side, which is where a schedule leaks. A station with no feeder has
- * nothing to have waited for, and a station nobody started has no answer at all.
- */
 function holdsIn(ctx: ObjectiveContext): Map<string, number> {
   const firstUse = new Map<string, number>();
   const lastDone = new Map<string, number>();
@@ -741,7 +612,6 @@ function holdsIn(ctx: ObjectiveContext): Map<string, number> {
   return held;
 }
 
-/** The longest hold on the site, and every station that can be said to have carried it. */
 function longestHold(ctx: ObjectiveContext): { ticks: number; stations: Set<string> } {
   const held = holdsIn(ctx);
   const stations = new Set<string>();
@@ -760,13 +630,6 @@ function longestHoldFiled(ctx: ObjectiveContext): boolean {
   return ticks >= 0 && stations.has(claim.id) && claim.count === ticks;
 }
 
-/**
- * Where the hand-over note and the shift part company, without naming the station.
- *
- * Naming it is the whole bonus. A wrong claim comes back priced against itself — the station the
- * note named, and what that station actually stood for — which rules one station out and leaves
- * the bookkeeping that would find the right one exactly where it was.
- */
 function misreadHold(ctx: ObjectiveContext): Divergence {
   const said = filedLines(ctx, HOLD_KEYWORD);
   const line = said[0];
@@ -813,13 +676,6 @@ function misreadHold(ctx: ObjectiveContext): Divergence {
   };
 }
 
-/**
- * The tick the gate first moved, on the clock of whoever moved it.
- *
- * Read off the log rather than the door, because the door's final state cannot say *when*, and
- * when is the whole of the question below. A run that never opened it has no answer at all, which
- * is the property that keeps a program that does nothing away from the star.
- */
 function gateMovedAt(ctx: ObjectiveContext): number | undefined {
   let earliest: number | undefined;
   for (const record of machineUseLog(ctx)) {
@@ -829,7 +685,6 @@ function gateMovedAt(ctx: ObjectiveContext): number | undefined {
   return earliest;
 }
 
-/** The tick the door's own substation was thrown, on the clock of whoever threw it. */
 function feederThrownAt(ctx: ObjectiveContext): number | undefined {
   const feeder = airlockFeeder(ctx.world);
   if (feeder === null) return undefined;
@@ -841,22 +696,6 @@ function feederThrownAt(ctx: ObjectiveContext): number | undefined {
   return earliest;
 }
 
-/**
- * How long the gate stood powered and shut: the ticks between the door's substation being thrown
- * and the door first moving.
- *
- * Undefined when either end of it never happened, which is what keeps the star away from a
- * program that did not do the work — there is no such interval on a shift where nobody opened the
- * gate, and no honest number to print about one.
- *
- * Undefined too when the gate moved first. Both ends are read off the clock of whichever bot did
- * it, and `Sim.unfed` tests the shared world rather than the two clocks, so a carrier parked at
- * the handle while the electrician waits out six hundred ticks turns it at a *lower* tick number
- * than the throw it was waiting for — measured −648 on seed 1. A negative reading is not a
- * shorter wait, and the note asks for "how long it stood powered and shut", so the answer is that
- * this shift has no such interval rather than a number below zero. The star is the join between
- * the two threads; a fleet whose clocks disagree by ten minutes has not made the join.
- */
 function gateSlack(ctx: ObjectiveContext): number | undefined {
   const powered = feederThrownAt(ctx);
   const moved = gateMovedAt(ctx);
@@ -864,21 +703,6 @@ function gateSlack(ctx: ObjectiveContext): number | undefined {
   return moved < powered ? undefined : moved - powered;
 }
 
-/**
- * `gate <station> <n>`: the substation the door draws from, and the ticks it stood powered before
- * anybody moved it.
- *
- * The question the coupling created, and the only one on this level that reads both halves of the
- * shift at once. `name-the-hold` grades the grid against its own clock. This grades the *errand*
- * against the grid — the slack on the join that did not exist until the door needed power — and it
- * is the number a player who wants a shorter shift has to attack, because every tick of it is the
- * ending waiting on a walk that could have started earlier.
- *
- * The station is free; `probe("airlock").vars` names it before anybody has walked anywhere. It is
- * asked for anyway, because a note that names the wrong door has not worked out which door it is.
- * The interval is what has to be earned, and it cannot be reconstructed afterwards: the final
- * world knows the gate is open and knows the grid is up, and knows nothing whatever about when.
- */
 function gateReportFiled(ctx: ObjectiveContext): boolean {
   const said = filedLines(ctx, GATE_KEYWORD);
   if (said.length !== 1) return false;
@@ -889,7 +713,6 @@ function gateReportFiled(ctx: ObjectiveContext): boolean {
   return claim.id === airlockFeeder(ctx.world) && claim.count === slack;
 }
 
-/** Where the gate note and the shift part company, without handing over the number. */
 function misreadGate(ctx: ObjectiveContext): Divergence {
   const said = filedLines(ctx, GATE_KEYWORD);
   const line = said[0];
@@ -947,18 +770,6 @@ function misreadGate(ctx: ObjectiveContext): Divergence {
   };
 }
 
-/**
- * The shift, in ticks, sized from the instance the seed actually produced.
- *
- * Deliberately generous: CURRICULUM.md's w8-05 block requires bronze to stay reachable with a
- * slow, honest program, and `par.ticks` is the thing that separates bronze from gold. The
- * deadline is not allowed to be the thing that stops anybody.
- *
- * The floor is measured, not guessed. A reference that surveys with the whole fleet, walks the
- * grid on one clock and hauls one crate at a time — the slow, ugly shape the level block asks
- * to stay viable — costs a little over 2200 ticks on the widest instance. Below the floor the
- * formula was quietly making that shape fail, which would have gated the ending on gold.
- */
 const SHIFT_FLOOR = 3000;
 
 export function deadlineFor(world: World): number {
@@ -970,10 +781,6 @@ export function deadlineFor(world: World): number {
   return Math.max(SHIFT_FLOOR, Math.round(span * 6 + crates * 90 + stations * 40 + chain * 20));
 }
 
-/**
- * Which slot KD-0001-T ended up in. Exists so the save and the ending screen can record the
- * player's choice; it carries no score and no objective reads it.
- */
 export function filedIn(world: World): 'charter' | 'renewals' | null {
   const charter = machineById(world, 'slot-charter');
   if (charter && itemsOnTile(world, charter.at, ItemKind.Chip) > 0) return 'charter';
@@ -981,10 +788,6 @@ export function filedIn(world: World): 'charter' | 'renewals' | null {
   if (renewals && itemsOnTile(world, renewals.at, ItemKind.Chip) > 0) return 'renewals';
   return null;
 }
-
-// ---------------------------------------------------------------------------
-// Copy
-// ---------------------------------------------------------------------------
 
 const BRIEF = [
   'dot: the Yards run this every night, so nothing is where it was yesterday. the',
@@ -1082,10 +885,6 @@ const STARTER = [
   'print(`stations: ${probe("desk")?.vars.stations ?? 0}`);',
 ].join('\n');
 
-// ---------------------------------------------------------------------------
-// Level
-// ---------------------------------------------------------------------------
-
 export const w8_05: LevelDef = {
   id: 'w8-05',
   world: 8,
@@ -1093,22 +892,6 @@ export const w8_05: LevelDef = {
   title: 'The Kessler Contract',
   hardware: [],
   brief: BRIEF,
-  /**
-   * DESIGN.md §11.10, on the finale, where everything at once is the point.
-   *
-   * Three authored instances rather than a draw (CURRICULUM.md §10), and the sheet has to say
-   * which of the things on one of them is the instance. The fleet, the grid and the crate list
-   * all move; the site does not. The bay is hand-built west of the carve box so it is always
-   * there, with a fuel depot tile on the desk row, and `sealStrandedGround` fills in anything the
-   * bay cannot reach — so the only shut thing on the site is the chamber, and the two gate tiles
-   * are the only way into it. A run may treat all of that as a constant, and no board shows it.
-   *
-   * The ids line is the same repair as `w8-03`: `relabel` deals the station names again until
-   * ascending order breaks, so counting to n is not a schedule. Naming the constraint leaves the
-   * feeder lists to be read and the order to be built, and it keeps `precedence` — the headline
-   * mechanic of the finale — a thing the player is beaten by on merit rather than by the sheet
-   * having said nothing.
-   */
   board: {
     fixed: [
       'the site is 46 by 38 inside the wall — the muster bay west, the Yards in the middle, the airlock and the chamber east',
@@ -1129,15 +912,6 @@ export const w8_05: LevelDef = {
   },
   facts: FACTS,
   seeds: [1, 4, 7],
-  /* Both halves of the reference — the `Sim` driver at 514 / 779 / 894 and the player-facing
-     source at 636 / 756 / 970 — come in between 514 and 970 ticks across the three seeds, so
-     both gold on all three. Coupling the airlock to the grid took ticks *off* the driver rather
-     than adding them (560 / 806 / 917 before it): holding the errand until the feeder is lit
-     stops the carrier spending the opening of the shift walking to a door it cannot move.
-     Par is left where it was when there were seven seeds: the two most expensive instances went
-     with the seed cull, and moving the gold line down to meet the new worst case would be
-     tightening the medal on a level nobody has closed yet. Left as a decision for the
-     orchestrator, not a silent one. */
   par: { ticks: 1050 },
   costs: { use: 1 },
   budget: { maxTicks: 16000, maxOps: 8_000_000 },
@@ -1221,16 +995,12 @@ export const w8_05: LevelDef = {
     ),
   ],
   bonus: [
-    /* No `progress()`. The number is one edge's slack, not a run-wide total, so `budgetFor`
-       would have had to guess a meter for the bar and would have drawn the wrong one. */
     Objectives.custom(
       'name-the-hold',
       'Name the substation your order left standing longest, and how long it stood',
       longestHoldFiled,
       { divergence: misreadHold },
     ),
-    /* Also no `progress()`, and for the same reason: the number is one join's slack rather than a
-       run-wide total, so `budgetFor` would have had to guess a meter and would have drawn one. */
     Objectives.custom(
       'mind-the-gate',
       'Name the substation the airlock draws from and how long it stood powered and shut',

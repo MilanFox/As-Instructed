@@ -1,30 +1,3 @@
-/**
- * The race that made a player's own `import` red.
- *
- * Monaco installs its TypeScript language service lazily, behind `onLanguage('typescript')`. Until
- * that dynamic import lands, `getTypeScriptWorker()` rejects — with the bare string
- * `TypeScript not registered!`, which carries no message and reached the console as an
- * `Uncaught (in promise)` with nothing in it. The noise was the small half. The large half is that
- * `installTypes` asked for the worker in the same tick as mount, before any editor existed, lost
- * the race on a cold module cache, and the `declare module 'lib'` it exists to publish was
- * **silently never installed** — so a player who imported their own published routine stared at a
- * red squiggle until the next Run.
- *
- * What is asserted here is the ordering guarantee, not the absence of a console message. A test
- * that watched `console.error` would go green the moment someone wrapped the same race in a
- * `catch`, and the declaration would still not be installed.
- *
- * The guarantee has one statement and one place it holds: **`RuntimeRunner.ready()` does not hand
- * Monaco to anybody until the TypeScript language service will answer.** Every path into Monaco in
- * this app is downstream of `ready()` — `installTypes`, the transpile, the library compile, the
- * regression suite — so pinning it there pins all of them. `typescriptRegistered` is stubbed the
- * way a slow cold load behaves: pending, then resolved when the test says the service arrived.
- *
- * *Not covered, and it is a resolution problem rather than a design one:* the polling and warm-up
- * model inside `typescriptRegistered` itself. `monaco-editor`'s package.json declares `module` and
- * no `main`, so vite cannot resolve it under node and no test file can even mock it. The exact
- * config change that would open it up exists but is not applied here.
- */
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 const setup = vi.hoisted(() => {
@@ -57,7 +30,6 @@ const setup = vi.hoisted(() => {
   return {
     events,
     monaco,
-    /** A cold load: nothing resolves until `serviceArrives()` is called. */
     coldStart(): void {
       events.length = 0;
       registration = new Promise<void>((resolve) => {
@@ -92,10 +64,6 @@ const setup = vi.hoisted(() => {
 
 vi.mock('../monaco-setup.ts', () => setup.module);
 
-/**
- * `RuntimeRunner` warms the simulation worker on construction, and node has no `Worker`. Nothing
- * below runs a program, so this only has to exist.
- */
 class IdleWorker {
   onmessage: unknown = null;
   onerror: unknown = null;
@@ -169,14 +137,6 @@ describe('nothing is handed Monaco before the language service will answer', () 
   });
 });
 
-/**
- * The bug, stated as an ordering.
- *
- * `configurePlayerLanguage` is what pushes the work order's ambient declarations into the language
- * service, and on the Repository's path the same call installs `declare module 'lib'`. Landing it
- * before the service exists is landing it in nothing — which is exactly what a player saw as a red
- * `import` that cleared itself on the next Run.
- */
 describe('the declarations are installed after the service exists, never before', () => {
   test('a level prepared on a cold load publishes nothing until the service is up', async () => {
     setup.coldStart();
@@ -196,11 +156,6 @@ describe('the declarations are installed after the service exists, never before'
   });
 });
 
-/**
- * StrictMode mounts twice and the workspace, the Repository and the regression suite all call
- * `ready()`. One registration, waited on by everyone, is what stops the double mount from starting
- * a second race against the first.
- */
 describe('one wait, however many callers', () => {
   test('concurrent callers share the single registration', async () => {
     setup.coldStart();

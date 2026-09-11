@@ -83,7 +83,6 @@ describe('terrainArt', () => {
     }
     const bad = [...seen].filter((name) => !resolvable.has(name));
     expect(bad).toEqual([]);
-    // A biome that only ever emits one floor would look like wallpaper.
     expect(seen.size).toBeGreaterThan(20);
   });
 

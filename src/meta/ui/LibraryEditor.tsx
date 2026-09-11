@@ -8,19 +8,6 @@ import { publishableDeclarations } from '../publish.ts';
 import { useLibrary } from '../store.ts';
 import './library.css';
 
-/**
- * The second tab: `lib.ts` as a real Monaco model.
- *
- * A real model rather than a textarea is the whole point. The player gets the same type checking,
- * the same autocomplete and the same hardware declarations they get in a work order — and, because
- * the file is compiled here and its emitted `.d.ts` is installed as `declare module 'lib'`, the
- * *level* editor immediately knows what the library publishes. Write a function here, and it
- * autocompletes over there.
- *
- * The compile is debounced rather than run on every keystroke: it emits a `.d.ts` as well as JS,
- * and doing that on every character would make typing feel heavy for no gain.
- */
-
 const COMPILE_DEBOUNCE_MS = 400;
 const MARKER_OWNER = 'bootstrap-library';
 
@@ -36,7 +23,6 @@ export function LibraryEditor(): React.JSX.Element {
     setupMonaco();
   }, []);
 
-  /* Compile, publish the type surface to the level editor, and mark whatever is wrong. */
   useEffect(() => {
     let live = true;
     const timer = setTimeout(() => {
@@ -97,8 +83,6 @@ export function LibraryEditor(): React.JSX.Element {
           onChange={(next) => setSource(next ?? '')}
           onMount={onMount}
           options={{
-            // The program's editor is still mounted behind this one; two "Editor content"
-            // textboxes in the tree are indistinguishable to anyone tabbing through it.
             ariaLabel: 'lib.ts',
             fontSize: 13,
             fontFamily: 'var(--font-mono)',
@@ -107,7 +91,6 @@ export function LibraryEditor(): React.JSX.Element {
             tabSize: 2,
             renderLineHighlight: 'line',
             automaticLayout: true,
-            // The same settings as the program's editor: this one holds player code too.
             autoClosingBrackets: 'never',
             autoClosingQuotes: 'never',
             autoClosingOvertype: 'never',

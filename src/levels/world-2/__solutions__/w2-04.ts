@@ -1,18 +1,6 @@
 import { Dir, type Sim } from '../../../engine/index.ts';
 import type { ReferenceSolution } from '../../types.ts';
 
-/**
- * TEST FIXTURE. Never imported from src/main.tsx — vite.config.ts fails the build if it is.
- *
- * The hopper starts full, so the very first `inventory()` reading is the capacity and nothing
- * else will ever report it. The first lap plants the bare tile — which is the only way to open a
- * slot — and takes whatever is already ripe. Later laps stand on the next unfinished tile and
- * wait it out: the clock runs at the same rate whether the bot drives or not, and driving arrives
- * late.
- *
- * `done` and `seen` are ordinary JavaScript Sets. They survive the whole run (DESIGN.md §5),
- * which is what makes "resume where you left off" possible at all.
- */
 export const solution: ReferenceSolution = {
   levelId: 'w2-04',
   run(sim: Sim, botId: number): void {
@@ -33,8 +21,6 @@ export const solution: ReferenceSolution = {
       }
       if (here.growth < here.maxGrowth) {
         if (!waitForIt) return;
-        // A tile that has not been sown yet reads 0 of 8 and stays there, so the gap is a
-        // lower bound on the wait, never the whole of it. Look again after every wait.
         for (let guard = 0; guard < 40; guard++) {
           const now = sim.scan(botId);
           if (now.growth >= now.maxGrowth) break;
@@ -64,8 +50,6 @@ export const solution: ReferenceSolution = {
       if (sim.canMove(botId, Dir.North)) sim.move(botId, Dir.North);
     };
 
-    // Standing still is only ever the last resort: another tile may be ready now, and the
-    // clock that ripens this one runs while the bot is over there.
     lap(false);
     for (let guard = 0; done.size < seen.size && guard < 40; guard++) {
       const before = done.size;

@@ -1,11 +1,3 @@
-/**
- * World 7's bonus stars, from both sides: a run that earns one and a run that does not.
- *
- * A bonus that every passing run collects is
- * confetti — both playtests said so in the same words — so each star here is pinned by a pair:
- * the shipped reference solution earns it on every declared seed, and a *correct* program that
- * did not have the second idea passes the level and is refused.
- */
 import { describe, expect, test } from 'vitest';
 import type { ObjectiveContext, Sim, Vec } from '../../../engine/index.ts';
 import { Dir, ItemKind, evaluateObjectives, vec } from '../../../engine/index.ts';
@@ -30,11 +22,14 @@ function scored(level: LevelDef, seed: number, drive: (sim: Sim, bot: number) =>
   return {
     passed: result.verdict.passed,
     ticks: result.trace.endTick,
-    met: (id: string) => must(stars.find((star) => star.id === id), id).met,
+    met: (id: string) =>
+      must(
+        stars.find((star) => star.id === id),
+        id,
+      ).met,
   };
 }
 
-/** A program that does nothing but say so. Nothing it fails to do may be worth a star. */
 const idle = (sim: Sim, botId: number): void => {
   sim.print(botId, 'nothing');
 };
@@ -50,20 +45,21 @@ function referenceEarns(level: LevelDef, id: string): void {
       ops: result.ops,
     });
     expect(result.verdict.passed, `seed ${String(seed)}`).toBe(true);
-    expect(must(stars.find((star) => star.id === id), id).met, `seed ${String(seed)}`).toBe(true);
+    expect(
+      must(
+        stars.find((star) => star.id === id),
+        id,
+      ).met,
+      `seed ${String(seed)}`,
+    ).toBe(true);
   }
 }
-
-// ---------------------------------------------------------------------------
-// w7-01 — report how long each bot stood idle
-// ---------------------------------------------------------------------------
 
 describe('w7-01 name-the-idle', () => {
   test('the reference solution earns it on every seed', () => {
     referenceEarns(w7_01, 'name-the-idle');
   });
 
-  /** The old reference: correct, tick-optimal, and it never says what the sync() cost it. */
   test('a run that parks both bots and files nothing is refused', () => {
     for (const seed of w7_01.seeds) {
       const run = scored(w7_01, seed, (sim) => {
@@ -78,12 +74,6 @@ describe('w7-01 name-the-idle', () => {
     }
   });
 
-  /**
-   * The star is not free to a run that assumes a balanced pair. Seeds 1 and 2 are the unequal
-   * ones and the guess is refused on both — seed 1 included, so the memorised `0` is caught on
-   * the first seed the player runs rather than after a pass. Seed 3 is the equal pair, where both
-   * bots really do idle for nothing and `0` is simply the right answer.
-   */
   test('reporting no idle at all is only right on the balanced pair', () => {
     const guess = (sim: Sim): void => {
       const ids = sim.botIds();
@@ -101,11 +91,6 @@ describe('w7-01 name-the-idle', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// w7-02 — split the crop, not the map
-// ---------------------------------------------------------------------------
-
-/** Reads the manifest, raises the fleet, then cuts the *field* into equal vertical bands. */
 function equalBands(sim: Sim, botId: number): void {
   const depot = sim.probe(botId, 'depot');
   if (!depot) return;
@@ -156,11 +141,6 @@ describe('w7-02 even-share', () => {
     referenceEarns(w7_02, 'even-share');
   });
 
-  /**
-   * The level's designed wrong answer, and the one its own hints are about: an equal-area cut of
-   * a field whose crops sit inside one column band. On seed 1 the whole crop falls in band 0, so
-   * four bots are raised, one of them works, and the field is cleared with nothing shared.
-   */
   test('cutting the field into equal bands clears it and misses the star', () => {
     const run = scored(w7_02, 1, equalBands);
 
@@ -168,7 +148,6 @@ describe('w7-02 even-share', () => {
     expect(run.met('even-share')).toBe(false);
   });
 
-  /** One bot doing the whole field is correct and is refused wherever a fleet was approved. */
   test('working the field single-handed is refused on every multi-bot seed', () => {
     for (const seed of w7_02.seeds) {
       const run = scored(w7_02, seed, (sim, botId) => {
@@ -200,20 +179,6 @@ describe('w7-02 even-share', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// w7-03 — the one blocked-move bonus in the campaign that asks something
-// ---------------------------------------------------------------------------
-
-/**
- * Each bot hauls its own pile on its own, straight down the aisle and straight back.
- *
- * This is the correct program with no schedule in it — the shape the starter hands the player,
- * one errand written once and handed to every bot. It delivers every crate, and because the
- * tunnel is one lane and nobody was told whose turn it is, a bot walks into ground another bot
- * was standing on at that moment and bounces. That is why `no-bumps` survives A10 on this board:
- * the count is not a second price on a blocked move, it is the only reading anywhere on the
- * level of whether the tunnel was scheduled.
- */
 function everyBotForItself(sim: Sim, seed: number): void {
   const site = siteFor(seed);
   const eastX = 8 + site.tunnel;
@@ -258,11 +223,6 @@ describe('w7-03 no-bumps', () => {
     referenceEarns(w7_03, 'no-bumps');
   });
 
-  /**
-   * The ruling this bonus was kept under, written down as a test. A correct, medal-taking haul
-   * that never decided whose turn the tunnel was is refused the star — so what the star reads is
-   * "did you schedule the tunnel", which is a question `crates-in-silo` never asks.
-   */
   test('hauling with no right of way clears the yard and misses the star', () => {
     for (const seed of w7_03.seeds) {
       const run = scored(w7_03, seed, (sim) => {
@@ -274,17 +234,6 @@ describe('w7-03 no-bumps', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// w7-04 — name the job that decided the shift
-// ---------------------------------------------------------------------------
-
-/**
- * The reference run, with its own report line rewritten or dropped.
- *
- * Every correct program for this board is a scheduler, so the honest missability test is not "a
- * different scheduler" — it is *this* scheduler, holding every tick and every job identical, with
- * only the sentence it files about itself changed. That isolates the one variable the star grades.
- */
 function reportedAs(seed: number, rewrite: (line: string) => string | null) {
   const solution = SOLUTIONS[w7_04.id] as ReferenceSolution;
   const result = runReference(w7_04, seed, solution);
@@ -315,10 +264,6 @@ describe('w7-04 name-the-decider', () => {
     }
   });
 
-  /**
-   * The makespan is the easy half of the line and the job is the hard one: a run that knows
-   * exactly when the shift ended and guesses what was underneath it is still refused.
-   */
   test('the right tick under the wrong job is refused on every seed', () => {
     for (const seed of w7_04.seeds) {
       const run = reportedAs(seed, (line) => `last job-0 ${line.split(' ')[2] ?? ''}`);
@@ -326,7 +271,6 @@ describe('w7-04 name-the-decider', () => {
     }
   });
 
-  /** And the job alone is not enough either: the tick has to be the one the clock actually read. */
   test('the right job under a wrong tick is refused on every seed', () => {
     for (const seed of w7_04.seeds) {
       const run = reportedAs(seed, (line) => {
@@ -338,15 +282,6 @@ describe('w7-04 name-the-decider', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// The third question: is it satisfied by a program that does nothing?
-// ---------------------------------------------------------------------------
-
-/**
- * The check that caught `w8-05`'s two budget stars, run here against the two World 7 stars this
- * pass authored. A predicate that measures the *absence* of something is vacuously true of a run
- * that never started; a predicate that asks the run to say what it found cannot be.
- */
 describe('a program that does nothing earns neither report', () => {
   test('w7-01 name-the-idle', () => {
     for (const seed of w7_01.seeds) {

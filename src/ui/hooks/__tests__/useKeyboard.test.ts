@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { isNativeSaveShortcut } from '../useKeyboard.ts';
 
-/**
- * `useKeyboard` itself is a `window` listener wired up inside a React effect, and this suite has
- * no DOM to mount it in — `environment: 'node'`, and only `*.test.ts` is collected, never
- * `*.test.tsx`. What is testable without one is the predicate the handler eats Cmd+S/Ctrl+S with,
- * before it ever reaches `KEY_LIST`: the browser's own "Save Page As" shortcut, on any platform.
- */
 describe('isNativeSaveShortcut', () => {
   it('matches Cmd+S on a Mac keyboard', () => {
     const event = { metaKey: true, ctrlKey: false, key: 's' } as KeyboardEvent;

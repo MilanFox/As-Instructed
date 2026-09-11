@@ -1,16 +1,3 @@
-/**
- * Nothing on the desk may take the desk down with it.
- *
- * A `<Binder>` that threw once blanked the whole screen — the site view, the paperwork and the
- * program the player was in the middle of writing. That is the same defect returning in
- * furniture rather than in a modal, and it is data loss rather than a styling complaint, the same
- * class as the run report being destroyed by a stray backdrop click.
- *
- * `Desk.tsx` renders every object through `PanelBoundary` from two lists. This asserts the lists
- * are complete, because a boundary applied by hand is a convention and a convention survives
- * exactly until someone adds an object. That is how the objectives overlay shipped past a guard
- * that asserted the wrong thing.
- */
 import { describe, expect, it } from 'vitest';
 
 import { DESKWARE, STATION } from '../desk/Desk.tsx';
@@ -24,10 +11,6 @@ const contained = new Set([...STATION, ...DESKWARE].map(([, render]) => render))
 
 describe('every object on the desk is inside a boundary', () => {
   it('contains everything the furniture barrel exports', () => {
-    /*
-     * The barrel is the file that grows when someone puts a new thing on the desk, so it is the
-     * one to hold against the lists rather than a hand-written roll-call.
-     */
     const missing = Object.entries(furniture)
       .filter(([, value]) => typeof value === 'function')
       .filter(([, value]) => !contained.has(value as () => React.ReactElement))

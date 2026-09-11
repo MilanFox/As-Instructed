@@ -12,37 +12,10 @@ import type { ApiFunctionSpec } from './protocol.ts';
 import { PLAYER_API, perBotApi } from './api-spec.ts';
 import { apiFunctionsFor, requiredTypesFor } from './ambient.ts';
 
-/**
- * Binds one real implementation to every function in `api-spec.ts`.
- *
- * The spec is the single source of truth for the API surface: the ambient `.d.ts`, the docs panel
- * and this file all read it, so a function cannot exist in the editor and be missing at runtime.
- * `assertApiComplete()` enforces the other direction at worker startup — a spec entry with no
- * implementation is a loud crash on boot, never a `undefined is not a function` in a player's face
- * halfway through World 5.
- *
- * The bot id is bound away here; the player never passes one (DESIGN.md §3). From World 7 on,
- * `bot(id)` hands it back: the handle it returns carries the same implementations re-bound to a
- * different bot, taken from this very table, so a fleet call and a bare call can never disagree.
- */
-
 export type PlayerFunction = (...args: unknown[]) => unknown;
 
-/**
- * `unlocked` is only read by `bot`, which needs it to give the handle exactly the methods this
- * level has installed and no more. Every other binder ignores it.
- */
-type Binder = (
-  sim: Sim,
-  botId: number,
-  unlocked: readonly ApiFunctionSpec[],
-) => PlayerFunction;
+type Binder = (sim: Sim, botId: number, unlocked: readonly ApiFunctionSpec[]) => PlayerFunction;
 
-/**
- * The `Bot` handle for one id: every per-bot entry of `unlocked`, bound to `id` instead of to the
- * bot the bare functions command. Handles are memoized because World 7 solutions call `bot(id)`
- * inside their hot loops, and a fresh object per call would be pure garbage.
- */
 function botHandles(
   sim: Sim,
   unlocked: readonly ApiFunctionSpec[],
@@ -64,14 +37,6 @@ function botHandles(
   };
 }
 
-/**
- * `link`, `receive`, `buffered`, `transmit` and `decode` have no `Sim` method: DESIGN.md leaves
- * World 5 and 6 semantics open and `api-spec.ts` hands them to RUNTIME to satisfy on top of the
- * engine's extension points. The defaults below are deliberately generic and fully replay-safe —
- * every world mutation goes through `applyMachineChange` / `applyTileChange`, so a trace still
- * replays exactly. CONTENT should treat them as the contract to author levels against.
- */
-
 const ANTENNA_KINDS = new Set(['antenna', 'router']);
 
 function antennaFor(sim: Sim, botId: number): Machine | undefined {
@@ -90,11 +55,6 @@ function metaNumber(tile: Tile | undefined, key: string): number {
   return typeof value === 'number' ? value : 0;
 }
 
-/**
- * The listening post's inbound queue lives in the antenna tile's `meta`: `rx` holds the packets
- * newline-separated and `rxNext` is the read cursor. `probe` charges the op; moving the cursor
- * through `applyTileChange` keeps the read in the trace, so a replay shows the same packets.
- */
 function receivePacket(sim: Sim, botId: number): string | null {
   const antenna = antennaFor(sim, botId);
   void sim.probe(botId, antenna?.id);
@@ -114,16 +74,6 @@ function receivePacket(sim: Sim, botId: number): string | null {
   return packets[next] as string;
 }
 
-/**
- * The same buffer `receive` pops, counted instead of consumed: `rx` behind the `rxNext` cursor.
- *
- * Free, and for a stronger reason than "sensing is free" (DESIGN.md §4.4). `receive` is itself
- * free, so any price here would make *finding out* the buffer is empty dearer than emptying it,
- * and every program would go back to popping packets to count them — which is the gap this call
- * exists to close (DESIGN.md §11.7). It charges the op `probe` charges, exactly as `receive`
- * does, so the read is bounded and shows up in the trace; it writes no tile change, because
- * asking how many are waiting is the one read on this band that changes nothing.
- */
 function bufferedPackets(sim: Sim, botId: number): number {
   const antenna = antennaFor(sim, botId);
   void sim.probe(botId, antenna?.id);
@@ -137,17 +87,6 @@ function bufferedPackets(sim: Sim, botId: number): number {
   return unread > 0 ? unread : 0;
 }
 
-/**
- * Outbound payloads accumulate on the antenna machine: `vars.sent` counts them and the tile's
- * `tx` meta keeps them in order, which is what an objective reads. The tick is charged either way.
- *
- * The two refusals are not the same kind of thing, and used to be one `false`. An antenna that is
- * not `on` is a state: `power(id, "on")` clears it and the identical call then succeeds, so it
- * keeps the `false` a program can honestly branch on. A work order with no antenna at all is not
- * a state — nothing in the API installs one — so it throws (docs/ENGINE.md §2). Note that neither
- * is an unknown *id*: `transmit` never takes one, which is why the ruling that makes `link` throw
- * on a bad id leaves this verb's boolean intact.
- */
 function transmitPayload(sim: Sim, botId: number, text: string, cost: number): boolean {
   const antenna = antennaFor(sim, botId);
   if (!antenna) {
@@ -178,11 +117,6 @@ function transmitPayload(sim: Sim, botId: number, text: string, cost: number): b
   return true;
 }
 
-/**
- * The default cipher is a Caesar shift over the printable ASCII range, which is what every World 6
- * brief will describe. A level that wants something else states it in its brief and supplies the
- * packets already encoded for that scheme.
- */
 function decodeText(text: string, key: number): string {
   const shift = ((Math.trunc(key) % 95) + 95) % 95;
   let out = '';
@@ -197,17 +131,6 @@ function decodeText(text: string, key: number): string {
   return out;
 }
 
-/**
- * A connection is recorded on the source machine as `vars['link:<toId>'] = 1`, and the cable it
- * consumes is the Manhattan distance between the two, reported through `Verdict.stats.spend`
- * (DESIGN.md §4.6).
- *
- * An id that names no machine costs the full price and then stops the run. Nothing in the API
- * creates a machine, so the identical call can never succeed later (docs/ENGINE.md §2), and
- * `probe(id)` returns `null` for free — which is the idiom the World 5 briefs already teach for
- * finding where the substations stop. The `boolean` is kept because a level may yet refuse a pair
- * it considers illegal, which would be a refusal the player can do something about.
- */
 function linkMachines(
   sim: Sim,
   botId: number,
@@ -359,17 +282,12 @@ function stringify(value: unknown): string {
   return String(value);
 }
 
-/** Ambient runtime values, by the name the player writes. Only value-carrying types appear. */
 const VALUES: Record<string, unknown> = {
   Dir: DirValue,
   Terrain: TerrainValue,
   ItemKind: ItemKindValue,
 };
 
-/**
- * Throws unless every function in the spec has an implementation. Called at worker startup so a
- * drifted spec fails on boot rather than mid-level. DESIGN.md §3.
- */
 export function assertApiComplete(): void {
   const missing = PLAYER_API.functions.filter((fn) => BINDERS[fn.name] === undefined);
   if (missing.length === 0) return;
@@ -379,7 +297,6 @@ export function assertApiComplete(): void {
   );
 }
 
-/** Every name the runtime can bind, for tests and tooling. */
 export function implementedApiNames(): string[] {
   return Object.keys(BINDERS);
 }
@@ -389,12 +306,6 @@ export interface PlayerScope {
   values: Record<string, unknown>;
 }
 
-/**
- * The exact scope the player's program runs in at this level: the unlocked functions, plus the
- * ambient values their signatures reference and nothing else. A locked function is absent from
- * both the `.d.ts` and this object, so calling it is a type error first and a clear runtime
- * message second.
- */
 export function buildPlayerScope(
   sim: Sim,
   botId: number,
@@ -423,11 +334,6 @@ export function buildPlayerScope(
   return { api, values };
 }
 
-/**
- * `console.log` is an alias for `print`, not an escape hatch: it writes into the same trace and
- * the same console panel. Beginners reach for it reflexively, and silently doing nothing would be
- * the worst of the available answers.
- */
 function consoleFor(sim: Sim, botId: number, api: Record<string, PlayerFunction>): unknown {
   const write = (...args: unknown[]): void => {
     const text = args.map(stringify).join(' ');

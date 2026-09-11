@@ -12,37 +12,16 @@ import type {
   RegressionRun,
 } from './types.ts';
 
-/**
- * Re-running every closed work order that reads the Repository, after the Repository changed.
- *
- * Three constraints shape all of this and none of them is negotiable:
- *
- *  1. **Nothing is silently downgraded.** A worse result is *reported*; the recorded medal moves
- *     only when the player presses accept. Losing a gold to an edit they were told nothing about
- *     is the fastest way to make someone stop touching the library, which kills the feature.
- *  2. **Nothing blocks a frame.** Each work order is one `await` on the worker, and the loop hands
- *     control back between them. A suite over forty work orders is slow; it is never janky.
- *  3. **Unchanged is free.** The cache is keyed on the work order, its source, and — only when
- *     that work order actually imports from `'lib'` — the library. Most of the campaign never
- *     touches the Repository, so most of the suite answers instantly on every edit.
- *
- * No worker, no Monaco: the caller supplies a `MetaRunner`, which the host implements over
- * `src/runtime`'s `Runner` and `src/meta/adapters.ts` fakes for tests.
- */
-
 export interface MetaRunRequest {
   levelId: string;
-  /** The player's source for that work order, exactly as saved. */
   code: string;
   seeds: number[];
-  /** Absent when the work order imports nothing. */
   library?: { source: string; hash: string };
 }
 
 export interface MetaRunOutcome {
   passed: boolean;
   ticks: number;
-  /** Present whenever a library was linked. */
   usage?: LibraryUsage;
   failure?: { message: string; file?: 'program' | 'lib'; line?: number };
 }
@@ -51,26 +30,16 @@ export interface MetaRunner {
   run(request: MetaRunRequest): Promise<MetaRunOutcome>;
 }
 
-/** One closed work order, as the suite needs it. */
 export interface RegressionTarget {
   levelId: string;
   code: string;
   seeds: number[];
   parTicks: number;
-  /** The medal on record. Never written by the suite. */
   medal: Medal;
-  /** Whether this work order carries a medal at all. Defaults to `true`. DESIGN.md §7. */
   graded?: boolean;
-  /** The ticks on record, when there are any. */
   ticks?: number;
 }
 
-/**
- * The medal a re-run would land on, or `Medal.None` where the level has no ladder.
- *
- * An ungraded work order can still break, still degrade and still improve — the suite reports all
- * three from the ticks — but it cannot change medal, because it has never had one to change.
- */
 function medalAfter(target: RegressionTarget, passed: boolean, ticks: number): Medal {
   if (target.graded === false) return Medal.None;
   return medalFor(passed, ticks, target.parTicks);
@@ -87,20 +56,12 @@ export interface RegressionSummary {
 
 const EMPTY_USAGE: LibraryUsage = { ticks: 0, calls: {} };
 
-/** Yields to the host between work orders so a long suite cannot hold a frame. */
 function yieldToHost(): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, 0);
   });
 }
 
-/**
- * The cache key for one work order under one library.
- *
- * `importsLibrary` is decided by the caller, because deciding it here would mean re-scanning every
- * saved source on every edit. When it is false the library hash is left out of the key entirely,
- * which is what makes an independent work order permanently cached.
- */
 export function keyFor(
   target: RegressionTarget,
   libraryHash: string | undefined,
@@ -115,12 +76,10 @@ export function keyFor(
   });
 }
 
-/** Reads a stored verdict, or `undefined` when the answer has to be measured. */
 export function cachedRun(save: LibrarySave, key: string): CachedRun | undefined {
   return save.cache[key];
 }
 
-/** Writes a verdict into the cache, dropping the oldest entries once the cap is reached. */
 export function withCachedRun(save: LibrarySave, run: CachedRun): LibrarySave {
   const cache = { ...save.cache, [run.key]: run };
   const keys = Object.keys(cache);
@@ -172,35 +131,21 @@ function classify(
 
 export interface SuiteOptions {
   runner: MetaRunner;
-  /** `lib.ts` as it stands now. */
   librarySource: string;
-  /** Identity of that source. Usually the revision id. */
   libraryHash: string;
   revisionId: string;
-  /** True for work orders whose source imports from `'lib'`. */
   dependsOnLibrary(target: RegressionTarget): boolean;
-  /** Called after every work order so the panel can redraw. */
   onProgress?(run: RegressionRun): void;
-  /** Returns true to abandon the suite. Checked between work orders. */
   cancelled?(): boolean;
 }
 
 export interface SuiteResult {
   run: RegressionRun;
   summary: RegressionSummary;
-  /** Cache entries to fold into the save, whether the player accepts the results or not. */
   cache: CachedRun[];
-  /** Fresh measurements, for the Refactor screen. Written regardless of the medal decision. */
   profiles: LevelProfile[];
 }
 
-/**
- * Runs the suite, one work order at a time.
- *
- * `profiles` come back even when nothing changed, because the Refactor screen's honesty depends on
- * having a measurement against *this* library for every work order it counts. `cache` comes back
- * separately so the caller can persist the cheap part without persisting a medal decision.
- */
 export async function runSuite(
   targets: readonly RegressionTarget[],
   save: LibrarySave,
@@ -306,12 +251,10 @@ export function summarise(run: RegressionRun): RegressionSummary {
   return summary;
 }
 
-/** True when the suite found something the player would want the revert button for. */
 export function needsAttention(summary: RegressionSummary): boolean {
   return summary.broken > 0 || summary.degraded > 0;
 }
 
-/** The line above the report. */
 export function summaryLine(summary: RegressionSummary): string {
   if (summary.total === 0) return REGRESSION.nothingToCheck;
   if (!needsAttention(summary)) return REGRESSION.clean;
@@ -323,14 +266,6 @@ export function summaryLine(summary: RegressionSummary): string {
   return `${parts.join(', ')}. ${REGRESSION.medalKept}`;
 }
 
-/**
- * Folds a finished suite into the save.
- *
- * `acceptMedals` is the player's decision and defaults to false, which is the whole safety
- * property: profiles and cache are written either way, medals only on request. `lastKnownGood`
- * advances only when the suite found nothing — a revision that broke something must never become
- * the thing revert restores.
- */
 export function applySuite(
   save: LibrarySave,
   result: SuiteResult,

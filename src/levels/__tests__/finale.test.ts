@@ -14,16 +14,6 @@ import { runReference } from '../harness.ts';
 import { SOLUTIONS } from './solutions.ts';
 import { formErrandOnly } from './naive.ts';
 
-/**
- * The two defects the finale used to have, pinned as tests.
- *
- * The first is the bypass an AoC playtester found: `power(id, state)` reached any machine
- * anywhere on the map, so eight calls and sixteen ticks satisfied both grid objectives of the
- * finale without a bot leaving the muster bay. The second is the reason they gave up: five
- * objectives across seven seeds collapsed into one bit, so a partially correct program was
- * indistinguishable from a blank one.
- */
-
 function run(level: LevelDef, seed: number, js: string) {
   return runSeed({
     level,
@@ -40,7 +30,6 @@ function levelOrThrow(id: string): LevelDef {
   return level;
 }
 
-/** The playtester's run 3, verbatim in shape: read the graph, sort it, switch it on from the bay. */
 const GRID_BYPASS = `
 const count = probe('desk').vars.stations;
 const stations = [];
@@ -112,8 +101,6 @@ describe('the finale no longer answers to power() from across the map', () => {
   });
 
   test('World 5 still operates its grid from the desk', () => {
-    // The reason `power` was not changed wholesale: w5-02 is a binary search over 200 relays and
-    // the bot never moves. Marking machines rather than the command is what keeps it working.
     const level = levelOrThrow('w5-02');
     const outcome = run(level, level.seeds[0] as number, `power('relay-0', 'patched');`);
     expect(powerCalls(outcome.trace.events).some((call) => call.ok)).toBe(true);
@@ -131,8 +118,6 @@ describe('a partly-correct program is credited per objective, per seed', () => {
 
     expect(response.verdict.passed).toBe(false);
 
-    /* The verdict carries the level's bonus rows too, and a bonus is not banked work:
-       `objectivesOnEverySeed` is asked about the required list only. */
     const required = new Set(level.objectives.map((objective) => objective.id));
     const met = response.verdict.objectives
       .filter((entry) => entry.met && required.has(entry.id))
@@ -155,8 +140,6 @@ describe('a partly-correct program is credited per objective, per seed', () => {
     const level = levelOrThrow('w8-05');
     const runs = level.seeds.map((seed) => run(level, seed, IDLE));
 
-    /* Seed 1 has the smallest grid, so reporting every objective from it would understate the
-       work outstanding on the others. The aggregate has to take the worst column per row. */
     const response = aggregate(runs);
     if (!response.ok) throw new Error('the run did not come back');
     const grid = response.verdict.objectives.find((entry) => entry.id === 'grid-online');
@@ -180,32 +163,16 @@ describe('a partly-correct program is credited per objective, per seed', () => {
 
     const progress = useGame.getState().save.levels['w8-05'];
     expect(progress?.completed).toBe(false);
-    /* The point of the whole exercise: a failed run still leaves a record of what was closed,
-       so four of five is a state the game can show rather than a state it forgets. */
     expect(progress?.objectives?.length ?? 0).toBeGreaterThan(0);
     expect(progress?.objectives).not.toContain('quota');
     useGame.setState({ save: emptySave() });
   });
 
   test('the three seeds kept are the three the level is authored against', () => {
-    // A branching grid at the smallest scale, a pure chain, and the fuel squeeze. Anything else
-    // in the old list of seven moved a number without moving a decision.
     expect(levelOrThrow('w8-05').seeds).toEqual([1, 4, 7]);
   });
 });
 
-// ---------------------------------------------------------------------------
-// The third specific: the form leg used to depend on nothing
-// ---------------------------------------------------------------------------
-
-/**
- * The same level with the one line of the coupling removed from its door.
- *
- * A test that only ran the errand against the shipped level could say that it fails, and would not
- * be able to say *why* — a fixture that walks into a wall looks identical to a fixture that cannot
- * walk. Building the level twice, differing in nothing but the `fed:` key `build` writes onto the
- * airlock, is what makes the difference attributable to the coupling rather than to the program.
- */
 function withoutTheCoupling(level: LevelDef): LevelDef {
   return {
     ...level,
@@ -225,15 +192,6 @@ function metOn(level: LevelDef, seed: number, solution: ReferenceSolution): Set<
   return new Set(result.verdict.objectives.filter((entry) => entry.met).map((entry) => entry.id));
 }
 
-/**
- * The one specific that survived the finale rewrite: the finale
- * *accumulates rather than integrates*, and concretely, *"the form leg depends on nothing else"*.
- *
- * It was true, and it was cheap: `formErrandOnly` lifts KD-0001-T, pays the nine-stage toll and
- * files it in **92 to 146 ticks** without ever looking at a substation, which is a fifth of the
- * reference's shift for a fifth of the objectives. The airlock draws from the grid now, so the
- * same program on the same seeds ends holding the chip in front of a door it has no power to move.
- */
 describe('the form leg cannot be run without the grid', () => {
   const errand = 'file-form';
 
@@ -251,7 +209,6 @@ describe('the form leg cannot be run without the grid', () => {
       const form = result.verdict.objectives.find((entry) => entry.id === errand);
       expect(form?.met, `seed ${String(seed)}`).toBe(false);
       expect(machineById(result.world, 'airlock')?.state, `seed ${String(seed)}`).not.toBe('open');
-      // The chip is in a hold rather than lost: the program did the errand and the door refused.
       expect(
         result.world.bots.some((bot) =>
           bot.inventory.some((stack) => stack.kind === 'chip' && stack.count > 0),
@@ -277,8 +234,6 @@ describe('the form leg cannot be run without the grid', () => {
       const fed = Object.keys(airlock?.vars ?? {}).filter((name) => name.startsWith(FED_BY));
       expect(fed.length, `seed ${String(seed)}`).toBe(1);
 
-      /* A feeder with no feeders of its own would be a form leg that depends on one switch
-         instead of on the shift, which is the defect rather than the repair. */
       const feeder = machineById(world, (fed[0] as string).slice(FED_BY.length));
       expect(feeder, `seed ${String(seed)}`).toBeDefined();
       expect(feeder?.vars['deps'] ?? 0, `seed ${String(seed)}`).toBeGreaterThan(0);

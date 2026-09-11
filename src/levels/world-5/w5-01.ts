@@ -18,21 +18,15 @@ import { at, firstNotIn } from './objectives.ts';
 
 const WIDTH = 22;
 const HEIGHT = 5;
-/** The one walkable row. Everything else is wall, so the corridor is a line. */
 const ROW = 2;
 const WEST_END = 1;
 const EAST_END = WIDTH - 2;
 
 export interface MainsLayout {
   reactorAt: Vec;
-  /** x of sub-1 … sub-n, already in distance order from the reactor. */
   stations: number[];
 }
 
-/**
- * The end the reactor sits on is decided by seed parity rather than by the Rng, so the three
- * seeds can never all agree on a direction — which is the whole anti-hardcode axis here.
- */
 export function mainsLayout(seed: number): MainsLayout {
   const rng = new Rng(seed * 7919 + 101);
   const count = rng.int(6, 9);
@@ -60,16 +54,9 @@ const substations = (world: World): Machine[] => world.machines.filter(isSubstat
 const energisedCount = (world: World): number =>
   substations(world).filter((machine) => machine.state === 'on').length;
 
-/**
- * Replays every `use` against the machine cycle to find which substations latched *legally*.
- *
- * `use` cycles a node off -> on whether or not its feeder is live, so the world alone cannot tell
- * a correct energisation from a futile one. Only the trace can, and only in order.
- */
 interface LatchLog {
   good: Set<string>;
   bad: Set<string>;
-  /** The first station switched on while the machine feeding it was still off. */
   early?: { id: string; feeder: string; t: number };
 }
 
@@ -101,13 +88,6 @@ function latchAudit(ctx: ObjectiveContext): LatchLog {
   return early === undefined ? { good, bad } : { good, bad, early };
 }
 
-/**
- * The first station the run switched on before the machine feeding it had come up.
- *
- * The chain is the level's whole content and it is readable for nothing — every station reports
- * the index of what feeds it — so naming the pair and the tick gives back the run's own decision,
- * not the answer. A run that simply never latched a station is told that instead.
- */
 const latchedEarly = (ctx: ObjectiveContext): Divergence | undefined => {
   const { good, bad, early } = latchAudit(ctx);
   if (early !== undefined) {
@@ -128,7 +108,6 @@ const latchedEarly = (ctx: ObjectiveContext): Divergence | undefined => {
   };
 };
 
-/** The tick and tile at which the run turned round, against the way it had been going. */
 const doubledBack = (ctx: ObjectiveContext): Divergence | undefined => {
   let started: Dir | undefined;
   for (const event of ctx.trace.events) {
@@ -152,14 +131,6 @@ const orderedCount = (ctx: ObjectiveContext): number => {
   return substations(ctx.world).filter((m) => good.has(m.id) && !bad.has(m.id)).length;
 };
 
-/**
- * Par: the reference reads the chain off `probe` before it moves, so it walks the line once in
- * the right direction — 22, 32 and 27 ticks across the three seeds, and par is the worst of them.
- *
- * It was 37, which is what the answer that never probes costs: walk to one end, find the reactor
- * is at the other, and walk back switching as it goes. Par sat exactly on that program, so the
- * level's own hardware bought nothing. 37 is now silver.
- */
 export const w5_01: LevelDef = {
   id: 'w5-01',
   world: 5,
@@ -176,19 +147,6 @@ export const w5_01: LevelDef = {
     '',
     'Bring every substation on the line to `on`.',
   ].join('\n'),
-  /**
-   * DESIGN.md §11.10.
-   *
-   * This order is one axis wide, and the axis is the direction: `mainsLayout` puts the reactor on
-   * the east end for even seeds and the west end for odd ones, so the three seeds can never agree
-   * and a memorised heading loses the shift. That much the memo says. What nothing says is that
-   * *only* the direction and the spacing move. The line is one row of cable inside a solid frame on
-   * every seed, and the chain is always `sub-1` outward with each station fed by the one before it,
-   * so a run can follow `feed` and trust it rather than defending against a fork or a branch the
-   * generator cannot draw. The bonus asks for one pass and never a double back, which is a fair ask
-   * only if the player knows the line is a line — on the one board in front of them, a corridor
-   * that happens to be straight and a corridor that is straight on every seed look the same.
-   */
   board: {
     fixed: [
       'feeder line 7 is one row of cable, twenty tiles long, walled on every side',

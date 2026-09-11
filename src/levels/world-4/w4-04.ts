@@ -29,11 +29,6 @@ import {
 const CELLS = 14;
 const SIZE = 30;
 
-/**
- * How the three collection points are scattered. Every mode is drawn per seed, and the shipped
- * seed list covers all three: one cave where two of them sit almost on top of each other, one
- * where they are pushed as far apart as the cave allows, and one that is simply arbitrary.
- */
 const MODES = ['spread', 'clustered', 'mixed', 'clustered'] as const;
 type Mode = (typeof MODES)[number];
 
@@ -113,7 +108,6 @@ function build(seed: number): World {
   return world;
 }
 
-/** The three collection points and the lift, recovered from the world as it was built. */
 function landmarks(world: World): { points: Vec[]; lift: Vec | undefined; start: Vec | undefined } {
   return {
     points: tilesWithTerrain(world, Terrain.Pad),
@@ -133,7 +127,6 @@ function permutations(items: readonly Vec[]): Vec[][] {
   return out;
 }
 
-/** True shortest-route cost of taking the points in this order and finishing on the lift. */
 function tourCost(world: World, start: Vec, order: readonly Vec[], lift: Vec): number {
   const stops = [start, ...order, lift];
   let total = 0;
@@ -161,7 +154,6 @@ function visitedCount(ctx: ObjectiveContext): number {
     .length;
 }
 
-/** The first collection point the run never stood on. */
 function missedPoint(ctx: ObjectiveContext): Divergence | undefined {
   const stood = standingKeys(ctx);
   const missed = tilesWithTerrain(ctx.initialWorld, Terrain.Pad).find(
@@ -171,15 +163,6 @@ function missedPoint(ctx: ObjectiveContext): Divergence | undefined {
   return { where: at(missed), expected: 'stood on', received: 'never reached' };
 }
 
-/**
- * The route the run took, priced against the best of the six, in the level's own unit.
- *
- * Both numbers are shortest-route costs, so the comparison is about the *order* and nothing else —
- * a player who took the right order badly is not told they took the wrong one. It reports the
- * order taken, which is the player's own output, and the cost of the best order, which is a number
- * they could have computed and did not. It does not report the best order: six permutations is the
- * work the bonus is asking for, and handing over the answer would leave nothing to do.
- */
 function orderTaken(ctx: ObjectiveContext): Divergence | undefined {
   const { points, lift, start } = landmarks(ctx.initialWorld);
   if (points.length !== 3 || lift === undefined || start === undefined) return undefined;
@@ -202,16 +185,6 @@ function orderTaken(ctx: ObjectiveContext): Divergence | undefined {
   };
 }
 
-/**
- * The difficulty cliff of the first half of the game (CURRICULUM.md §6, §11). Everything here
- * that can be scaffolded, is: the starter ships the representation, hint 1 splits the task in two,
- * the bonus is six permutations rather than a second hard problem, and `budget.maxTicks` is set
- * well above a full survey plus a clean circuit — a player who wanders while mapping and then
- * routes properly still passes.
- *
- * The lift is a depot tile rather than a pad so that the three collection points and the lift can
- * be told apart by sight, which they have to be for a route to be plannable at all.
- */
 export const w4_04: LevelDef = {
   id: 'w4-04',
   world: 4,
@@ -234,26 +207,6 @@ export const w4_04: LevelDef = {
     '',
     'Stand on all three collection points, then end the run on the lift.',
   ].join('\n'),
-  /**
-   * DESIGN.md §11.10.
-   *
-   * This sheet says nothing about what the shift costs. The clock, the survey and the three trips
-   * it does not pay for are the level (CURRICULUM §11), and they are stated where they already are
-   * — in the facts, as a budget the player reads before writing anything. What the board adds is
-   * only the shape the survey runs over, which is the half a player cannot get from one draw.
-   *
-   * The load-bearing row is that the cave is carved everywhere. A map built by walking towards the
-   * nearest unknown terminates because there is nothing unreachable in it, and a program that
-   * cannot rely on that has to decide when to give up looking — a decision with no honest answer
-   * and no reason to be in this level. The lift standing at the side passage furthest from the
-   * start is the same kind of fact: it is why the route home is worth planning rather than
-   * stumbling into, and on one board it looks like where the lift happened to land.
-   *
-   * How the three points are scattered is the redrawn axis, and it is the whole of the star. Two
-   * of the four modes push them apart and one bunches two of them together, so the best order is a
-   * different order on different shifts and no memorised sequence survives. The row names the axis
-   * and stops there: six permutations is the work, and the sheet is not going to rank them.
-   */
   board: {
     fixed: [
       'the map is 30 tiles square',

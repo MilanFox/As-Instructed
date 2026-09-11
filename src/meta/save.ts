@@ -10,29 +10,10 @@ import type {
   PublishedFunction,
 } from './types.ts';
 
-/**
- * Persistence for the Shared Subroutines Repository.
- *
- * A separate `localStorage` key from `bootstrap.save`, on purpose. The campaign save is owned by
- * the UI agent and versioned on its own clock; nesting the library inside it would make every
- * library change a coordinated migration across two owners, and the first time those two clocks
- * disagreed somebody's `lib.ts` would be the thing that got dropped. Two keys, two version
- * numbers, one rule:
- *
- * **No read path may discard source.** `migrate` rescues the current `lib.ts` and every revision
- * it can recognise before it gives up on anything else. A save from a *newer* build keeps its
- * code too — a downgrade costs cached numbers, never writing.
- *
- * `toFragment` / `fromFragment` exist so the integrator can also carry the library inside the
- * campaign's JSON export without this module having to know that the campaign save exists.
- */
-
 export const LIBRARY_SAVE_KEY = 'bootstrap.library';
 export const LIBRARY_SAVE_VERSION = 1;
 
-/** Revisions are the only way back from a bad edit, so the cap is generous and drops the oldest. */
 export const MAX_REVISIONS = 40;
-/** Cached verdicts are pure derived data; the cap can be tight. */
 export const MAX_CACHE_ENTRIES = 400;
 
 export function emptyLibrary(): LibrarySave {
@@ -64,7 +45,6 @@ export function revisionOf(
   return revision;
 }
 
-/** Appends a revision, unless the source is byte-identical to the newest one. */
 export function recordRevision(save: LibrarySave, revision: LibraryRevision): LibrarySave {
   const newest = save.revisions[save.revisions.length - 1];
   if (newest && newest.id === revision.id) return save;
@@ -77,25 +57,13 @@ export function recordRevision(save: LibrarySave, revision: LibraryRevision): Li
   };
 }
 
-/** The revision the player would be restored to. Undefined when nothing has been verified yet. */
 export function lastKnownGoodRevision(save: LibrarySave): LibraryRevision | undefined {
   if (save.lastKnownGood === undefined) return undefined;
   return save.revisions.find((revision) => revision.id === save.lastKnownGood);
 }
 
-// ---------------------------------------------------------------------------
-// Migration
-// ---------------------------------------------------------------------------
-
 type Migration = (raw: Record<string, unknown>) => Record<string, unknown>;
 
-/**
- * One entry per version step, keyed by the version being migrated *from*.
- *
- * Version 0 is anything unversioned — including, deliberately, a bare string, because the very
- * first thing a hand-edited export or a truncated write is likely to leave behind is the source
- * on its own.
- */
 const MIGRATIONS: Record<number, Migration> = {};
 
 export function migrateLibrary(raw: unknown): LibrarySave {
@@ -136,8 +104,6 @@ export function migrateLibrary(raw: unknown): LibrarySave {
   const lastKnownGood = working['lastKnownGood'];
   if (typeof lastKnownGood === 'string') save.lastKnownGood = lastKnownGood;
 
-  /* A library with code in it is unlocked whatever the flag says. The flag is a UI gate; the code
-     is the player's. Never hide their writing behind a boolean that a bad write could clear. */
   if (!save.unlocked && (save.revisions.length > 0 || save.published.length > 0)) {
     save.unlocked = true;
   }
@@ -256,10 +222,6 @@ function rescueDiscrepancies(raw: unknown): Discrepancy[] {
   return found;
 }
 
-// ---------------------------------------------------------------------------
-// Storage
-// ---------------------------------------------------------------------------
-
 export interface LibraryStorage {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
@@ -277,7 +239,6 @@ export function parseLibrary(text: string): LibrarySave {
   try {
     return migrateLibrary(JSON.parse(text) as unknown);
   } catch {
-    /* Not JSON. The likeliest reason is that it is the source itself, so keep it. */
     return migrateLibrary(text);
   }
 }
@@ -305,16 +266,10 @@ export function writeLibrary(
   }
 }
 
-/** The library as a value the campaign's JSON export can carry alongside its own fields. */
 export function toFragment(save: LibrarySave): LibrarySave {
   return { ...save, version: LIBRARY_SAVE_VERSION };
 }
 
-/**
- * Merges an imported library into the current one. Incoming source wins, because import is an
- * explicit act — but every revision from both sides is kept, so nothing the player wrote is lost
- * by importing a save that happened to be older.
- */
 export function mergeLibrary(current: LibrarySave, incoming: unknown): LibrarySave {
   const next = migrateLibrary(incoming);
   const byId = new Map<string, LibraryRevision>();

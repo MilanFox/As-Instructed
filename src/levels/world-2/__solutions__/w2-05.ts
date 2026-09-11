@@ -2,17 +2,6 @@ import type { Dir as DirType, Sim } from '../../../engine/index.ts';
 import { Dir, ItemKind } from '../../../engine/index.ts';
 import type { ReferenceSolution } from '../../types.ts';
 
-/**
- * TEST FIXTURE. Never imported from src/main.tsx — vite.config.ts fails the build if it is.
- *
- * Two lanes rather than six rows. `scan(Dir.North)` and `scan(Dir.South)` read the rows either
- * side for nothing, so a bot driving the second row has already surveyed the first three; three
- * rows further South covers the rest. The wheels only leave the lane for a tile the sensor has
- * already called ripe crop, and that detour is two ticks there and back.
- *
- * The field is wider than the shift is long, so what this buys is not tidiness — it is the four
- * rows of driving that never happen.
- */
 export const solution: ReferenceSolution = {
   levelId: 'w2-05',
   run(sim: Sim, botId: number): void {
@@ -44,7 +33,6 @@ export const solution: ReferenceSolution = {
       }
     };
 
-    // Drop onto the middle of the first three rows, run it, then drop onto the middle of the rest.
     if (sim.canMove(botId, Dir.South)) sim.move(botId, Dir.South);
     lane(Dir.East);
     for (let i = 0; i < 3 && !full && sim.canMove(botId, Dir.South); i++) {

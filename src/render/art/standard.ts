@@ -1,13 +1,3 @@
-/**
- * The look as it shipped, expressed as one entry in the registry.
- *
- * Every value here was lifted verbatim from the old frozen records in `theme.ts`, so selecting
- * `standard` is a no-op against the build that existed before the registry did. It is kept for
- * exactly one reason: a spike that cannot show you what you already had is not a comparison.
- *
- * It implements no painter hooks, which is what makes it the definition of the fallback path —
- * the tile atlas draws the terrain and `sprites.ts` draws the bot.
- */
 import type { ArtDirection } from './types.ts';
 
 export const standard: ArtDirection = {
@@ -58,11 +48,6 @@ export const standard: ArtDirection = {
     outOfBounds: '#070a0f',
   },
 
-  /*
-   * `gridWidth: 0.5` is not a preference, it is the old `ctx.lineWidth = 1` written in the new
-   * unit. That 1 was in *device* pixels, so on the 2x display this is developed on it has always
-   * been half a CSS pixel, and the other directions do not inherit it.
-   */
   metrics: {
     gridWidth: 0.5,
     gridMajorWidth: 0.5,
@@ -71,12 +56,6 @@ export const standard: ArtDirection = {
     botDetailTilePx: 22,
   },
 
-  /*
-   * The trail ramp, unchanged: a darkening at the cold end, red by the sixth visit, alpha
-   * still deepening to the tenth. `referenceFloor` is the World 4 cave floor as it actually
-   * renders — `floor.rock` #89a2a3 under the cave biome's 0.7 dim — which is the surface that
-   * caught the original calibration out.
-   */
   trail: { cold: '#0a0e14', hot: '#ff5d5d', minAlpha: 0.16, maxAlpha: 0.36 },
   referenceFloor: '#6b7681',
 

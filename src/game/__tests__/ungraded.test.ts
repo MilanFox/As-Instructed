@@ -1,15 +1,3 @@
-/**
- * DESIGN.md §7 — a level may be ungraded.
- *
- * The whole amendment, held to from the level definition through to the two things that count
- * medals: the site map's arithmetic and the Performance Review's denominator. It lives in one file
- * because the invariants are about the *seams* — a medal absent in `score.ts` but present in the
- * save, or dropped by the save but still counted by the review, is exactly the bug this file is
- * for, and no single module's test can see it.
- *
- * `reportFor` is imported from a module this work does not own, deliberately: A7 claims the review
- * is already inert against an ungraded level and that claim needed proving rather than trusting.
- */
 import { describe, expect, it } from 'vitest';
 import { Medal } from '../../engine/index.ts';
 import { campaignOrder, getLevel, levelIsGraded } from '../../levels/index.ts';
@@ -18,7 +6,6 @@ import { isGraded, levelPoints, medalForLevel, medalOf, progressPoints } from '.
 import { emptyProgress, emptySave, migrate, parseSave } from '../save.ts';
 import type { LevelProgress, SaveFile } from '../save.ts';
 
-/** The levels on which no correct program can beat another on ticks. */
 const UNGRADED = ['w1-01', 'w1-03', 'w5-02', 'w6-01', 'w6-03', 'w6-05'];
 
 const closed = (patch: Partial<LevelProgress> = {}): LevelProgress => ({
@@ -56,7 +43,6 @@ describe('the ungraded set', () => {
   });
 
   it('keeps every objective and bonus the levels already had', () => {
-    /* `w1-01`'s tick objective is a hard requirement, not a ladder rung, and A7 does not touch it. */
     expect(getLevel('w1-01')?.objectives.map((objective) => objective.id)).toContain('bay-booking');
     expect(getLevel('w1-03')?.bonus?.length).toBe(1);
     expect(getLevel('w6-05')?.bonus?.length).toBeGreaterThan(0);
@@ -158,11 +144,6 @@ describe('an ungraded level never enters the Performance Review denominator', ()
 });
 
 describe('a save written by a build that graded these levels', () => {
-  /**
-   * The fixture: a version 2 save from before A7, holding a gold on `w1-01`, a silver on `w6-03`,
-   * and a gold on `w1-05` which is still graded. Every field beside the medal is populated so the
-   * test can prove none of them is collateral damage.
-   */
   const beforeA7 = JSON.stringify({
     version: 2,
     updatedAt: 1_700_000_000_000,
@@ -238,7 +219,6 @@ describe('a save written by a build that graded these levels', () => {
       settings: {},
     };
     const migrated = migrate(v1);
-    /* No commendation reads a medal any more, so a medal the level no longer has pays nothing. */
     expect(migrated.achievements).toEqual({});
   });
 

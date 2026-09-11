@@ -2,16 +2,6 @@ import type { Dir, Sim, Vec } from '../../../engine/index.ts';
 import { ALL_DIRS, manhattan, step } from '../../../engine/index.ts';
 import type { ReferenceSolution } from '../../types.ts';
 
-/**
- * TEST FIXTURE. Never imported from src/main.tsx — vite.config.ts fails the build if it is.
- *
- * Scouts buy information and workers spend it, but nobody stands still: a worker with no order
- * goes and looks at something, and stops looking the moment one arrives. Everything anybody sees
- * lands in one shared picture of the site, which is what lets a worker route over ground it has
- * never stood on. `sync()` sits between the send and the read because a worker running behind in
- * virtual time has not been handed the message yet.
- */
-
 const LEG = 3;
 const RANGE = 12;
 const key = (at: Vec): string => `${String(at.x)},${String(at.y)}`;
@@ -87,11 +77,6 @@ export const solution: ReferenceSolution = {
 
     const nothing = new Set<string>();
 
-    /**
-     * Up to `LEG` steps. A bot that has stopped never gives its tile back, so the first attempt
-     * routes around where everybody is now and the second ignores them — better to queue behind
-     * somebody who might move than to conclude the site is unreachable.
-     */
     const advance = (id: number, to: Vec): void => {
       const from = sim.pos(id);
       if (from.x === to.x && from.y === to.y) return;
@@ -131,7 +116,6 @@ export const solution: ReferenceSolution = {
 
     let lit = 0;
     for (let round = 0; round < 3000 && lit < total; round++) {
-      // ---- dispatch -------------------------------------------------------
       let posted = false;
       for (const [id, at] of found) {
         if (claimed.has(id)) continue;
@@ -160,7 +144,6 @@ export const solution: ReferenceSolution = {
         }
       }
 
-      // ---- everybody moves ------------------------------------------------
       const reserved = new Set<string>();
       let acted = false;
       for (const id of ids) {

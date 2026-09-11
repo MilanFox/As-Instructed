@@ -13,12 +13,6 @@ import {
   requirementLevelCount,
 } from '../unlock.ts';
 
-/**
- * The unlock moved from the close of World 3 to the close of World 2, so two things need holding
- * down: where it fires in the play order, and that no save written under the old timing either
- * loses its Repository or is made to sit through a delivery note it already read.
- */
-
 const ORDER = campaignOrder().map((level) => level.id);
 
 function completedThrough(levelId: string): { levelId: string; world: number }[] {

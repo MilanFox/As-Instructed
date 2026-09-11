@@ -1,13 +1,6 @@
 import { Component } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 
-/**
- * Keeps one panel's failure inside that panel.
- *
- * A desk panel is optional, so a fault in one must cost the player that panel and nothing else.
- * Without a boundary a render error in a mounted panel unmounts the whole tree and the player
- * loses the work order they were in the middle of.
- */
 export class PanelBoundary extends Component<
   { label: string; children: ReactNode },
   { failed: boolean }

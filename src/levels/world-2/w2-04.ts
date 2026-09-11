@@ -7,22 +7,8 @@ const PLOT_W = 3;
 const PLOT_H = 2;
 const MAX_GROWTH = 8;
 
-/**
- * Ripening times climb a ladder so that one pass can never finish the plot, and the last tile is
- * far enough out that driving laps around it arrives later than standing on it does.
- *
- * `plantedAt` is the tick the crop reaches maturity minus its `maxGrowth`, and it is allowed to be
- * negative: maturity clamps at zero, so a tile with `plantedAt: -8` is simply ripe on arrival.
- */
 const RIPEN_LADDER: readonly number[] = [0, 9, 18, 28, 38];
 
-/**
- * Ticks of standing ripe crop the depot will absorb across the whole plot.
- *
- * Measured: a run that reads the plot and stands on each tile as it comes ready owes 4–15 over the
- * four seeds; the resume-sweep that passes the level owes 14–30 and 24 on the seed the report
- * shows. Set above the first and under the second.
- */
 const SPOILAGE_ALLOWANCE = 18;
 
 function plotTiles(): Vec[] {
@@ -70,25 +56,6 @@ export const w2_04: LevelDef = {
     'These are not the same tile list — a tile can satisfy the second without ever having grown',
     'anything for the first.',
   ].join('\n'),
-  /**
-   * DESIGN.md §11.10. The ladder is the level, so the ladder goes on the sheet.
-   *
-   * `RIPEN_LADDER` is a structural guarantee dressed as a constant: the ripening times climb far
-   * enough apart that no single pass over six tiles can finish the plot, on any seed, ever. The
-   * hint budget spends a line on that ("one pass cannot finish the plot") and the facts table does
-   * not, which is §11.3 the wrong way round — interrupt-and-resume is the whole thing this order
-   * teaches, and a player who thinks the spread is this shift's bad luck writes a single sweep and
-   * reads the failure as a near miss rather than as the wrong shape of program.
-   *
-   * What stays off the sheet is where on the ladder the far tile lands relative to a lap of the
-   * plot. That is the `withinSpoilage` star, it is arithmetic the player can do from `scan()` on
-   * the board in front of them, and handing over the conclusion would be handing over the star.
-   * `fixed` says the crops arrive spread out; it does not say what to do while waiting.
-   *
-   * The hopper is on both halves and means a different thing on each. That it *starts full* is
-   * fixed and is the only reason `inventory()` can be read as a capacity at all; how full is
-   * redrawn, which is why the reading has to happen at runtime instead of being typed in.
-   */
   board: {
     fixed: [
       'the plot is 3 across and 2 deep — six tiles of soil, walled on every side',

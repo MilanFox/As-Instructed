@@ -1,26 +1,3 @@
-/**
- * A hand-cranked React, shared by every UI test that renders a component in node.
- *
- * Vitest runs in node: there is no DOM, and no new dependency is allowed. `src/meta/__tests__/publish-dialog.test.ts`
- * set the precedent — real hook semantics, real `Object.is` dependency comparison, the real
- * component called as a function — and four files then carried a trimmed copy of it each. Four
- * copies of one driver is the duplicated-constant class the two ratchets in `src/__tests__` exist
- * to catch, sitting inside the test suite; this file is the extraction.
- *
- * Nothing was weakened to make it shareable. The version here is the widest of the four — the
- * `useState` setter takes an updater function as well as a value, which only
- * `modal-dismissal.test.ts` needed and none of the others can be harmed by.
- *
- * **Effects never run.** `useEffect` and `useLayoutEffect` are no-ops rather than a queue, and
- * every file that uses this driver depends on that: `App`'s mount effect builds a `RuntimeRunner`
- * and a canvas renderer, and these tests are about what a component *renders*, not what it mounts.
- * A driver that flushed effects would be a different instrument and would need its own name.
- *
- * `vi.mock` is hoisted per test file and cannot be moved in here, so each file keeps its own two
- * mock registrations. They are three lines each and they read the driver back out of this module,
- * which is the same instance the test body imports.
- */
-
 interface Slot {
   filled: boolean;
   value: unknown;

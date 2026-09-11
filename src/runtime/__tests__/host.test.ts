@@ -4,21 +4,12 @@ import { Runner } from '../host.ts';
 import type { WorkerLike } from '../host.ts';
 import type { RunRequest, RunResponse, WorkerRequestMessage } from '../protocol.ts';
 
-/**
- * The watchdog, and the promise that a hung program is always recoverable (DESIGN.md §10.6).
- *
- * `while (true) {}` with no API call in it never reaches the engine, so neither the tick budget
- * nor the op budget can stop it. Terminating the worker is the only defence there is, which makes
- * this the one path in the runtime that must never have a hole in it.
- */
-
 class FakeWorker implements WorkerLike {
   onmessage: ((event: MessageEvent) => void) | null = null;
   onerror: ((event: ErrorEvent) => void) | null = null;
 
   readonly received: WorkerRequestMessage[] = [];
   terminated = false;
-  /** When false, the worker simply never answers — a hung program. */
   responsive = true;
 
   static readonly created: FakeWorker[] = [];

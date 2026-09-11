@@ -1,11 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { ItemKind, Objective, ObjectiveContext, Sim, Vec } from '../../../engine/index.ts';
-import {
-  Dir,
-  countItemsAt,
-  evaluateObjectives,
-  medalFor,
-} from '../../../engine/index.ts';
+import { Dir, countItemsAt, evaluateObjectives, medalFor } from '../../../engine/index.ts';
 import type { LevelRunResult } from '../../harness.ts';
 import { runLevel, runReference } from '../../harness.ts';
 import type { LevelDef, ReferenceSolution } from '../../types.ts';
@@ -30,7 +25,6 @@ const HARDWARE: Record<string, string[]> = {
 const bonusMet = (level: LevelDef, ctx: ObjectiveContext): boolean =>
   evaluateObjectives((level.bonus ?? []) as Objective[], ctx).every((entry) => entry.met);
 
-/** Everything the reference survey learns, reused by the naive drivers below. */
 interface Survey {
   crates: { at: Vec; kind: ItemKind }[];
   depots: Map<string, Vec>;
@@ -60,7 +54,6 @@ const YARD_EAST = 16;
 const YARD_SOUTH = 8;
 const SLOT_BUDGET = 18;
 
-/** Everything a w3-04 round can learn without leaving the aisles. */
 interface Yard {
   bay: Vec | null;
   arrivals: Map<number, Vec>;
@@ -89,7 +82,6 @@ function readAround(sim: Sim, botId: number, found: Yard): void {
 const treadCost = (found: Yard, at: Vec): number =>
   RACK_ROWS.includes(at.y) && !found.stocked.has(key(at)) ? 1 : 0;
 
-/** Cheapest route from `from` to `to` in empty slots trodden first, moves second. */
 function routeThroughAisles(found: Yard, from: Vec, to: Vec): Vec[] {
   const index = (at: Vec): number => at.y * (YARD_EAST + 2) + at.x;
   const cost = new Map<number, number>([[index(from), 0]]);
@@ -161,10 +153,6 @@ function shipInOrder(sim: Sim, botId: number, found: Yard): void {
   }
 }
 
-/**
- * The round the w3-04 star is pitched at: every stencil read from the aisle beside it, and a rack
- * row entered only where a crate is standing in it.
- */
 const aisleRound = (sim: Sim, botId: number): void => {
   const found: Yard = { bay: null, arrivals: new Map(), stocked: new Set() };
   readAround(sim, botId, found);
@@ -174,7 +162,6 @@ const aisleRound = (sim: Sim, botId: number): void => {
   shipInOrder(sim, botId, found);
 };
 
-/** The degenerate answer: the two middle aisles cost nothing and see none of the outer racks. */
 const middleAislesOnly = (sim: Sim, botId: number): void => {
   const found: Yard = { bay: null, arrivals: new Map(), stocked: new Set() };
   readAround(sim, botId, found);
@@ -191,7 +178,6 @@ const slotsTrodden = (result: LevelRunResult): number =>
       countItemsAt(result.initialWorld, event.to, 'crate') === 0,
   ).length;
 
-/** The w3-02 route plan the star asks for: one class collected and delivered before the next. */
 const oneClassAtATime = (sim: Sim, botId: number): void => {
   const found = survey(sim, botId);
   const remaining = [...new Set(found.crates.map((crate) => crate.kind))];
@@ -216,7 +202,6 @@ const oneClassAtATime = (sim: Sim, botId: number): void => {
   }
 };
 
-/** The obvious w3-02 round: fetch whichever crate is nearest and take it where its stencil says. */
 const nearestCrateFirst = (sim: Sim, botId: number): void => {
   const found = survey(sim, botId);
   const left = found.crates.slice();
@@ -236,7 +221,6 @@ const nearestCrateFirst = (sim: Sim, botId: number): void => {
   }
 };
 
-/** A w3-01 round with no memory: it re-surveys the shed before every single trip. */
 const resurveyEveryTrip = (sim: Sim, botId: number): void => {
   for (;;) {
     const found = survey(sim, botId);
@@ -410,13 +394,6 @@ describe('w3-01 — one clamp', () => {
     }
   });
 
-  /*
-   * The old label said "pickup", which is a trace event kind, so
-   * the readout counted every pickup in the run against a limit taken from a 0-or-1 flag and
-   * rendered `6 / 1 pickups`. The star that replaced it counts nothing at all — it is one line,
-   * right or wrong — so the honest shape is no progress bar and a label that names no meter,
-   * which is what DESIGN.md §5 asks for while `Objectives.custom` still cannot declare one.
-   */
   test('the star names no meter and offers no bar to point at the wrong one', () => {
     const star = (w3_01.bonus ?? [])[0] as Objective;
     expect(star.progress).toBeUndefined();
@@ -435,13 +412,6 @@ describe('w3-01 — one clamp', () => {
     }
   });
 
-  /*
-   * Why this level carries a report star and no budget at all. The only freedom the shed offers
-   * is which crate is paired with which pad and in what order, and it is small enough to solve
-   * exactly: nearest-crate-then-nearest-pad is already the best pairing on seed 2 and seed 3, and
-   * is two ticks off it on seed 1. There is no budget that separates a better idea from a worse
-   * one, so the star asks a question about the shift instead of a smaller number about the route.
-   */
   test('greedy pairing is within two ticks of the best pairing on every declared seed', () => {
     const permutations = (items: Vec[]): Vec[][] => {
       if (items.length <= 1) return [items];
@@ -556,14 +526,6 @@ describe('w3-04 — arrival order, not proximity', () => {
     expect(ordered).toContain(false);
   });
 
-  /**
-   * Shipping the crates in the order a sweep of the racks walks past them is the wrong general
-   * rule this level exists to refuse, and a shift whose schedule agreed with its own layout would
-   * let it through. `build` redraws the numbering under `sweptFirst` until the two part company at
-   * the very first crate, so the sweep is refused on the first thing it sets down rather than
-   * somewhere in the middle of the run. Seed 4 is the one-crate yard, which has nothing to
-   * disagree about.
-   */
   test('shipping in rack-sweep order is refused on the first crate onto the bay', () => {
     const drive = (sim: Sim, botId: number): void => {
       const found = survey(sim, botId);

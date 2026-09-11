@@ -2,18 +2,6 @@ import type { Dir, MachineView, Sim, TileView, Vec } from '../../../engine/index
 import { unlockedApiNames } from '../../../runtime/ambient.ts';
 import { buildPlayerScope } from '../../../runtime/api-bindings.ts';
 
-/**
- * TEST FIXTURE. Never imported from src/main.tsx — vite.config.ts fails the build if it is.
- *
- * The exact surface a player has at `levelId`, bound to a live `Sim`.
- *
- * Reference solutions drive this rather than `Sim` directly for two reasons. `link`, `receive`,
- * `transmit` and `decode` have no `Sim` method — they are RUNTIME compositions over
- * `applyMachineChange` / `applyTileChange` — so a solution that called `Sim` would be testing
- * something the player cannot write. And `unlockedApiNames` throws the level's own hardware gate
- * across the fixture: a solution that reaches for a verb the level has not unlocked fails loudly
- * here instead of shipping as an unsolvable level.
- */
 export interface PlayerApi {
   move(dir: Dir): boolean;
   pos(): Vec;

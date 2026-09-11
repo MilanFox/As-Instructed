@@ -1,22 +1,3 @@
-/**
- * Every objective in the campaign can say *where* a run went wrong.
- *
- * 71 of the 82 objective calls were `Objectives.custom`
- * with no divergence, so 31 of 33 work orders could only ever report the string `not met`. The
- * core loop is run → fail → read → revise, and with nothing to read it degrades to guessing.
- * `src/levels/__tests__/divergence.test.ts` is the same idea applied to four specific levels; this
- * file is the one that makes the silence impossible to reintroduce anywhere.
- *
- * The rule is one line: **an objective either reports a divergence or declares itself binary.**
- * A progress tuple is not a third option — `0 of 5 — 5 short` is the exact readout that cost a
- * beginner playtester fifty-five minutes: four plausible answers and an empty program all
- * produced it.
- *
- * The type system now asks the same question at every call site: `Objectives.custom` takes a
- * `CustomReport` whose `divergence` is required. This file is what catches the two things a type
- * cannot — a `divergence` that exists and returns `undefined` on the commonest failure there is,
- * and a `checkbox` reached for because it was easier than thinking.
- */
 import { describe, expect, test } from 'vitest';
 import type { Objective, ObjectiveContext } from '../../engine/index.ts';
 import { DIVERGENCE_VALUE_CHARS, evaluateObjectives } from '../../engine/index.ts';
@@ -32,15 +13,6 @@ function nameOf(level: LevelDef, objective: Objective): string {
   return `${level.id}/${objective.id}`;
 }
 
-/**
- * Every objective the campaign ships that declares itself binary rather than reporting a diff.
- *
- * It is empty, and that is the finding rather than an accident: all 98 objectives across the 34
- * work orders turned out to hold a tick, a tile, a count or a pair of values they had already
- * computed and were throwing away. `Objectives.checkbox` stays because the rule needs a legal way
- * to say "there is genuinely nothing here", and because a rule with no exit is one people route
- * around. Adding one means adding a line here, which is the point.
- */
 const BINARY_BY_DESIGN: readonly string[] = [];
 
 describe('every objective can name where the run went wrong', () => {
@@ -90,11 +62,6 @@ describe('every objective can name where the run went wrong', () => {
   });
 });
 
-/**
- * The static check above proves a `divergence` function exists. This one proves it *fires*: the
- * empty program is the run every player makes at least once, and it is the run the audit's `not
- * met` was measured on. Every objective it misses must come back with a filled-in point.
- */
 describe('an empty program is told where it fell short', () => {
   for (const level of LEVELS) {
     const seed = level.seeds[0] as number;

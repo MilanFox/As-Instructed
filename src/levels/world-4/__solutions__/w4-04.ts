@@ -2,23 +2,6 @@ import type { Dir, Sim, TileView, Vec } from '../../../engine/index.ts';
 import { ALL_DIRS, Terrain } from '../../../engine/index.ts';
 import type { ReferenceSolution } from '../../types.ts';
 
-/**
- * TEST FIXTURE. Never imported from src/main.tsx — vite.config.ts fails the build if it is.
- *
- * Survey, plan, run — kept strictly apart, which is the whole lesson.
- *
- * Survey: sensing is free, so the bot looks in all four directions from every tile it stands on
- * and writes down what came back. A tile is finished once all four of its neighbours are known;
- * the bot walks to the nearest unfinished tile and repeats. The pads and the depot are the ends
- * of side passages, so they are recorded by sight and never entered during the survey — which is
- * also what keeps the visit order in phase three equal to the planned order.
- *
- * Plan: with the map complete, distances are a breadth-first search over remembered tiles rather
- * than a walk. Three stops is six orders; all six are costed and the cheapest is taken.
- *
- * Run: walk it once.
- */
-
 type Key = string;
 
 const key = (x: number, y: number): Key => `${x},${y}`;
@@ -28,12 +11,7 @@ const parse = (k: Key): Vec => {
 };
 const around = (k: Key): Key[] => {
   const at = parse(k);
-  return [
-    key(at.x, at.y - 1),
-    key(at.x + 1, at.y),
-    key(at.x, at.y + 1),
-    key(at.x - 1, at.y),
-  ];
+  return [key(at.x, at.y - 1), key(at.x + 1, at.y), key(at.x, at.y + 1), key(at.x - 1, at.y)];
 };
 const towards = (from: Vec, to: Vec): Dir =>
   (to.y < from.y ? 0 : to.x > from.x ? 1 : to.y > from.y ? 2 : 3) as Dir;
@@ -60,7 +38,6 @@ export const solution: ReferenceSolution = {
     const unfinished = (k: Key): boolean =>
       open.get(k) === true && !isLanding(k) && !around(k).every((n) => open.has(n));
 
-    /** Shortest route over remembered floor, as keys, first step first. Null when unreachable. */
     const routeTo = (from: Key, goal: (k: Key) => boolean): Key[] | null => {
       const previous = new Map<Key, Key>();
       const seen = new Set<Key>([from]);
@@ -81,7 +58,7 @@ export const solution: ReferenceSolution = {
       }
       if (found === null) return null;
       const route: Key[] = [];
-      for (let cursor = found; cursor !== from; ) {
+      for (let cursor = found; cursor !== from;) {
         route.push(cursor);
         cursor = previous.get(cursor) as Key;
       }
@@ -100,7 +77,6 @@ export const solution: ReferenceSolution = {
     const origin = sim.pos(botId);
     const start = key(origin.x, origin.y);
 
-    // 1. Survey.
     for (;;) {
       senseHere();
       const here = sim.pos(botId);
@@ -109,7 +85,6 @@ export const solution: ReferenceSolution = {
       walk(route.slice(0, 1));
     }
 
-    // 2. Plan.
     const pads = [...terrain.keys()].filter((k) => terrain.get(k) === Terrain.Pad);
     const lift = [...terrain.keys()].find((k) => terrain.get(k) === Terrain.Depot);
     if (lift === undefined || pads.length < 3) return;
@@ -135,7 +110,6 @@ export const solution: ReferenceSolution = {
       }
     }
 
-    // 3. Run.
     for (const stop of [...best, lift]) {
       const here = sim.pos(botId);
       const route = routeTo(key(here.x, here.y), (k) => k === stop);

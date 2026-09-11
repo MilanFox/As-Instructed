@@ -3,18 +3,6 @@ import { Dir, ItemKind, step } from '../../../engine/index.ts';
 import type { ReferenceSolution } from '../../types.ts';
 import { KEY_SPACE, KnownMap, drainAntenna, follow, readPacket } from '../shared.ts';
 
-/**
- * TEST FIXTURE. Never imported from src/main.tsx — vite.config.ts fails the build if it is.
- *
- * Trust the plan, check every step of it, and re-plan only where it turns out to be wrong.
- *
- * The shift is recovered the World 6 way: ninety-five candidates, and the checksum says which one
- * landed. After that the run is driven literally — until a move the plan wants is into rock.
- * A group of moves says two things, where to walk and where you end up, and only the first has
- * stopped being true, so the recovery is a short local search for a way to the group's own
- * endpoint. Everywhere the plan still holds costs nothing extra.
- */
-
 const SIZE = 30;
 const HEADING: Record<string, Dir> = {
   N: Dir.North,
@@ -88,29 +76,26 @@ export const solution: ReferenceSolution = {
     for (const index of [...sections.keys()].sort((a, b) => a - b)) {
       plan.push(...(sections.get(index) as Run[]));
     }
-    // Filed before a step is taken: neither figure survives the walk, and neither is readable
-    // off the ground the walk covers.
     sim.print(botId, `plan ${String(bestKey)} ${String(plan.length)}`);
 
     map.observe(sim, botId, SIZE);
 
-    /** Gets to `to` over what has been seen, buying more of the map when that is not enough. */
     const reach = (to: Vec): boolean => {
       for (let attempt = 0; attempt < 80; attempt++) {
         map.observe(sim, botId, SIZE);
-        if (map.passable(to) && follow(sim, botId, map, to, { onStep: () => map.observe(sim, botId, SIZE) })) {
+        if (
+          map.passable(to) &&
+          follow(sim, botId, map, to, { onStep: () => map.observe(sim, botId, SIZE) })
+        ) {
           return true;
         }
-        // Not the nearest edge of the known map — the one that is nearest *and* pointed the
-        // right way. A way round a fallen stretch is always beside it, never back up the tunnel.
         let outward: Dir[] | null = null;
         let bestScore = Number.POSITIVE_INFINITY;
         const from = sim.pos(botId);
         for (const view of map.where((candidate) => map.isFrontier(candidate.at))) {
           const path = map.pathTo(from, view.at);
           if (path === null) continue;
-          const score =
-            path.length + Math.abs(view.at.x - to.x) + Math.abs(view.at.y - to.y);
+          const score = path.length + Math.abs(view.at.x - to.x) + Math.abs(view.at.y - to.y);
           if (score < bestScore) {
             bestScore = score;
             outward = path;

@@ -1,12 +1,3 @@
-/**
- * Pooled particle system.
- *
- * DESIGN.md §8: "Every action emits an FX event; the renderer owns a small particle system."
- * Everything here is preallocated at construction — `spawn` recycles a slot, never allocates —
- * because the RAF loop must not produce garbage. When the pool is exhausted the oldest particle
- * is stolen rather than growing the array; a dropped dust mote is cheaper than a GC pause.
- */
-
 import { fxColors, alpha } from './theme.ts';
 
 export const FX_LAYER_UNDER = 0;
@@ -20,23 +11,13 @@ const SHAPE_SHARD = 3;
 interface Particle {
   active: boolean;
   serial: number;
-  /**
-   * Seconds of particle time before the particle wakes up. A burst that needs to arrive *after*
-   * the event that caused it — the dust a bot kicks up when it lands, the second ring of a medal
-   * flourish — is one emit with staggered delays rather than a timer, because a timer would
-   * survive a scrub and a delay does not: `clear()` takes the whole schedule with it.
-   */
   delay: number;
-  /** Tile units. */
   x: number;
   y: number;
-  /** Tiles per second. */
   vx: number;
   vy: number;
-  /** Seconds. */
   life: number;
   maxLife: number;
-  /** Tile units. */
   size: number;
   size1: number;
   rot: number;
@@ -73,7 +54,6 @@ function makeParticle(): Particle {
   };
 }
 
-/** The `fx` strings the engine emits (`Sim` pushes these), plus the ones the renderer synthesises. */
 export type FxName =
   | 'harvest'
   | 'plant'
@@ -95,39 +75,22 @@ export type FxName =
   | 'medal';
 
 export interface FxOptions {
-  /** Direction the action pointed, in tile units. Used by dust and chip cones. */
   dx?: number;
   dy?: number;
-  /** Accent colour of the acting bot, so multi-bot fx stays attributable. */
   accent?: string;
-  /** Deterministic jitter source, so a replayed tick looks the same twice. */
   seed?: number;
-  /**
-   * How much of the burst to fire, 0..1. The escalating fx (`flourish`, `medal`) read it as
-   * "which tier is this", and every caller can read it as "damp this down" — a reduced-motion
-   * frame passes a small number rather than skipping the emit and losing the information.
-   */
   strength?: number;
-  /** Seconds of particle time to hold the whole burst back by. */
   delay?: number;
 }
 
 export class ParticleSystem {
   private readonly pool: Particle[];
-  /**
-   * Explicit free list. Scanning the pool for a dead slot is O(capacity) per particle, which
-   * turns a twenty-bot mining tick (hundreds of chips in one frame) into a quarter of a million
-   * iterations and a visible hitch. Popping an index is O(1).
-   */
   private readonly free: Int32Array;
   private freeCount: number;
-  /** Round-robin victim when the pool is genuinely full. Also O(1). */
   private stealCursor = 0;
   private serial = 0;
   private liveCount = 0;
-  /** Base delay for the burst currently being emitted. Read by `add`, reset by `emit`. */
   private emitDelay = 0;
-  /** Scales particle ageing with playback speed so fx do not smear at 8x. */
   timeScale = 1;
 
   constructor(capacity = 900) {
@@ -158,10 +121,6 @@ export class ParticleSystem {
     this.liveCount = 0;
   }
 
-  /**
-   * Claims a slot. Prefers a dead one; recycles a live one round-robin when full. Never grows the
-   * pool and never allocates — a dropped dust mote is cheaper than a GC pause.
-   */
   private claim(): Particle {
     if (this.freeCount > 0) {
       const index = this.free[--this.freeCount] as number;
@@ -214,10 +173,6 @@ export class ParticleSystem {
     return p;
   }
 
-  /**
-   * Emits the burst for one action. `x`/`y` are tile coordinates of the cell centre.
-   * Jitter is derived from `options.seed` so the same tick replays identically.
-   */
   emit(name: FxName, x: number, y: number, options: FxOptions = {}): void {
     const dx = options.dx ?? 0;
     const dy = options.dy ?? 0;
@@ -254,8 +209,6 @@ export class ParticleSystem {
         break;
       }
       case 'blocked': {
-        // DESIGN.md §8: a blocked move has to read as a *failure*, not a pause. Hard white
-        // sparks against the bump direction plus an expanding red ring on the wall it hit.
         for (let i = 0; i < 10; i++) {
           const a = (rand() - 0.5) * 2.2 + Math.atan2(-dy, -dx);
           const speed = 0.7 + rand() * 1.1;
@@ -276,7 +229,22 @@ export class ParticleSystem {
             (rand() - 0.5) * 24,
           );
         }
-        this.add(x + dx * 0.4, y + dy * 0.4, 0, 0, 0.4, 0.14, 0.6, fxColors.bad, SHAPE_RING, FX_LAYER_OVER, 0.9, 0, 1, 0);
+        this.add(
+          x + dx * 0.4,
+          y + dy * 0.4,
+          0,
+          0,
+          0.4,
+          0.14,
+          0.6,
+          fxColors.bad,
+          SHAPE_RING,
+          FX_LAYER_OVER,
+          0.9,
+          0,
+          1,
+          0,
+        );
         break;
       }
       case 'harvest': {
@@ -299,7 +267,22 @@ export class ParticleSystem {
             (rand() - 0.5) * 12,
           );
         }
-        this.add(x, y, 0, 0, 0.45, 0.1, 0.55, fxColors.good, SHAPE_RING, FX_LAYER_OVER, 0.7, 0, 1, 0);
+        this.add(
+          x,
+          y,
+          0,
+          0,
+          0.45,
+          0.1,
+          0.55,
+          fxColors.good,
+          SHAPE_RING,
+          FX_LAYER_OVER,
+          0.7,
+          0,
+          1,
+          0,
+        );
         break;
       }
       case 'plant': {
@@ -447,13 +430,11 @@ export class ParticleSystem {
         break;
       }
       case 'send': {
-        // A transmission leaves the antenna as a widening ring in the sender's accent.
         this.add(x, y, 0, 0, 0.6, 0.15, 0.95, accent, SHAPE_RING, FX_LAYER_OVER, 0.75, 0, 1, 0);
         this.add(x, y, 0, 0, 0.8, 0.05, 0.55, accent, SHAPE_RING, FX_LAYER_OVER, 0.45, 0, 1, 0);
         break;
       }
       case 'sendFail': {
-        // Same shape, wrong colour, and it collapses instead of expanding. Reads as "not sent".
         this.add(x, y, 0, 0, 0.5, 0.9, 0.12, fxColors.bad, SHAPE_RING, FX_LAYER_OVER, 0.9, 0, 1, 0);
         for (let i = 0; i < 6; i++) {
           const a = rand() * Math.PI * 2;
@@ -478,13 +459,25 @@ export class ParticleSystem {
       }
       case 'objective': {
         this.add(x, y, 0, 0, 0.9, 0.15, 1.1, fxColors.good, SHAPE_RING, FX_LAYER_OVER, 1, 0, 1, 0);
-        this.add(x, y, 0, 0, 0.7, 0.1, 0.7, fxColors.good, SHAPE_RING, FX_LAYER_OVER, 0.5, 0, 1, 0)
-          .delay = this.emitDelay + 0.09;
+        this.add(
+          x,
+          y,
+          0,
+          0,
+          0.7,
+          0.1,
+          0.7,
+          fxColors.good,
+          SHAPE_RING,
+          FX_LAYER_OVER,
+          0.5,
+          0,
+          1,
+          0,
+        ).delay = this.emitDelay + 0.09;
         break;
       }
       case 'land': {
-        // The puff a bot pushes out from under itself as it settles onto a tile. Low, slow and
-        // almost transparent: the point is that the tile the bot arrived on has been *arrived on*.
         const count = 3 + Math.round(strength * 3);
         for (let i = 0; i < count; i++) {
           const a = rand() * Math.PI * 2;
@@ -509,8 +502,6 @@ export class ParticleSystem {
         break;
       }
       case 'flourish': {
-        // The last objective of the run. Same vocabulary as `objective`, escalated: three rings
-        // on the beat instead of one, and a slow upward drift that reads as "and that is that".
         for (let i = 0; i < 3; i++) {
           this.add(
             x,
@@ -552,8 +543,6 @@ export class ParticleSystem {
         break;
       }
       case 'medal': {
-        // Synchronised to the medal stinger in `src/audio/sounds.ts`: one ring per note of the
-        // quartal figure, on the same step. `strength` selects the tier — 2 notes, 3, or 4.
         const notes = Math.max(2, Math.min(4, Math.round(strength)));
         const step = notes >= 4 ? 0.075 : notes === 3 ? 0.08 : 0.085;
         for (let i = 0; i < notes; i++) {
@@ -631,10 +620,6 @@ export class ParticleSystem {
     }
   }
 
-  /**
-   * Draws one layer. The caller has already transformed the context to tile space, so `tilePx`
-   * is only needed to keep stroke widths honest at low zoom.
-   */
   draw(ctx: CanvasRenderingContext2D, layer: number, tilePx: number): void {
     const pool = this.pool;
     ctx.save();
@@ -686,7 +671,6 @@ export class ParticleSystem {
   }
 }
 
-/** Soft glow behind a light source. Kept here so the gradient cache lives with the fx budget. */
 export function glowStyle(
   ctx: CanvasRenderingContext2D,
   x: number,

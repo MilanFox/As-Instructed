@@ -25,11 +25,6 @@ import {
 } from '../discrepancy.ts';
 import type { LibraryStorage } from '../save.ts';
 
-/**
- * The one rule this file exists to enforce: **no read path may discard the player's source.**
- * Everything else in the save is derived data that can be recomputed; `lib.ts` cannot.
- */
-
 function memory(initial: Record<string, string> = {}): LibraryStorage & { data: typeof initial } {
   const data = { ...initial };
   return {
@@ -229,7 +224,6 @@ describe('discrepancies', () => {
     });
     expect(shouldProbe(raised, 20)).toBe(false);
 
-    /* Closing it re-opens the door, but only once enough has happened since. */
     const closed = patchDiscrepancy(raised, 'D1', { closed: true });
     expect(shouldProbe(closed, MIN_CLOSED_BEFORE_FIRST + COMPLETIONS_PER_DISCREPANCY - 1)).toBe(
       false,

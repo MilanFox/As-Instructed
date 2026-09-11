@@ -12,10 +12,6 @@ interface Task {
   lane: number;
 }
 
-/**
- * One step of an open-plain walk. Productive directions first, then a sidestep, then anything at
- * all — `canMove` is free and truthful, so the bot never issues a move it already knows will fail.
- */
 function preferences(from: Vec, to: Vec): Dir[] {
   const horizontal = to.x > from.x ? Dir.East : Dir.West;
   const vertical = to.y > from.y ? Dir.South : Dir.North;
@@ -31,7 +27,6 @@ function preferences(from: Vec, to: Vec): Dir[] {
   return wanted;
 }
 
-/** Walks a bot to `to` and reports the ticks it spent doing so. */
 function walkTo(sim: Sim, botId: number, to: Vec): number {
   let spent = 0;
   for (let guard = 0; guard < 600; guard++) {
@@ -49,23 +44,6 @@ function walkTo(sim: Sim, botId: number, to: Vec): number {
   return spent;
 }
 
-/**
- * TEST FIXTURE. Never imported from src/main.tsx — vite.config.ts fails the build if it is.
- *
- * List scheduling on the dependency graph.
- *
- * The desk is probed for the station count and every station is probed for its tile and its
- * feeders — all free, all before anyone moves. Then the schedule is built offline: repeatedly take
- * the stations whose feeders are all placed, and hand each one to whichever bot can finish it
- * soonest, counting that bot's walk from wherever the schedule last left it. Nothing is issued to
- * the fleet until the whole rota exists.
- *
- * Execution follows the rota in order. Each bot walks to its next station, waits out whatever is
- * left of its feeders' energising — every bot keeps its own clock, so a wait is the only thing that
- * ties two of them together — and uses it. There is no `sync()` anywhere: a sync would drag the
- * whole fleet up to the clock of whoever is furthest ahead, which is precisely the parallelism the
- * level is asking for.
- */
 export const solution: ReferenceSolution = {
   levelId: 'w8-03',
   run(sim: Sim, botId: number): void {

@@ -1,41 +1,3 @@
-/**
- * The frame must contain the furniture it frames — and the other view must contain the way out.
- *
- * `DESK_FRAME` is the denominator of `--u`, so a frame smaller than the composition crops it at
- * every viewport where that axis binds. That is not hypothetical: the prototype's 1560 x 1000 was
- * four units short vertically against a terminal whose top edge is at `50% - 502 * u`, and the
- * terminal's lit north arris — the one hard rule the lamp spends on the top edge — was
- * clipped by about 1.5px on every laptop.
- *
- * The extents are **recomputed from the stylesheets**, never restated here. A test that carried
- * its own copy of the numbers would pass forever while someone nudged the in-tray outward, which
- * is precisely how the objectives overlay shipped past a guard that asserted the wrong thing.
- * The only literals below are the *policy*: which objects have to be
- * wholly on screen and which are cropped on purpose.
- *
- * **The desk is one composition fitted to a frame. FOCUS is a second view, and it is not in the
- * frame at all** — `.station` becomes a grid against the window and the two machines are sized by
- * it rather than placed in design units. So the two halves of this file guard different kinds of
- * thing, deliberately:
- *
- * - **The desk is guarded by extent.** Every assertion below the resting `describe` is the one it
- *   always was, measured off the rules that carry no `[data-focus=…]` predicate. That is also the
- *   first thing FOCUS could have broken and did not: a stray override that widened
- *   `.display--term` in *both* views would move the resting geometry these assertions measure, so
- *   the parser buckets by the predicate and the resting bucket is the un-predicated rules alone.
- *   `no FOCUS rule places anything in the frame` states the other half out loud.
- * - **FOCUS is guarded by presence and by the way out.** Extent is meaningless for a grid whose
- *   column is `1fr` of an unknown window, and asserting it would be asserting nothing. What can go
- *   wrong in this view is different in kind: an object leaking in that has no business in it, or —
- *   far worse — the bezel plate going out with the furniture. That plate carries the FOCUS switch,
- *   which is the only way back to the reference, the Repository, the paperwork and the stamp block.
- *   A view with no way out of it is the soft-lock DESIGN §10.6 forbids, wearing a stylesheet.
- *
- * So every object the desk places is on exactly one of two roll-calls, `FOCUS_KEEPS` or
- * `FOCUS_HIDES`, each entry with its reason. A new piece of deskware fails this file until somebody
- * decides which view it belongs to, which is the point: the alternative is that it leaks silently
- * into a view that was designed to be two objects and nothing else.
- */
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -44,11 +6,6 @@ import { DESK_FRAME } from '../desk/scale.ts';
 
 const STYLE_DIR = join(process.cwd(), 'src/ui/styles/desk');
 
-/**
- * Wholly on screen at every supported viewport. Each of these is either a machine the player
- * reads or a door they have to be able to find — a
- * door the player cannot see is a door that does not exist.
- */
 const MUST_CONTAIN: Record<string, string> = {
   'display--term': 'the program. the largest thing on the desk while writing',
   'display--feed': 'the site. the picture the whole work order describes',
@@ -61,10 +18,6 @@ const MUST_CONTAIN: Record<string, string> = {
   routines: 'lib.ts. the door onto the routines the player has published',
 };
 
-/**
- * Cropped by the front edge of the desk on purpose, because you are sitting at it. Clipping these
- * is the composition working, not failing.
- */
 const MAY_OVERFLOW: Record<string, string> = {
   keyboard: 'cropped by the desk edge. you are sitting here',
   tray: 'sits behind the copy stand at the desk edge',
@@ -77,30 +30,12 @@ const MAY_OVERFLOW: Record<string, string> = {
   room: 'the room is the viewport',
 };
 
-/**
- * On screen in FOCUS. Two machines and the player's own code, and that is the whole view.
- *
- * `routines` is the only entry here that is not a machine, and it earns its place: `~/lib.ts` is
- * the player's own subroutines drawn on the terminal's own glass, and this is the view for looking
- * at code. Its door is the file rail on the terminal bar, which is inside the glass and therefore
- * survives with it, so hiding the panel while leaving the key that opens it would be a door onto
- * nothing.
- */
 const FOCUS_KEEPS: Record<string, string> = {
   'display--term': 'the program. the view exists for it',
   'display--feed': 'the site, as a preview. a run you cannot watch is a run you cannot debug',
   routines: 'lib.ts — the player’s own code, on the terminal glass. reached from the file rail',
 };
 
-/**
- * Off screen in FOCUS, with what the player gives up and how they get it back.
- *
- * Every one of these is reachable by throwing the switch, and the player asked for it in those
- * terms. Two of them are DESIGN §11 obligations rather than conveniences and are answered in copy
- * on the terminal's status strip rather than by being kept: `dispatch`, because `ctrl+enter` has to
- * be the announced way to run, and `stampblock`, because a passing verdict must not land on a
- * surface nobody can see.
- */
 const FOCUS_HIDES: Record<string, string> = {
   room: 'no lamp and nothing to light. a half-lit desk with no desk on it reads as a bug',
   manual: 'the REFERENCE is paper on the desk. the switch is the door to it',
@@ -123,15 +58,9 @@ interface Box {
   top?: number;
   width?: number;
   height?: number;
-  /**
-   * Whether the rule positions from the centre of the frame. That is what makes something a piece
-   * of furniture rather than a part of one: a stage object is placed against the desk, a detail is
-   * placed against its parent.
-   */
   centred?: boolean;
 }
 
-/** `calc(50% - 762 * var(--u))` -> -762 centred, `calc(306 * var(--u))` -> 306 not. */
 function units(value: string): { n: number; centred: boolean } | undefined {
   const centred = /calc\(\s*50%\s*([-+])\s*([\d.]+)\s*\*\s*var\(--u\)\s*\)/.exec(value);
   if (centred?.[2]) return { n: Number(centred[2]) * (centred[1] === '-' ? -1 : 1), centred: true };
@@ -152,7 +81,6 @@ interface Rule {
   body: string;
 }
 
-/** Every `.desk … { }` rule, in source order, because a later rule overrides an earlier one. */
 function deskRules(css: string): Rule[] {
   const found: Rule[] = [];
   const pattern = /\.desk([^{}]*)\{([^}]*)\}/g;
@@ -163,24 +91,16 @@ function deskRules(css: string): Rule[] {
   return found;
 }
 
-/** The view a rule belongs to: the one its `[data-focus=…]` predicate names, or both. */
 function viewOf(selector: string): 'desk' | 'program' | 'both' {
   const named = /\[data-focus=['"]?([\w-]+)['"]?\]/.exec(selector)?.[1];
   if (named === undefined) return 'both';
   return named === 'program' ? 'program' : 'desk';
 }
 
-/** Every class in a selector list, deduplicated — `.a, .b .c` -> `a`, `b`, `c`. */
 function classesIn(selector: string): string[] {
   return [...new Set((selector.match(/\.[\w-]+/g) ?? []).map((each) => each.slice(1)))];
 }
 
-/**
- * Every class the desk positions with `position: fixed`, with whatever box it declares.
- *
- * Only the rules that place the resting composition are read. A FOCUS rule is a different view's
- * business and mixing the two would be measuring a composition that never exists.
- */
 function fixedBoxes(rules: readonly Rule[]): Map<string, Box> {
   const found = new Map<string, Box>();
   for (const { selector, body } of rules) {
@@ -205,7 +125,6 @@ function fixedBoxes(rules: readonly Rule[]): Map<string, Box> {
   return found;
 }
 
-/** Whether a rule takes its subject off screen outright. */
 function hides(body: string): boolean {
   return /(?:^|;)\s*display:\s*none/.test(body);
 }
@@ -215,10 +134,6 @@ const rules = deskRules(css);
 const boxes = fixedBoxes(rules);
 const focusRules = rules.filter((rule) => viewOf(rule.selector) === 'program');
 
-/**
- * `.display` carries `position: fixed` for both machines; the two modifiers carry the geometry.
- * The shared rule is not a piece of furniture and has nothing to measure.
- */
 const NOT_FURNITURE = new Set(['desk', 'display', 'bezel', 'screen', 'glass', 'stand', 'held']);
 
 describe('the desk frame contains the desk', () => {
@@ -279,15 +194,6 @@ describe('the desk frame contains the desk', () => {
     ).toBeGreaterThanOrEqual(tallest * 2);
   });
 
-  /**
-   * The routines file is the terminal showing something else, not a layer laid over it.
-   *
-   * The rule is absolute that nothing is drawn over either machine, and a
-   * full-bleed panel is how that rule gets broken by accident. So the box is asserted to be the
-   * terminal's glass exactly — recomputed here from the bezel's padding and the terminal screen's
-   * own height, never restated — which makes it impossible for it to reach the desk, the paper or
-   * the site feed without failing.
-   */
   it('draws lib.ts on the terminal glass and nowhere else', () => {
     const term = boxes.get('display--term');
     const routines = boxes.get('routines');
@@ -319,7 +225,6 @@ describe('the desk frame contains the desk', () => {
   });
 
   it('is not so large that it wastes the window', () => {
-    // A frame with slack shrinks every desk for nothing. Half a unit of tolerance, no more.
     let widest = 0;
     let tallest = 0;
     for (const name of Object.keys(MUST_CONTAIN)) {
@@ -354,7 +259,6 @@ describe('FOCUS is two objects and a way out', () => {
       if (!hides(body)) continue;
       for (const name of classesIn(selector)) hidden.add(name);
     }
-    /* `slot` is already `display: none` at rest, so a FOCUS rule for it would be dead weight. */
     const restingHidden = new Set(
       rules
         .filter((rule) => viewOf(rule.selector) !== 'program' && hides(rule.body))
@@ -376,14 +280,6 @@ describe('FOCUS is two objects and a way out', () => {
     expect(lost, 'the view exists for these').toEqual([]);
   });
 
-  /**
-   * The way out, and the only one.
-   *
-   * With the desk gone, the bezel plate is the whole of the game's navigation: the FOCUS switch on
-   * it is how the player reaches the reference, the Repository, the site plan, the paperwork and
-   * the stamp block again. A stylesheet that took the plate out with the furniture would be a
-   * soft-lock, which DESIGN §10.6 forbids outright, and it would look like a tidy-up.
-   */
   it('keeps the bezel plate, which carries the switch back', () => {
     const gone = focusRules
       .filter((rule) => hides(rule.body))
@@ -395,16 +291,6 @@ describe('FOCUS is two objects and a way out', () => {
     expect(switchRule, 'the FOCUS switch has no rule in src/ui/styles/desk/').toBe(true);
   });
 
-  /**
-   * `~/lib.ts` is still exactly the glass — established by measurement rather than by arithmetic.
-   *
-   * On the desk the panel's box is stated in design units and the assertion above recomputes it. In
-   * this view the glass is whatever the window left it after the station's grid, so no `calc()` in
-   * `--u` can name it: `Terminal.tsx` observes the screen and publishes its box as `--glass-x/-y/
-   * -w/-h`, and the panel is those four numbers and nothing else. The identity is unchanged —
-   * `.routines` still cannot reach the desk, the paper or the site feed — so what is checked here is
-   * that it is taken from the glass and not re-derived from something that will drift.
-   */
   it('draws lib.ts on the glass the glass says it is', () => {
     const rule = focusRules.find((each) => classesIn(each.selector).includes('routines'));
     expect(
@@ -425,13 +311,6 @@ describe('FOCUS is two objects and a way out', () => {
     }
   });
 
-  /**
-   * The station is laid against the window, and that is the difference between the two views.
-   *
-   * If this ever reverts to centred coordinates the view is back inside `DESK_FRAME`, the terminal
-   * is back to the 1160u the copy stand allows it, and the whole reason for the second view is
-   * gone — quietly, because everything would still render.
-   */
   it('lays the station against the window rather than in the frame', () => {
     const station = focusRules.find(
       (rule) => classesIn(rule.selector).length === 1 && classesIn(rule.selector)[0] === 'station',
@@ -456,14 +335,6 @@ describe('FOCUS is two objects and a way out', () => {
     ).toEqual([]);
   });
 
-  /**
-   * And the resting composition is untouched by all of it.
-   *
-   * Every assertion in the first `describe` reads the un-predicated rules, so a FOCUS override
-   * cannot reach them — this states the guarantee rather than trusting the parser to have it. A
-   * rule that widened `.display--term` without a predicate would move the desk, and the desk is
-   * approved.
-   */
   it('changes no box the desk composition states', () => {
     const restingOnly = fixedBoxes(rules.filter((rule) => viewOf(rule.selector) === 'both'));
     for (const name of Object.keys(MUST_CONTAIN)) {

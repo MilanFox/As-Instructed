@@ -1,15 +1,3 @@
-/**
- * What World 6's objectives say when they are missed.
- *
- * The listening post grades streams — packets in, packets out, lines printed — and a stream is
- * exactly the shape a beginner playtest measured the damage on: `4 of 31` says a run
- * went wrong somewhere in thirty-one packets and nothing else. Every test here drives a program
- * that is wrong in one specific way and asserts the report names that way.
- *
- * Two of them assert the opposite: that `w6-02`'s bonus never says which byte was altered and
- * that `w6-04`'s never says a character of the straggler's plain text. Those are the answers the
- * levels exist to make the player work out.
- */
 import { describe, expect, test } from 'vitest';
 import type { Objective, ObjectiveContext, Sim, World } from '../../../engine/index.ts';
 import { NOTHING, evaluateObjectives } from '../../../engine/index.ts';
@@ -25,7 +13,12 @@ import { w6_03 } from '../w6-03.ts';
 import { w6_04 } from '../w6-04.ts';
 import { w6_05 } from '../w6-05.ts';
 
-function diverge(level: LevelDef, seed: number, id: string, drive: (sim: Sim, bot: number) => void) {
+function diverge(
+  level: LevelDef,
+  seed: number,
+  id: string,
+  drive: (sim: Sim, bot: number) => void,
+) {
   const result = runLevel(level, seed, drive);
   const pool: Objective[] = [...level.objectives, ...(level.bonus ?? [])];
   const objective = must(
@@ -42,10 +35,6 @@ function diverge(level: LevelDef, seed: number, id: string, drive: (sim: Sim, bo
   return must(report, id);
 }
 
-// ---------------------------------------------------------------------------
-// w6-01 — the queue
-// ---------------------------------------------------------------------------
-
 describe('w6-01 names the line the log first got wrong', () => {
   test('a program that prints nothing is told what the first packet said', () => {
     const first = must(queued(w6_01.build(1))[0], 'a packet');
@@ -60,17 +49,11 @@ describe('w6-01 names the line the log first got wrong', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// w6-02 — the checksum
-// ---------------------------------------------------------------------------
-
 interface Corrupt {
-  /** Where the packet sat on the band, counting from 0. */
   index: number;
   bytes: number[];
 }
 
-/** The band as the level built it, split into the packets that verify and the ones that do not. */
 function sortBand(world: World): { clean: string[]; corrupt: Corrupt[] } {
   const salt = postVar(world, 'salt');
   const clean: string[] = [];
@@ -78,7 +61,10 @@ function sortBand(world: World): { clean: string[]; corrupt: Corrupt[] } {
   queued(world).forEach((text, index) => {
     const star = text.indexOf('*');
     const bytes = text.slice(0, star).split(',').map(Number);
-    const claimed = text.slice(star + 1).split(',').map(Number);
+    const claimed = text
+      .slice(star + 1)
+      .split(',')
+      .map(Number);
     if (additive(bytes, salt) === claimed[0] && weighted(bytes, salt) === claimed[1]) {
       clean.push(text);
       return;
@@ -135,11 +121,6 @@ describe('w6-02 names the packet the relay handled the wrong way', () => {
     });
   });
 
-  /**
-   * The bonus is "work out which byte moved". Reporting the byte would be the answer, so what
-   * comes back is the run's own guess and the fact that it is wrong — one of the packet's four to
-   * ten bytes ruled out, and the arithmetic that finds the rest left where it was.
-   */
   test('a fault report that names the wrong byte is told only that it is the wrong byte', () => {
     const { corrupt } = sortBand(w6_02.build(1));
     const first = must(corrupt[0], 'a corrupt packet');
@@ -170,16 +151,7 @@ describe('w6-02 names the packet the relay handled the wrong way', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// w6-03 — the return packet
-// ---------------------------------------------------------------------------
-
 describe('w6-03 prices the return packet against the one that arrived', () => {
-  /**
-   * Character count is not a score in this game. This one is the length of a message on a band
-   * the brief says is metered by the character, which is a different thing and is the whole
-   * content of the bonus, so the count is exactly what the report is for.
-   */
   test('a route sent straight back is told how long it is and how long it may be', () => {
     const report = diverge(w6_03, 1, 'shorter-encoding', (sim, botId) => {
       const { receive, transmit, probe, decode } = playerApi(sim, botId, 'w6-03');
@@ -200,7 +172,11 @@ describe('w6-03 prices the return packet against the one that arrived', () => {
     });
 
     expect(report.met).toBe(false);
-    expect(report.divergence).toEqual({ where: 'move 2 of the route', expected: 'S', received: 'E' });
+    expect(report.divergence).toEqual({
+      where: 'move 2 of the route',
+      expected: 'S',
+      received: 'E',
+    });
   });
 
   test('a line that is not a route at all is told the format', () => {
@@ -226,10 +202,6 @@ describe('w6-03 prices the return packet against the one that arrived', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// w6-04 — the cipher
-// ---------------------------------------------------------------------------
-
 describe('w6-04 names the packet the relay sent in the wrong alphabet', () => {
   test('a band relayed untouched is told the first packet did not open with the header', () => {
     const report = diverge(w6_04, 1, 'relay-plain', (sim, botId) => {
@@ -244,11 +216,6 @@ describe('w6-04 names the packet the relay sent in the wrong alphabet', () => {
     expect(shown.received).not.toContain('KD//');
   });
 
-  /**
-   * The straggler carries no header, so its plain text is the one thing on this band a program
-   * cannot confirm — which makes it the answer, and makes the shift the run used the only thing
-   * the report may hand back. Ninety-four candidates survive it.
-   */
   test('a straggler read with the headed key is told which shift that was', () => {
     const report = diverge(w6_04, 1, 'straggler', (sim, botId) => {
       const { receive, transmit, decode } = playerApi(sim, botId, 'w6-04');
@@ -283,10 +250,6 @@ describe('w6-04 names the packet the relay sent in the wrong alphabet', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// w6-05 — telemetry
-// ---------------------------------------------------------------------------
-
 describe('w6-05 names the pad and the block the repair report got wrong', () => {
   test('a bot that never drove is told the pad and where it stopped', () => {
     const world = w6_05.build(1);
@@ -313,11 +276,6 @@ describe('w6-05 names the pad and the block the repair report got wrong', () => 
     expect(shown.received).toBe(NOTHING);
   });
 
-  /**
-   * Where the altered character sits is the arithmetic hint 5 spells out, and the character falls
-   * straight out of the position, so neither appears. The block is named by the slot it arrived
-   * in and the run's own line comes back beside it.
-   */
   test('a wrong repair is told it is wrong and not what the right one says', () => {
     const report = diverge(w6_05, 1, 'repair-blocks', (sim, botId) => {
       playerApi(sim, botId, 'w6-05').print('fix main|1E');

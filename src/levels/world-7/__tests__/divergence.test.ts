@@ -1,15 +1,3 @@
-/**
- * What World 7's objectives say when they are missed.
- *
- * A fleet is the hardest thing in the game to read a `not met` off, because there is no single
- * bot to look at: the clock stops when the last one stops, and `3 of 6` never says which three.
- * Every test here drives a fleet that is wrong in one specific way — one bot left in its
- * corridor, one that never caught up in time to hear anything, one that walked into a wall, one
- * job left four uses short — and asserts the report names the bot, the tick or the tile.
- *
- * `w7-05/sites-up` gets the opposite assertion: it must never print a site's coordinates, because
- * the sites are on no plan and finding them is the level.
- */
 import { describe, expect, test } from 'vitest';
 import type {
   Objective,
@@ -37,7 +25,12 @@ function objectiveIn(level: LevelDef, id: string): Objective {
   );
 }
 
-function diverge(level: LevelDef, seed: number, id: string, drive: (sim: Sim, bot: number) => void) {
+function diverge(
+  level: LevelDef,
+  seed: number,
+  id: string,
+  drive: (sim: Sim, bot: number) => void,
+) {
   const result = runLevel(level, seed, drive);
   const ctx: ObjectiveContext = {
     world: result.world,
@@ -48,10 +41,6 @@ function diverge(level: LevelDef, seed: number, id: string, drive: (sim: Sim, bo
   const [report] = evaluateObjectives([objectiveIn(level, id)], ctx);
   return { report: must(report, id), ticks: result.trace.endTick };
 }
-
-// ---------------------------------------------------------------------------
-// w7-01 — two bots
-// ---------------------------------------------------------------------------
 
 describe('w7-01 names the bot rather than counting them', () => {
   test('a fleet that never moved is told which bot, its pad and where it stands', () => {
@@ -78,11 +67,6 @@ describe('w7-01 names the bot rather than counting them', () => {
     });
   });
 
-  /**
-   * `recv` hands back null until the reader's own clock reaches the tick the message was sent at,
-   * which is the whole difficulty of the level. A bot that asked three times too early and a bot
-   * that never asked at all are different mistakes and used to read identically.
-   */
   test('a bot that asked too early is told how many reads came back empty', () => {
     const { report } = diverge(w7_01, 1, 'both-heard', (sim) => {
       sim.recv(0);
@@ -124,10 +108,6 @@ describe('w7-01 names the bot rather than counting them', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// w7-02 — the field
-// ---------------------------------------------------------------------------
-
 describe('w7-02 names a crop rather than counting them', () => {
   test('an unharvested field is told the first crop still standing', () => {
     const { report } = diverge(w7_02, 1, 'field-cleared', () => undefined);
@@ -164,10 +144,6 @@ describe('w7-02 names a crop rather than counting them', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// w7-03 — the tunnel
-// ---------------------------------------------------------------------------
-
 describe('w7-03 names a crate and the move that bounced', () => {
   test('a yard nobody cleared is told which crate is in which column', () => {
     const { report } = diverge(w7_03, 1, 'crates-in-silo', () => undefined);
@@ -196,10 +172,6 @@ describe('w7-03 names a crate and the move that bounced', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// w7-04 — dispatch
-// ---------------------------------------------------------------------------
-
 describe('w7-04 names the job and how far into it the fleet got', () => {
   test('an untouched board is told the first job and what it costs', () => {
     const { report } = diverge(w7_04, 1, 'board-clear', () => undefined);
@@ -211,11 +183,6 @@ describe('w7-04 names the job and how far into it the fleet got', () => {
     expect(shown.received).toMatch(/^0 of \d+ uses$/);
   });
 
-  /**
-   * Dealing the board out in advance is correct on the flat seed and roughly doubles the shift on
-   * the skewed one, which is the whole level. What it could not read before is *which* job it
-   * left behind and how far in.
-   */
   test('the round-robin deal is told which job it left short', () => {
     const { report } = diverge(w7_04, 3, 'board-clear', (sim, botId) => {
       roundRobinDispatch.run(sim, botId);
@@ -241,7 +208,6 @@ describe('w7-04 names the job and how far into it the fleet got', () => {
     });
   });
 
-  /** Naming the wrong job gives back that job's own closing tick, never the right job. */
   test('naming a job that closed earlier is priced against the run own makespan', () => {
     const { report } = diverge(w7_04, 1, 'name-the-decider', (sim, botId) => {
       roundRobinDispatch.run(sim, botId);
@@ -256,11 +222,6 @@ describe('w7-04 names the job and how far into it the fleet got', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// w7-05 — chain of command
-// ---------------------------------------------------------------------------
-
-/** The order rule reads only the `use` and `recv` log, so the log is written rather than driven. */
 function contextFrom(initialWorld: World, events: readonly TraceEvent[]): ObjectiveContext {
   const trace: Trace = {
     initialWorld,
@@ -283,10 +244,6 @@ describe('w7-05 names the site and the bot that jumped its orders', () => {
     });
   });
 
-  /**
-   * `probe()` with no argument is the only thing on this level that finds a site. A coordinate in
-   * the report would not be a diff, it would be the search.
-   */
   test('no part of the report says where a site is', () => {
     const world = w7_05.build(1);
     const site = must(
@@ -320,11 +277,6 @@ describe('w7-05 names the site and the bot that jumped its orders', () => {
     });
   });
 
-  /**
-   * The rule is read against the *bot's own clock*, not the order the calls were written in: a
-   * message stamped at tick 30 has not been handed to a bot standing at tick 12, however early
-   * the `recv` appears in the program.
-   */
   test('a bot that read an order stamped later is told both ticks', () => {
     const initialWorld = w7_05.build(1);
     const site = must(

@@ -1,24 +1,3 @@
-/**
- * SIGNAL — one phosphor, taken to the wall.
- *
- * The bet: commit to the bit absolutely. TIS-100 wins its look by refusing to concede anywhere,
- * and this game's writing is already in that territory — a company whose client dissolved in
- * 2198 and whose contract nobody can legally end. The screen is Kessler & Daughters equipment,
- * the feed is forty light minutes stale, and the tube has been on since before the contractor
- * was born.
- *
- * Everything is one amber phosphor at varying intensity. There is no second hue and no fill that
- * is not made of light. Terrain is drawn as raster: hatched scanlines, dotted floors, solid
- * blocks for walls, with the whole board built from horizontal lines because that is what the
- * device can physically draw.
- *
- * The trail is the direction's best trick and it is free: on a phosphor tube a visited cell is
- * one that has not finished decaying, so the heat overlay stops being an overlay and becomes the
- * thing the display would actually do.
- *
- * The cost is real and stated in the report: monochrome deletes colour as a channel. Bot
- * identity, medals and pass/fail all have to be carried by shape, intensity and glyph instead.
- */
 import { Terrain, tileAt } from '../../engine/index.ts';
 import type { Tile, World } from '../../engine/index.ts';
 import { alpha } from './color.ts';
@@ -34,9 +13,7 @@ import type {
 } from './types.ts';
 import type { BotPose } from '../timeline.ts';
 
-/** The tube's black. Warm, because a phosphor screen at rest is never neutral. */
 export const TUBE = '#080603';
-/** Floor at rest — the dimmest lit state, not an unlit one. */
 export const FLOOR = '#2a1d09';
 
 const INK = '#ffbe57';
@@ -48,18 +25,11 @@ export const signal: ArtDirection = {
   id: 'signal',
   label: 'Signal',
 
-  /*
-   * `danger` is the one place the monochrome bends, and it bends inside the family: a red-shifted
-   * phosphor rather than a second colour. A tube that has been driven too hard in one spot really
-   * does burn redder, so the alarm state stays diegetic and stays legible for the colour-blind,
-   * which a pure intensity ramp would not.
-   */
   palette: {
     bgVoid: TUBE,
     bgPanel: '#0e0a04',
     bgRaised: '#191006',
     ink: INK,
-    /* 7.9:1 on `bgRaised`. Monochrome buys contrast back; it does not get to skip it. */
     inkDim: '#c2872f',
     accent: HOT,
     accent2: WARM,
@@ -90,11 +60,6 @@ export const signal: ArtDirection = {
     good: '#d8a63c',
   },
 
-  /*
-   * The graticule is etched on the glass in front of the phosphor, so it is a constant faint
-   * presence rather than something the beam draws — brighter than the shipped grid, and it never
-   * disappears at small tile sizes, because on this device it is not part of the image.
-   */
   overlay: {
     grid: 'rgba(255, 154, 31, 0.20)',
     gridMajor: 'rgba(255, 190, 87, 0.46)',
@@ -112,12 +77,6 @@ export const signal: ArtDirection = {
     botDetailTilePx: 20,
   },
 
-  /*
-   * Bot identity cannot be hue here, so these are one hue at twelve intensities — which is a
-   * warmth cue and not a name. The name is carried by `drawBot` instead: a printed number in the
-   * far form and a four-bit punch strip on the hull in the near one, because an intensity is not
-   * something twenty bots on a World 7 board can be told apart by.
-   */
   botAccents: [
     '#ffe7c2',
     '#ffbe57',
@@ -133,12 +92,6 @@ export const signal: ArtDirection = {
     '#e8b264',
   ],
 
-  /*
-   * The one direction where the cold end must *brighten*. A darkening against a #2a1d09 floor
-   * would be as illegible as `inkDim` was against the World 4 cave floor, with the sign flipped —
-   * which is why the invariant is expressed as contrast against `referenceFloor` rather than as a
-   * fixed literal.
-   */
   trail: { cold: '#6b4a12', hot: BURN, minAlpha: 0.3, maxAlpha: 0.62 },
   referenceFloor: FLOOR,
 
@@ -151,19 +104,6 @@ export const signal: ArtDirection = {
   post,
 };
 
-// ---------------------------------------------------------------------------
-// Raster
-// ---------------------------------------------------------------------------
-
-/**
- * Scanline pitch, in cache device pixels, constrained to divide the tile exactly.
- *
- * The pitch has to be an integer or the raster shimmers, and it has to *divide the tile* or the
- * phase resets at every cell boundary and the board turns into a moiré field instead of one
- * continuous raster. Eight lines per tile is the target because that is the coarsest raster in
- * which a tile still reads as a surface rather than as three stripes; `w8-05` lands on a 24 px
- * cache tile, where the divisor that gets closest is 3.
- */
 function rasterPitch(tilePx: number): number {
   let best = 3;
   let bestErr = Infinity;
@@ -193,18 +133,6 @@ const STAMP_CONVEYOR = 15;
 const STAMP_PIT = 19;
 const STAMP_COUNT = 20;
 
-/**
- * The stamp sheet: every terrain drawn once at cache resolution, then blitted per cell.
- *
- * Drawing the raster cell by cell is the obvious implementation and it is a thousand times too
- * slow — `w8-05` is 1920 cells and a dotted floor is sixty-four fills, which is a hundred and
- * twenty thousand `fillRect` calls on a layer that rebuilds on every zoom step. One sheet costs
- * the same work for twenty tiles and turns the board pass into one `drawImage` per cell, which is
- * exactly what the atlas pipeline this replaces was already doing.
- *
- * Held at module scope and rebuilt only when the cache resolution moves, for the same reason the
- * terrain layer itself is cached.
- */
 let sheet: HTMLCanvasElement | null = null;
 let sheetTilePx = 0;
 
@@ -224,7 +152,6 @@ function ensureSheet(tilePx: number): HTMLCanvasElement | null {
   return canvas;
 }
 
-/** Deterministic per-stamp noise. Same shape as `cellHash`, kept local so a stamp is pure. */
 function noise(i: number, j: number): number {
   let h = (i * 374761393 + j * 668265263) | 0;
   h = (h ^ (h >>> 13)) * 1274126177;
@@ -233,11 +160,6 @@ function noise(i: number, j: number): number {
 
 function paintSheet(ctx: CanvasRenderingContext2D, t: number): void {
   const p = rasterPitch(t);
-  /*
-   * Below ten device pixels a tile is fewer than three raster lines and the vocabulary collapses
-   * into noise, so it degrades to flat intensity. That is not a compromise on the look — a real
-   * tube underscanned this far has no line structure left either.
-   */
   const flat = t < 10;
   const at = (index: number): number => index * t;
 
@@ -247,7 +169,6 @@ function paintSheet(ctx: CanvasRenderingContext2D, t: number): void {
   };
   const fill = (index: number, style: string): void => box(index, 0, 0, t, t, style);
 
-  /** One raster line at row `y`, `lw` device px tall, clipped to the stamp. */
   const line = (
     index: number,
     x: number,
@@ -269,11 +190,6 @@ function paintSheet(ctx: CanvasRenderingContext2D, t: number): void {
     }
   };
 
-  /**
-   * A triangle rasterised into horizontal runs. Every conveyor arrow on the board is this, which
-   * is the whole argument of the direction stated in one primitive: a pointer the device could
-   * actually draw, made of the only mark it has.
-   */
   const arrow = (
     index: number,
     dir: number,
@@ -298,13 +214,9 @@ function paintSheet(ctx: CanvasRenderingContext2D, t: number): void {
     }
   };
 
-  // floor — a dotted field. The dimmest lit state on the board and the one every other terrain is
-  // read against. Alternate rows are offset so it reads as a surface, not as columns fighting the
-  // graticule.
   if (flat) fill(STAMP_FLOOR, alpha(INK, 0.1));
   else dots(STAMP_FLOOR, alpha(INK, 0.2), Math.max(1, p >> 2));
 
-  // regolith — the same field, loose: a second jittered dot per cell, brighter and grainier.
   if (flat) fill(STAMP_REGOLITH, alpha(INK, 0.16));
   else {
     dots(STAMP_REGOLITH, alpha(INK, 0.22), Math.max(1, p >> 2));
@@ -316,8 +228,6 @@ function paintSheet(ctx: CanvasRenderingContext2D, t: number): void {
     }
   }
 
-  // soil — tilled: broken dashes in a brick offset, so furrows read at a glance and never look
-  // like the dotted floor they sit beside.
   if (flat) fill(STAMP_SOIL, alpha(INK, 0.2));
   else {
     const dash = alpha(INK, 0.26);
@@ -327,8 +237,6 @@ function paintSheet(ctx: CanvasRenderingContext2D, t: number): void {
     }
   }
 
-  // rock — a mass: continuous raster over a faint base, with a break or two per line so it reads
-  // as natural stone rather than as the manufactured wall it must never be confused with.
   if (flat) fill(STAMP_ROCK, alpha(INK, 0.26));
   else {
     fill(STAMP_ROCK, alpha(INK, 0.06));
@@ -340,8 +248,6 @@ function paintSheet(ctx: CanvasRenderingContext2D, t: number): void {
     }
   }
 
-  // ore — rock, plus the glint. The brightest solid on the board, because a vein is the thing the
-  // player is looking for and the only reason to drive at a wall on purpose.
   if (flat) fill(STAMP_ORE, alpha(INK, 0.42));
   else {
     fill(STAMP_ORE, alpha(INK, 0.08));
@@ -356,8 +262,6 @@ function paintSheet(ctx: CanvasRenderingContext2D, t: number): void {
     }
   }
 
-  // rubble — the raster itself is broken. Short runs, wide gaps, whole lines missing: the read is
-  // "this block has failed", which is exactly what cheap-to-mine collapsed rock is.
   if (flat) fill(STAMP_RUBBLE, alpha(INK, 0.18));
   else {
     const chip = alpha(INK, 0.32);
@@ -371,8 +275,6 @@ function paintSheet(ctx: CanvasRenderingContext2D, t: number): void {
     }
   }
 
-  // ice — the only unbroken raster on the board, plus a specular band. Smooth where everything
-  // else is textured, which is the whole point of a surface a bot slides across.
   if (flat) fill(STAMP_ICE, alpha(INK, 0.2));
   else {
     fill(STAMP_ICE, alpha(INK, 0.04));
@@ -383,9 +285,6 @@ function paintSheet(ctx: CanvasRenderingContext2D, t: number): void {
     line(STAMP_ICE, 0, p * 2, t, 1, glare);
   }
 
-  // wall — full-coverage raster over a lit base. Held at 0.46 rather than at the top of the ramp
-  // so the brightest marks on the board stay the pad, the depot and the bot; structure is a
-  // *texture* here, not a light source.
   if (flat) fill(STAMP_WALL, alpha(INK, 0.34));
   else {
     fill(STAMP_WALL, alpha(INK, 0.14));
@@ -393,8 +292,6 @@ function paintSheet(ctx: CanvasRenderingContext2D, t: number): void {
     for (let y = 0; y < t; y += p) line(STAMP_WALL, 0, y, t, 1, brick);
   }
 
-  // pad — a lit target: dense bright raster with the centre knocked back out, so it reads as a
-  // marked square from across the board and never as a solid the bot cannot enter.
   if (flat) fill(STAMP_PAD, alpha(WARM, 0.5));
   else {
     const ring = alpha(WARM, 0.62);
@@ -419,9 +316,6 @@ function paintSheet(ctx: CanvasRenderingContext2D, t: number): void {
     line(STAMP_PAD, t - w, t - lw, w, lw, tick);
   }
 
-  // depot — a gauge in a box. `refuel()` only works while standing on one, so it has to be
-  // findable *and* distinguishable from the pad; a bracket with three bars inside is neither a
-  // solid block nor a lit square.
   if (flat) fill(STAMP_DEPOT, alpha(INK, 0.3));
   else {
     dots(STAMP_DEPOT, alpha(INK, 0.16), 1);
@@ -440,8 +334,6 @@ function paintSheet(ctx: CanvasRenderingContext2D, t: number): void {
     }
   }
 
-  // cable — a busbar. Drawn full width so adjacent cells fuse into one run; the vertical joins
-  // are added in the board pass, where the neighbours are known.
   if (flat) fill(STAMP_CABLE, alpha(WARM, 0.3));
   else {
     dots(STAMP_CABLE, alpha(INK, 0.12), 1);
@@ -452,8 +344,6 @@ function paintSheet(ctx: CanvasRenderingContext2D, t: number): void {
     line(STAMP_CABLE, 0, cy + p + lw, t, 1, alpha(WARM, 0.2));
   }
 
-  // conveyor — one stamp per facing, so the direction of travel is baked and the board pass never
-  // has to branch. Two stacked arrows read as motion where one reads as a marker.
   for (let dir = 0; dir < 4; dir++) {
     const index = STAMP_CONVEYOR + dir;
     if (flat) {
@@ -469,9 +359,6 @@ function paintSheet(ctx: CanvasRenderingContext2D, t: number): void {
     arrow(index, dir, t / 2 + (along ? spread : 0), t / 2 + (along ? 0 : spread), s, style);
   }
 
-  // pit — the beam fails here. An opaque hole with the raster collapsing into it and burning at
-  // the rim, plus one torn line. It is the only black tile and the only red one, because it is the
-  // only terrain that kills a bot for driving onto it.
   fill(STAMP_PIT, TUBE);
   if (!flat) {
     const cx = t / 2;
@@ -539,13 +426,6 @@ function stampFor(tile: Tile): number {
   }
 }
 
-/**
- * The board, drawn as raster.
- *
- * Void is the absence of a stamp rather than a dark stamp: a cell the beam never reached is the
- * one thing a tube renders for free, and leaving it transparent lets the backdrop's dead raster
- * show through, which is a truer "outside the contract area" than any fill would be.
- */
 function paintTerrain(paint: TerrainPaint): void {
   const { ctx, world, tilePx, width, height } = paint;
   const source = ensureSheet(tilePx);
@@ -580,14 +460,6 @@ function paintTerrain(paint: TerrainPaint): void {
   ctx.restore();
 }
 
-/**
- * The second pass: everything that needs a neighbour or a tile field.
- *
- * A lit line along the top of every solid edge is beam overshoot at a brightness transition, and
- * it is doing the job the standard direction's drop shadow does — without it a raster board is a
- * flat texture map and the player cannot see where the structure is. It is the single highest-
- * value mark in the whole terrain pass and it costs one `fillRect` per exposed wall face.
- */
 function paintStructure(ctx: CanvasRenderingContext2D, world: World, t: number): void {
   const lw = Math.max(1, Math.round(t / 14));
   const crown = alpha(HOT, 0.62);
@@ -627,10 +499,6 @@ function paintStructure(ctx: CanvasRenderingContext2D, world: World, t: number):
         continue;
       }
 
-      /*
-       * Growth as a stack of bars rather than a sprite that swells. Countable is the requirement —
-       * the player is checking whether a crop is ready, which is a number, not a mood.
-       */
       const growth = tile.growth ?? 0;
       if (tile.terrain === Terrain.Soil && growth > 0) {
         const max = Math.max(1, tile.maxGrowth ?? growth);
@@ -646,18 +514,6 @@ function paintStructure(ctx: CanvasRenderingContext2D, world: World, t: number):
   }
 }
 
-// ---------------------------------------------------------------------------
-// Screen passes
-// ---------------------------------------------------------------------------
-
-/**
- * Everything the two screen-space hooks allocate, allocated once.
- *
- * `backdrop` and `post` run at 60 Hz through a whole replay scrub, so a pattern, a gradient or an
- * offscreen canvas built inside either of them is a per-frame allocation with a GC pause attached.
- * They are keyed on the only things that can invalidate them — the canvas size and the device
- * pixel ratio — and rebuilt on a resize, which is not a frame.
- */
 let deadRaster: CanvasPattern | null = null;
 let deadRasterDpr = 0;
 let scanlines: CanvasPattern | null = null;
@@ -669,7 +525,6 @@ let bloom: HTMLCanvasElement | null = null;
 let bloomCtx: CanvasRenderingContext2D | null = null;
 let bloomKey = '';
 
-/** Scanline period in device px. Two CSS pixels: integer at every ratio, and it never beats. */
 function scanPeriod(dpr: number): number {
   return Math.max(2, Math.round(2 * dpr));
 }
@@ -721,11 +576,6 @@ function ensureScreen(paint: BackdropPaint): void {
   g.addColorStop(0.55, '#0b0804');
   g.addColorStop(1, TUBE);
   glass = g;
-  /*
-   * Built in local coordinates and translated at fill time — gradient space resolves against the
-   * transform in force when it is used, which is what lets one cached object be the retrace bar
-   * wherever it happens to be on the screen this frame.
-   */
   const band = Math.max(24, height * 0.16);
   const s = ctx.createLinearGradient(0, 0, 0, band);
   s.addColorStop(0, alpha(INK, 0));
@@ -735,7 +585,6 @@ function ensureScreen(paint: BackdropPaint): void {
   sweep = s;
 }
 
-/** The dark glass of the tube at rest, with its raster showing even where there is no signal. */
 function backdrop(paint: BackdropPaint): void {
   const { ctx, width, height } = paint;
   ensureScreen(paint);
@@ -750,16 +599,6 @@ function backdrop(paint: BackdropPaint): void {
   ctx.restore();
 }
 
-/**
- * Bloom, as one downsample and one additive upsample.
- *
- * The blur is applied *during* the downscale rather than after it, so the whole effect is two
- * `drawImage` calls and one filtered blit at a sixteenth of the pixels; `blur(2px)` at quarter
- * resolution is `blur(8px)` at full, which is a wider halo than a full-res filter would be worth
- * paying for. There is deliberately no bright-pass: on a board whose background is #080603 the
- * dark areas contribute almost nothing to an additive composite, so thresholding would cost a
- * second pass to remove light that is not there.
- */
 function drawBloom(paint: PostPaint): void {
   const { ctx, width, height } = paint;
   if (typeof document === 'undefined') return;
@@ -792,7 +631,6 @@ function drawBloom(paint: PostPaint): void {
   ctx.restore();
 }
 
-/** Wall-clock seconds the reveal takes. Long enough to read as a scan, short enough to sit through. */
 const REVEAL = 1.6;
 const LAG_LINE = 'K&D RELAY 4471  ·  SIGNAL ACQUIRED  ·  LAG 40:00:00';
 const HOLD_LINE = 'FRAME HELD — NO CARRIER FROM SITE';
@@ -800,13 +638,6 @@ const HOLD_LINE = 'FRAME HELD — NO CARRIER FROM SITE';
 let revealStart = -1;
 let wasPreview = false;
 
-/**
- * The screen, after everything.
- *
- * Order matters and is not arbitrary: bloom first, because it has to blur the *image* and not the
- * raster laid over it; then the scanlines, which are the display and therefore sit above every
- * mark; then the beam artefacts, which happen in the glass in front of both.
- */
 function post(paint: PostPaint): void {
   const { ctx, width, height, time, preview, reducedMotion } = paint;
   ensureScreen(paint);
@@ -820,12 +651,6 @@ function post(paint: PostPaint): void {
     ctx.fillRect(0, 0, width, height);
   }
 
-  /*
-   * The retrace. A tube that has been on for two hundred years does not hold its vertical lock,
-   * and the bar drifting down the frame is the cheapest possible way to say the picture is being
-   * redrawn rather than displayed. It is additive and it is under six per cent, so it never takes
-   * a tile away from the player — and it is the first thing `prefers-reduced-motion` deletes.
-   */
   if (!reducedMotion && sweep) {
     const band = Math.max(24, height * 0.16);
     const y = ((time * 0.13) % 1) * (height + band) - band;
@@ -848,14 +673,6 @@ function post(paint: PostPaint): void {
   ctx.restore();
 }
 
-/**
- * The pre-run still, as the device would present one.
- *
- * A tube handed a frame that is forty minutes old paints it once and then holds it, so the board
- * arrives under a beam that sweeps down it — and the sweep runs *once* on entry rather than on a
- * loop, because a wipe that keeps occluding the board is an obstruction dressed as an idea and
- * the player is trying to read this picture. After it lands, all that is left is the readout.
- */
 function drawPreview(paint: PostPaint, progress: number): void {
   const { ctx, width, height, dpr, time, reducedMotion } = paint;
 
@@ -883,8 +700,6 @@ function drawPreview(paint: PostPaint, progress: number): void {
   ctx.fillStyle = alpha(INK, 0.38);
   ctx.fillText(HOLD_LINE, pad, base);
 
-  // A cursor that is not blinking is a screen that has stopped, which is the one thing this
-  // machine is not allowed to look like.
   if (!reducedMotion && Math.floor(time * 1.6) % 2 === 0) {
     const w = ctx.measureText(HOLD_LINE).width;
     ctx.fillStyle = alpha(HOT, 0.8);
@@ -892,20 +707,9 @@ function drawPreview(paint: PostPaint, progress: number): void {
   }
 }
 
-// ---------------------------------------------------------------------------
-// The unit
-// ---------------------------------------------------------------------------
-
-/** The 48-unit frame bot geometry is authored in. A local copy: `tiles.ts` imports `theme.ts`. */
 const BOT_FRAME = 48;
-/** Facing angles, indexed by `Dir`. */
 const BOT_ANGLE = [-Math.PI / 2, 0, Math.PI / 2, Math.PI] as const;
 
-/**
- * `String(n)` inside a draw path allocates once per label per frame, and on this direction the
- * label is drawn on *every* bot at every zoom rather than only when there is room, so the table
- * matters more here than it does in `sprites.ts`.
- */
 const NUMERALS: readonly string[] = Array.from({ length: 100 }, (_, i) => String(i));
 
 function numeral(value: number): string {
@@ -916,10 +720,6 @@ function numeral(value: number): string {
 let fontPx = -1;
 let fontFace = '';
 
-/**
- * One slot, because the near and far forms are mutually exclusive on a frame — only the size
- * changes, and only on a zoom step.
- */
 function fontAt(px: number): string {
   if (px !== fontPx) {
     fontPx = px;
@@ -928,15 +728,6 @@ function fontAt(px: number): string {
   return fontFace;
 }
 
-/**
- * The far-zoom unit: a dark cell with a lit rim and its number printed in it.
- *
- * This is the direction paying its own bill. `botAccents` is one hue at twelve intensities, and
- * an intensity is not a name — at the zoom World 7 is played at, twelve bots that differ only in
- * how bright they are is twelve bots the player cannot tell apart. So the far form stops trying
- * to be a coloured blip and becomes a *numbered* one, which is the identity channel a monochrome
- * device actually has. The rim keeps the intensity as a second, weaker cue.
- */
 function drawBotChip(
   ctx: CanvasRenderingContext2D,
   pose: BotPose,
@@ -971,7 +762,6 @@ function drawBotChip(
   ctx.strokeStyle = rim;
   ctx.stroke();
 
-  /* The rim is brightest on the leading edges, which is the facing cue the number cannot carry. */
   if (!dead) {
     ctx.lineWidth = Math.max(1.5, tilePx * 0.1);
     ctx.strokeStyle = HOT;
@@ -983,7 +773,6 @@ function drawBotChip(
   }
   ctx.restore();
 
-  /* Printed after the rotation is dropped: a number that turns with the bot is not a number. */
   ctx.font = fontAt(Math.round(tilePx * 0.46));
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -1001,14 +790,6 @@ function drawBotChip(
   if (options.showFuel && pose.alive) drawBotFuel(ctx, cx, cy, tilePx / BOT_FRAME, options.fuel);
 }
 
-/**
- * The near-zoom unit.
- *
- * The chassis is the shipped geometry rebuilt out of what the device can draw — flat blocks and
- * ruled edges, no fillets, no bevel, no cast shadow, because a tube has no light source to cast
- * one and nothing to bevel against. Lift comes from a dark hull inside a lit rim, and the halo
- * comes free from the bloom in `post`.
- */
 function drawBotDetail(
   ctx: CanvasRenderingContext2D,
   pose: BotPose,
@@ -1054,13 +835,6 @@ function drawBotDetail(
   ctx.fillStyle = dead ? '#150d03' : '#241703';
   ctx.fillRect(-11, -9, 21, 18);
 
-  /*
-   * The punch strip: `id` in binary, four cells, on the top plate.
-   *
-   * Sixteen bots readable straight off the hull without a label and without a hue. This is the
-   * whole answer to what a monochrome direction does about identity — the accent stays as a
-   * warmth cue, but the thing you actually count is holes in a card.
-   */
   ctx.globalAlpha = dead ? 0.25 : 1;
   ctx.fillStyle = accent;
   for (let bit = 0; bit < 4; bit++) {
@@ -1069,7 +843,6 @@ function drawBotDetail(
   }
   ctx.globalAlpha = 1;
 
-  /* Shifted forward off the punch strip: the two marks must not read as one block. */
   ctx.globalAlpha = dead ? 0.3 : 1;
   ctx.fillStyle = dead ? alpha(INK, 0.4) : accent;
   ctx.beginPath();
@@ -1095,8 +868,6 @@ function drawBotDetail(
   }
 
   if (!dead) {
-    // The mast lags whatever the chassis is doing: it hangs forward through the wind-up, whips
-    // back on the launch, and rattles for a moment after a bump.
     const bob =
       (reduced ? 0 : Math.sin(options.time * 3.4 + pose.id * 1.7) * 2.2) +
       pose.travel * -3.4 +
@@ -1148,11 +919,6 @@ function drawBotDetail(
   }
   if (options.showFuel && pose.alive) drawBotFuel(ctx, cx, cy, s, options.fuel);
 
-  /*
-   * 28 device px is 14 CSS px on a retina panel, which switched the id off across most of the
-   * range World 7 is actually played at — on the one direction that has no other way to say which
-   * bot this is. It comes on as soon as a glyph has a body.
-   */
   if (options.showLabel && tilePx >= 20 * options.dpr) {
     const px = Math.max(9, Math.round(tilePx * 0.24));
     const label = numeral(pose.id);
@@ -1189,7 +955,6 @@ function drawBot(
   ctx.restore();
 }
 
-/** Selection, as the device would mark it: four corner brackets, not a bloom. */
 function drawBotBrackets(
   ctx: CanvasRenderingContext2D,
   cx: number,
@@ -1211,13 +976,6 @@ function drawBotBrackets(
   ctx.stroke();
 }
 
-/**
- * DESIGN.md §8: a blocked move must look obviously different from a successful one.
- *
- * `danger` is the one place the monochrome bends, so the bump is the only time the phosphor goes
- * red — which makes it the single most distinct event on the board and keeps it legible for the
- * colour-blind, where an intensity change would not be.
- */
 function drawBotBlocked(
   ctx: CanvasRenderingContext2D,
   pose: BotPose,
@@ -1249,8 +1007,6 @@ function drawBotBlocked(
     ctx.strokeRect(-20 * s, -20 * s, 40 * s, 40 * s);
   }
 
-  // The bang outlasts the impact by a beat and hops while the bot collects itself. A wall is
-  // funnier than an error dialog, and this is the part that makes it one.
   const bang = Math.max(k, pose.recoil * 0.85);
   const hop = reduced ? 0 : Math.abs(Math.sin(pose.recoil * 9)) * pose.recoil * 4 * s;
   const by = (-32 - lift) * s - bang * 3 * s - hop;
@@ -1260,7 +1016,6 @@ function drawBotBlocked(
   ctx.restore();
 }
 
-/** Three ticking cells over a waiting bot, on a slow cycle so a whole row of them is not a strobe. */
 function drawBotIdle(
   ctx: CanvasRenderingContext2D,
   cx: number,
@@ -1281,7 +1036,6 @@ function drawBotIdle(
   }
 }
 
-/** A failed non-move action. Same red as the bump, one notch quieter. */
 function drawBotFailed(
   ctx: CanvasRenderingContext2D,
   cx: number,
@@ -1301,7 +1055,6 @@ function drawBotFailed(
   ctx.stroke();
 }
 
-/** Fuel as eight lit cells rather than an arc: this device counts, it does not sweep. */
 function drawBotFuel(
   ctx: CanvasRenderingContext2D,
   cx: number,
@@ -1322,55 +1075,19 @@ function drawBotFuel(
   }
 }
 
-// ---------------------------------------------------------------------------
-// The plant
-// ---------------------------------------------------------------------------
-
-/**
- * Rows a machine glyph is rasterised into, and the two spans a row may carry.
- *
- * Eight rows because that is the same eight-lines-per-tile target `rasterPitch` aims the terrain
- * at — a machine drawn on a coarser grid than the floor it stands on reads as a different device.
- * Two spans because a door is a slab with a seam down it and a furnace has a mouth, and a gap in
- * the middle of a run is the only way a raster says "hollow" without an outline.
- */
 const GLYPH_ROWS = 8;
 const ITEM_ROWS = 6;
 const SPAN = 4;
 
-/**
- * The second channel. Silhouette says which machine; the pattern its runs are broken with says it
- * again in texture, so two kinds seen at the edge of vision still differ when the outline is a
- * smudge. Monochrome deleted hue and this is a third of what buys it back.
- */
 const PAT_SOLID = 0;
 const PAT_HALF = 1;
 const PAT_THIRD = 2;
 const PAT_STAGGER = 3;
 
-/**
- * Below this *CSS* tile size the interior pattern is dropped and every run is filled solid.
- *
- * At 12 CSS px a glyph row is a pixel and a half of device height and a one-in-three dash is a
- * single dot inside it, which is not a texture, it is grain. The silhouette is what survives that
- * far out, so the far form spends its whole budget on making the outline continuous. Stated in CSS
- * px and multiplied by `dpr` at the call site, the same way `botDetailTilePx` is.
- */
 const PATTERN_CSS = 12;
 
-/**
- * Below this CSS tile size a crop stops being countable and becomes a gauge.
- *
- * The near form is a stack of separated runs and the player reads it by counting. Six rungs need
- * six pitches; at 13 CSS px the pitch is under two device pixels and the gaps close, so counting
- * fails silently — which on `w2-02` is the difference between a solvable level and a guess. A
- * filled column has no such floor: the lit boundary is one edge and an edge is locatable to a
- * single pixel, so six steps stay apart all the way down to the smallest rung the campaign asks
- * for.
- */
 const CROP_COUNT_CSS = 13;
 
-/** A stack count needs a glyph with a body in it. Below this the badge is not drawn at all. */
 const ITEM_BADGE_CSS = 12;
 
 const M_DOOR = 0;
@@ -1386,71 +1103,28 @@ const M_ANTENNA = 9;
 const M_CHARGER = 10;
 const M_ROUTER = 11;
 
-/**
- * Ten silhouettes, in `a0 a1 b0 b1` per row, top row first, as fractions of the glyph box.
- *
- * Written as extents rather than as paths because extents are what the device draws. Every pair
- * that could plausibly be confused is opposed rather than merely made different: the sink is a
- * funnel and the source is that funnel upside down, so the two ends of a delivery chain read as a
- * pair and never as each other; the press is a waisted column between two plates and the furnace
- * is a stack that only narrows, so neither can be taken for the other's outline at speed. `door`
- * and `lever` carry two profiles each — a door that opens and a lever that throws are the two
- * machines whose state *is* a movement, and giving them a separate tell instead would be inventing
- * a signal for something that already has one.
- */
 const MACHINE_GLYPHS = new Float32Array([
-  // door — closed: a slab with a seam. The only glyph split from top to bottom.
   0.1, 0.48, 0.52, 0.9, 0.1, 0.48, 0.52, 0.9, 0.1, 0.48, 0.52, 0.9, 0.1, 0.48, 0.52, 0.9, 0.1, 0.48,
-  0.52, 0.9, 0.1, 0.48, 0.52, 0.9, 0.1, 0.48, 0.52, 0.9, 0.1, 0.48, 0.52, 0.9,
-  // door — open: the leaves withdrawn into the jambs.
-  0.08, 0.22, 0.78, 0.92, 0.08, 0.22, 0.78, 0.92, 0.08, 0.22, 0.78, 0.92, 0.08, 0.22, 0.78, 0.92,
-  0.08, 0.22, 0.78, 0.92, 0.08, 0.22, 0.78, 0.92, 0.08, 0.22, 0.78, 0.92, 0.08, 0.22, 0.78, 0.92,
-  // lever — off: a stalk thrown left off a wide foot.
-  0.2, 0.34, 0, 0, 0.24, 0.38, 0, 0, 0.29, 0.43, 0, 0, 0.34, 0.48, 0, 0, 0.39, 0.53, 0, 0, 0.44,
-  0.58, 0, 0, 0.24, 0.76, 0, 0, 0.18, 0.82, 0, 0,
-  // lever — on: thrown right.
-  0.66, 0.8, 0, 0, 0.62, 0.76, 0, 0, 0.57, 0.71, 0, 0, 0.52, 0.66, 0, 0, 0.47, 0.61, 0, 0, 0.42,
-  0.56, 0, 0, 0.24, 0.76, 0, 0, 0.18, 0.82, 0, 0,
-  // furnace — a stack over a firebox, with the mouth knocked out of the last two rows.
-  0.38, 0.62, 0, 0, 0.38, 0.62, 0, 0, 0.28, 0.72, 0, 0, 0.2, 0.8, 0, 0, 0.16, 0.84, 0, 0, 0.16,
-  0.36, 0.64, 0.84, 0.16, 0.36, 0.64, 0.84, 0.12, 0.88, 0, 0,
-  // press — two plates and a waist. Narrow exactly where the furnace is wide.
-  0.14, 0.86, 0, 0, 0.14, 0.86, 0, 0, 0.42, 0.58, 0, 0, 0.42, 0.58, 0, 0, 0.34, 0.66, 0, 0, 0.34,
-  0.66, 0, 0, 0.1, 0.9, 0, 0, 0.1, 0.9, 0, 0,
-  // sink — a funnel closing downward. Things end here.
-  0.1, 0.9, 0, 0, 0.14, 0.86, 0, 0, 0.2, 0.8, 0, 0, 0.27, 0.73, 0, 0, 0.34, 0.66, 0, 0, 0.41, 0.59,
-  0, 0, 0.45, 0.55, 0, 0, 0.45, 0.55, 0, 0,
-  // source — the same funnel inverted. Things start here.
-  0.45, 0.55, 0, 0, 0.45, 0.55, 0, 0, 0.41, 0.59, 0, 0, 0.34, 0.66, 0, 0, 0.27, 0.73, 0, 0, 0.2,
-  0.8, 0, 0, 0.14, 0.86, 0, 0, 0.1, 0.9, 0, 0,
-  // node — a diamond: widest in the middle, so it is neither funnel and reads as a junction.
-  0.44, 0.56, 0, 0, 0.34, 0.66, 0, 0, 0.22, 0.78, 0, 0, 0.1, 0.9, 0, 0, 0.1, 0.9, 0, 0, 0.22, 0.78,
-  0, 0, 0.34, 0.66, 0, 0, 0.44, 0.56, 0, 0,
-  // antenna — a mast under two arms opening upward. The only glyph that is empty in the middle at
-  // the top, which is what "this one talks to the sky" has to look like.
-  0.1, 0.24, 0.76, 0.9, 0.18, 0.3, 0.7, 0.82, 0.26, 0.38, 0.62, 0.74, 0.34, 0.46, 0.54, 0.66, 0.44,
-  0.56, 0, 0, 0.44, 0.56, 0, 0, 0.44, 0.56, 0, 0, 0.28, 0.72, 0, 0,
-  // charger — a box with a socket bitten out of one side. Held narrower than the door and bitten
-  // three rows deep, because at the far end of the zoom a slab and a slab with a nick in it are
-  // the one pair of these ten that could still converge.
-  0.18, 0.82, 0, 0, 0.18, 0.82, 0, 0, 0.18, 0.54, 0, 0, 0.18, 0.54, 0, 0, 0.18, 0.54, 0, 0, 0.18,
-  0.82, 0, 0, 0.18, 0.82, 0, 0, 0.18, 0.82, 0, 0,
-  // router — a dish with a feed horn standing off it. Curved on one side and flat on the other,
-  // which no other machine is.
-  0.3, 0.44, 0, 0, 0.22, 0.42, 0, 0, 0.16, 0.4, 0, 0, 0.14, 0.4, 0.56, 0.74, 0.14, 0.4, 0.56, 0.74,
-  0.16, 0.4, 0, 0, 0.22, 0.42, 0, 0, 0.3, 0.44, 0, 0,
+  0.52, 0.9, 0.1, 0.48, 0.52, 0.9, 0.1, 0.48, 0.52, 0.9, 0.1, 0.48, 0.52, 0.9, 0.08, 0.22, 0.78,
+  0.92, 0.08, 0.22, 0.78, 0.92, 0.08, 0.22, 0.78, 0.92, 0.08, 0.22, 0.78, 0.92, 0.08, 0.22, 0.78,
+  0.92, 0.08, 0.22, 0.78, 0.92, 0.08, 0.22, 0.78, 0.92, 0.08, 0.22, 0.78, 0.92, 0.2, 0.34, 0, 0,
+  0.24, 0.38, 0, 0, 0.29, 0.43, 0, 0, 0.34, 0.48, 0, 0, 0.39, 0.53, 0, 0, 0.44, 0.58, 0, 0, 0.24,
+  0.76, 0, 0, 0.18, 0.82, 0, 0, 0.66, 0.8, 0, 0, 0.62, 0.76, 0, 0, 0.57, 0.71, 0, 0, 0.52, 0.66, 0,
+  0, 0.47, 0.61, 0, 0, 0.42, 0.56, 0, 0, 0.24, 0.76, 0, 0, 0.18, 0.82, 0, 0, 0.38, 0.62, 0, 0, 0.38,
+  0.62, 0, 0, 0.28, 0.72, 0, 0, 0.2, 0.8, 0, 0, 0.16, 0.84, 0, 0, 0.16, 0.36, 0.64, 0.84, 0.16,
+  0.36, 0.64, 0.84, 0.12, 0.88, 0, 0, 0.14, 0.86, 0, 0, 0.14, 0.86, 0, 0, 0.42, 0.58, 0, 0, 0.42,
+  0.58, 0, 0, 0.34, 0.66, 0, 0, 0.34, 0.66, 0, 0, 0.1, 0.9, 0, 0, 0.1, 0.9, 0, 0, 0.1, 0.9, 0, 0,
+  0.14, 0.86, 0, 0, 0.2, 0.8, 0, 0, 0.27, 0.73, 0, 0, 0.34, 0.66, 0, 0, 0.41, 0.59, 0, 0, 0.45,
+  0.55, 0, 0, 0.45, 0.55, 0, 0, 0.45, 0.55, 0, 0, 0.45, 0.55, 0, 0, 0.41, 0.59, 0, 0, 0.34, 0.66, 0,
+  0, 0.27, 0.73, 0, 0, 0.2, 0.8, 0, 0, 0.14, 0.86, 0, 0, 0.1, 0.9, 0, 0, 0.44, 0.56, 0, 0, 0.34,
+  0.66, 0, 0, 0.22, 0.78, 0, 0, 0.1, 0.9, 0, 0, 0.1, 0.9, 0, 0, 0.22, 0.78, 0, 0, 0.34, 0.66, 0, 0,
+  0.44, 0.56, 0, 0, 0.1, 0.24, 0.76, 0.9, 0.18, 0.3, 0.7, 0.82, 0.26, 0.38, 0.62, 0.74, 0.34, 0.46,
+  0.54, 0.66, 0.44, 0.56, 0, 0, 0.44, 0.56, 0, 0, 0.44, 0.56, 0, 0, 0.28, 0.72, 0, 0, 0.18, 0.82, 0,
+  0, 0.18, 0.82, 0, 0, 0.18, 0.54, 0, 0, 0.18, 0.54, 0, 0, 0.18, 0.54, 0, 0, 0.18, 0.82, 0, 0, 0.18,
+  0.82, 0, 0, 0.18, 0.82, 0, 0, 0.3, 0.44, 0, 0, 0.22, 0.42, 0, 0, 0.16, 0.4, 0, 0, 0.14, 0.4, 0.56,
+  0.74, 0.14, 0.4, 0.56, 0.74, 0.16, 0.4, 0, 0, 0.22, 0.42, 0, 0, 0.3, 0.44, 0, 0,
 ]);
 
-/**
- * Intensity as hierarchy, not as name.
- *
- * Ten brightnesses is not something a player can name, and this file already says so about
- * `botAccents`. What a ramp can do is rank, so it ranks by reach: the machines a bot has to
- * physically arrive at — a door in its path, a charger it parks on, a press it stands beside — sit
- * at the top, and the ones it only ever addresses down a wire sit at the bottom. The board's
- * brightest structures are then the ones worth driving to, and identity is still the silhouette's
- * job.
- */
 const MACHINE_INK: readonly string[] = [
   alpha(INK, 0.86),
   alpha(INK, 0.7),
@@ -1464,7 +1138,6 @@ const MACHINE_INK: readonly string[] = [
   alpha(INK, 0.54),
 ];
 
-/** The same ramp on the hot phosphor. Every entry outruns its cold twin in value, not in hue. */
 const MACHINE_LIT: readonly string[] = [
   alpha(HOT, 0.98),
   alpha(HOT, 0.86),
@@ -1483,7 +1156,6 @@ const MACHINE_FOOT = alpha(INK, 0.26);
 const MACHINE_FOOT_LIT = alpha(HOT, 0.94);
 const MACHINE_LAMP_OFF = alpha(INK, 0.34);
 
-/** Kind order, and the index every per-kind table above is read at. */
 function machineIndex(kind: string): number {
   switch (kind) {
     case 'door':
@@ -1534,15 +1206,6 @@ function machineGlyph(kind: string, powered: boolean): number {
   }
 }
 
-/**
- * Which break each kind's runs carry.
- *
- * Paired against the silhouettes rather than handed out in rotation: the funnel that swallows is
- * the sparsest raster on the board and the funnel that emits is the densest, so sink and source
- * differ in texture as well as in outline; the furnace is broken and offset because that is what
- * fire looks like on a tube; the door and the lever are solid because a slab and a stick have no
- * interior to break at any zoom this game is played at.
- */
 function machinePattern(kind: string): number {
   switch (kind) {
     case 'door':
@@ -1563,18 +1226,10 @@ function machinePattern(kind: string): number {
   }
 }
 
-/** Power drives the raster one step denser. A running machine is a fuller picture, literally. */
 function denser(pattern: number): number {
   return pattern === PAT_THIRD ? PAT_HALF : PAT_SOLID;
 }
 
-/**
- * A glyph, rasterised into horizontal runs.
- *
- * The one primitive both machines and items are made of, so the two layers cannot drift into
- * different mark languages the way the shared atlas let them. `flip` reflects the extents about the
- * box centre, which is how a dish points the way the level authored it without a second table.
- */
 function rasterRuns(
   ctx: CanvasRenderingContext2D,
   table: Float32Array,
@@ -1623,18 +1278,6 @@ function rasterRuns(
   }
 }
 
-/**
- * One machine, as a rasterised glyph block.
- *
- * Four marks in a fixed order, each doing a different job. The backing knocks the terrain raster
- * out of the cell, because a glyph drawn straight onto a dotted floor is a glyph with the floor's
- * texture running through it. The runs are the identity. The footing and the lamp are the state,
- * and they are deliberately the two marks that do not move: `powered` is the one bit every kind
- * carries, a player who has asked the system for stillness still has to see it, and a pulse is not
- * an answer to that. So power is a bar that goes from barely lit to the brightest run in the cell,
- * a lamp that changes from a dash to a block, a raster that closes up, and a value step across the
- * whole glyph — four still tells, and not one of them a hue.
- */
 function drawMachine(paint: MachinePaint): void {
   const { ctx, tilePx, kind, powered, dpr } = paint;
   const px = paint.x * tilePx;
@@ -1675,7 +1318,6 @@ function drawMachine(paint: MachinePaint): void {
   if (powered) {
     ctx.fillStyle = MACHINE_FOOT_LIT;
     ctx.fillRect(lx, ly, lamp, lamp);
-    /* The flicker is a fifth tell and the only one allowed to be motion, so it only ever adds. */
     if (!paint.reduced) {
       ctx.fillStyle = alpha(HOT, 0.4 + 0.35 * Math.sin(paint.time * 3.1 + px + py));
       ctx.fillRect(lx, ly, lamp, lamp);
@@ -1686,13 +1328,6 @@ function drawMachine(paint: MachinePaint): void {
   }
 }
 
-/**
- * Six intensities to go with six lengths, so maturity is told twice.
- *
- * The last entry is the hot phosphor and every other one is the cold: ripe is not the top of a
- * ramp, it is a different colour of light. On a board with one hue that is the strongest claim a
- * value channel can be asked to make.
- */
 const CROP_INK: readonly string[] = [
   alpha(INK, 0.46),
   alpha(INK, 0.53),
@@ -1707,16 +1342,6 @@ const CROP_EMPTY = alpha(INK, 0.14);
 const CROP_GAUGE = alpha(INK, 0.88);
 const CROP_BRACKET = alpha(INK, 0.9);
 
-/**
- * Ripe, and it is not the sixth rung of anything.
- *
- * The ladder below this counts runs and its runs are separated; this is one solid block with no
- * gap anywhere in it, inside a bracket, on the hot phosphor. Three categorical changes at once —
- * texture, enclosure and value — because `w2-02` is a field of these mixed in with unripe ones and
- * the player is scanning it, not studying it. A crop that was merely the tallest stack would be a
- * thing you have to compare against a neighbour to read, and on the edge of the field there is no
- * neighbour to compare it against.
- */
 function drawCropRipe(paint: CropPaint, px: number, py: number): void {
   const { ctx, tilePx } = paint;
   const inset = Math.round(tilePx * 0.24);
@@ -1741,23 +1366,8 @@ function drawCropRipe(paint: CropPaint, px: number, py: number): void {
   }
 }
 
-/**
- * Ice-scrub, and the whole of `w2-05`. Two things grow on that soil and only one is the harvest.
- *
- * Every crop rung above stands on the soil rule, in the centre column, tapering upward, and the
- * ripe one is enclosed in a bracket. That is a *cultivated* grammar: worked ground, one plant per
- * row, a mark that says take this. Scrub gets none of it. **No soil rule** — nobody turned this
- * ground, and "sown but bare" and "a weed came up here" are different facts a player acts on
- * differently. No column, no stalk, no bracket, and never the hot phosphor, which on this
- * direction is reserved for the one thing worth stopping for.
- *
- * What is left is low, wide and uneven: runs scattered across the bottom half of the tile at no
- * pitch and on no baseline. Against a centred vertical tally that is a different silhouette
- * rather than a different value, so it holds at the floor and holds with the hue gone.
- */
 const SCRUB_INK = alpha(INK, 0.4);
 
-/** `x`, `w`, `y` as tile fractions. Uneven on purpose: a pitch is what a planted row has. */
 const SCRUB_RUNS: readonly (readonly [number, number, number])[] = [
   [0.08, 0.26, 0.76],
   [0.44, 0.34, 0.72],
@@ -1767,7 +1377,6 @@ const SCRUB_RUNS: readonly (readonly [number, number, number])[] = [
   [0.66, 0.22, 0.4],
 ];
 
-/** Weeds spread sideways. Maturity is how much of the tile it has taken, never how tall it is. */
 const SCRUB_COUNT: readonly number[] = [1, 2, 3, 4, 5, 6];
 
 function drawScrub(paint: CropPaint): void {
@@ -1789,13 +1398,6 @@ function drawScrub(paint: CropPaint): void {
   }
 }
 
-/**
- * One crop tile.
- *
- * The soil rule is drawn at every stage including the first, so a sown-but-bare tile is never an
- * empty cell — "nothing has come up yet" and "nothing was ever planted here" are different facts
- * and a player acts on them differently.
- */
 function drawCrop(paint: CropPaint): void {
   if (paint.kind === 'ice') {
     drawScrub(paint);
@@ -1819,10 +1421,6 @@ function drawCrop(paint: CropPaint): void {
   const cx = px + Math.round(tilePx / 2);
 
   if (tilePx < CROP_COUNT_CSS * paint.dpr) {
-    /*
-     * The far form: a column, part of it lit. Height instead of count, because what a gauge asks
-     * the eye to find is one boundary and what a stack asks it to do is arithmetic.
-     */
     const w = Math.max(2, Math.round(tilePx * 0.3));
     const top = py + Math.round(tilePx * 0.15);
     const h = Math.max(stages, Math.round(tilePx * 0.68));
@@ -1864,57 +1462,21 @@ const I_PART = 8;
 const I_CELL = 9;
 const I_CHIP = 10;
 
-/**
- * Eleven small glyphs, six rows each, in the same `a0 a1 b0 b1` extents the machines use.
- *
- * The atlas told several of these apart by hue alone — a red ore chunk beside a grey stone one —
- * and there is no hue here, so every pair that shared a shape had to be given a different one.
- * Regolith is a scatter and stone is a mass, which is the actual difference between dust and rock;
- * ore is the only diamond and the only glyph with a hot core; ice is the only sheared stack; the
- * crate is the only thing you can see through and the chip is the only thing with legs under it.
- */
 const ITEM_GLYPHS = new Float32Array([
-  // regolith — loose, scattered, never one body.
   0, 0, 0, 0, 0.1, 0.3, 0.62, 0.82, 0, 0, 0, 0, 0.34, 0.56, 0.8, 1, 0.04, 0.22, 0.44, 0.66, 0.2,
-  0.44, 0.62, 0.96,
-  // stone — a squat mass widening to the ground.
-  0, 0, 0, 0, 0, 0, 0, 0, 0.3, 0.72, 0, 0, 0.2, 0.82, 0, 0, 0.12, 0.9, 0, 0, 0.08, 0.94, 0, 0,
-  // ore — a diamond, with the vein laid over it.
-  0.42, 0.58, 0, 0, 0.28, 0.72, 0, 0, 0.14, 0.86, 0, 0, 0.14, 0.86, 0, 0, 0.28, 0.72, 0, 0, 0.42,
-  0.58, 0, 0,
-  // ice — every row the same width and every row offset. The only sheared glyph on the board.
-  0.44, 0.86, 0, 0, 0.38, 0.8, 0, 0, 0.32, 0.74, 0, 0, 0.26, 0.68, 0, 0, 0.2, 0.62, 0, 0, 0.14,
-  0.56, 0, 0,
-  // scrap — a body that has been broken. No two rows agree.
-  0.34, 0.52, 0, 0, 0.22, 0.58, 0, 0, 0.16, 0.46, 0.6, 0.8, 0.1, 0.72, 0, 0, 0.24, 0.9, 0, 0, 0.06,
-  0.56, 0.68, 0.86,
-  // seed — the smallest mark in the game, and it lies on the floor.
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.4, 0.6, 0, 0, 0.32, 0.68, 0, 0, 0.38, 0.62, 0, 0,
-  // crop — the ripe tile in miniature, so a harvested crop is the object it was in the field.
-  0.3, 0.7, 0, 0, 0.3, 0.7, 0, 0, 0.3, 0.7, 0, 0, 0.3, 0.7, 0, 0, 0.3, 0.7, 0, 0, 0.2, 0.8, 0, 0,
-  // crate — hollow, with one band across it.
-  0.08, 0.92, 0, 0, 0.08, 0.2, 0.8, 0.92, 0.08, 0.92, 0, 0, 0.08, 0.2, 0.8, 0.92, 0.08, 0.2, 0.8,
-  0.92, 0.08, 0.92, 0, 0,
-  // part — a machined cross. Nothing else is wide only in the middle.
-  0.4, 0.6, 0, 0, 0.4, 0.6, 0, 0, 0.06, 0.94, 0, 0, 0.06, 0.94, 0, 0, 0.4, 0.6, 0, 0, 0.4, 0.6, 0,
-  0,
-  // cell — a capped can, with the charge block laid over it.
-  0.36, 0.64, 0, 0, 0.22, 0.78, 0, 0, 0.22, 0.78, 0, 0, 0.22, 0.78, 0, 0, 0.22, 0.78, 0, 0, 0.22,
-  0.78, 0, 0,
-  // chip — a flat body standing on legs.
-  0, 0, 0, 0, 0.16, 0.84, 0, 0, 0.16, 0.84, 0, 0, 0.16, 0.84, 0, 0, 0.04, 0.16, 0.84, 0.96, 0.04,
-  0.16, 0.84, 0.96,
+  0.44, 0.62, 0.96, 0, 0, 0, 0, 0, 0, 0, 0, 0.3, 0.72, 0, 0, 0.2, 0.82, 0, 0, 0.12, 0.9, 0, 0, 0.08,
+  0.94, 0, 0, 0.42, 0.58, 0, 0, 0.28, 0.72, 0, 0, 0.14, 0.86, 0, 0, 0.14, 0.86, 0, 0, 0.28, 0.72, 0,
+  0, 0.42, 0.58, 0, 0, 0.44, 0.86, 0, 0, 0.38, 0.8, 0, 0, 0.32, 0.74, 0, 0, 0.26, 0.68, 0, 0, 0.2,
+  0.62, 0, 0, 0.14, 0.56, 0, 0, 0.34, 0.52, 0, 0, 0.22, 0.58, 0, 0, 0.16, 0.46, 0.6, 0.8, 0.1, 0.72,
+  0, 0, 0.24, 0.9, 0, 0, 0.06, 0.56, 0.68, 0.86, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.4, 0.6, 0, 0,
+  0.32, 0.68, 0, 0, 0.38, 0.62, 0, 0, 0.3, 0.7, 0, 0, 0.3, 0.7, 0, 0, 0.3, 0.7, 0, 0, 0.3, 0.7, 0,
+  0, 0.3, 0.7, 0, 0, 0.2, 0.8, 0, 0, 0.08, 0.92, 0, 0, 0.08, 0.2, 0.8, 0.92, 0.08, 0.92, 0, 0, 0.08,
+  0.2, 0.8, 0.92, 0.08, 0.2, 0.8, 0.92, 0.08, 0.92, 0, 0, 0.4, 0.6, 0, 0, 0.4, 0.6, 0, 0, 0.06,
+  0.94, 0, 0, 0.06, 0.94, 0, 0, 0.4, 0.6, 0, 0, 0.4, 0.6, 0, 0, 0.36, 0.64, 0, 0, 0.22, 0.78, 0, 0,
+  0.22, 0.78, 0, 0, 0.22, 0.78, 0, 0, 0.22, 0.78, 0, 0, 0.22, 0.78, 0, 0, 0, 0, 0, 0, 0.16, 0.84, 0,
+  0, 0.16, 0.84, 0, 0, 0.16, 0.84, 0, 0, 0.04, 0.16, 0.84, 0.96, 0.04, 0.16, 0.84, 0.96,
 ]);
 
-/**
- * The third channel, and on this layer the load-bearing one.
- *
- * Items are drawn at half a tile, so at the far end of the zoom there are twenty device pixels
- * between eleven of them and a silhouette is six rows of two. Value carries what the outline
- * cannot, and the ramp is ordered by what the player is usually hunting for: a crop or a chip at
- * the top, tailings and rubble at the bottom, so a floor covered in mining spoil never out-shouts
- * the one crate that matters.
- */
 const ITEM_INK: readonly string[] = [
   alpha(INK, 0.44),
   alpha(INK, 0.56),
@@ -1961,7 +1523,6 @@ function itemGlyph(kind: string): number {
   }
 }
 
-/** Ice and the chip are half-lit because both are things you see through; the cell is sparsest. */
 function itemPattern(glyph: number): number {
   switch (glyph) {
     case I_ICE:
@@ -1976,13 +1537,6 @@ function itemPattern(glyph: number): number {
   }
 }
 
-/**
- * A second cached font slot.
- *
- * `fontAt` holds one, and the bot label and this badge want different sizes at the same zoom — one
- * slot shared between them would rebuild a template string on every alternation, which is the
- * per-frame allocation the single slot exists to prevent in the first place.
- */
 let badgePx = -1;
 let badgeFace = '';
 
@@ -1994,14 +1548,6 @@ function badgeFont(px: number): string {
   return badgeFace;
 }
 
-/**
- * One ground stack, glyph and count both.
- *
- * There is no cast shadow, because a tube has no light to cast one with — the "this is lying on
- * the floor" cue is a dim rule under the glyph, which is what the device would draw and which
- * costs one run rather than an ellipse. The bob is the only motion here and is the first thing
- * `reduced` deletes; the rule stays put while the glyph rides, which is what sells the lift.
- */
 function drawItem(paint: ItemPaint): void {
   const { ctx, tilePx, count, dpr } = paint;
   const px = paint.x * tilePx;

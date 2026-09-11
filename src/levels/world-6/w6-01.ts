@@ -24,22 +24,11 @@ const MAST_AT = vec(5, 3);
 const TAGS = ['BAND', 'GRID', 'MAST', 'RELAY', 'DRIFT', 'POST', 'SESS'];
 const WORDS = ['NOMINAL', 'IDLE', 'STANDBY', 'CARRIER', 'QUIET', 'ACTIVE', 'SYNC', 'LOW'];
 
-/** NARRATIVE.md §3.2: 4470's status ping is planted here as traffic and read as noise. */
 const PING = 'SESS 4470 ACTIVE';
 
 const expected = (ctx: ObjectiveContext): Objective =>
   Objectives.printedSequence(queued(ctx.initialWorld));
 
-/**
- * CURRICULUM.md §8 calls this the rest beat: the biggest deliberate difficulty drop in the
- * game, straight after w5-05's spanning tree. It is a `while` loop over a queue and nothing else.
- * No traversal, no bonus, one objective.
- *
- * Par: every verb the level unlocks is free, so the reference finishes in 0 ticks. `par.ticks` is
- * 1 because the registry test requires a positive par — which is exactly why the level is
- * ungraded (DESIGN.md §7). A ladder built on a number that exists to satisfy a test would
- * teach the player the grade is noise, one world before the grade starts carrying information.
- */
 export const w6_01: LevelDef = {
   id: 'w6-01',
   world: 6,
@@ -55,19 +44,6 @@ export const w6_01: LevelDef = {
     '',
     'Print every packet on the band, in order, exactly as it arrived.',
   ].join('\n'),
-  /**
-   * DESIGN.md §11.10.
-   *
-   * The rest beat has one thing to get wrong and it is the empty shift, so the sheet says outright
-   * that the length is the axis and that none at all is one of its values. The `The queue` card
-   * says "some shifts it is empty"; what it cannot say is that nothing else about the band moves.
-   *
-   * The line that earns its place is the second one. The whole band is queued before the shift
-   * starts — `installPost` writes it onto the tile once and nothing is ever added — so `buffered()`
-   * is a length, not a sample, and a run does not have to sit and wait for traffic that will never
-   * arrive. A player who suspects packets are still coming in writes a polling loop against a
-   * queue that has been finished since tick zero, on the one level in the game built to be small.
-   */
   board: {
     fixed: [
       'the post is a 10 by 6 shack; RIG-06 is parked on the antenna and nothing here needs it to move',
@@ -100,7 +76,6 @@ export const w6_01: LevelDef = {
     const world = createWorld({ w: 10, h: 6, seed, fill: Terrain.Floor });
     paintAscii(world, SHACK, LEGEND);
     const rng = new Rng(seed * 7919 + 61);
-    // Seed 3 is the empty-queue shift (CURRICULUM.md §15). Doing nothing must pass it.
     const count = seed === 3 ? 0 : rng.int(5, 15);
     const packets: string[] = [];
     for (let i = 0; i < count; i++) {

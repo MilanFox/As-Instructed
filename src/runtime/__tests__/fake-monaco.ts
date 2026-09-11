@@ -2,33 +2,15 @@ import ts from 'typescript';
 import type * as MonacoEditor from 'monaco-editor';
 import type { MonacoApi } from '../compile.ts';
 
-/**
- * Enough of Monaco's TypeScript namespace to run `compile.ts` in Node.
- *
- * TEST HELPER. `compilePlayerCode` is the only path a player's source ever takes, and until this
- * existed nothing could execute it outside a browser: the real implementation is Monaco's bundled
- * TypeScript worker, which needs a DOM and a web worker. So this is the same compiler — the
- * `typescript` package, the version Monaco ships — behind the same three calls `compile.ts` makes
- * (`getSyntacticDiagnostics`, `getSemanticDiagnostics`, `getEmitOutput`).
- *
- * What matters is that the compiler options are not restated here. `configurePlayerLanguage` sets
- * them through `setCompilerOptions`, this host hands whatever arrived straight to the language
- * service, and so a test that compiles a program is testing the options the editor really uses.
- */
-
 type TextModel = MonacoEditor.editor.ITextModel;
 
 export interface FakeMonaco {
   monaco: MonacoApi;
-  /** Creates or replaces the model at `uri`, ready for `compilePlayerCode`. */
   model(uri: string, text: string): TextModel;
 }
 
-/** `lib: ['es2022']` is how Monaco spells it; the compiler wants the file name. */
 function normalizeOptions(options: ts.CompilerOptions): ts.CompilerOptions {
-  const lib = options.lib?.map((name) =>
-    name.startsWith('lib.') ? name : `lib.${name}.d.ts`,
-  );
+  const lib = options.lib?.map((name) => (name.startsWith('lib.') ? name : `lib.${name}.d.ts`));
   return { ...options, ...(lib ? { lib } : {}) };
 }
 
@@ -50,9 +32,6 @@ function toWorkerDiagnostic(diagnostic: ts.Diagnostic): {
 
 export function createFakeMonaco(): FakeMonaco {
   const documents = new Map<string, string>();
-  /* Kept outside `documents` deliberately: an extra lib is deleted and rewritten on every level
-     change, and a version that restarted at 1 would let the language service serve the previous
-     level's declarations out of its cache. */
   const versions = new Map<string, number>();
   let compilerOptions: ts.CompilerOptions = {};
   let ignoredCodes: number[] = [];
@@ -87,9 +66,13 @@ export function createFakeMonaco(): FakeMonaco {
 
   const worker = {
     getSyntacticDiagnostics: (fileName: string) =>
-      Promise.resolve(service.getSyntacticDiagnostics(fileName).filter(keep).map(toWorkerDiagnostic)),
+      Promise.resolve(
+        service.getSyntacticDiagnostics(fileName).filter(keep).map(toWorkerDiagnostic),
+      ),
     getSemanticDiagnostics: (fileName: string) =>
-      Promise.resolve(service.getSemanticDiagnostics(fileName).filter(keep).map(toWorkerDiagnostic)),
+      Promise.resolve(
+        service.getSemanticDiagnostics(fileName).filter(keep).map(toWorkerDiagnostic),
+      ),
     getEmitOutput: (fileName: string, emitOnlyDtsFiles?: boolean, forceDtsEmit?: boolean) =>
       Promise.resolve(service.getEmitOutput(fileName, emitOnlyDtsFiles, forceDtsEmit)),
   };

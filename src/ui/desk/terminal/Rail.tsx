@@ -1,18 +1,3 @@
-/**
- * The machine's account of the work order, tucked against the program's right edge.
- *
- * It is the old `ObjectiveRail`, moved onto the terminal's own screen and stripped of the fold.
- * The fold existed because the card floated over the board and the player sometimes wanted the
- * width back; inside the terminal it has a permanent home and takes nothing from
- * anybody, so there is nothing to fold away from.
- *
- * Two things the old card could not do are done here. The label and its readout used to be
- * siblings on one row in a card clamped between 168 and 232px, so a label wrapped
- * mid-phrase — the column is taller and narrower now, and the readout sits *under* the label rather
- * than beside it. And DESIGN.md §7's rule that an ungraded work order never prints "par" is
- * carried over word for word, because `src/ui/__tests__/limit-and-par.test.ts` is the record of
- * what those words have to be.
- */
 import { useMemo } from 'react';
 import type { World } from '../../../engine/index.ts';
 import { replayTo } from '../../../engine/index.ts';
@@ -31,14 +16,10 @@ interface ObjectiveRow {
   label: string;
   met: boolean;
   bonus: boolean;
-  /** The one the run is working towards at this tick. Exactly one row has it, or none. */
   active: boolean;
   progress?: [number, number];
-  /** Declared by the objective (DESIGN.md §5). Without it `budgetFor` parses the label. */
   meter?: Meter;
-  /** Declared by the objective. Without it the noun is taken from the label. */
   unit?: string;
-  /** Set when this objective is something the run spends rather than something it completes. */
   budget?: Budget;
 }
 
@@ -53,14 +34,6 @@ export function Rail(): React.JSX.Element {
   const atEnd = !trace || flooredTick >= trace.endTick;
   const active = activeTrack(playback, flooredTick);
 
-  /*
-   * The rail is live during playback, not just afterwards.
-   *
-   * Objective state and progress both come from `src/game/playback.ts` — the run replayed forward
-   * and evaluated as it goes — so a tick ticks over on screen at the moment the bot earned it,
-   * and "7/12" counts up while you watch. At the very end the verdict wins: it is the record, and
-   * it knows about ops and sense budgets that a partial replay cannot.
-   */
   const rows: ObjectiveRow[] = useMemo(() => {
     if (!level) return [];
     const bonusIds = new Set((level.bonus ?? []).map((objective) => objective.id));
@@ -83,11 +56,6 @@ export function Rail(): React.JSX.Element {
       const live = track ? progressAt(track, flooredTick) : undefined;
       const progress = atEnd ? result?.progress : (live ?? result?.progress);
       if (progress) row.progress = progress;
-      /*
-       * The clamp in `progress()` is what makes an overrun invisible — 21 beams against a rating
-       * of 16 reports 16/16 — so the real spend is recovered from the trace at this tick. Live and
-       * at the end it is the same call, because the trace is the same evidence either way.
-       */
       const budget = budgetFor(row, {
         trace,
         tick: flooredTick,
@@ -99,12 +67,6 @@ export function Rail(): React.JSX.Element {
     });
   }, [level, verdict, playback, atEnd, active, flooredTick, trace]);
 
-  /*
-   * Objective credit is banked per objective, not per run (`LevelProgress.objectives`), and a
-   * multi-seed level is the one place a player cannot see it any other way: an objective that has
-   * held on every layout is closed work, even on a run where its neighbour failed. Without this
-   * line the rail resets to the last run and five objectives read as one unfinished bit.
-   */
   const banked = useGame((state) => (level ? state.save.levels[level.id]?.objectives : undefined));
   const bankedCount = useMemo(() => {
     if (!level || !banked) return 0;
@@ -112,14 +74,6 @@ export function Rail(): React.JSX.Element {
     return level.objectives.filter((objective) => ids.has(objective.id)).length;
   }, [level, banked]);
 
-  /*
-   * The world under the playhead, replayed once and read by everything below it.
-   *
-   * The fuel gauge used to do this on its own; the crew block needs the same object at the same
-   * tick, and `replayTo` clones a whole world, so it is hoisted rather than called twice. Before
-   * the first run there is no trace and the board on screen is the first seed — the same
-   * expression the feed uses, for the same reason.
-   */
   const board = useMemo<World | null>(() => {
     if (trace) return replayTo(trace, flooredTick);
     return level ? level.build(level.seeds[0] as number) : null;
@@ -132,22 +86,6 @@ export function Rail(): React.JSX.Element {
     return bot ? { fuel: bot.fuel, max: bot.fuelMax } : null;
   }, [showFuel, trace, board]);
 
-  /*
-   * What each bot is doing right now, in words.
-   *
-   * Three things had no text anywhere in the game. **Per-bot clocks**, which DESIGN.md §8 requires
-   * by name for `w7-01` and `w7-03` — `api-spec.ts` explains causality entirely in terms of them
-   * ("a bot only sees a message once its own clock has reached the moment the message was sent")
-   * and a player debugging an empty inbox could not look at either clock. **Inbox depth**, which
-   * `recv()` pops destructively and never reports. And **the edge of `capacity`**: nothing on the
-   * bot reports its own limit — that omission is a designed limit under DESIGN.md §11.9 and it
-   * stays — but §11.9's second half says to *draw the edge*, and a full bot and a half-full bot
-   * were the same picture. At `capacity: 1`, which is the premise of three World 3 orders, that is
-   * the difference between the level working and not.
-   *
-   * The clock and the inbox are drawn only where there is more than one bot. On a single-bot
-   * order the bot's clock is the playhead, and the playhead is the transport's number.
-   */
   const crew = useMemo(() => {
     if (!board) return [];
     return board.bots.map((bot) => {
@@ -181,15 +119,6 @@ export function Rail(): React.JSX.Element {
     (objective) => objective.meter?.kind === 'ticks' || TICK_OBJECTIVE.test(objective.label),
   );
   const hardStop = gradesTicks ? undefined : level.budget?.maxTicks;
-  /*
-   * Two tick numbers, two words for them.
-   *
-   * `w8-01` asks for 215 and pars at 165, and until this line both were called ticks — so the one
-   * that ends the work order and the one that moves the medal were indistinguishable. The
-   * objective keeps the number, because a limit is something the level asked for; `targets` keeps
-   * par, because a medal is something the site awards. The note is only drawn where both are on
-   * the screen at once, which is the only place the confusion exists.
-   */
   const hasTickLimit = gradesTicks || level.budget?.maxTicks !== undefined;
 
   return (
@@ -225,17 +154,6 @@ export function Rail(): React.JSX.Element {
 
       <div className="rail-block rail-block--targets">
         <h3>TARGETS</h3>
-        {/*
-          On an ungraded work order (DESIGN.md §7) par is not a target, so it is not drawn as
-          one. The clock still shows — it is the number `personalBestLine` compares against, and
-          both playtesters called that the best reward in the game — but there is no denominator
-          to fall short of and no red for falling short of it. A `78 / 78` in green on the level
-          whose only correct program costs 78 is the ladder in miniature, and it teaches exactly
-          the lesson A7 exists to stop teaching.
-
-          Both numbers here are what the last run *cost*. The playhead is the transport's number
-          and it is never printed twice.
-        */}
         <dl className="targets">
           <dt>{graded ? 'par' : 'ticks'}</dt>
           {graded ? (
@@ -304,19 +222,6 @@ export function Rail(): React.JSX.Element {
   );
 }
 
-/**
- * One objective, as a tick-box or as a gauge.
- *
- * A budget gets the bar and the unit-bearing readout; everything else keeps the box and the plain
- * "7/12". The two are deliberately different shapes, because they mean opposite things: a full box
- * is the goal and a full bar is the failure.
- *
- * The `objective*` marks are the same ones the run report draws, and they are the contract
- * `src/ui/__tests__/rail-report-agreement.test.ts` reads both surfaces through: a budget that read
- * as a gauge while the run played and as a tick-box in the report is two different claims about
- * the same number. What changed on the desk is only where the readout sits — under the label
- * rather than beside it — which is layout, not a claim.
- */
 function ObjectiveItem({ row }: { row: ObjectiveRow }): React.JSX.Element {
   const budget = row.budget;
   const over = budget !== undefined && budget.over > 0;
@@ -373,19 +278,10 @@ interface CrewRow {
   clock: number;
   carrying: number;
   capacity: number;
-  /** The one kind in the hold, when there is exactly one. Named because a coloured pip is not. */
   cargo: string | null;
   waiting: number;
 }
 
-/**
- * One bot, as its own clock, its own hold and its own queue.
- *
- * `full` is the whole point of the hold readout. `pickup` returning less than it was asked for is
- * the puzzle and stays the puzzle; being unable to see *that you are full* was the mystery, and a
- * word is the cheapest form that edge can take. A bot that walked into a pit reads `lost` and keeps
- * its row, because a crew that silently got shorter is the same defect one layer up.
- */
 function CrewItem({
   row,
   clocks,

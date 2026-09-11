@@ -9,13 +9,6 @@ import type {
 import { NOTHING, tileAt } from '../../engine/index.ts';
 import { keyOf } from './caves.ts';
 
-/**
- * Objective helpers shared by World 4. Every level here randomizes the position of its goal, so
- * `Objectives.botAt(fixedVec)` cannot be used: the objectives locate their targets by terrain in
- * `ctx.initialWorld` instead, which is the same thing expressed once per seed.
- */
-
-/** Tiles with the given terrain in a world, in row-major order. */
 export function tilesWithTerrain(world: World, terrain: Terrain): Vec[] {
   const out: Vec[] = [];
   for (let y = 0; y < world.h; y++) {
@@ -26,7 +19,6 @@ export function tilesWithTerrain(world: World, terrain: Terrain): Vec[] {
   return out;
 }
 
-/** Every tile the bot stood on, in visit order, reconstructed from the trace. DESIGN.md §4.5. */
 export function standingTiles(ctx: ObjectiveContext, botId = 0): Vec[] {
   const bot = ctx.initialWorld.bots.find((b) => b.id === botId);
   const out: Vec[] = bot ? [{ x: bot.at.x, y: bot.at.y }] : [];
@@ -41,7 +33,6 @@ export function standingKeys(ctx: ObjectiveContext, botId = 0): Set<string> {
   return new Set(standingTiles(ctx, botId).map(keyOf));
 }
 
-/** The tick at which the bot first stood on `at`, or Infinity if it never did. */
 export function firstVisitOrder(ctx: ObjectiveContext, targets: readonly Vec[]): Vec[] {
   const wanted = new Map(targets.map((at) => [keyOf(at), at]));
   const order: Vec[] = [];
@@ -60,19 +51,15 @@ export function botEndsOn(ctx: ObjectiveContext, terrain: Terrain, botId = 0): b
   return tileAt(ctx.world, bot.at)?.terrain === terrain;
 }
 
-/** A coordinate, written the way the brief and the facts table write one. */
 export function at(pos: Vec): string {
   return `(${String(pos.x)}, ${String(pos.y)})`;
 }
 
-/**
- * Where the run left the bot, against the tile it was asked to end on.
- *
- * Every World 4 goal is randomized per seed, so "not met" hides two different mistakes that look
- * identical in the editor: a route that stopped short, and a route that went to the wrong chamber.
- * The pair of coordinates separates them, and both are on the map the player is already looking at.
- */
-export function endedOn(ctx: ObjectiveContext, terrain: Terrain, botId = 0): Divergence | undefined {
+export function endedOn(
+  ctx: ObjectiveContext,
+  terrain: Terrain,
+  botId = 0,
+): Divergence | undefined {
   const target = tilesWithTerrain(ctx.initialWorld, terrain)[0];
   if (target === undefined) return undefined;
   const bot = ctx.world.bots.find((b) => b.id === botId);
@@ -84,7 +71,6 @@ export function endedOn(ctx: ObjectiveContext, terrain: Terrain, botId = 0): Div
   };
 }
 
-/** The tick and tile the bot stopped on, and what stopped it. */
 export function died(ctx: ObjectiveContext, botId = 0): Divergence | undefined {
   const death = ctx.trace.events.find(
     (event): event is DieEvent => event.kind === 'die' && event.botId === botId,
