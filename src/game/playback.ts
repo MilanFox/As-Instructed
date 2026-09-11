@@ -4,8 +4,6 @@ import type { LevelDef } from '../levels/index.ts';
 
 const MAX_SAMPLES = 500;
 
-const MAX_HIGHLIGHTS = 8;
-
 export interface ObjectiveFlip {
   t: number;
   met: boolean;
@@ -223,17 +221,8 @@ export function highlightsAt(
     return { cells: cell ? [{ x: cell.x, y: cell.y }] : [], met: true };
   }
 
-  const cells: Vec[] = [];
-  const seen = new Set<string>();
-  for (const entry of active.work) {
-    if (entry.t <= tick) continue;
-    const key = `${entry.x},${entry.y}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    cells.push({ x: entry.x, y: entry.y });
-    if (cells.length >= MAX_HIGHLIGHTS) break;
-  }
-  if (cells.length > 0) return { cells, met: false };
+  const next = active.work.find((entry) => entry.t > tick);
+  if (next) return { cells: [{ x: next.x, y: next.y }], met: false };
 
   const fallback = active.landing ?? active.work[active.work.length - 1] ?? null;
   return { cells: fallback ? [{ x: fallback.x, y: fallback.y }] : [], met: false };
