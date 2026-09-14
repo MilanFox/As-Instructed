@@ -60,6 +60,21 @@ function sortingProgram(groupWhen: string): string {
   ].join('\n');
 }
 
+const BLIND_STEPS = 24;
+const SURVEY_STRIDE = 6;
+
+function blindProgram(steps: number): string {
+  return Array.from({ length: steps }, () => 'move(Dir.East);').join('\n');
+}
+
+function stridedSurveyProgram(stride: number): string {
+  return [
+    'while (canMove(Dir.East)) {',
+    `  for (let step = 0; step < ${String(stride)}; step++) move(Dir.East);`,
+    '}',
+  ].join('\n');
+}
+
 function levelOrThrow(id: string): LevelDef {
   const level = getLevel(id);
   if (!level) throw new Error(`no level ${id}`);
@@ -151,6 +166,46 @@ describe('w3-02: the bonus star is graded on every seed', () => {
     if (!response.ok) throw new Error('the run did not come back');
     expect(response.verdict.passed).toBe(true);
     expect(response.verdict.failure).toBeUndefined();
+  });
+});
+
+describe('w1-02: the bonus star is graded on every seed', () => {
+  const level = levelOrThrow('w1-02');
+  const bonusId = 'within-7-canMove';
+
+  test('the level still has more than one seed and a bonus to grade', () => {
+    expect(level.seeds.length).toBeGreaterThan(1);
+    expect((level.bonus ?? []).map((objective) => objective.id)).toContain(bonusId);
+  });
+
+  test('a drive that never senses still parks on the pad on every seed', () => {
+    const js = blindProgram(BLIND_STEPS);
+    expect(js).not.toContain('canMove');
+
+    const runs = runEverySeed(level, js);
+    expect(runs.every((run) => run.result.passed)).toBe(true);
+
+    const response = aggregate(runs);
+    if (!response.ok) throw new Error('the run did not come back');
+    expect(response.verdict.passed).toBe(true);
+    expect(response.verdict.stats.senses?.['canMove'] ?? 0).toBe(0);
+  });
+
+  test('a drive that never senses fits one corridor and is refused the star for the rest', () => {
+    const runs = runEverySeed(level, blindProgram(BLIND_STEPS));
+    expect(runs.map((run) => [run.result.seed, run.result.bonus?.[0]?.met])).toEqual([
+      [1, false],
+      [4, true],
+      [7, false],
+    ]);
+    expect(starFor(runs, bonusId)).toBe(false);
+  });
+
+  test('a strided survey stays inside both budgets and keeps the star', () => {
+    const runs = runEverySeed(level, stridedSurveyProgram(SURVEY_STRIDE));
+    expect(runs.every((run) => run.result.passed)).toBe(true);
+    expect(runs.map((run) => run.result.bonus?.[0]?.met)).toEqual(runs.map(() => true));
+    expect(starFor(runs, bonusId)).toBe(true);
   });
 });
 
