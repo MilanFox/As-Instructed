@@ -2,6 +2,7 @@ import type { MonacoApi, RunRequest, RunResponse, RuntimeFailure } from '../runt
 import {
   PLAYER_FILE_PATH,
   Runner,
+  cancelledFailure,
   compilePlayerCode,
   configurePlayerLanguage,
   importsLibrary,
@@ -48,6 +49,10 @@ export class RuntimeRunner implements RunnerPort {
 
     const library = await this.library(monaco, submission.code);
     if (library.error) return { ok: false, error: library.error };
+
+    // this.model writes into the editor's own document, so a submission the player has
+    // already navigated away from would stamp the previous level's source into it.
+    if (this.levelId !== submission.levelId) return { ok: false, error: cancelledFailure() };
 
     const model = this.model(monaco, submission.code);
     const compiled = await compilePlayerCode(monaco, model);

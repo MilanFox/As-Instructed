@@ -63,7 +63,7 @@ export type { RunnerOptions, WorkerLike } from './host.ts';
 export { Runner } from './host.ts';
 
 export type { StackFrame } from './errors.ts';
-export { parseStackFrames, topFrameLine } from './errors.ts';
+export { cancelledFailure, parseStackFrames, topFrameLine } from './errors.ts';
 
 export {
   DEFAULT_WRAPPER_OFFSET,

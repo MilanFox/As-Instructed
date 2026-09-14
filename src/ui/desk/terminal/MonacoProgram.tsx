@@ -45,12 +45,6 @@ export function MonacoProgram({
 
   const { fontSize, lineHeight } = useCodeMetrics();
 
-  const previousLevelId = useRef<string | undefined>(undefined);
-  if (level?.id !== previousLevelId.current) {
-    monaco.editor.getModel(monaco.Uri.parse(PLAYER_FILE_PATH))?.dispose();
-    previousLevelId.current = level?.id;
-  }
-
   useEffect(() => {
     setupMonaco();
   }, []);
@@ -114,6 +108,10 @@ export function MonacoProgram({
 
   const onMount: OnMount = (editor, api) => {
     editorRef.current = editor;
+    // A monaco model outlives the editor that showed it, and the editor adopts whatever
+    // sits at PLAYER_FILE_PATH rather than the value prop. The store owns the document.
+    const model = editor.getModel();
+    if (model && model.getValue() !== code) model.setValue(code);
     editor.addCommand(api.KeyMod.CtrlCmd | api.KeyCode.Enter, () => runRef.current());
     editor.focus();
   };
