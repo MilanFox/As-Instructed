@@ -6,7 +6,7 @@ import { runLevel, runReference } from '../../harness.ts';
 import { SOLUTIONS } from '../../__tests__/solutions.ts';
 import type { LevelDef, ReferenceSolution } from '../../types.ts';
 import { w3_01 } from '../w3-01.ts';
-import { w3_04 } from '../w3-04.ts';
+import { w3_03 } from '../w3-03.ts';
 import { key } from '../yard.ts';
 
 function countCrates(world: World): number {
@@ -222,30 +222,30 @@ function aisleDisciplined(sim: Sim, botId: number): void {
   }
 }
 
-describe('w3-04 aisle-discipline', () => {
+describe('w3-03 aisle-discipline', () => {
   test('a round that stays in the aisles earns it on every seed', () => {
     const trodden = [0, 0, 0, 0];
-    w3_04.seeds.forEach((seed, i) => {
-      const run = scored(w3_04, seed, aisleDisciplined);
+    w3_03.seeds.forEach((seed, i) => {
+      const run = scored(w3_03, seed, aisleDisciplined);
       expect(run.passed, `seed ${String(seed)}`).toBe(true);
       expect(run.spent('aisle-discipline'), `seed ${String(seed)}`).toBe(trodden[i]);
       expect(run.met('aisle-discipline'), `seed ${String(seed)}`).toBe(true);
-      expect(run.ticks, `seed ${String(seed)}`).toBeLessThanOrEqual(w3_04.par.ticks);
+      expect(run.ticks, `seed ${String(seed)}`).toBeLessThanOrEqual(w3_03.par.ticks);
     });
   });
 
   test('the reference sweeps the racks, takes gold and is refused on every seed', () => {
-    const solution = SOLUTIONS[w3_04.id] as ReferenceSolution;
-    for (const seed of w3_04.seeds) {
-      const result = runReference(w3_04, seed, solution);
-      const stars = evaluateObjectives(w3_04.bonus ?? [], {
+    const solution = SOLUTIONS[w3_03.id] as ReferenceSolution;
+    for (const seed of w3_03.seeds) {
+      const result = runReference(w3_03, seed, solution);
+      const stars = evaluateObjectives(w3_03.bonus ?? [], {
         world: result.world,
         initialWorld: result.initialWorld,
         trace: result.trace,
         ops: result.ops,
       });
       expect(result.verdict.passed, `seed ${String(seed)}`).toBe(true);
-      expect(result.ticks, `seed ${String(seed)}`).toBeLessThanOrEqual(w3_04.par.ticks);
+      expect(result.ticks, `seed ${String(seed)}`).toBeLessThanOrEqual(w3_03.par.ticks);
       expect(must(stars[0], 'the star').met, `seed ${String(seed)}`).toBe(false);
     }
   });

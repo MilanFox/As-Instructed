@@ -5,9 +5,9 @@ import { must } from '../../../engine/__tests__/helpers.ts';
 import { runLevel } from '../../harness.ts';
 import type { LevelDef } from '../../types.ts';
 import { WORLD_2_LEVELS } from '../index.ts';
+import { w2_01 } from '../w2-01.ts';
 import { w2_02 } from '../w2-02.ts';
-import { w2_04 } from '../w2-04.ts';
-import { w2_05 } from '../w2-05.ts';
+import { w2_03 } from '../w2-03.ts';
 import { at, ripeAtStart, soilTiles } from '../shared.ts';
 
 function diverge(
@@ -62,10 +62,10 @@ function ripeOf(world: World, kind: ItemKind): Vec[] {
   });
 }
 
-describe('w2-02 names the tile, and says whether the arm ever came down on it', () => {
+describe('w2-01 names the tile, and says whether the arm ever came down on it', () => {
   test('harvested-ripe names a ready crop the run never swung at', () => {
-    const first = must(ripeAtStart(w2_02.build(1))[0], 'a ripe crop');
-    const { met, divergence } = diverge(w2_02, 1, 'harvested-ripe', () => undefined);
+    const first = must(ripeAtStart(w2_01.build(1))[0], 'a ripe crop');
+    const { met, divergence } = diverge(w2_01, 1, 'harvested-ripe', () => undefined);
 
     expect(met).toBe(false);
     expect(divergence).toEqual({
@@ -76,8 +76,8 @@ describe('w2-02 names the tile, and says whether the arm ever came down on it', 
   });
 
   test('all-planted reports the plant swing that came before the harvest', () => {
-    const first = must(ripeAtStart(w2_02.build(1))[0], 'a ripe crop');
-    const { met, divergence } = diverge(w2_02, 1, 'all-planted', (sim, botId) => {
+    const first = must(ripeAtStart(w2_01.build(1))[0], 'a ripe crop');
+    const { met, divergence } = diverge(w2_01, 1, 'all-planted', (sim, botId) => {
       sweep(sim, botId, (each, bot) => {
         each.plant(bot);
         each.harvest(bot);
@@ -93,7 +93,7 @@ describe('w2-02 names the tile, and says whether the arm ever came down on it', 
   });
 
   test('no-wasted-fieldwork names the first wasted swing and how many followed it', () => {
-    const { met, divergence } = diverge(w2_02, 1, 'no-wasted-fieldwork', (sim, botId) => {
+    const { met, divergence } = diverge(w2_01, 1, 'no-wasted-fieldwork', (sim, botId) => {
       sim.harvest(botId);
       sim.plant(botId);
     });
@@ -107,9 +107,9 @@ describe('w2-02 names the tile, and says whether the arm ever came down on it', 
   });
 });
 
-describe('w2-04 separates a swing that found nothing from a tile nobody visited', () => {
+describe('w2-02 separates a swing that found nothing from a tile nobody visited', () => {
   test('harvested-crops counts the swings that came back empty', () => {
-    const { met, divergence } = diverge(w2_04, 1, 'harvested-crops', (sim, botId) => {
+    const { met, divergence } = diverge(w2_02, 1, 'harvested-crops', (sim, botId) => {
       sim.harvest(botId);
     });
 
@@ -122,7 +122,7 @@ describe('w2-04 separates a swing that found nothing from a tile nobody visited'
   });
 
   test('all-planted counts the plant swings a spent hopper turned away', () => {
-    const { met, divergence } = diverge(w2_04, 1, 'all-planted', (sim, botId) => {
+    const { met, divergence } = diverge(w2_02, 1, 'all-planted', (sim, botId) => {
       sim.wait(botId, 45);
       for (let pass = 0; pass < 3; pass++) {
         sweep(sim, botId, (each, bot) => {
@@ -141,7 +141,7 @@ describe('w2-04 separates a swing that found nothing from a tile nobody visited'
   });
 
   test('crop-spoilage on a crop nobody picked asks for the crop before it asks for the ledger', () => {
-    const { met, divergence } = diverge(w2_04, 1, 'crop-spoilage', () => undefined);
+    const { met, divergence } = diverge(w2_02, 1, 'crop-spoilage', () => undefined);
 
     expect(met).toBe(false);
     expect(divergence).toEqual({
@@ -152,7 +152,7 @@ describe('w2-04 separates a swing that found nothing from a tile nobody visited'
   });
 
   test('a run that picked everything late is told the total and the tile that stood longest', () => {
-    const { met, divergence } = diverge(w2_04, 1, 'crop-spoilage', (sim, botId) => {
+    const { met, divergence } = diverge(w2_02, 1, 'crop-spoilage', (sim, botId) => {
       sim.wait(botId, 45);
       for (let pass = 0; pass < 3; pass++) {
         sweep(sim, botId, (each, bot) => {
@@ -175,12 +175,12 @@ describe('w2-04 separates a swing that found nothing from a tile nobody visited'
   });
 });
 
-describe('w2-05 reports what the hopper came back with and where the wheels went', () => {
+describe('w2-03 reports what the hopper came back with and where the wheels went', () => {
   test('hopper-full-crop names the ice that took the slots', () => {
-    const world = w2_05.build(1);
+    const world = w2_03.build(1);
     const ice = ripeOf(world, ItemKind.Ice).slice(0, 3);
     const crop = ripeOf(world, ItemKind.Crop).slice(0, 3);
-    const { met, divergence } = diverge(w2_05, 1, 'hopper-full-crop', (sim, botId) => {
+    const { met, divergence } = diverge(w2_03, 1, 'hopper-full-crop', (sim, botId) => {
       for (const tile of [...ice, ...crop]) {
         goTo(sim, botId, tile);
         sim.harvest(botId);
@@ -196,7 +196,7 @@ describe('w2-05 reports what the hopper came back with and where the wheels went
   });
 
   test('an empty hopper is told how many slots it never filled', () => {
-    const { divergence } = diverge(w2_05, 1, 'hopper-full-crop', () => undefined);
+    const { divergence } = diverge(w2_03, 1, 'hopper-full-crop', () => undefined);
 
     expect(divergence).toEqual({
       where: 'the hopper at the end of the run',
@@ -206,7 +206,7 @@ describe('w2-05 reports what the hopper came back with and where the wheels went
   });
 
   test('tile-footprint names the tick and tile the allowance ran out on', () => {
-    const { met, divergence } = diverge(w2_05, 1, 'tile-footprint', (sim, botId) => {
+    const { met, divergence } = diverge(w2_03, 1, 'tile-footprint', (sim, botId) => {
       let dir: Dir = Dir.East;
       for (let row = 0; row < 3; row++) {
         for (let step = 0; step < 11; step++) sim.move(botId, dir);

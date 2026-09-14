@@ -3,7 +3,7 @@ import { Dir, ItemKind } from '../../../engine/index.ts';
 import type { ReferenceSolution } from '../../types.ts';
 
 export const solution: ReferenceSolution = {
-  levelId: 'w2-05',
+  levelId: 'w2-03',
   run(sim: Sim, botId: number): void {
     let full = false;
 

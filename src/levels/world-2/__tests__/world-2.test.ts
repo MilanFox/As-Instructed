@@ -7,16 +7,16 @@ import { playbackFor } from '../../../game/playback.ts';
 import type { LevelRunResult } from '../../harness.ts';
 import { runLevel, runReference } from '../../harness.ts';
 import type { LevelDef, ReferenceSolution } from '../../types.ts';
-import { WORLD_2_LEVELS, w2_04, w2_05 } from '../index.ts';
+import { WORLD_2_LEVELS, w2_02, w2_03 } from '../index.ts';
+import { solution as w2_01Solution } from '../__solutions__/w2-01.ts';
 import { solution as w2_02Solution } from '../__solutions__/w2-02.ts';
-import { solution as w2_04Solution } from '../__solutions__/w2-04.ts';
-import { solution as w2_05Solution } from '../__solutions__/w2-05.ts';
+import { solution as w2_03Solution } from '../__solutions__/w2-03.ts';
 import { serpentineHarvest } from '../../__tests__/naive.ts';
 
 const SOLUTIONS: Record<string, ReferenceSolution> = {
+  'w2-01': w2_01Solution,
   'w2-02': w2_02Solution,
-  'w2-04': w2_04Solution,
-  'w2-05': w2_05Solution,
+  'w2-03': w2_03Solution,
 };
 
 const key = (at: Vec): string => `${at.x},${at.y}`;
@@ -242,7 +242,7 @@ function surveyTwoLanesThenStrike(sim: Sim, botId: number): void {
 
 describe('world 2 shape', () => {
   test('three levels, in order, each with exactly one bonus star', () => {
-    expect(WORLD_2_LEVELS.map((level) => level.id)).toEqual(['w2-02', 'w2-04', 'w2-05']);
+    expect(WORLD_2_LEVELS.map((level) => level.id)).toEqual(['w2-01', 'w2-02', 'w2-03']);
     for (const level of WORLD_2_LEVELS) {
       expect((level.bonus ?? []).length, level.id).toBe(1);
     }
@@ -270,47 +270,47 @@ describe('world 2 shape', () => {
   });
 });
 
-describe('w2-04 bonus — spoilage', () => {
+describe('w2-02 bonus — spoilage', () => {
   test('standing on each crop as it ripens earns the star on every seed', () => {
-    for (const seed of w2_04.seeds) {
-      const run = runLevel(w2_04, seed, standOnEachCropAsItRipens);
+    for (const seed of w2_02.seeds) {
+      const run = runLevel(w2_02, seed, standOnEachCropAsItRipens);
       expect(run.verdict.passed, `seed ${String(seed)}`).toBe(true);
-      expect(medalFor(true, run.ticks, w2_04.par.ticks), `seed ${String(seed)}`).toBe('gold');
-      expect(starred(w2_04, run), `seed ${String(seed)}`).toBe(true);
+      expect(medalFor(true, run.ticks, w2_02.par.ticks), `seed ${String(seed)}`).toBe('gold');
+      expect(starred(w2_02, run), `seed ${String(seed)}`).toBe(true);
     }
   });
 
   test('the resume-sweep solves it and misses the star, the reported seed included', () => {
-    const missed = w2_04.seeds.filter((seed) => {
-      const run = runReference(w2_04, seed, w2_04Solution);
+    const missed = w2_02.seeds.filter((seed) => {
+      const run = runReference(w2_02, seed, w2_02Solution);
       expect(run.verdict.passed, `seed ${String(seed)}`).toBe(true);
-      return !starred(w2_04, run);
+      return !starred(w2_02, run);
     });
     expect(missed).toContain(1);
     expect(missed.length).toBeGreaterThanOrEqual(3);
   });
 
   test('waiting instead of reading solves it and misses the star by a mile', () => {
-    for (const seed of w2_04.seeds) {
-      const run = runLevel(w2_04, seed, waitLongEnoughOnEverything);
+    for (const seed of w2_02.seeds) {
+      const run = runLevel(w2_02, seed, waitLongEnoughOnEverything);
       expect(run.verdict.passed, `seed ${String(seed)}`).toBe(true);
-      expect(starred(w2_04, run), `seed ${String(seed)}`).toBe(false);
+      expect(starred(w2_02, run), `seed ${String(seed)}`).toBe(false);
     }
   });
 
   test('a run that harvests nothing is charged for every crop it left standing', () => {
-    const run = runLevel(w2_04, 1, stayPut);
+    const run = runLevel(w2_02, 1, stayPut);
     expect(run.verdict.passed).toBe(false);
-    expect(starred(w2_04, run)).toBe(false);
+    expect(starred(w2_02, run)).toBe(false);
   });
 
   test('the ledger reads back in spoilage and never in ticks', () => {
-    const over = runReference(w2_04, 1, w2_04Solution);
-    expect(scoreBonus(w2_04, over).progress).toEqual([24, 18]);
-    expect(readout(w2_04, over)).toBeNull();
+    const over = runReference(w2_02, 1, w2_02Solution);
+    expect(scoreBonus(w2_02, over).progress).toEqual([24, 18]);
+    expect(readout(w2_02, over)).toBeNull();
 
-    const clean = runLevel(w2_04, 1, standOnEachCropAsItRipens);
-    const budget = readout(w2_04, clean);
+    const clean = runLevel(w2_02, 1, standOnEachCropAsItRipens);
+    const budget = readout(w2_02, clean);
     expect(budget?.meter).toBeNull();
     expect(budget?.used).toBe(5);
     expect(budget?.limit).toBe(18);
@@ -318,23 +318,23 @@ describe('w2-04 bonus — spoilage', () => {
   });
 });
 
-describe('w2-05 bonus — footprint', () => {
+describe('w2-03 bonus — footprint', () => {
   test('surveying two lanes and striking earns the star inside the shift on every seed', () => {
-    for (const seed of w2_05.seeds) {
-      const run = runLevel(w2_05, seed, surveyTwoLanesThenStrike);
+    for (const seed of w2_03.seeds) {
+      const run = runLevel(w2_03, seed, surveyTwoLanesThenStrike);
       expect(run.verdict.passed, `seed ${String(seed)}`).toBe(true);
-      expect(run.ticks, `seed ${String(seed)}`).toBeLessThanOrEqual(w2_05.budget?.maxTicks ?? 0);
+      expect(run.ticks, `seed ${String(seed)}`).toBeLessThanOrEqual(w2_03.budget?.maxTicks ?? 0);
       expect(footprintOf(run), `seed ${String(seed)}`).toBeLessThanOrEqual(32);
-      expect(starred(w2_05, run), `seed ${String(seed)}`).toBe(true);
+      expect(starred(w2_03, run), `seed ${String(seed)}`).toBe(true);
     }
   });
 
   test('the serpentine sweep runs out of shift, and misses the star where it does not', () => {
     const closed: number[] = [];
-    for (const seed of w2_05.seeds) {
+    for (const seed of w2_03.seeds) {
       let run;
       try {
-        run = runReference(w2_05, seed, serpentineHarvest);
+        run = runReference(w2_03, seed, serpentineHarvest);
       } catch (error) {
         expect((error as Error).message, `seed ${String(seed)}`).toContain('Shift over');
         continue;
@@ -342,24 +342,24 @@ describe('w2-05 bonus — footprint', () => {
       closed.push(seed);
       expect(run.verdict.passed, `seed ${String(seed)}`).toBe(true);
       expect(footprintOf(run), `seed ${String(seed)}`).toBeGreaterThan(32);
-      expect(starred(w2_05, run), `seed ${String(seed)}`).toBe(false);
+      expect(starred(w2_03, run), `seed ${String(seed)}`).toBe(false);
     }
     expect(closed).toEqual([1, 4]);
   });
 
   test('standing still keeps the footprint at one and fails the shift', () => {
-    const run = runLevel(w2_05, 1, stayPut);
+    const run = runLevel(w2_03, 1, stayPut);
     expect(footprintOf(run)).toBe(1);
     expect(run.verdict.passed).toBe(false);
   });
 
   test('the footprint reads back in tiles, unclamped', () => {
-    const over = runReference(w2_05, 1, serpentineHarvest);
-    expect(scoreBonus(w2_05, over).progress).toEqual([41, 32]);
-    expect(readout(w2_05, over)).toBeNull();
+    const over = runReference(w2_03, 1, serpentineHarvest);
+    expect(scoreBonus(w2_03, over).progress).toEqual([41, 32]);
+    expect(readout(w2_03, over)).toBeNull();
 
-    const clean = runLevel(w2_05, 1, surveyTwoLanesThenStrike);
-    const budget = readout(w2_05, clean);
+    const clean = runLevel(w2_03, 1, surveyTwoLanesThenStrike);
+    const budget = readout(w2_03, clean);
     expect(budget?.meter).toBeNull();
     expect(budget?.used).toBe(23);
     expect(budget?.limit).toBe(32);

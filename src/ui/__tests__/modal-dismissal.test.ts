@@ -120,7 +120,7 @@ describe('the app layer holds no ceremony that can destroy itself', () => {
 
 describe('a run leaves paper on the desk', () => {
   test('a pass issues a certificate of closure and closes the store report', () => {
-    runFinished('w1-05', true, 78);
+    runFinished('w1-03', true, 78);
     deliver();
 
     expect(ofKind('certificate')).toHaveLength(1);
@@ -128,7 +128,7 @@ describe('a run leaves paper on the desk', () => {
   });
 
   test('a failure issues a HALT notice', () => {
-    runFinished('w1-05', false, 900);
+    runFinished('w1-03', false, 900);
     deliver();
 
     expect(ofKind('halt')).toHaveLength(1);
@@ -136,14 +136,14 @@ describe('a run leaves paper on the desk', () => {
   });
 
   test('the work order is on the desk the moment the level is open', () => {
-    useGame.setState({ screen: 'workspace', currentLevelId: 'w1-05' });
+    useGame.setState({ screen: 'workspace', currentLevelId: 'w1-03' });
     deliver();
 
     expect(ofKind('order')).toHaveLength(1);
   });
 
   test("nothing but the open level's own paper is on the desk", () => {
-    useGame.setState({ screen: 'workspace', currentLevelId: 'w1-05' });
+    useGame.setState({ screen: 'workspace', currentLevelId: 'w1-03' });
     deliver();
 
     expect(loose().every((doc) => doc.kind === 'order' || doc.kind === 'requisition')).toBe(true);
@@ -152,7 +152,7 @@ describe('a run leaves paper on the desk', () => {
 
 describe('the paper stays', () => {
   test('nothing in the store closes it, and re-delivering does not duplicate it', () => {
-    runFinished('w1-05', true, 78);
+    runFinished('w1-03', true, 78);
     deliver();
     const issued = ofKind('certificate')[0]?.id;
 
@@ -163,7 +163,7 @@ describe('the paper stays', () => {
   });
 
   test('it is filed to the binder, not dropped, when another work order opens', () => {
-    runFinished('w1-05', true, 78);
+    runFinished('w1-03', true, 78);
     deliver();
     const issued = ofKind('certificate')[0]?.id;
 
@@ -178,12 +178,12 @@ describe('the paper stays', () => {
 
 describe('the certificate is a snapshot, so the second run cannot rewrite the first', () => {
   test('two runs leave two sheets, and the first still says what it said', () => {
-    runFinished('w1-05', true, 78);
+    runFinished('w1-03', true, 78);
     deliver();
     const first = ofKind('certificate')[0];
     const firstTicks = first?.payload.kind === 'certificate' ? first.payload.report.ticks : null;
 
-    runFinished('w1-05', true, 140);
+    runFinished('w1-03', true, 140);
     deliver();
 
     const certificates = ofKind('certificate');
@@ -196,9 +196,9 @@ describe('the certificate is a snapshot, so the second run cannot rewrite the fi
   });
 
   test('a pass then a failure leaves both, not one overwriting the other', () => {
-    runFinished('w1-05', true, 78);
+    runFinished('w1-03', true, 78);
     deliver();
-    runFinished('w1-05', false, 900);
+    runFinished('w1-03', false, 900);
     deliver();
 
     expect(ofKind('certificate')).toHaveLength(1);
@@ -208,7 +208,7 @@ describe('the certificate is a snapshot, so the second run cannot rewrite the fi
 
 describe('filing is the only way off the desk, and it is not deletion', () => {
   test('a stamped certificate leaves the desk and is in the record with its mark', () => {
-    runFinished('w1-05', true, 78);
+    runFinished('w1-03', true, 78);
     deliver();
     const id = ofKind('certificate')[0]?.id as string;
 
@@ -234,7 +234,7 @@ describe('filing is the only way off the desk, and it is not deletion', () => {
   });
 
   test('filing a sheet takes it off the copy stand rather than leaving a ghost pinned', () => {
-    useGame.setState({ screen: 'workspace', currentLevelId: 'w1-05' });
+    useGame.setState({ screen: 'workspace', currentLevelId: 'w1-03' });
     deliver();
     const order = ofKind('order')[0]?.id as string;
     usePapers.getState().pin(order);
@@ -248,7 +248,7 @@ describe('filing is the only way off the desk, and it is not deletion', () => {
 
 describe('the desk holds one sheet at a time', () => {
   test('everything the company sends arrives in the tray, not on the desk', () => {
-    runFinished('w1-03', false, 900);
+    runFinished('w1-02', false, 900);
     deliver();
 
     const out = looseDocs(usePapers.getState());
@@ -260,7 +260,7 @@ describe('the desk holds one sheet at a time', () => {
   });
 
   test('taking one out puts the other one away, and nothing is destroyed', () => {
-    runFinished('w1-03', false, 900);
+    runFinished('w1-02', false, 900);
     deliver();
 
     const before = loose().length;
@@ -279,8 +279,8 @@ describe('a requisition surfaces once, on the level that grants it', () => {
   test('it lies out rather than landing silently in the tray', () => {
     useGame.setState({
       screen: 'workspace',
-      currentLevelId: 'w1-05',
-      requisition: { levelId: 'w1-05', hardware: ['scan'] },
+      currentLevelId: 'w1-03',
+      requisition: { levelId: 'w1-03', hardware: ['scan'] },
     });
     deliver();
 
@@ -291,14 +291,14 @@ describe('a requisition surfaces once, on the level that grants it', () => {
   test('it does not re-surface once handled, even if the level is granted again', () => {
     useGame.setState({
       screen: 'workspace',
-      currentLevelId: 'w1-05',
-      requisition: { levelId: 'w1-05', hardware: ['scan'] },
+      currentLevelId: 'w1-03',
+      requisition: { levelId: 'w1-03', hardware: ['scan'] },
     });
     deliver();
     const id = ofKind('requisition')[0]?.id as string;
     usePapers.getState().stow(id, 'signed');
 
-    useGame.setState({ requisition: { levelId: 'w1-05', hardware: ['scan'] } });
+    useGame.setState({ requisition: { levelId: 'w1-03', hardware: ['scan'] } });
     deliver();
 
     expect(usePapers.getState().docs.find((doc) => doc.id === id)?.stowed).toBe(true);
@@ -307,8 +307,8 @@ describe('a requisition surfaces once, on the level that grants it', () => {
   test('signing it stows it for reference rather than filing it to the Repository', () => {
     useGame.setState({
       screen: 'workspace',
-      currentLevelId: 'w1-05',
-      requisition: { levelId: 'w1-05', hardware: ['scan'] },
+      currentLevelId: 'w1-03',
+      requisition: { levelId: 'w1-03', hardware: ['scan'] },
     });
     deliver();
     const id = ofKind('requisition')[0]?.id as string;

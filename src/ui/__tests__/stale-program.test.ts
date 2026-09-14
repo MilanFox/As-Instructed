@@ -92,9 +92,11 @@ function tick(): Promise<void> {
 
 async function freshRunner(): Promise<{
   prepare(id: string): void;
-  run(submission: { code: string; levelId: string; seeds: number[] }): Promise<
-    { ok: true } | { ok: false; error: { kind: string } }
-  >;
+  run(submission: {
+    code: string;
+    levelId: string;
+    seeds: number[];
+  }): Promise<{ ok: true } | { ok: false; error: { kind: string } }>;
 }> {
   vi.resetModules();
   const { RuntimeRunner } = await import('../adapters.ts');
@@ -116,7 +118,7 @@ describe('the editor document belongs to the level that is open', () => {
     runner.prepare('w1-01');
     const abandoned = runner.run({ code: 'the previous order', levelId: 'w1-01', seeds: [1] });
 
-    runner.prepare('w1-03');
+    runner.prepare('w1-02');
     setup.serviceArrives();
 
     const response = await abandoned.then(

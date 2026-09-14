@@ -339,7 +339,7 @@ describe('the regression cache key', () => {
   });
 
   test('a different work order with identical source is a different key', () => {
-    expect(runKey({ ...base, levelId: 'w4-04' })).not.toBe(runKey(base));
+    expect(runKey({ ...base, levelId: 'w4-03' })).not.toBe(runKey(base));
   });
 });
 

@@ -202,8 +202,8 @@ describe('an ungraded work order has no par to print', () => {
   });
 
   test('the report prints par on a graded work order', () => {
-    const level = getLevel('w1-05');
-    openLevel('w1-05', 78);
+    const level = getLevel('w1-03');
+    openLevel('w1-03', 78);
 
     expect(screen(Results)).toContain(`par ${String(level?.par.ticks)}`);
   });
@@ -218,7 +218,7 @@ describe('an ungraded work order has no par to print', () => {
     openLevel(UNGRADED, 78);
     expect(screen(Results)).toContain('ticks 78');
 
-    openLevel('w1-05', 78);
+    openLevel('w1-03', 78);
     expect(screen(Results)).toContain('ticks 78');
   });
 });

@@ -49,7 +49,7 @@ export function RepositoryNote({ docId }: { docId: string }): React.JSX.Element 
 
       <p className="quiet">
         {REPOSITORY_ISSUE.asksLabel(requirementLevelCount())}{' '}
-        <code>{next?.levelId ?? 'w4-05'}</code>. {REPOSITORY_ISSUE.perCall}
+        <code>{next?.levelId ?? 'w4-04'}</code>. {REPOSITORY_ISSUE.perCall}
       </p>
 
       <div className="dot">dot: {REPOSITORY_ISSUE.dot}</div>

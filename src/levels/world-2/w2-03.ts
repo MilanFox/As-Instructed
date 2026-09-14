@@ -69,10 +69,10 @@ function sowField(world: World, capacity: number): void {
   }
 }
 
-export const w2_05: LevelDef = {
-  id: 'w2-05',
+export const w2_03: LevelDef = {
+  id: 'w2-03',
   world: 2,
-  index: 5,
+  index: 3,
   title: 'Harvest Quota',
   hardware: [],
   brief: [

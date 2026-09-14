@@ -77,12 +77,12 @@ describe('where the unlock fires in the campaign', () => {
 describe('the reason the delivery note gives for itself', () => {
   test('it names the next work order that will ask, from wherever the player stands', () => {
     const next = nextRequirementAfter(ORDER, 'w3-01');
-    expect(next?.levelId).toBe('w4-05');
+    expect(next?.levelId).toBe('w4-04');
     expect(next?.requirements.map((each) => each.name)).toContain('pathTo');
   });
 
   test('a work order that names one answers with itself', () => {
-    expect(nextRequirementAfter(ORDER, 'w4-05')?.levelId).toBe('w4-05');
+    expect(nextRequirementAfter(ORDER, 'w4-04')?.levelId).toBe('w4-04');
   });
 
   test('past the last one it answers with nothing rather than wrapping', () => {
@@ -90,8 +90,8 @@ describe('the reason the delivery note gives for itself', () => {
   });
 
   test('an unknown or absent level falls back to the first requirement in the campaign', () => {
-    expect(nextRequirementAfter(ORDER, null)?.levelId).toBe('w4-05');
-    expect(nextRequirementAfter(ORDER, 'nope')?.levelId).toBe('w4-05');
+    expect(nextRequirementAfter(ORDER, null)?.levelId).toBe('w4-04');
+    expect(nextRequirementAfter(ORDER, 'nope')?.levelId).toBe('w4-04');
   });
 
   test('the count it states is the number of work orders that name something', () => {
@@ -105,7 +105,7 @@ describe('saves written under the old World 3 unlock', () => {
   });
 
   test('a save that passed the old unlock level keeps its Repository', () => {
-    expect(isLibraryUnlocked(completedThrough('w3-04'))).toBe(true);
+    expect(isLibraryUnlocked(completedThrough('w3-03'))).toBe(true);
   });
 
   test('a save already flagged unlocked is never re-locked by refreshUnlock', () => {
@@ -139,7 +139,7 @@ describe('saves written under the old World 3 unlock', () => {
   });
 
   test('a save still inside the on-ramp is left locked', () => {
-    useLibrary.getState().attach(host(completedThrough('w2-04')));
+    useLibrary.getState().attach(host(completedThrough('w2-02')));
     useLibrary.setState({ save: emptyLibrary() });
     useLibrary.getState().refreshUnlock();
     expect(useLibrary.getState().save.unlocked).toBe(false);

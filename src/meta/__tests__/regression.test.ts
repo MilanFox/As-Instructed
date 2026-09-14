@@ -37,7 +37,7 @@ const PLAIN_LEVEL = `move();`;
 
 function target(overrides: Partial<RegressionTarget> = {}): RegressionTarget {
   return {
-    levelId: 'w4-05',
+    levelId: 'w4-04',
     code: LIBRARY_LEVEL,
     seeds: [1, 2, 3],
     parTicks: 100,
@@ -61,7 +61,7 @@ function options(runner: MetaRunner, save: LibrarySave) {
 describe('detecting a regression', () => {
   test('a dependent work order that stops closing is reported as broken', async () => {
     const runner = fakeRunner({
-      'w4-05': {
+      'w4-04': {
         passed: false,
         ticks: 0,
         failure: { message: 'pathTo returned undefined', file: 'lib', line: 12 },
@@ -82,7 +82,7 @@ describe('detecting a regression', () => {
     const slower = await runSuite(
       [target()],
       save,
-      options(fakeRunner({ 'w4-05': { passed: true, ticks: 120 } }), save),
+      options(fakeRunner({ 'w4-04': { passed: true, ticks: 120 } }), save),
     );
     expect(slower.run.entries[0]?.state).toBe('degraded');
     expect(slower.run.entries[0]?.afterMedal).toBe(Medal.Silver);
@@ -90,7 +90,7 @@ describe('detecting a regression', () => {
     const faster = await runSuite(
       [target()],
       save,
-      options(fakeRunner({ 'w4-05': { passed: true, ticks: 70 } }), save),
+      options(fakeRunner({ 'w4-04': { passed: true, ticks: 70 } }), save),
     );
     expect(faster.run.entries[0]?.state).toBe('improved');
     expect(faster.run.entries[0]?.note).toContain('20 ticks');
@@ -101,7 +101,7 @@ describe('detecting a regression', () => {
     const result = await runSuite(
       [target()],
       save,
-      options(fakeRunner({ 'w4-05': { passed: true, ticks: 90 } }), save),
+      options(fakeRunner({ 'w4-04': { passed: true, ticks: 90 } }), save),
     );
     expect(result.run.entries[0]?.state).toBe('nominal');
     expect(needsAttention(result.summary)).toBe(false);
@@ -114,12 +114,12 @@ describe('never silently downgrading a medal', () => {
     const result = await runSuite(
       [target()],
       save,
-      options(fakeRunner({ 'w4-05': { passed: true, ticks: 120 } }), save),
+      options(fakeRunner({ 'w4-04': { passed: true, ticks: 120 } }), save),
     );
     const applied = applySuite(save, result, { revisionId: 'lib-2' });
 
     expect(applied.medals).toEqual([]);
-    expect(applied.save.profiles['w4-05']?.ticks).toBe(120);
+    expect(applied.save.profiles['w4-04']?.ticks).toBe(120);
     expect(applied.save.cache[result.cache[0]?.key ?? '']).toBeDefined();
   });
 
@@ -128,10 +128,10 @@ describe('never silently downgrading a medal', () => {
     const result = await runSuite(
       [target()],
       save,
-      options(fakeRunner({ 'w4-05': { passed: true, ticks: 120 } }), save),
+      options(fakeRunner({ 'w4-04': { passed: true, ticks: 120 } }), save),
     );
     const applied = applySuite(save, result, { revisionId: 'lib-2', acceptMedals: true });
-    expect(applied.medals).toEqual([{ levelId: 'w4-05', medal: Medal.Silver, ticks: 120 }]);
+    expect(applied.medals).toEqual([{ levelId: 'w4-04', medal: Medal.Silver, ticks: 120 }]);
   });
 
   test('a revision that broke something never becomes the revert target', async () => {
@@ -139,14 +139,14 @@ describe('never silently downgrading a medal', () => {
     const broken = await runSuite(
       [target()],
       save,
-      options(fakeRunner({ 'w4-05': { passed: false, ticks: 0 } }), save),
+      options(fakeRunner({ 'w4-04': { passed: false, ticks: 0 } }), save),
     );
     expect(applySuite(save, broken, { revisionId: 'lib-2' }).save.lastKnownGood).toBeUndefined();
 
     const clean = await runSuite(
       [target()],
       save,
-      options(fakeRunner({ 'w4-05': { passed: true, ticks: 90 } }), save),
+      options(fakeRunner({ 'w4-04': { passed: true, ticks: 90 } }), save),
     );
     expect(applySuite(save, clean, { revisionId: 'lib-2' }).save.lastKnownGood).toBe('lib-2');
   });
@@ -154,13 +154,13 @@ describe('never silently downgrading a medal', () => {
 
 describe('the cache', () => {
   test('an unchanged library and source answers from cache without running anything', async () => {
-    const first = fakeRunner({ 'w4-05': { passed: true, ticks: 88 } });
+    const first = fakeRunner({ 'w4-04': { passed: true, ticks: 88 } });
     const save = emptyLibrary();
     const one = await runSuite([target()], save, options(first, save));
     expect(first.calls).toHaveLength(1);
 
     const warmed = applySuite(save, one, { revisionId: 'lib-2' }).save;
-    const second = fakeRunner({ 'w4-05': { passed: true, ticks: 999 } });
+    const second = fakeRunner({ 'w4-04': { passed: true, ticks: 999 } });
     const two = await runSuite([target()], warmed, options(second, warmed));
 
     expect(second.calls).toHaveLength(0);
@@ -199,7 +199,7 @@ describe('the cache', () => {
     for (let i = 0; i < MAX_CACHE_ENTRIES + 10; i++) {
       const run: CachedRun = {
         key: `k${i}`,
-        levelId: 'w4-05',
+        levelId: 'w4-04',
         passed: true,
         ticks: i,
         medal: Medal.Gold,

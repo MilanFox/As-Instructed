@@ -6,7 +6,7 @@ import { isGraded, levelPoints, medalForLevel, medalOf, progressPoints } from '.
 import { emptyProgress, emptySave, migrate, parseSave } from '../save.ts';
 import type { LevelProgress, SaveFile } from '../save.ts';
 
-const UNGRADED = ['w1-01', 'w1-03', 'w5-02', 'w6-01', 'w6-03', 'w6-05'];
+const UNGRADED = ['w1-01', 'w1-02', 'w5-02', 'w6-01', 'w6-03', 'w6-05'];
 
 const closed = (patch: Partial<LevelProgress> = {}): LevelProgress => ({
   ...emptyProgress(),
@@ -29,13 +29,13 @@ describe('the ungraded set', () => {
     }
   });
 
-  it('keeps `w2-04` graded — the clock cannot see its lesson, but it can still grade it', () => {
-    expect(isGraded(getLevel('w2-04') as { graded?: boolean })).toBe(true);
+  it('keeps `w2-02` graded — the clock cannot see its lesson, but it can still grade it', () => {
+    expect(isGraded(getLevel('w2-02') as { graded?: boolean })).toBe(true);
   });
 
   it('changes no par', () => {
     expect(getLevel('w1-01')?.par.ticks).toBe(78);
-    expect(getLevel('w1-03')?.par.ticks).toBe(24);
+    expect(getLevel('w1-02')?.par.ticks).toBe(24);
     expect(getLevel('w5-02')?.par.ticks).toBe(2);
     expect(getLevel('w6-01')?.par.ticks).toBe(1);
     expect(getLevel('w6-03')?.par.ticks).toBe(38);
@@ -44,7 +44,7 @@ describe('the ungraded set', () => {
 
   it('keeps every objective and bonus the levels already had', () => {
     expect(getLevel('w1-01')?.objectives.map((objective) => objective.id)).toContain('bay-booking');
-    expect(getLevel('w1-03')?.bonus?.length).toBe(1);
+    expect(getLevel('w1-02')?.bonus?.length).toBe(1);
     expect(getLevel('w6-05')?.bonus?.length).toBeGreaterThan(0);
   });
 });
@@ -119,9 +119,9 @@ describe('an ungraded level never enters the Performance Review denominator', ()
   });
 
   it('cannot drag a perfect record down', () => {
-    const perfect = reportFor(withLevels({ 'w1-05': closed({ medal: Medal.Gold }) }));
+    const perfect = reportFor(withLevels({ 'w1-03': closed({ medal: Medal.Gold }) }));
     const withUngraded = reportFor(
-      withLevels({ 'w1-05': closed({ medal: Medal.Gold }), 'w1-01': closed(), 'w6-01': closed() }),
+      withLevels({ 'w1-03': closed({ medal: Medal.Gold }), 'w1-01': closed(), 'w6-01': closed() }),
     );
     expect(withUngraded.percent).toBe(perfect.percent);
     expect(withUngraded.percent).toBe(100);
@@ -129,15 +129,15 @@ describe('an ungraded level never enters the Performance Review denominator', ()
   });
 
   it('cannot inflate a weak one either', () => {
-    const weak = reportFor(withLevels({ 'w1-05': closed({ medal: Medal.Bronze }) }));
+    const weak = reportFor(withLevels({ 'w1-03': closed({ medal: Medal.Bronze }) }));
     const withUngraded = reportFor(
-      withLevels({ 'w1-05': closed({ medal: Medal.Bronze }), 'w1-01': closed() }),
+      withLevels({ 'w1-03': closed({ medal: Medal.Bronze }), 'w1-01': closed() }),
     );
     expect(withUngraded.percent).toBe(weak.percent);
   });
 
   it('still counts a bonus star it earned, because stars are not the yardstick', () => {
-    const report = reportFor(withLevels({ 'w1-03': closed({ stars: ['within-7-canMove'] }) }));
+    const report = reportFor(withLevels({ 'w1-02': closed({ stars: ['within-7-canMove'] }) }));
     expect(report.stars).toBe(1);
     expect(report.closed).toBe(0);
   });
@@ -167,7 +167,7 @@ describe('a save written by a build that graded these levels', () => {
         bestTicks: 38,
         attempts: 2,
       },
-      'w1-05': { code: 'sweep();', completed: true, medal: 'gold', stars: [], attempts: 1 },
+      'w1-03': { code: 'sweep();', completed: true, medal: 'gold', stars: [], attempts: 1 },
     },
     settings: {},
     achievements: {},
@@ -178,7 +178,7 @@ describe('a save written by a build that graded these levels', () => {
 
   it('still loads', () => {
     expect(() => parseSave(beforeA7)).not.toThrow();
-    expect(Object.keys(parseSave(beforeA7).levels).sort()).toEqual(['w1-01', 'w1-05', 'w6-03']);
+    expect(Object.keys(parseSave(beforeA7).levels).sort()).toEqual(['w1-01', 'w1-03', 'w6-03']);
   });
 
   it('drops the medal the level no longer carries', () => {
@@ -200,7 +200,7 @@ describe('a save written by a build that graded these levels', () => {
   });
 
   it('leaves a still-graded level medal exactly where it was', () => {
-    expect(parseSave(beforeA7).levels['w1-05']?.medal).toBe(Medal.Gold);
+    expect(parseSave(beforeA7).levels['w1-03']?.medal).toBe(Medal.Gold);
   });
 
   it('loses no points by the drop — the close is still worth three', () => {

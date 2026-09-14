@@ -87,8 +87,8 @@ function classes(node: Node | undefined): string[] {
 function boardWithEveryMedal(): void {
   const save = emptySave();
   save.levels['w1-01'] = { completed: true, medal: Medal.Gold, stars: [], attempts: 1 };
-  save.levels['w1-03'] = { completed: true, medal: Medal.Silver, stars: [], attempts: 1 };
-  save.levels['w1-05'] = { completed: true, medal: Medal.Bronze, stars: [], attempts: 1 };
+  save.levels['w1-02'] = { completed: true, medal: Medal.Silver, stars: [], attempts: 1 };
+  save.levels['w1-03'] = { completed: true, medal: Medal.Bronze, stars: [], attempts: 1 };
   useGame.setState({ save, screen: 'levels' });
 }
 
@@ -190,8 +190,8 @@ describe('the site map says what the three discs mean', () => {
   });
 
   test('and what it says is what the grader does', () => {
-    const level = getLevel('w1-05');
-    if (!level) throw new Error('no w1-05');
+    const level = getLevel('w1-03');
+    if (!level) throw new Error('no w1-03');
     const par = level.par.ticks;
 
     expect(medalForLevel(level, true, par)).toBe(Medal.Gold);
@@ -212,8 +212,8 @@ describe('the key is drawn in the marks the board is drawn in', () => {
     const rows = keyRows(tree);
     const onBoard: Record<string, string[]> = {
       gold: boardMark(tree, 'w1-01'),
-      silver: boardMark(tree, 'w1-03'),
-      bronze: boardMark(tree, 'w1-05'),
+      silver: boardMark(tree, 'w1-02'),
+      bronze: boardMark(tree, 'w1-03'),
     };
 
     for (const [index, medal] of MEDALS.entries()) {

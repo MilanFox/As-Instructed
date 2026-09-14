@@ -34,7 +34,7 @@ function saveWith(...profiles: LevelProfile[]): LibrarySave {
 describe('attribution across levels', () => {
   const save = saveWith(
     profile({
-      levelId: 'w4-05',
+      levelId: 'w4-04',
       ticks: 100,
       imports: ['pathTo'],
       usage: { ticks: 40, calls: { pathTo: { calls: 4, ticks: 40 } } },
@@ -51,8 +51,8 @@ describe('attribution across levels', () => {
     const [report] = buildReports({
       save,
       exports: ['pathTo'],
-      facts: facts('w4-05', 'w5-01'),
-      freshKeys: new Set(['key-w4-05', 'key-w5-01']),
+      facts: facts('w4-04', 'w5-01'),
+      freshKeys: new Set(['key-w4-04', 'key-w5-01']),
     });
     expect(report?.callers).toHaveLength(2);
     expect(report?.calls).toBe(6);
@@ -64,10 +64,10 @@ describe('attribution across levels', () => {
     const [report] = buildReports({
       save,
       exports: ['pathTo'],
-      facts: facts('w4-05', 'w5-01'),
-      freshKeys: new Set(['key-w4-05']),
+      facts: facts('w4-04', 'w5-01'),
+      freshKeys: new Set(['key-w4-04']),
     });
-    expect(report?.callers.map((each) => each.levelId)).toEqual(['w4-05']);
+    expect(report?.callers.map((each) => each.levelId)).toEqual(['w4-04']);
     expect(report?.stale).toEqual(['w5-01']);
     expect(report?.ticks).toBe(40);
   });
@@ -88,8 +88,8 @@ describe('attribution across levels', () => {
     const [report] = buildReports({
       save,
       exports: ['pathTo'],
-      facts: facts('w4-05', 'w5-01'),
-      freshKeys: new Set(['key-w4-05', 'key-w5-01']),
+      facts: facts('w4-04', 'w5-01'),
+      freshKeys: new Set(['key-w4-04', 'key-w5-01']),
     });
     expect(report?.origin?.fromLevel).toBe('w4-02');
   });
@@ -99,7 +99,7 @@ describe('projection', () => {
   const report = buildReports({
     save: saveWith(
       profile({
-        levelId: 'w4-05',
+        levelId: 'w4-04',
         ticks: 100,
         medal: Medal.Silver,
         parTicks: 90,
@@ -116,19 +116,19 @@ describe('projection', () => {
       }),
     ),
     exports: ['pathTo'],
-    facts: facts('w4-05', 'w5-01'),
-    freshKeys: new Set(['key-w4-05', 'key-w5-01']),
+    facts: facts('w4-04', 'w5-01'),
+    freshKeys: new Set(['key-w4-04', 'key-w5-01']),
   })[0];
 
   test('saving ticks per call improves every work order that calls it', () => {
     const projection = projectSavings(report!, 1);
-    expect(projection.improves).toEqual(['w4-05', 'w5-01']);
+    expect(projection.improves).toEqual(['w4-04', 'w5-01']);
   });
 
   test('a medal upgrade is only claimed when the arithmetic reaches the bracket', () => {
     expect(projectSavings(report!, 2).upgrades).toEqual([]);
     expect(projectSavings(report!, 3).upgrades).toEqual([
-      { levelId: 'w4-05', from: Medal.Silver, to: Medal.Gold },
+      { levelId: 'w4-04', from: Medal.Silver, to: Medal.Gold },
     ]);
   });
 
@@ -149,7 +149,7 @@ describe('projection', () => {
     const stuck = buildReports({
       save: saveWith(
         profile({
-          levelId: 'w4-05',
+          levelId: 'w4-04',
           ticks: 400,
           medal: Medal.Bronze,
           parTicks: 90,
@@ -158,8 +158,8 @@ describe('projection', () => {
         }),
       ),
       exports: ['pathTo'],
-      facts: facts('w4-05'),
-      freshKeys: new Set(['key-w4-05']),
+      facts: facts('w4-04'),
+      freshKeys: new Set(['key-w4-04']),
     })[0];
     expect(bestProjection(stuck!)).toBeUndefined();
   });

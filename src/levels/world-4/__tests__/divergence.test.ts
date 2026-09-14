@@ -9,7 +9,7 @@ import { pathBetween } from '../caves.ts';
 import { tilesWithTerrain } from '../objectives.ts';
 import { w4_01 } from '../w4-01.ts';
 import { w4_02 } from '../w4-02.ts';
-import { w4_04 } from '../w4-04.ts';
+import { w4_03 } from '../w4-03.ts';
 
 function diverge(
   level: LevelDef,
@@ -50,7 +50,7 @@ function walkTo(sim: Sim, botId: number, to: Vec): void {
   }
 }
 
-describe('w4-04 prices the order the run took against the best one', () => {
+describe('w4-03 prices the order the run took against the best one', () => {
   const seed = 1;
 
   function worstOrder(level: LevelDef): { order: Vec[]; lift: Vec } {
@@ -80,8 +80,8 @@ describe('w4-04 prices the order the run took against the best one', () => {
   }
 
   test('the worst of the six orders is told what it cost and what the best costs', () => {
-    const { order, lift } = worstOrder(w4_04);
-    const { met, divergence } = diverge(w4_04, seed, 'best-order', (sim, botId) => {
+    const { order, lift } = worstOrder(w4_03);
+    const { met, divergence } = diverge(w4_03, seed, 'best-order', (sim, botId) => {
       for (const point of order) walkTo(sim, botId, point);
       walkTo(sim, botId, lift);
     });
@@ -97,8 +97,8 @@ describe('w4-04 prices the order the run took against the best one', () => {
   });
 
   test('it never names the best order, only what the best order costs', () => {
-    const { order, lift } = worstOrder(w4_04);
-    const { divergence } = diverge(w4_04, seed, 'best-order', (sim, botId) => {
+    const { order, lift } = worstOrder(w4_03);
+    const { divergence } = diverge(w4_03, seed, 'best-order', (sim, botId) => {
       for (const point of order) walkTo(sim, botId, point);
       walkTo(sim, botId, lift);
     });
@@ -107,7 +107,7 @@ describe('w4-04 prices the order the run took against the best one', () => {
   });
 
   test('a run that never reached all three is told how many it did reach', () => {
-    const { met, divergence } = diverge(w4_04, seed, 'best-order', () => undefined);
+    const { met, divergence } = diverge(w4_03, seed, 'best-order', () => undefined);
     expect(met).toBe(false);
     expect(divergence).toEqual({
       where: 'the collection points',
@@ -117,8 +117,8 @@ describe('w4-04 prices the order the run took against the best one', () => {
   });
 
   test('collect-all names a collection point the run never stood on', () => {
-    const { divergence } = diverge(w4_04, seed, 'collect-all', () => undefined);
-    const first = must(tilesWithTerrain(w4_04.build(seed), Terrain.Pad)[0], 'a pad');
+    const { divergence } = diverge(w4_03, seed, 'collect-all', () => undefined);
+    const first = must(tilesWithTerrain(w4_03.build(seed), Terrain.Pad)[0], 'a pad');
     expect(divergence).toEqual({
       where: `(${String(first.x)}, ${String(first.y)})`,
       expected: 'stood on',
@@ -127,10 +127,10 @@ describe('w4-04 prices the order the run took against the best one', () => {
   });
 
   test('end-on-lift names the lift and where the bot actually stopped', () => {
-    const world = w4_04.build(seed);
+    const world = w4_03.build(seed);
     const lift = must(tilesWithTerrain(world, Terrain.Depot)[0], 'the lift');
     const start = must(world.bots[0], 'the bot').at;
-    const { divergence } = diverge(w4_04, seed, 'end-on-lift', () => undefined);
+    const { divergence } = diverge(w4_03, seed, 'end-on-lift', () => undefined);
     expect(divergence).toEqual({
       where: 'end of run',
       expected: `(${String(lift.x)}, ${String(lift.y)})`,

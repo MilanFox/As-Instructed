@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { runReference } from '../../levels/harness.ts';
 import { campaignOrder } from '../../levels/index.ts';
-import { solution as w2_05 } from '../../levels/world-2/__solutions__/w2-05.ts';
+import { solution as w2_03 } from '../../levels/world-2/__solutions__/w2-03.ts';
 import { useGame } from '../../game/store.ts';
 import { DOC_HOME, filedDocs, looseDocs, usePapers } from '../desk/paper/papers.ts';
 import { snapshotReport } from '../desk/paper/report.ts';
 
-const level = campaignOrder().find((each) => each.id === 'w2-05');
+const level = campaignOrder().find((each) => each.id === 'w2-03');
 
 beforeEach(() => {
   usePapers.setState({ docs: [], lifted: null, pinned: null, top: 20 });
@@ -15,16 +15,16 @@ beforeEach(() => {
 
 describe('closing a work order', () => {
   it('a reference solution actually passes, or the rest of this proves nothing', () => {
-    expect(level, 'w2-05 is in the campaign').toBeDefined();
+    expect(level, 'w2-03 is in the campaign').toBeDefined();
     if (!level) return;
     const seed = level.seeds[0] as number;
-    expect(runReference(level, seed, w2_05).verdict.passed).toBe(true);
+    expect(runReference(level, seed, w2_03).verdict.passed).toBe(true);
   });
 
   it('issues a certificate carrying the run, stamps it, and files it', () => {
     if (!level) return;
     const seed = level.seeds[0] as number;
-    const { trace, verdict } = runReference(level, seed, w2_05);
+    const { trace, verdict } = runReference(level, seed, w2_03);
 
     useGame.setState({
       screen: 'workspace',
@@ -72,7 +72,7 @@ describe('closing a work order', () => {
 
   it('keeps the report after the desk is reloaded, which is the whole ruling', () => {
     if (!level) return;
-    const { trace, verdict } = runReference(level, level.seeds[0] as number, w2_05);
+    const { trace, verdict } = runReference(level, level.seeds[0] as number, w2_03);
     useGame.setState({
       screen: 'workspace',
       currentLevelId: level.id,

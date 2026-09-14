@@ -24,16 +24,16 @@ describe('the desk selectors are stable', () => {
   it('returns a new reference once a sheet is filed', () => {
     reset();
     usePapers.getState().issue({
-      id: 'order:w1-03',
+      id: 'order:w1-02',
       kind: 'order',
       home: DOC_HOME.order,
-      payload: { kind: 'order', levelId: 'w1-03' },
+      payload: { kind: 'order', levelId: 'w1-02' },
     });
 
     const before = looseDocs(usePapers.getState());
     expect(before).toHaveLength(1);
 
-    usePapers.getState().file('order:w1-03', 'closed');
+    usePapers.getState().file('order:w1-02', 'closed');
     const after = looseDocs(usePapers.getState());
 
     expect(after).not.toBe(before);

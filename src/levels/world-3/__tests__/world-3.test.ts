@@ -11,22 +11,22 @@ import {
 import type { LevelRunResult } from '../../harness.ts';
 import { runLevel, runReference } from '../../harness.ts';
 import type { LevelDef, ReferenceSolution } from '../../types.ts';
-import { WORLD_3_LEVELS, w3_01, w3_02, w3_04 } from '../index.ts';
+import { WORLD_3_LEVELS, w3_01, w3_02, w3_03 } from '../index.ts';
 import { distance, goTo, key, nearestIndex, surveyYard } from '../__solutions__/driver.ts';
 import { solution as w3_01Solution } from '../__solutions__/w3-01.ts';
 import { solution as w3_02Solution } from '../__solutions__/w3-02.ts';
-import { solution as w3_04Solution } from '../__solutions__/w3-04.ts';
+import { solution as w3_03Solution } from '../__solutions__/w3-03.ts';
 
 const SOLUTIONS: Record<string, ReferenceSolution> = {
   'w3-01': w3_01Solution,
   'w3-02': w3_02Solution,
-  'w3-04': w3_04Solution,
+  'w3-03': w3_03Solution,
 };
 
 const HARDWARE: Record<string, string[]> = {
   'w3-01': ['pickup', 'drop'],
   'w3-02': ['carrying'],
-  'w3-04': [],
+  'w3-03': [],
 };
 
 const bonusMet = (level: LevelDef, ctx: ObjectiveContext): boolean =>
@@ -245,7 +245,7 @@ const resurveyEveryTrip = (sim: Sim, botId: number): void => {
 
 describe('World 3 — structure', () => {
   test('the world exports three levels in play order', () => {
-    expect(WORLD_3_LEVELS).toEqual([w3_01, w3_02, w3_04]);
+    expect(WORLD_3_LEVELS).toEqual([w3_01, w3_02, w3_03]);
   });
 
   for (const level of WORLD_3_LEVELS) {
@@ -323,28 +323,28 @@ describe('w3-02 — one depot at a time', () => {
   });
 });
 
-describe('w3-04 — read the racks from the aisle', () => {
+describe('w3-03 — read the racks from the aisle', () => {
   test('an aisle round ships the yard treading no empty slot on every seed', () => {
-    for (const seed of w3_04.seeds) {
-      const result = runLevel(w3_04, seed, aisleRound);
+    for (const seed of w3_03.seeds) {
+      const result = runLevel(w3_03, seed, aisleRound);
       expect(result.verdict.passed).toBe(true);
       expect(slotsTrodden(result)).toBe(0);
-      expect(bonusMet(w3_04, result)).toBe(true);
+      expect(bonusMet(w3_03, result)).toBe(true);
     }
   });
 
   test('the rack-walking survey ships the yard and treads empty slots on every seed', () => {
-    for (const seed of w3_04.seeds) {
-      const result = runReference(w3_04, seed, w3_04Solution);
+    for (const seed of w3_03.seeds) {
+      const result = runReference(w3_03, seed, w3_03Solution);
       expect(result.verdict.passed).toBe(true);
       expect(slotsTrodden(result)).toBeGreaterThan(0);
-      expect(bonusMet(w3_04, result)).toBe(false);
+      expect(bonusMet(w3_03, result)).toBe(false);
     }
   });
 
   test('never reaching the outer aisles treads no slot and cannot ship the yard', () => {
     for (const seed of [1, 2, 3]) {
-      const result = runLevel(w3_04, seed, middleAislesOnly);
+      const result = runLevel(w3_03, seed, middleAislesOnly);
       expect(slotsTrodden(result)).toBe(0);
       expect(result.verdict.passed).toBe(false);
     }
@@ -360,7 +360,7 @@ describe('World 3 — the starter alone passes nothing', () => {
       while (sim.canMove(botId, Dir.West)) sim.move(botId, Dir.West);
       while (sim.canMove(botId, Dir.North)) sim.move(botId, Dir.North);
     },
-    'w3-04': (sim, botId) => {
+    'w3-03': (sim, botId) => {
       while (sim.canMove(botId, Dir.West)) sim.move(botId, Dir.West);
       while (sim.canMove(botId, Dir.North)) sim.move(botId, Dir.North);
     },
@@ -508,7 +508,7 @@ describe('w3-02 — the mapping is the puzzle', () => {
   });
 });
 
-describe('w3-04 — arrival order, not proximity', () => {
+describe('w3-03 — arrival order, not proximity', () => {
   test('greedy nearest-crate-first fills the bay in the wrong order', () => {
     const drive = (sim: Sim, botId: number): void => {
       const found = survey(sim, botId);
@@ -526,7 +526,7 @@ describe('w3-04 — arrival order, not proximity', () => {
       }
     };
 
-    const verdicts = w3_04.seeds.map((seed) => runLevel(w3_04, seed, drive).verdict);
+    const verdicts = w3_03.seeds.map((seed) => runLevel(w3_03, seed, drive).verdict);
     const delivered = verdicts.map((v) => v.objectives.find((o) => o.id === 'bay-cleared')?.met);
     const ordered = verdicts.map((v) => v.objectives.find((o) => o.id === 'bay-in-order')?.met);
     expect(delivered).not.toContain(false);
@@ -547,9 +547,9 @@ describe('w3-04 — arrival order, not proximity', () => {
       }
     };
 
-    for (const seed of w3_04.seeds) {
-      const crates = w3_04.build(seed).items.reduce((sum, stack) => sum + stack.count, 0);
-      const verdict = runLevel(w3_04, seed, drive).verdict;
+    for (const seed of w3_03.seeds) {
+      const crates = w3_03.build(seed).items.reduce((sum, stack) => sum + stack.count, 0);
+      const verdict = runLevel(w3_03, seed, drive).verdict;
       const order = verdict.objectives.find((entry) => entry.id === 'bay-in-order');
       expect(verdict.objectives.find((entry) => entry.id === 'bay-cleared')?.met).toBe(true);
       if (crates === 1) {

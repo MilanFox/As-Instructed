@@ -7,7 +7,7 @@ import { levelsByWorld } from '../../../levels/index.ts';
 import { buildRows, campaignTally, nodeLabel } from '../LevelSelect.tsx';
 
 const UNGRADED = 'w1-01';
-const GRADED = 'w1-05';
+const GRADED = 'w1-03';
 
 function close(save: SaveFile, id: string, medal: Medal): SaveFile {
   save.levels[id] = { completed: true, medal, stars: [], attempts: 1 };
@@ -33,14 +33,14 @@ describe('the fixture the browser was driven against', () => {
     const world = levelsByWorld().find((entry) => entry.world.id === 1);
     const graded = (world?.levels ?? []).filter((level) => isGraded(level)).map((l) => l.id);
     const ungraded = (world?.levels ?? []).filter((level) => !isGraded(level)).map((l) => l.id);
-    expect(ungraded).toEqual(['w1-01', 'w1-03']);
-    expect(graded).toEqual(['w1-05']);
+    expect(ungraded).toEqual(['w1-01', 'w1-02']);
+    expect(graded).toEqual(['w1-03']);
   });
 });
 
 describe('an ungraded close is worth a gold', () => {
   test('closing both ungraded orders in Boot Sector pays six, not nothing', () => {
-    const save = close(close(emptySave(), 'w1-01', Medal.None), 'w1-03', Medal.None);
+    const save = close(close(emptySave(), 'w1-01', Medal.None), 'w1-02', Medal.None);
     const row = rowFor(save, 1);
     expect(row.closed).toBe(2);
     expect(row.points).toBe(6);
@@ -53,7 +53,7 @@ describe('an ungraded close is worth a gold', () => {
 
   test('the ceiling does not move — a close can reach it', () => {
     const save = close(
-      close(close(emptySave(), 'w1-01', Medal.None), 'w1-03', Medal.None),
+      close(close(emptySave(), 'w1-01', Medal.None), 'w1-02', Medal.None),
       GRADED,
       Medal.Gold,
     );
@@ -63,7 +63,7 @@ describe('an ungraded close is worth a gold', () => {
   });
 
   test('the campaign total carries the same six', () => {
-    const save = close(close(emptySave(), 'w1-01', Medal.None), 'w1-03', Medal.None);
+    const save = close(close(emptySave(), 'w1-01', Medal.None), 'w1-02', Medal.None);
     expect(campaignTally(buildRows(save)).points).toBe(6);
   });
 });
@@ -71,7 +71,7 @@ describe('an ungraded close is worth a gold', () => {
 describe('ALL AT PAR is attainable in a world holding an ungraded order', () => {
   test('a sector of ungraded closes and a gold is perfect', () => {
     const save = close(
-      close(close(emptySave(), 'w1-01', Medal.None), 'w1-03', Medal.None),
+      close(close(emptySave(), 'w1-01', Medal.None), 'w1-02', Medal.None),
       GRADED,
       Medal.Gold,
     );
@@ -82,7 +82,7 @@ describe('ALL AT PAR is attainable in a world holding an ungraded order', () => 
 
   test('a silver on the one graded order still withholds the stamp', () => {
     const save = close(
-      close(close(emptySave(), 'w1-01', Medal.None), 'w1-03', Medal.None),
+      close(close(emptySave(), 'w1-01', Medal.None), 'w1-02', Medal.None),
       GRADED,
       Medal.Silver,
     );
@@ -96,7 +96,7 @@ describe('ALL AT PAR is attainable in a world holding an ungraded order', () => 
 
   test('the at-par aside counts the close; the medal columns do not', () => {
     const save = close(
-      close(close(emptySave(), 'w1-01', Medal.None), 'w1-03', Medal.None),
+      close(close(emptySave(), 'w1-01', Medal.None), 'w1-02', Medal.None),
       GRADED,
       Medal.Gold,
     );
@@ -110,7 +110,7 @@ describe('ALL AT PAR is attainable in a world holding an ungraded order', () => 
 
 describe('the accessible name does not announce finished work as unfinished', () => {
   function bootSectorInProgress(): SaveFile {
-    return close(close(emptySave(), 'w1-01', Medal.None), 'w1-03', Medal.None);
+    return close(close(emptySave(), 'w1-01', Medal.None), 'w1-02', Medal.None);
   }
 
   test('a closed ungraded order is not read as a missing medal', () => {

@@ -1,73 +1,114 @@
-import type { Dir as DirType, Sim } from '../../../engine/index.ts';
-import { Dir } from '../../../engine/index.ts';
+import { Dir, type Sim } from '../../../engine/index.ts';
 import type { ReferenceSolution } from '../../types.ts';
 
 export const solution: ReferenceSolution = {
   levelId: 'w2-02',
   run(sim: Sim, botId: number): void {
-    const service = (): void => {
+    const capacity = sim.inventory(botId);
+    const done = new Set<string>();
+    const seen = new Set<string>();
+
+    const service = (waitForIt: boolean): void => {
+      const at = sim.pos(botId);
+      const key = `${at.x},${at.y}`;
+      seen.add(key);
+      if (done.has(key)) return;
+
       const here = sim.scan(botId);
       if (here.crop === null) {
-        sim.plant(botId);
+        if (sim.plant(botId)) done.add(key);
         return;
       }
-      if (here.growth >= here.maxGrowth) {
-        sim.harvest(botId);
-        sim.plant(botId);
+      if (here.growth < here.maxGrowth) {
+        if (!waitForIt) return;
+        for (let guard = 0; guard < 40; guard++) {
+          const now = sim.scan(botId);
+          if (now.growth >= now.maxGrowth) break;
+          sim.wait(botId, Math.max(1, now.maxGrowth - now.growth));
+        }
       }
-    };
-    const sweep = (dir: DirType): void => {
-      while (sim.canMove(botId, dir)) {
-        sim.move(botId, dir);
-        service();
-      }
+      if (sim.inventory(botId) >= capacity) return;
+      if (sim.harvest(botId) === null) return;
+      sim.plant(botId);
+      done.add(key);
     };
 
-    const across: DirType = sim.canMove(botId, Dir.East) ? Dir.East : Dir.West;
-    const back: DirType = across === Dir.East ? Dir.West : Dir.East;
-    const down: DirType = sim.canMove(botId, Dir.South) ? Dir.South : Dir.North;
+    const lap = (waitForIt: boolean): void => {
+      service(waitForIt);
+      while (sim.canMove(botId, Dir.East)) {
+        sim.move(botId, Dir.East);
+        service(waitForIt);
+      }
+      if (sim.canMove(botId, Dir.South)) {
+        sim.move(botId, Dir.South);
+        service(waitForIt);
+      }
+      while (sim.canMove(botId, Dir.West)) {
+        sim.move(botId, Dir.West);
+        service(waitForIt);
+      }
+      if (sim.canMove(botId, Dir.North)) sim.move(botId, Dir.North);
+    };
 
-    let dir: DirType = across;
-    service();
-    sweep(dir);
-    while (sim.canMove(botId, down)) {
-      sim.move(botId, down);
-      service();
-      dir = dir === across ? back : across;
-      sweep(dir);
+    lap(false);
+    for (let guard = 0; done.size < seen.size && guard < 40; guard++) {
+      const before = done.size;
+      lap(false);
+      if (done.size === before) lap(true);
     }
   },
   source: [
-    'function service(): void {',
+    'const capacity = inventory();',
+    'const done = new Set();',
+    'const seen = new Set();',
+    '',
+    'function service(waitForIt) {',
+    '  const at = pos();',
+    '  const key = `${at.x},${at.y}`;',
+    '  seen.add(key);',
+    '  if (done.has(key)) return;',
+    '',
     '  const here = scan();',
     '  if (here.crop === null) {',
-    '    plant();',
+    '    if (plant()) done.add(key);',
     '    return;',
     '  }',
-    '  if (here.growth >= here.maxGrowth) {',
-    '    harvest();',
-    '    plant();',
+    '  if (here.growth < here.maxGrowth) {',
+    '    if (!waitForIt) return;',
+    '    let now = here;',
+    '    while (now.growth < now.maxGrowth) {',
+    '      wait(Math.max(1, now.maxGrowth - now.growth));',
+    '      now = scan();',
+    '    }',
     '  }',
-    '}',
-    'function sweep(dir: Dir): void {',
-    '  while (canMove(dir)) {',
-    '    move(dir);',
-    '    service();',
-    '  }',
+    '  if (inventory() >= capacity) return;',
+    '  if (harvest() === null) return;',
+    '  plant();',
+    '  done.add(key);',
     '}',
     '',
-    'const across: Dir = canMove(Dir.East) ? Dir.East : Dir.West;',
-    'const back: Dir = across === Dir.East ? Dir.West : Dir.East;',
-    'const down: Dir = canMove(Dir.South) ? Dir.South : Dir.North;',
+    'function lap(waitForIt) {',
+    '  service(waitForIt);',
+    '  while (canMove(Dir.East)) {',
+    '    move(Dir.East);',
+    '    service(waitForIt);',
+    '  }',
+    '  if (canMove(Dir.South)) {',
+    '    move(Dir.South);',
+    '    service(waitForIt);',
+    '  }',
+    '  while (canMove(Dir.West)) {',
+    '    move(Dir.West);',
+    '    service(waitForIt);',
+    '  }',
+    '  if (canMove(Dir.North)) move(Dir.North);',
+    '}',
     '',
-    'let dir: Dir = across;',
-    'service();',
-    'sweep(dir);',
-    'while (canMove(down)) {',
-    '  move(down);',
-    '  service();',
-    '  dir = dir === across ? back : across;',
-    '  sweep(dir);',
+    'lap(false);',
+    'for (let guard = 0; done.size < seen.size && guard < 40; guard++) {',
+    '  const before = done.size;',
+    '  lap(false);',
+    '  if (done.size === before) lap(true);',
     '}',
   ].join('\n'),
 };

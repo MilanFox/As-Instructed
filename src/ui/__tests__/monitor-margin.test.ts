@@ -130,8 +130,8 @@ describe('the feed reserves its own margin', () => {
 });
 
 const CANNOT_SHOW_WHOLE_BOARD_AT_1280 = [
+  'w4-03',
   'w4-04',
-  'w4-05',
   'w5-02',
   'w6-05',
   'w7-05',
@@ -140,7 +140,7 @@ const CANNOT_SHOW_WHOLE_BOARD_AT_1280 = [
   'w8-05',
 ] as const;
 
-const CANNOT_SHOW_WHOLE_BOARD_FULL_BLEED = ['w4-04', 'w4-05', 'w6-05', 'w8-04', 'w8-05'] as const;
+const CANNOT_SHOW_WHOLE_BOARD_FULL_BLEED = ['w4-03', 'w4-04', 'w6-05', 'w8-04', 'w8-05'] as const;
 
 describe('the legibility floor', () => {
   test('only the known large grids cannot be shown whole above the floor at 1280x800', () => {
@@ -166,8 +166,8 @@ describe('the legibility floor', () => {
     expect(under).toEqual([]);
   });
 
-  test('w2-02 is legible on the fit alone, so it is never cropped', () => {
-    const level = campaignOrder().find((each) => each.id === 'w2-02');
+  test('w2-01 is legible on the fit alone, so it is never cropped', () => {
+    const level = campaignOrder().find((each) => each.id === 'w2-01');
     const world = (level as NonNullable<typeof level>).build(1);
     for (const viewport of VIEWPORTS) {
       const fitted = fit(viewport.w, viewport.h, world.w, world.h).deviceTilePx;

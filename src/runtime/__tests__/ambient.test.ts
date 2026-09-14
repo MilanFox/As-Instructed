@@ -10,13 +10,13 @@ import {
 import { implementedApiNames } from '../api-bindings.ts';
 
 const W1_01 = ['move', 'pos', 'print', 'wait'];
-const W2_02 = unlockedApiNames('w2-02');
+const W2_02 = unlockedApiNames('w2-01');
 
 describe('unlockedApiNames', () => {
   test('grows with the campaign and never goes backwards', () => {
     expect(unlockedApiNames('w1-01')).toEqual(W1_01);
-    expect(unlockedApiNames('w1-03')).toEqual(['move', 'pos', 'print', 'wait', 'canMove']);
-    expect(W2_02).toEqual([...unlockedApiNames('w1-03'), 'scan', 'harvest', 'plant']);
+    expect(unlockedApiNames('w1-02')).toEqual(['move', 'pos', 'print', 'wait', 'canMove']);
+    expect(W2_02).toEqual([...unlockedApiNames('w1-02'), 'scan', 'harvest', 'plant']);
     expect(unlockedApiNames('w8-05')).toEqual(PLAYER_API.functions.map((fn) => fn.name));
   });
 

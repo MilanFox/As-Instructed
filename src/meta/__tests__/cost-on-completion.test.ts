@@ -232,7 +232,7 @@ function afterFirstPublish(): LibrarySave {
     unlocked: true,
     briefed: true,
     source: LIB,
-    published: [{ name: 'pathTo', fromLevel: 'w3-04', at: 1 }],
+    published: [{ name: 'pathTo', fromLevel: 'w3-03', at: 1 }],
   };
 }
 

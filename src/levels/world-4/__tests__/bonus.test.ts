@@ -7,7 +7,7 @@ import { SOLUTIONS } from '../../__tests__/solutions.ts';
 import type { LevelDef, ReferenceSolution } from '../../types.ts';
 import { w4_01 } from '../w4-01.ts';
 import { w4_02 } from '../w4-02.ts';
-import { w4_05 } from '../w4-05.ts';
+import { w4_04 } from '../w4-04.ts';
 
 function markedVisited(sim: Sim, botId: number): void {
   const back: Dir[] = [];
@@ -185,14 +185,14 @@ describe('w4-02 breadcrumb-trail', () => {
 });
 
 function filedAs(seed: number, rewrite: (line: string) => string | null) {
-  const solution = SOLUTIONS[w4_05.id] as ReferenceSolution;
-  const result = runReference(w4_05, seed, solution);
+  const solution = SOLUTIONS[w4_04.id] as ReferenceSolution;
+  const result = runReference(w4_04, seed, solution);
   const events = result.trace.events.flatMap((event) => {
     if (event.kind !== 'print' || !event.text.startsWith('home ')) return [event];
     const line = rewrite(event.text);
     return line === null ? [] : [{ ...event, text: line }];
   });
-  const stars = evaluateObjectives(w4_05.bonus ?? [], {
+  const stars = evaluateObjectives(w4_04.bonus ?? [], {
     world: result.world,
     initialWorld: result.initialWorld,
     trace: { ...result.trace, events },
@@ -205,31 +205,31 @@ function filedAs(seed: number, rewrite: (line: string) => string | null) {
   };
 }
 
-describe('w4-05 filed-return', () => {
+describe('w4-04 filed-return', () => {
   test('the reference solution earns it on every seed', () => {
-    referenceEarns(w4_05, 'filed-return');
+    referenceEarns(w4_04, 'filed-return');
   });
 
   test('the same run without its filed price brings the ore home and is refused', () => {
-    for (const seed of w4_05.seeds) {
+    for (const seed of w4_04.seeds) {
       const run = filedAs(seed, () => null);
       expect(run.passed, `seed ${String(seed)}`).toBe(true);
-      expect(run.ticks, `seed ${String(seed)}`).toBeLessThanOrEqual(w4_05.par.ticks);
+      expect(run.ticks, `seed ${String(seed)}`).toBeLessThanOrEqual(w4_04.par.ticks);
       expect(run.met, `seed ${String(seed)}`).toBe(false);
     }
   });
 
   test('a price that is off by one is refused on every seed', () => {
-    for (const seed of w4_05.seeds) {
+    for (const seed of w4_04.seeds) {
       const run = filedAs(seed, (line) => `home ${String(Number(line.split(' ')[1]) - 1)}`);
       expect(run.met, `seed ${String(seed)}`).toBe(false);
     }
   });
 
   test('reporting the trip after driving it is not filing it', () => {
-    const solution = SOLUTIONS[w4_05.id] as ReferenceSolution;
-    for (const seed of w4_05.seeds) {
-      const result = runReference(w4_05, seed, solution);
+    const solution = SOLUTIONS[w4_04.id] as ReferenceSolution;
+    for (const seed of w4_04.seeds) {
+      const result = runReference(w4_04, seed, solution);
       const filed = result.trace.events.filter(
         (event) => event.kind === 'print' && event.text.startsWith('home '),
       );
@@ -245,7 +245,7 @@ describe('w4-05 filed-return', () => {
         trace: { ...result.trace, events },
         ops: result.ops,
       };
-      const star = must(evaluateObjectives(w4_05.bonus ?? [], ctx)[0], 'the star');
+      const star = must(evaluateObjectives(w4_04.bonus ?? [], ctx)[0], 'the star');
 
       expect(result.verdict.passed, `seed ${String(seed)}`).toBe(true);
       expect(star.met, `seed ${String(seed)}`).toBe(false);
@@ -254,13 +254,13 @@ describe('w4-05 filed-return', () => {
   });
 
   test('an idle program is refused on every seed', () => {
-    for (const seed of w4_05.seeds) {
-      const run = scored(w4_05, seed, idle);
+    for (const seed of w4_04.seeds) {
+      const run = scored(w4_04, seed, idle);
       expect(run.passed, `seed ${String(seed)}`).toBe(false);
       expect(run.met('filed-return'), `seed ${String(seed)}`).toBe(false);
-      const result = runLevel(w4_05, seed, idle);
+      const result = runLevel(w4_04, seed, idle);
       const star = must(
-        evaluateObjectives(w4_05.bonus ?? [], {
+        evaluateObjectives(w4_04.bonus ?? [], {
           world: result.world,
           initialWorld: result.initialWorld,
           trace: result.trace,

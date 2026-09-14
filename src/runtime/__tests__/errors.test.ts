@@ -164,7 +164,7 @@ describe('rewriteMessage', () => {
       unlocked,
     });
     expect(message).toContain('`scan()` is not installed');
-    expect(message).toContain('w2-02');
+    expect(message).toContain('w2-01');
   });
 
   test("handles Safari's wording for the same mistake", () => {
@@ -172,7 +172,7 @@ describe('rewriteMessage', () => {
       wrapperOffset: 2,
       unlocked,
     });
-    expect(message).toContain('w2-02');
+    expect(message).toContain('w2-01');
   });
 
   test('a genuine typo is not blamed on hardware', () => {
@@ -189,7 +189,7 @@ describe('rewriteMessage', () => {
       wrapperOffset: 2,
       unlocked,
     });
-    expect(message).toContain('w2-02');
+    expect(message).toContain('w2-01');
   });
 
   test('reading a property of undefined explains array indexes', () => {
@@ -283,7 +283,7 @@ describe('toRuntimeFailure', () => {
     expect(failure.kind).toBe('runtime');
     expect(failure.code).toBe('crash');
     expect(failure.line).toBe(4);
-    expect(failure.message).toContain('w2-02');
+    expect(failure.message).toContain('w2-01');
   });
 
   test('a thrown non-Error does not escape as a raw value', () => {

@@ -219,7 +219,7 @@ describe('run state machine', () => {
 });
 
 describe('preview', () => {
-  const level = getLevel('w1-03');
+  const level = getLevel('w1-02');
 
   async function previewOnce(code: string): Promise<void> {
     useGame.getState().setCode(code);
@@ -236,7 +236,7 @@ describe('preview', () => {
     expect(level?.seeds.length ?? 0).toBeGreaterThan(1);
     const runner = new ScriptedRunner();
     useGame.getState().attachRunner(runner);
-    useGame.getState().openLevel('w1-03');
+    useGame.getState().openLevel('w1-02');
 
     useGame.getState().preview();
 
@@ -247,7 +247,7 @@ describe('preview', () => {
   it('populates trace and verdict but never opens the report or touches the save', async () => {
     reset();
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
-    useGame.getState().openLevel('w1-03');
+    useGame.getState().openLevel('w1-02');
     const runsBefore = useGame.getState().save.stats.runs;
 
     await previewOnce('move(Dir.South);');
@@ -259,13 +259,13 @@ describe('preview', () => {
     expect(state.runState).toBe('idle');
     expect(state.showResults).toBe(false);
     expect(state.save.stats.runs).toBe(runsBefore);
-    expect(state.save.levels['w1-03']?.attempts ?? 0).toBe(0);
+    expect(state.save.levels['w1-02']?.attempts ?? 0).toBe(0);
   });
 
   it('resetPreview clears the loaded run without touching the code or the save', async () => {
     reset();
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
-    useGame.getState().openLevel('w1-03');
+    useGame.getState().openLevel('w1-02');
     await previewOnce('move(Dir.South);');
     const code = useGame.getState().code;
     const save = useGame.getState().save;
@@ -285,7 +285,7 @@ describe('preview', () => {
   it('editing the code after a preview clears the stale trace, quietly', async () => {
     reset();
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
-    useGame.getState().openLevel('w1-03');
+    useGame.getState().openLevel('w1-02');
     await previewOnce('move(Dir.South);');
     expect(useGame.getState().trace).not.toBeNull();
 
@@ -301,7 +301,7 @@ describe('preview', () => {
   it('setCode leaves a loaded trace alone when the code has not actually changed', async () => {
     reset();
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
-    useGame.getState().openLevel('w1-03');
+    useGame.getState().openLevel('w1-02');
     await previewOnce('move(Dir.South);');
     const trace = useGame.getState().trace;
 
@@ -313,7 +313,7 @@ describe('preview', () => {
   it('togglePlay with no trace loaded starts a preview rather than doing nothing', async () => {
     reset();
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
-    useGame.getState().openLevel('w1-03');
+    useGame.getState().openLevel('w1-02');
     useGame.getState().setCode('move(Dir.South);');
     expect(useGame.getState().trace).toBeNull();
 
@@ -567,13 +567,13 @@ describe('rewards', () => {
     useGame.getState().openLevel('w1-01');
     expect(useGame.getState().requisition?.hardware).toEqual(['move', 'pos', 'print', 'wait']);
 
-    useGame.getState().openLevel('w1-03');
+    useGame.getState().openLevel('w1-02');
     expect(useGame.getState().requisition?.hardware).toEqual(['canMove']);
 
-    useGame.getState().openLevel('w1-05');
+    useGame.getState().openLevel('w1-03');
     expect(useGame.getState().requisition).toBeNull();
 
-    useGame.getState().openLevel('w1-03');
+    useGame.getState().openLevel('w1-02');
     useGame.getState().signRequisition();
     expect(useGame.getState().requisition).toBeNull();
 
@@ -699,8 +699,8 @@ describe('a freshly opened work order carries no run', () => {
   it('when the order is picked off the site map', async () => {
     reset();
     await aRunOn('w1-01');
-    useGame.getState().openLevel('w1-03');
-    expect(useGame.getState().currentLevelId).toBe('w1-03');
+    useGame.getState().openLevel('w1-02');
+    expect(useGame.getState().currentLevelId).toBe('w1-02');
     expect(runShape(useGame.getState())).toEqual(AT_REST);
   });
 
@@ -708,7 +708,7 @@ describe('a freshly opened work order carries no run', () => {
     reset();
     await aRunOn('w1-01');
     useGame.getState().advanceToNextLevel();
-    expect(useGame.getState().currentLevelId).toBe('w1-03');
+    expect(useGame.getState().currentLevelId).toBe('w1-02');
     expect(runShape(useGame.getState())).toEqual(AT_REST);
   });
 
@@ -719,7 +719,7 @@ describe('a freshly opened work order carries no run', () => {
     useGame.getState().goto('levels');
     useGame.getState().goto('workspace');
     expect(useGame.getState().trace).toBe(watching);
-    useGame.getState().openLevel('w1-03');
+    useGame.getState().openLevel('w1-02');
     expect(runShape(useGame.getState())).toEqual(AT_REST);
   });
 
@@ -753,7 +753,7 @@ describe('a freshly opened work order carries no run', () => {
     useGame.getState().openLevel('w1-01');
     useGame.getState().run();
 
-    useGame.getState().openLevel('w1-03');
+    useGame.getState().openLevel('w1-02');
     runner.fail(1, new Error('the simulator could not be started'));
     await afterTheHostAnswers();
 
@@ -768,7 +768,7 @@ describe('a freshly opened work order carries no run', () => {
     useGame.getState().openLevel('w1-01');
     useGame.getState().run();
 
-    useGame.getState().openLevel('w1-03');
+    useGame.getState().openLevel('w1-02');
     const answer = await new FakeRunner({ latencyMs: 0 }).run({
       code: 'move(Dir.South);',
       levelId: 'w1-01',

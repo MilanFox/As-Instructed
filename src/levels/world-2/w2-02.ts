@@ -1,42 +1,39 @@
 import type { Vec, World } from '../../engine/index.ts';
 import { Dir, ItemKind, Terrain, addBot, createWorld, setTile, vec } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
-import { everyTilePlanted, harvestedEvery, noWastedFieldwork, ripeAtStart } from './shared.ts';
+import { croppedAtStart, everyTilePlanted, harvestedEvery, withinSpoilage } from './shared.ts';
 
-const FIELD = 5;
+const PLOT_W = 3;
+const PLOT_H = 2;
 const MAX_GROWTH = 8;
-const SEED_LOAD = 30;
 
-const CORNERS: readonly Vec[] = [vec(1, 1), vec(FIELD, 1), vec(1, FIELD), vec(FIELD, FIELD)];
+const RIPEN_LADDER: readonly number[] = [0, 9, 18, 28, 38];
 
-function sowField(world: World): void {
+const SPOILAGE_ALLOWANCE = 18;
+
+function plotTiles(): Vec[] {
   const tiles: Vec[] = [];
-  for (let y = 1; y <= FIELD; y++) {
-    for (let x = 1; x <= FIELD; x++) tiles.push(vec(x, y));
+  for (let y = 1; y <= PLOT_H; y++) {
+    for (let x = 1; x <= PLOT_W; x++) tiles.push(vec(x, y));
   }
-  const order = world.rng.shuffle(tiles);
-  const ripe = world.rng.int(8, 10);
-  const bare = world.rng.int(4, 6);
+  return tiles;
+}
 
-  order.forEach((at, i) => {
-    if (i < ripe) {
-      setTile(world, at, {
-        terrain: Terrain.Soil,
-        crop: ItemKind.Crop,
-        growth: MAX_GROWTH,
-        maxGrowth: MAX_GROWTH,
-      });
-      return;
-    }
-    if (i < ripe + bare) {
-      setTile(world, at, { terrain: Terrain.Soil });
-      return;
-    }
+function sowPlot(world: World): void {
+  const order = world.rng.shuffle(plotTiles());
+  const bare = world.rng.int(1, 2);
+  const cropped = order.slice(bare);
+
+  for (const at of order.slice(0, bare)) setTile(world, at, { terrain: Terrain.Soil });
+
+  cropped.forEach((at, i) => {
+    const base = RIPEN_LADDER[i] ?? 38;
+    const ripeAt = Math.max(0, base + world.rng.int(-2, 2));
     setTile(world, at, {
       terrain: Terrain.Soil,
       crop: ItemKind.Crop,
-      growth: world.rng.int(1, 6),
       maxGrowth: MAX_GROWTH,
+      meta: { plantedAt: ripeAt - MAX_GROWTH },
     });
   });
 }
@@ -45,85 +42,112 @@ export const w2_02: LevelDef = {
   id: 'w2-02',
   world: 2,
   index: 2,
-  title: 'Rotation',
-  hardware: ['scan', 'harvest', 'plant'],
+  title: 'Capacity',
+  hardware: ['inventory'],
   brief: [
-    '**FROM:** Field Eng. D. Halloran',
+    '**FROM:** Dep. Coordinator M. Vance',
+    '**RE:** Hopper allocation, north plot',
     '',
-    'you will have seen the rotation memo. it is real and they do check. the silo was moved',
-    'again over the winter, so the mule drops you at a different corner than last time.',
+    'The hopper leaves the depot full of seed. It does not open at the other end; Legal have',
+    'confirmed this is a feature and have declined to say of what.',
     '',
-    'Work every tile of the field.',
+    'Two things get checked at the end of shift: every tile that started with a crop must have',
+    'been harvested at some point, and every tile in the plot must be planted when you clock out.',
+    'These are not the same tile list — a tile can satisfy the second without ever having grown',
+    'anything for the first.',
   ].join('\n'),
   board: {
     fixed: [
-      'the field is 5 by 5 of soil inside its wall — 25 tiles, nothing else on them',
-      'the mule parks the bot on one of the four corners of the field',
-      'a crop that is not ready when the shift starts never comes ready during it',
-      'every tile is workable soil: no ice, no rubble, no gaps',
-      'the hopper carries more seed than the field can take',
+      'the plot is 3 across and 2 deep — six tiles of soil, walled on every side',
+      'every tile is soil, so a bare tile is empty rather than blocked',
+      'one or two tiles come up bare — never none',
+      'the hopper leaves the depot full, whatever full is this shift',
+      'the crops come ready spread across the shift, never all at once',
+      'FIELD-02 starts in the north-west corner, facing East',
     ],
     redrawn: [
-      'which corner the mule parks at',
-      'how many tiles come up ready — eight to ten of the twenty-five',
-      'how many come up bare — four to six',
-      'which tiles those are, and how far along the rest have got',
+      'how much the hopper holds, six to ten',
+      'which tiles came up bare, and whether it is one or two',
+      'how long each crop has left before it is ready',
+      'which crops have not started their clock, and what `sproutsIn` reports for them',
     ],
   },
   facts: [
+    { label: 'The plot', value: 'Six tiles. Three across, two deep.' },
     {
-      label: '`scan()`',
-      value: 'Reads the tile under the bot. `scan(Dir.East)` reads the next one along. Free.',
-    },
-    { label: 'Ready', value: 'A crop whose `growth` has reached its `maxGrowth`.' },
-    { label: 'A ready tile', value: 'Harvest it, then plant it again before you move on.' },
-    {
-      label: 'Bare soil',
+      label: 'The bare patch',
       value:
-        'Soil (a terrain) with nothing on it. Reads `crop: null` and `growth: 0` of `maxGrowth: 0`. Plant it — seed only goes into bare soil.',
+        'One or two tiles came up empty this shift. Maintenance blames the night crew, the night ' +
+        'crew blames the schedule, the schedule blames Legal.',
     },
-    { label: 'Not ready', value: 'Leave it standing. It already counts as planted.' },
     {
-      label: 'A swing',
-      value:
-        '`harvest()` and `plant()` cost **two ticks each**, whether or not they find anything.',
+      label: 'The hopper',
+      value: 'Starts the shift full. A full hopper takes nothing and the arm swings anyway.',
     },
-    { label: 'The hopper', value: 'Far more seed than the field needs.' },
+    {
+      label: '`inventory()`',
+      value: 'What the bot is carrying right now. The only reading of the hopper there is.',
+    },
+    {
+      label: 'Ripening',
+      value:
+        'Growth climbs by one every tick, driving or not. A tile at 5 of 8 is ready in three ticks.',
+    },
+    {
+      label: '`sproutsIn`',
+      value:
+        'Growth stuck at 0 is not always a bare tile — some crops on this shift have not started ' +
+        'their clock. `scan()` reports `sproutsIn`, the ticks left before growth moves at all.',
+    },
+    {
+      label: 'Spoilage',
+      value:
+        'One against the sheet for every tick a ripe crop stands in the ground with nobody on it.',
+    },
+    { label: 'At `maxGrowth`', value: 'Growth stops. The docking does not.' },
   ],
   seeds: [1, 2, 3, 4],
-  par: { ticks: 76 },
+  par: { ticks: 52 },
   build(seed: number): World {
-    const world = createWorld({ w: FIELD + 2, h: FIELD + 2, seed, fill: Terrain.Wall });
-    sowField(world);
-    const corner = world.rng.pick(CORNERS);
+    const world = createWorld({ w: PLOT_W + 2, h: PLOT_H + 2, seed, fill: Terrain.Wall });
+    sowPlot(world);
+    const capacity = world.rng.int(6, 10);
     addBot(world, {
-      at: corner,
+      at: vec(1, 1),
       facing: Dir.East,
-      capacity: 60,
-      inventory: [{ kind: ItemKind.Seed, count: SEED_LOAD }],
+      capacity,
+      inventory: [{ kind: ItemKind.Seed, count: capacity }],
       name: 'FIELD-02',
     });
     return world;
   },
   objectives: [
-    harvestedEvery(ripeAtStart, 'Harvest every crop that was ready', 'harvested-ripe'),
+    harvestedEvery(croppedAtStart, 'Harvest every crop in the plot', 'harvested-crops'),
     everyTilePlanted(),
   ],
-  bonus: [noWastedFieldwork('Waste no swing and no seed')],
+  bonus: [
+    withinSpoilage(
+      SPOILAGE_ALLOWANCE,
+      `Come back with no more than ${String(SPOILAGE_ALLOWANCE)} spoilage on the sheet`,
+    ),
+  ],
   starter: [
-    '// NOTE(4470): two ticks a swing, ready or not. the field does not care',
-    '// The mule parks at a different corner each quarter. canMove() is free.',
+    '// NOTE(4470): the hopper comes out full. that is the schedule, not a fault',
+    '// NOTE(4470): you cannot pick anything up until you have put something down',
     '',
-    'const here = scan();',
-    'print(`${here.crop} ${here.growth}/${here.maxGrowth}`);',
+    '// inventory() counts everything the bot is carrying, seed included.',
+    'print(`carrying ${inventory()}`);',
     '',
   ].join('\n'),
   hints: [
-    'A swing of the arm costs two ticks even on bare soil. Scanning first costs nothing.',
-    'Ready means growth has caught up with maxGrowth. Bare soil reports both as zero, which also counts as caught up.',
-    'Each tile needs at most two actions. Harvest, then plant. The other way round leaves the tile empty.',
-    'You start in a different corner each shift. Two free canMove questions tell you which way the field runs.',
-    'Sweep row by row and turn at the walls. canMove finds the walls, so the same sweep works from any corner.',
+    'The hopper starts full, so the first inventory reading is also its size.',
+    'A swing at a full hopper costs the same two ticks as one that works.',
+    'The plot always has one or two bare tiles. Plant those first — that is the only room the',
+    'hopper has to empty into before anything can be harvested.',
+    'One pass cannot finish the plot. The crops do not all come ready at the same time.',
+    'Growth climbs by one per tick, so a tile says exactly how long it needs. The clock runs whether the bot drives or stands still.',
+    'A tile reading 0 growth is not always freshly planted. Some crops on this ladder have not started yet, and sproutsIn says how many ticks until they do.',
+    'Waiting on a tile until it comes ready costs no spoilage. Driving laps costs the same ticks and arrives late.',
   ],
-  docs: ['scan', 'harvest', 'plant'],
+  docs: ['inventory', 'harvest', 'plant', 'wait'],
 };

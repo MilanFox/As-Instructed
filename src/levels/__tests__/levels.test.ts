@@ -32,10 +32,10 @@ function runOnce(level: (typeof LEVELS)[number], seed: number) {
 }
 
 const EXPECTED_INDICES: Readonly<Record<number, number[]>> = {
-  1: [1, 3, 5],
-  2: [2, 4, 5],
-  3: [1, 2, 4],
-  4: [1, 2, 4, 5],
+  1: [1, 2, 3],
+  2: [1, 2, 3],
+  3: [1, 2, 3],
+  4: [1, 2, 3, 4],
   5: [1, 2, 3, 4, 5],
   6: [1, 2, 3, 4, 5],
   7: [1, 2, 3, 4, 5],
@@ -51,12 +51,6 @@ describe('registry', () => {
     expect(LEVELS.length).toBe(EXPECTED_IDS.length);
     expect(new Set(LEVELS.map((level) => level.id)).size).toBe(EXPECTED_IDS.length);
     expect(campaignOrder().map((level) => level.id)).toEqual(EXPECTED_IDS);
-  });
-
-  test('nothing still points at a withdrawn work order', () => {
-    for (const id of ['w1-02', 'w1-04', 'w2-01', 'w2-03', 'w3-03', 'w3-05', 'w4-03']) {
-      expect(getLevel(id), id).toBeUndefined();
-    }
   });
 
   test('level ids match their world and index', () => {
@@ -253,20 +247,20 @@ describe('par calibration', () => {
     return scored(levelId, SOLUTIONS[levelId] as ReferenceSolution);
   }
 
-  test('w1-03: par is at the floor, because the answer with no idea in it is tick-optimal', () => {
-    const polled = scored('w1-03', corridorPoll);
+  test('w1-02: par is at the floor, because the answer with no idea in it is tick-optimal', () => {
+    const polled = scored('w1-02', corridorPoll);
     expect(polled.passed).toBe(true);
-    expect(polled.worst).toBe(reference('w1-03').worst);
+    expect(polled.worst).toBe(reference('w1-02').worst);
     expect(polled.medal).toBe('gold');
   });
 
-  test('w2-05: serpentining all six rows runs out of shift on most seeds', () => {
-    const level = getLevel('w2-05') as NonNullable<ReturnType<typeof getLevel>>;
-    const closed = level.seeds.filter((seed) => survives('w2-05', seed, serpentineHarvest));
+  test('w2-03: serpentining all six rows runs out of shift on most seeds', () => {
+    const level = getLevel('w2-03') as NonNullable<ReturnType<typeof getLevel>>;
+    const closed = level.seeds.filter((seed) => survives('w2-03', seed, serpentineHarvest));
     expect(closed.length).toBeLessThanOrEqual(2);
     expect(closed.length).toBeGreaterThan(0);
 
-    const lanes = reference('w2-05');
+    const lanes = reference('w2-03');
     expect(lanes.passed).toBe(true);
     expect(lanes.medal).toBe('gold');
     expect(level.budget?.maxTicks).toBeGreaterThanOrEqual(lanes.worst + 7);

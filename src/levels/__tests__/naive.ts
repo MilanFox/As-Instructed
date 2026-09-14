@@ -221,7 +221,7 @@ export const fieldSweep: ReferenceSolution = {
 };
 
 export const corridorPoll: ReferenceSolution = {
-  levelId: 'w1-03',
+  levelId: 'w1-02',
   run(sim: Sim, botId: number): void {
     while (sim.canMove(botId, Dir.East)) sim.move(botId, Dir.East);
   },
@@ -229,7 +229,7 @@ export const corridorPoll: ReferenceSolution = {
 };
 
 export const serpentineHarvest: ReferenceSolution = {
-  levelId: 'w2-05',
+  levelId: 'w2-03',
   run(sim: Sim, botId: number): void {
     let full = false;
     const service = (): void => {

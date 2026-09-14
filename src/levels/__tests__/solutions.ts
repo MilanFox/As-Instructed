@@ -1,18 +1,18 @@
 import type { ReferenceSolution } from '../types.ts';
 
 import { solution as w1_01 } from '../world-1/__solutions__/w1-01.ts';
+import { solution as w1_02 } from '../world-1/__solutions__/w1-02.ts';
 import { solution as w1_03 } from '../world-1/__solutions__/w1-03.ts';
-import { solution as w1_05 } from '../world-1/__solutions__/w1-05.ts';
+import { solution as w2_01 } from '../world-2/__solutions__/w2-01.ts';
 import { solution as w2_02 } from '../world-2/__solutions__/w2-02.ts';
-import { solution as w2_04 } from '../world-2/__solutions__/w2-04.ts';
-import { solution as w2_05 } from '../world-2/__solutions__/w2-05.ts';
+import { solution as w2_03 } from '../world-2/__solutions__/w2-03.ts';
 import { solution as w3_01 } from '../world-3/__solutions__/w3-01.ts';
 import { solution as w3_02 } from '../world-3/__solutions__/w3-02.ts';
-import { solution as w3_04 } from '../world-3/__solutions__/w3-04.ts';
+import { solution as w3_03 } from '../world-3/__solutions__/w3-03.ts';
 import { solution as w4_01 } from '../world-4/__solutions__/w4-01.ts';
 import { solution as w4_02 } from '../world-4/__solutions__/w4-02.ts';
+import { solution as w4_03 } from '../world-4/__solutions__/w4-03.ts';
 import { solution as w4_04 } from '../world-4/__solutions__/w4-04.ts';
-import { solution as w4_05 } from '../world-4/__solutions__/w4-05.ts';
 import { solution as w5_01 } from '../world-5/__solutions__/w5-01.ts';
 import { solution as w5_02 } from '../world-5/__solutions__/w5-02.ts';
 import { solution as w5_03 } from '../world-5/__solutions__/w5-03.ts';
@@ -36,18 +36,18 @@ import { solution as w8_05 } from '../world-8/__solutions__/w8-05.ts';
 
 export const SOLUTIONS: Record<string, ReferenceSolution> = {
   'w1-01': w1_01,
+  'w1-02': w1_02,
   'w1-03': w1_03,
-  'w1-05': w1_05,
+  'w2-01': w2_01,
   'w2-02': w2_02,
-  'w2-04': w2_04,
-  'w2-05': w2_05,
+  'w2-03': w2_03,
   'w3-01': w3_01,
   'w3-02': w3_02,
-  'w3-04': w3_04,
+  'w3-03': w3_03,
   'w4-01': w4_01,
   'w4-02': w4_02,
+  'w4-03': w4_03,
   'w4-04': w4_04,
-  'w4-05': w4_05,
   'w5-01': w5_01,
   'w5-02': w5_02,
   'w5-03': w5_03,

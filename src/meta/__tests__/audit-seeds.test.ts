@@ -41,33 +41,33 @@ function saveWith(...entries: Discrepancy[]): LibrarySave {
 
 describe('auditSeedsOf', () => {
   test('an open discrepancy puts its layout on its work order', () => {
-    const seeds = auditSeedsOf(saveWith(discrepancy('w4-05', 617)));
-    expect(seeds['w4-05']?.seeds).toEqual([617]);
-    expect(seeds['w4-05']?.note).toContain('617');
+    const seeds = auditSeedsOf(saveWith(discrepancy('w4-04', 617)));
+    expect(seeds['w4-04']?.seeds).toEqual([617]);
+    expect(seeds['w4-04']?.note).toContain('617');
   });
 
   test('the note names the discrepancy, so the console line says what put it there', () => {
-    const entry = discrepancy('w4-05', 617);
-    expect(auditSeedsOf(saveWith(entry))['w4-05']?.note).toContain(entry.id);
+    const entry = discrepancy('w4-04', 617);
+    expect(auditSeedsOf(saveWith(entry))['w4-04']?.note).toContain(entry.id);
   });
 
   test('a resolved discrepancy takes its layout back off', () => {
-    const save = saveWith(discrepancy('w4-05', 617));
-    const resolved = patchDiscrepancy(save, 'DISCREPANCY 4471-w4-05', { resolved: true });
+    const save = saveWith(discrepancy('w4-04', 617));
+    const resolved = patchDiscrepancy(save, 'DISCREPANCY 4471-w4-04', { resolved: true });
     expect(auditSeedsOf(resolved)).toEqual({});
   });
 
   test('a closed discrepancy takes its layout back off', () => {
-    const save = saveWith(discrepancy('w4-05', 617));
-    const closed = patchDiscrepancy(save, 'DISCREPANCY 4471-w4-05', { closed: true });
+    const save = saveWith(discrepancy('w4-04', 617));
+    const closed = patchDiscrepancy(save, 'DISCREPANCY 4471-w4-04', { closed: true });
     expect(auditSeedsOf(closed)).toEqual({});
   });
 
   test('two on one work order run both layouts', () => {
     const seeds = auditSeedsOf(
-      saveWith(discrepancy('w4-05', 617), { ...discrepancy('w4-05', 618), id: 'D2' }),
+      saveWith(discrepancy('w4-04', 617), { ...discrepancy('w4-04', 618), id: 'D2' }),
     );
-    expect(seeds['w4-05']?.seeds).toEqual([617, 618]);
+    expect(seeds['w4-04']?.seeds).toEqual([617, 618]);
   });
 });
 
@@ -101,12 +101,12 @@ describe('the wire from the incident list to the run', () => {
   });
 
   test('raising one adds the layout to the campaign schedule; closing it removes it', () => {
-    const entry = discrepancy('w4-05', 617);
+    const entry = discrepancy('w4-04', 617);
     useLibrary.setState({ save: withDiscrepancy(useLibrary.getState().save, entry) });
-    expect(useGame.getState().auditSeeds['w4-05']?.seeds).toEqual([617]);
+    expect(useGame.getState().auditSeeds['w4-04']?.seeds).toEqual([617]);
 
     useLibrary.getState().closeDiscrepancy(entry.id);
-    expect(useGame.getState().auditSeeds['w4-05']).toBeUndefined();
+    expect(useGame.getState().auditSeeds['w4-04']).toBeUndefined();
   });
 
   test('the layout reaches the runner, behind the work order own seeds', () => {

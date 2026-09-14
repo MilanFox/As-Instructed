@@ -108,7 +108,7 @@ describe('migration', () => {
   test('a profile keeps its measured usage through a migration', () => {
     const save = migrateLibrary({
       profiles: {
-        'w4-05': {
+        'w4-04': {
           key: 'k',
           passed: true,
           ticks: 100,
@@ -120,7 +120,7 @@ describe('migration', () => {
         },
       },
     });
-    expect(save.profiles['w4-05']?.usage.calls['pathTo']).toEqual({ calls: 3, ticks: 12 });
+    expect(save.profiles['w4-04']?.usage.calls['pathTo']).toEqual({ calls: 3, ticks: 12 });
   });
 });
 
@@ -205,9 +205,9 @@ describe('merging an imported save', () => {
 
 describe('discrepancies', () => {
   test('the probe seed is outside the work order own schedule', () => {
-    const seeds = offScheduleSeeds([1, 2, 3], 'w4-05', 0);
+    const seeds = offScheduleSeeds([1, 2, 3], 'w4-04', 0);
     expect(seeds.every((seed) => ![1, 2, 3].includes(seed))).toBe(true);
-    expect(offScheduleSeeds([1, 2, 3], 'w4-05', 0)).toEqual(seeds);
+    expect(offScheduleSeeds([1, 2, 3], 'w4-04', 0)).toEqual(seeds);
   });
 
   test('nothing is raised while the player is early, muted, or already has one open', () => {
@@ -218,7 +218,7 @@ describe('discrepancies', () => {
 
     const raised = withDiscrepancy(save, {
       id: 'D1',
-      levelId: 'w4-05',
+      levelId: 'w4-04',
       seed: 100,
       raisedAt: 1,
     });
@@ -242,8 +242,8 @@ describe('discrepancies', () => {
     expect(
       pickCandidate(save, [
         { ...base, levelId: 'w1-01', code: 'move();', dependsOnLibrary: false },
-        { ...base, levelId: 'w4-05', code: "import { a } from 'lib';", dependsOnLibrary: true },
+        { ...base, levelId: 'w4-04', code: "import { a } from 'lib';", dependsOnLibrary: true },
       ])?.levelId,
-    ).toBe('w4-05');
+    ).toBe('w4-04');
   });
 });

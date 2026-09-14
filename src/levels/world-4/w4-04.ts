@@ -1,295 +1,271 @@
 import type { Divergence, ObjectiveContext, Rng, Vec, World } from '../../engine/index.ts';
 import {
+  ItemKind,
+  NOTHING,
   Objectives,
   Terrain,
   addBot,
   clipValue,
   createWorld,
+  opposite,
   setTerrain,
+  step,
+  tileAt,
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
+import type { CellGrid } from './caves.ts';
 import {
   addCycles,
   carvePerfectMaze,
+  caveFloorTiles,
   cellTile,
   deadEndCells,
   distancesFrom,
   keyOf,
+  linkDirs,
   paintCave,
 } from './caves.ts';
-import {
-  at,
-  botEndsOn,
-  endedOn,
-  firstVisitOrder,
-  standingKeys,
-  tilesWithTerrain,
-} from './objectives.ts';
+import { botEndsOn, died, endedOn } from './objectives.ts';
 
-const CELLS = 14;
-const SIZE = 30;
+const CELLS = 19;
+const SIZE = 40;
+export const ORE_QUOTA = 5;
 
-const MODES = ['spread', 'clustered', 'mixed', 'clustered'] as const;
-type Mode = (typeof MODES)[number];
+const WALL = Terrain.Wall;
 
-function farthest(from: Map<string, number>, candidates: readonly Vec[]): Vec {
-  return candidates.reduce<Vec>(
-    (best, at) => ((from.get(keyOf(at)) ?? -1) > (from.get(keyOf(best)) ?? -1) ? at : best),
-    candidates[0] ?? { x: 1, y: 1 },
-  );
+interface Vein {
+  ore: Vec;
+  stand: Vec;
 }
 
-function nearest(from: Map<string, number>, candidates: readonly Vec[]): Vec {
-  return candidates.reduce<Vec>(
-    (best, at) =>
-      (from.get(keyOf(at)) ?? Infinity) < (from.get(keyOf(best)) ?? Infinity) ? at : best,
-    candidates[0] ?? { x: 1, y: 1 },
-  );
-}
-
-function without(pool: readonly Vec[], taken: readonly Vec[]): Vec[] {
-  const keys = new Set(taken.map(keyOf));
-  return pool.filter((at) => !keys.has(keyOf(at)));
-}
-
-function collectionPoints(
-  world: World,
-  rng: Rng,
-  mode: Mode,
-  pool: readonly Vec[],
-  anchors: readonly Vec[],
-): Vec[] {
-  if (mode === 'mixed') return rng.shuffle(pool).slice(0, 3);
-  if (mode === 'clustered') {
-    const first = rng.pick(pool);
-    const fromFirst = distancesFrom(world, first);
-    const others = without(pool, [first]);
-    const second = nearest(fromFirst, others);
-    const third = farthest(fromFirst, without(others, [second]));
-    return [first, second, third];
-  }
-  const chosen: Vec[] = [];
-  const seeds = anchors.slice();
-  let remaining = pool.slice();
-  while (chosen.length < 3 && remaining.length > 0) {
-    const spread = remaining.map((at) => {
-      let worst = Infinity;
-      for (const anchor of seeds) {
-        const d = distancesFrom(world, anchor).get(keyOf(at)) ?? 0;
-        if (d < worst) worst = d;
-      }
-      return { at, worst };
-    });
-    const best = spread.reduce((a, b) => (b.worst > a.worst ? b : a));
-    chosen.push(best.at);
-    seeds.push(best.at);
-    remaining = without(remaining, [best.at]);
-  }
-  return chosen;
-}
-
-function build(seed: number): World {
-  const world = createWorld({ w: SIZE, h: SIZE, seed, fill: Terrain.Rock });
-  const rng = world.rng;
-  const grid = carvePerfectMaze(rng, CELLS, CELLS);
-  addCycles(rng, grid, rng.int(1, 3));
-  paintCave(world, grid);
-
-  const chambers = deadEndCells(grid).map((cell) => cellTile(cell.i, cell.j));
-  const start = rng.pick(chambers);
-  const fromStart = distancesFrom(world, start);
-  const lift = farthest(fromStart, without(chambers, [start]));
-  const pool = without(chambers, [start, lift]);
-  const points = collectionPoints(world, rng, rng.pick(MODES), pool, [start, lift]);
-
-  for (const at of points) setTerrain(world, at, Terrain.Pad);
-  setTerrain(world, lift, Terrain.Depot);
-  addBot(world, { at: start, name: 'RIG-04' });
-  return world;
-}
-
-function landmarks(world: World): { points: Vec[]; lift: Vec | undefined; start: Vec | undefined } {
-  return {
-    points: tilesWithTerrain(world, Terrain.Pad),
-    lift: tilesWithTerrain(world, Terrain.Depot)[0],
-    start: world.bots[0]?.at,
-  };
-}
-
-function permutations(items: readonly Vec[]): Vec[][] {
-  if (items.length <= 1) return [items.slice()];
-  const out: Vec[][] = [];
-  for (let n = 0; n < items.length; n++) {
-    const head = items[n] as Vec;
-    const rest = items.filter((_, index) => index !== n);
-    for (const tail of permutations(rest)) out.push([head, ...tail]);
+function veinSites(world: World, grid: CellGrid, exclude: Vec): Vein[] {
+  const seen = new Set<string>();
+  const out: Vein[] = [];
+  for (const cell of deadEndCells(grid)) {
+    const stand = cellTile(cell.i, cell.j);
+    if (stand.x === exclude.x && stand.y === exclude.y) continue;
+    const inward = linkDirs(grid, cell.i, cell.j)[0];
+    if (inward === undefined) continue;
+    const ore = step(stand, opposite(inward));
+    if (tileAt(world, ore)?.terrain !== WALL) continue;
+    if (seen.has(keyOf(ore))) continue;
+    seen.add(keyOf(ore));
+    out.push({ ore, stand });
   }
   return out;
 }
 
-function tourCost(world: World, start: Vec, order: readonly Vec[], lift: Vec): number {
-  const stops = [start, ...order, lift];
-  let total = 0;
-  for (let n = 1; n < stops.length; n++) {
-    const leg = distancesFrom(world, stops[n - 1] as Vec).get(keyOf(stops[n] as Vec));
-    if (leg === undefined) return Infinity;
-    total += leg;
+function chooseVeins(rng: Rng, world: World, sites: Vein[], lift: Vec): Vein[] {
+  const fromLift = distancesFrom(world, lift);
+  const ranked = sites
+    .slice()
+    .sort((a, b) => (fromLift.get(keyOf(a.stand)) ?? 0) - (fromLift.get(keyOf(b.stand)) ?? 0));
+  const split = Math.max(ORE_QUOTA + 1, Math.ceil(ranked.length * 0.5));
+  const near = rng.shuffle(ranked.slice(0, split));
+  const far = rng.shuffle(ranked.slice(split));
+  const total = rng.int(6, 10);
+  const chosen = near.slice(0, Math.min(6, total));
+  return chosen.concat(far.slice(0, total - chosen.length));
+}
+
+function build(seed: number): World {
+  const world = createWorld({ w: SIZE, h: SIZE, seed, fill: WALL });
+  const rng = world.rng;
+  const grid = carvePerfectMaze(rng, CELLS, CELLS);
+  addCycles(rng, grid, rng.int(4, 8));
+  paintCave(world, grid);
+
+  const middle = Math.floor(CELLS / 4);
+  const lift = cellTile(rng.int(middle, CELLS - 1 - middle), rng.int(middle, CELLS - 1 - middle));
+  setTerrain(world, lift, Terrain.Depot);
+
+  for (const vein of chooseVeins(rng, world, veinSites(world, grid, lift), lift)) {
+    setTerrain(world, vein.ore, Terrain.Ore);
   }
-  return total;
+
+  const surveyCost = 2 * caveFloorTiles(grid).length;
+  const tank = Math.round(surveyCost * (0.5 + rng.int(0, 10) / 100));
+  addBot(world, { at: lift, name: 'RIG-04', fuel: tank, fuelMax: tank });
+  return world;
 }
 
-function tookBestOrder(ctx: ObjectiveContext): boolean {
-  const { points, lift, start } = landmarks(ctx.initialWorld);
-  if (points.length !== 3 || lift === undefined || start === undefined) return false;
-  const order = firstVisitOrder(ctx, points);
-  if (order.length !== 3) return false;
-  const costs = permutations(points).map((perm) => tourCost(ctx.initialWorld, start, perm, lift));
-  const best = Math.min(...costs);
-  return tourCost(ctx.initialWorld, start, order, lift) === best;
+interface TripHome {
+  filed?: string;
+  paid: number;
+  short: boolean;
+  droveFirst: boolean;
 }
 
-function visitedCount(ctx: ObjectiveContext): number {
-  const stood = standingKeys(ctx);
-  return tilesWithTerrain(ctx.initialWorld, Terrain.Pad).filter((point) => stood.has(keyOf(point)))
-    .length;
+function tripHome(ctx: ObjectiveContext): TripHome {
+  const events = ctx.trace.events;
+  let carried = 0;
+  let anchor = -1;
+  for (let i = 0; i < events.length && anchor < 0; i++) {
+    const event = events[i];
+    if (event === undefined || event.kind !== 'mine' || !event.ok) continue;
+    carried += event.count;
+    if (carried >= ORE_QUOTA) anchor = i;
+  }
+  if (anchor < 0) return { paid: 0, short: true, droveFirst: false };
+
+  let filedAt = -1;
+  let filed: string | undefined;
+  let droveFirst = false;
+  for (let i = anchor + 1; i < events.length; i++) {
+    const event = events[i];
+    if (event === undefined) continue;
+    if (event.kind === 'move' && event.ok) {
+      droveFirst = true;
+      break;
+    }
+    if (event.kind === 'print' && event.text.startsWith('home ')) {
+      filedAt = i;
+      filed = event.text;
+      break;
+    }
+  }
+
+  let paid = 0;
+  for (let i = (filedAt < 0 ? anchor : filedAt) + 1; i < events.length; i++) {
+    const event = events[i];
+    if (event?.kind === 'move' && event.ok) paid++;
+  }
+  return filed === undefined
+    ? { paid, short: false, droveFirst }
+    : { filed, paid, short: false, droveFirst };
 }
 
-function missedPoint(ctx: ObjectiveContext): Divergence | undefined {
-  const stood = standingKeys(ctx);
-  const missed = tilesWithTerrain(ctx.initialWorld, Terrain.Pad).find(
-    (point) => !stood.has(keyOf(point)),
-  );
-  if (missed === undefined) return undefined;
-  return { where: at(missed), expected: 'stood on', received: 'never reached' };
-}
-
-function orderTaken(ctx: ObjectiveContext): Divergence | undefined {
-  const { points, lift, start } = landmarks(ctx.initialWorld);
-  if (points.length !== 3 || lift === undefined || start === undefined) return undefined;
-  const order = firstVisitOrder(ctx, points);
-  if (order.length !== points.length) {
+const unfiled = (ctx: ObjectiveContext): Divergence | undefined => {
+  const trip = tripHome(ctx);
+  if (trip.short) {
     return {
-      where: 'the collection points',
-      expected: `all ${String(points.length)}, in some order`,
-      received: `${String(order.length)} of ${String(points.length)}`,
+      where: 'the last vein',
+      expected: `${String(ORE_QUOTA)} ore cut`,
+      received: 'the quota was never made',
     };
   }
-  const best = Math.min(
-    ...permutations(points).map((perm) => tourCost(ctx.initialWorld, start, perm, lift)),
-  );
-  const took = tourCost(ctx.initialWorld, start, order, lift);
+  if (trip.droveFirst) {
+    return {
+      where: 'the trip home',
+      expected: 'a price filed before the first move back',
+      received: 'the bot drove off first',
+    };
+  }
+  if (trip.filed === undefined) {
+    return {
+      where: 'the trip home',
+      expected: 'a line saying what the way back costs',
+      received: NOTHING,
+    };
+  }
   return {
-    where: clipValue(order.map(at).join(' → ')),
-    expected: `${String(best)} steps`,
-    received: Number.isFinite(took) ? `${String(took)} steps` : 'no route',
+    where: 'the trip home',
+    expected: 'a different figure',
+    received: clipValue(trip.filed),
   };
-}
+};
 
 export const w4_04: LevelDef = {
   id: 'w4-04',
   world: 4,
   index: 4,
-  title: 'Map First, Move Second',
-  hardware: [],
+  title: 'The Deep Shaft',
+  hardware: ['mine', 'fuel', 'refuel'],
   brief: [
-    '```',
-    'MEMO KD-2429',
-    'FROM: Dep. Coordinator M. Vance',
-    'RE:   Unlogged unit',
+    '> dot: the shaft runs deeper than survey admit. there is ore in the walls down there and',
+    '> the cutting head will take it. you may take the ore. you may not widen the tunnel.',
     '',
-    'Telemetry has found a bot at depth running a program with no',
-    'deployment record. It has been running for eleven months. It is',
-    'not malfunctioning.',
-    '',
-    'Facilities have classified it as "existing infrastructure" so that',
-    'it does not require a decision.',
-    '```',
-    '',
-    'Stand on all three collection points, then end the run on the lift.',
+    `Bring back ${ORE_QUOTA} ore and end the run standing on the lift.`,
   ].join('\n'),
   board: {
     fixed: [
-      'the map is 30 tiles square',
-      'tunnels are one tile wide, and a tile with an even `x` and an even `y` is always rock',
-      'the cave is carved throughout — every tunnel is reachable from every other, and nothing is sealed off',
-      'three collection points and one lift, each at the blind end of a side passage',
-      'RIG-04 starts at a blind end too, and the lift is the one furthest from it',
+      'the map is 40 tiles square; corridors are one tile wide, and a tile with an even `x` and an even `y` is always solid',
+      'the cave is carved throughout — every corridor is reachable from every other',
+      'RIG-04 starts on the lift, and the lift stands well inside the cave rather than against its outer wall',
+      'every ore face is set square into the blind end of a side passage, so a ray down that passage ends on it',
+      'six of the ore faces are among those nearest the lift, so the quota never asks for the far end of the cave',
+      'the tank never holds more than about half of what walking every corridor would cost',
     ],
     redrawn: [
-      'the layout of the tunnels',
-      'one to three tunnels that rejoin further in',
-      'where the three points and the lift sit',
-      'how far apart the three points are — some shifts leave two of them almost together, others push all three as far apart as the cave allows',
-      'which side passage RIG-04 starts in',
+      'the layout of the corridors',
+      'four to eight corridors that rejoin further in',
+      'six to ten ore faces, and which passages they end',
+      'where in the middle of the cave the lift stands',
+      'the size of the tank',
     ],
   },
   facts: [
-    { label: 'Collection points', value: 'Three pad tiles.' },
-    { label: 'The lift', value: 'Depot (a terrain). One tile of it.' },
+    { label: 'The lift', value: 'The depot tile the bot starts on.' },
     {
-      label: 'Where they sit',
-      value: 'Each of the four is at the end of a short side passage off the main tunnels.',
+      label: 'The veins',
+      value:
+        'Ore (a terrain) set into the tunnel walls. Stand next to one and call `mine(dir)`. Cutting a face clears it to floor and puts ore (an item) in the hold. The plain `wall` tiles around them cannot be cut — only an ore face can.',
     },
     {
-      label: 'The order',
+      label: 'Fuel',
       value:
-        'For the star: counted from the **first** time the bot stands on each point. A survey that walks into a side chamber has already spent that point — read the chamber off a ray down the passage instead.',
+        'Acting spends fuel equal to the ticks it costs. Looking, reading and waiting spend none. An action the tank cannot pay for does not happen: the shift ends where the bot is standing.',
     },
     {
-      label: 'The clock',
+      label: 'The tank',
       value:
-        'It pays for one look around and one good circuit. It does not pay for three separate trips.',
+        'A different size every shift. `fuel()` reads it; `refuel()` fills it, but only on the depot.',
     },
     {
-      label: 'The Repository',
-      value:
-        'Nothing here needs it. But the two halves you write get names later: `survey` and `pathTo`.',
+      label: 'A `look` ray',
+      value: 'Stops at the first thing it cannot see through, and tells you what that thing was.',
+    },
+    {
+      label: 'The return note',
+      value: `For the star: the moment the ${String(ORE_QUOTA)}th ore is cut, and before the bot moves again, file one line \`home <n>\` — the number of moves the trip back is going to take. Then take exactly that many.`,
     },
   ],
-  seeds: [1, 2, 3, 4],
-  par: { ticks: 970 },
-  budget: { maxTicks: 1350 },
+  seeds: [1, 2, 3, 4, 5],
+  par: { ticks: 700 },
+  budget: { maxTicks: 2600 },
   build,
   objectives: [
-    Objectives.custom(
-      'collect-all',
-      'Stand on all three collection points',
-      (ctx) => visitedCount(ctx) === 3,
-      { progress: (ctx) => [visitedCount(ctx), 3], divergence: missedPoint },
-    ),
+    Objectives.inventoryAtLeast(ItemKind.Ore, ORE_QUOTA, {
+      id: 'ore-quota',
+      label: `Carry ${ORE_QUOTA} ore out of the shaft`,
+    }),
     Objectives.custom(
       'end-on-lift',
-      'End the run on the lift',
+      'End the run standing on the lift',
       (ctx) => botEndsOn(ctx, Terrain.Depot),
       { divergence: (ctx) => endedOn(ctx, Terrain.Depot) },
+    ),
+    Objectives.custom(
+      'bot-recovered',
+      'Bring the bot back in one piece',
+      (ctx) => ctx.world.bots[0]?.alive === true,
+      { divergence: (ctx) => died(ctx) },
     ),
   ],
   bonus: [
     Objectives.custom(
-      'best-order',
-      'Take the collection points in the best order',
-      (ctx) => tookBestOrder(ctx),
-      { divergence: orderTaken },
+      'filed-return',
+      'File what the trip home will cost before driving it',
+      (ctx) => {
+        const trip = tripHome(ctx);
+        return trip.filed === `home ${String(trip.paid)}`;
+      },
+      { divergence: unfiled },
     ),
   ],
   starter: [
-    '// NOTE(4470): i kept mine like this. key(x, y) names a tile, the',
-    '// NOTE(4470): array is what it touches. the tunnels join up in places',
+    "// import { survey, pathTo } from 'lib';",
+    '// The tank is a different size every shift. Read it, do not assume it.',
     '',
-    'const known = new Map<string, string[]>();',
-    '',
-    'function key(x: number, y: number): string {',
-    '  return x + "," + y;',
-    '}',
-    '',
-    '// TODO(4470): the side chambers are easy to walk straight past',
+    'print(`tank: ${fuel()}`);',
     '',
   ].join('\n'),
   hints: [
-    'You are being asked to do two different things. Doing them at the same time is what is expensive.',
-    'The first thing produces no movement towards any collection point and that is fine. It produces a description of the cave.',
-    'Once the cave is written down, the bot no longer has to be anywhere for you to work out how far apart two tiles are.',
-    'There are six ways to order three stops. Six is a small enough number to simply try all of them.',
+    'The same fuel pays for finding a vein and for getting home afterwards. Only one of those two is optional.',
+    'A corridor you have not walked down is not a mystery. Look down it first and see what the far end is made of.',
+    'The bot can work out how far it is from the lift at any moment, as long as it wrote down how it got there.',
+    'Before each step, ask what it would take to get home from where that step lands you. When the answer is more than the tank holds, you went too far one step ago.',
+    'A program that can answer that question can also write the answer down. Work the route back out of the map you kept, count it, say it, and then drive it — in that order.',
   ],
-  docs: ['look', 'coordinates', 'memory'],
+  docs: ['look', 'mine', 'fuel', 'refuel', 'memory'],
 };

@@ -215,13 +215,13 @@ describe('a requisition belongs to the level that delivers its hardware', () => 
   });
 
   it('never lets requisitions pile up across a world opened all at once', () => {
-    for (const levelId of ['w4-01', 'w4-02', 'w4-05']) {
+    for (const levelId of ['w4-01', 'w4-02', 'w4-04']) {
       useGame.setState({ currentLevelId: levelId });
       usePapers.getState().clearLevelPaper();
       issue(`requisition:${levelId}`, { kind: 'requisition', levelId, hardware: ['look'] });
     }
 
     const held = reachable().filter((id) => id.startsWith('requisition:'));
-    expect(held).toEqual(['requisition:w4-05']);
+    expect(held).toEqual(['requisition:w4-04']);
   });
 });

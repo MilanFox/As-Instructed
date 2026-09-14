@@ -9,7 +9,7 @@ import { at } from '../objectives.ts';
 import { key, stencilledDepots } from '../yard.ts';
 import { w3_01 } from '../w3-01.ts';
 import { w3_02 } from '../w3-02.ts';
-import { w3_04 } from '../w3-04.ts';
+import { w3_03 } from '../w3-03.ts';
 
 function diverge(
   level: LevelDef,
@@ -157,9 +157,9 @@ describe('w3-02 — the depot that ended short', () => {
   });
 });
 
-describe('w3-04 — the crate, the place in the stack and the step', () => {
+describe('w3-03 — the crate, the place in the stack and the step', () => {
   const arrivalsOf = (seed: number): { index: number; at: Vec }[] => {
-    const world = w3_04.build(seed);
+    const world = w3_03.build(seed);
     const out: { index: number; at: Vec }[] = [];
     for (let y = 0; y < world.h; y++) {
       for (let x = 0; x < world.w; x++) {
@@ -171,11 +171,11 @@ describe('w3-04 — the crate, the place in the stack and the step', () => {
     return out.sort((a, b) => a.index - b.index);
   };
 
-  const bayOf = (seed: number): Vec => must(padsOf(w3_04, seed)[0], 'the bay');
+  const bayOf = (seed: number): Vec => must(padsOf(w3_03, seed)[0], 'the bay');
 
   test('bay-cleared names the lowest arrival still standing in the yard', () => {
     const first = must(arrivalsOf(1)[0], 'arrival 1');
-    const { met, divergence } = diverge(w3_04, 1, 'bay-cleared', () => undefined);
+    const { met, divergence } = diverge(w3_03, 1, 'bay-cleared', () => undefined);
     expect(met).toBe(false);
     expect(divergence).toEqual({
       where: `arrival ${String(first.index)}, from ${at(first.at)}`,
@@ -189,7 +189,7 @@ describe('w3-04 — the crate, the place in the stack and the step', () => {
     const bay = bayOf(1);
     const second = must(arrivals[1], 'arrival 2');
     const first = must(arrivals[0], 'arrival 1');
-    const { met, divergence } = diverge(w3_04, 1, 'bay-in-order', (sim, botId) => {
+    const { met, divergence } = diverge(w3_03, 1, 'bay-in-order', (sim, botId) => {
       for (const crate of [second, first]) {
         goTo(sim, botId, crate.at);
         sim.pickup(botId, 'crate', 1);
@@ -206,12 +206,12 @@ describe('w3-04 — the crate, the place in the stack and the step', () => {
   });
 
   test('a bay the run never reached is told so rather than given a number', () => {
-    const { divergence } = diverge(w3_04, 1, 'bay-in-order', () => undefined);
+    const { divergence } = diverge(w3_03, 1, 'bay-in-order', () => undefined);
     expect(must(divergence, 'a divergence').received).toBe('(nothing)');
   });
 
   test('aisle-discipline names the first step into an empty slot', () => {
-    const world = w3_04.build(1);
+    const world = w3_03.build(1);
     const vacant = new Set<string>();
     for (let y = 0; y < world.h; y++) {
       for (let x = 0; x < world.w; x++) {
@@ -222,7 +222,7 @@ describe('w3-04 — the crate, the place in the stack and the step', () => {
       }
     }
 
-    const { met, divergence, result } = diverge(w3_04, 1, 'aisle-discipline', (sim, botId) => {
+    const { met, divergence, result } = diverge(w3_03, 1, 'aisle-discipline', (sim, botId) => {
       goTo(sim, botId, vec(1, 2));
       goTo(sim, botId, vec(16, 2));
       goTo(sim, botId, vec(16, 3));

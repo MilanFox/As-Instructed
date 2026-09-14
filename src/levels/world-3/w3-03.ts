@@ -162,10 +162,10 @@ const overTrodden = (ctx: ObjectiveContext): Divergence | undefined => {
   };
 };
 
-export const w3_04: LevelDef = {
-  id: 'w3-04',
+export const w3_03: LevelDef = {
+  id: 'w3-03',
   world: 3,
-  index: 4,
+  index: 3,
   title: 'First In, First Out',
   hardware: [],
   brief: [

@@ -1,189 +1,237 @@
-import type { Dir, Sim, TileView, Vec } from '../../../engine/index.ts';
-import { ALL_DIRS, Terrain } from '../../../engine/index.ts';
+import type { Sim, Vec } from '../../../engine/index.ts';
+import { ALL_DIRS, ItemKind, Terrain, dirBetween, manhattan, step } from '../../../engine/index.ts';
 import type { ReferenceSolution } from '../../types.ts';
 
-type Key = string;
+const RANGE = 14;
+const key = (at: Vec): string => `${String(at.x)},${String(at.y)}`;
 
-const key = (x: number, y: number): Key => `${x},${y}`;
-const parse = (k: Key): Vec => {
-  const [x = '0', y = '0'] = k.split(',');
-  return { x: Number(x), y: Number(y) };
-};
-const around = (k: Key): Key[] => {
-  const at = parse(k);
-  return [key(at.x, at.y - 1), key(at.x + 1, at.y), key(at.x, at.y + 1), key(at.x - 1, at.y)];
-};
-const towards = (from: Vec, to: Vec): Dir =>
-  (to.y < from.y ? 0 : to.x > from.x ? 1 : to.y > from.y ? 2 : 3) as Dir;
+interface Survey {
+  open: Map<string, Vec>;
+  seen: Set<string>;
+  veins: Map<string, Vec>;
+}
+
+function record(survey: Survey, at: Vec, terrain: Terrain, walkable: boolean): void {
+  survey.seen.add(key(at));
+  if (walkable) survey.open.set(key(at), at);
+  else if (terrain === Terrain.Ore) survey.veins.set(key(at), at);
+}
+
+function reachable(
+  survey: Survey,
+  from: Vec,
+): { cost: Map<string, number>; via: Map<string, Vec> } {
+  const cost = new Map<string, number>([[key(from), 0]]);
+  const via = new Map<string, Vec>();
+  const queue: Vec[] = [from];
+  for (let head = 0; head < queue.length; head++) {
+    const at = queue[head] as Vec;
+    const here = cost.get(key(at)) ?? 0;
+    for (const dir of ALL_DIRS) {
+      const next = step(at, dir);
+      if (!survey.open.has(key(next)) || cost.has(key(next))) continue;
+      cost.set(key(next), here + 1);
+      via.set(key(next), at);
+      queue.push(next);
+    }
+  }
+  return { cost, via };
+}
+
+function pathTo(via: Map<string, Vec>, from: Vec, to: Vec): Vec[] {
+  const route: Vec[] = [];
+  let at = to;
+  while (key(at) !== key(from)) {
+    route.push(at);
+    const back = via.get(key(at));
+    if (!back) return [];
+    at = back;
+  }
+  return route.reverse();
+}
 
 export const solution: ReferenceSolution = {
   levelId: 'w4-04',
   run(sim: Sim, botId: number): void {
-    const open = new Map<Key, boolean>();
-    const terrain = new Map<Key, string>();
-
-    const note = (view: TileView): void => {
-      const k = key(view.at.x, view.at.y);
-      open.set(k, view.walkable);
-      terrain.set(k, view.terrain);
+    const home = sim.pos(botId);
+    const survey: Survey = {
+      open: new Map([[key(home), home]]),
+      seen: new Set([key(home)]),
+      veins: new Map(),
     };
+    const cut = new Set<string>();
 
-    const senseHere = (): void => {
-      note(sim.scan(botId));
-      for (const dir of ALL_DIRS) for (const view of sim.look(botId, dir)) note(view);
-    };
-
-    const isLanding = (k: Key): boolean =>
-      terrain.get(k) === Terrain.Pad || terrain.get(k) === Terrain.Depot;
-    const unfinished = (k: Key): boolean =>
-      open.get(k) === true && !isLanding(k) && !around(k).every((n) => open.has(n));
-
-    const routeTo = (from: Key, goal: (k: Key) => boolean): Key[] | null => {
-      const previous = new Map<Key, Key>();
-      const seen = new Set<Key>([from]);
-      const queue: Key[] = [from];
-      let found: Key | null = null;
-      for (let head = 0; head < queue.length && found === null; head++) {
-        const at = queue[head] as Key;
-        if (at !== from && goal(at)) {
-          found = at;
-          break;
-        }
-        for (const next of around(at)) {
-          if (seen.has(next) || open.get(next) !== true) continue;
-          seen.add(next);
-          previous.set(next, at);
-          queue.push(next);
+    const observe = (): void => {
+      const at = sim.pos(botId);
+      survey.seen.add(key(at));
+      survey.open.set(key(at), at);
+      for (const dir of ALL_DIRS) {
+        for (const view of sim.look(botId, dir, RANGE)) {
+          if (!view.inBounds) break;
+          record(survey, view.at, view.terrain, view.walkable);
         }
       }
-      if (found === null) return null;
-      const route: Key[] = [];
-      for (let cursor = found; cursor !== from;) {
-        route.push(cursor);
-        cursor = previous.get(cursor) as Key;
+    };
+
+    const walk = (route: readonly Vec[]): void => {
+      for (const next of route) {
+        const dir = dirBetween(sim.pos(botId), next);
+        if (dir === null || !sim.move(botId, dir)) return;
+        observe();
       }
-      return route.reverse();
     };
 
-    const distance = (from: Key, to: Key): number => {
-      const route = routeTo(from, (k) => k === to);
-      return route === null ? Number.POSITIVE_INFINITY : route.length;
-    };
+    observe();
 
-    const walk = (route: Key[]): void => {
-      for (const next of route) sim.move(botId, towards(sim.pos(botId), parse(next)));
-    };
+    for (let round = 0; round < 400; round++) {
+      const have = sim.inventory(botId, ItemKind.Ore);
+      if (have >= 5) break;
 
-    const origin = sim.pos(botId);
-    const start = key(origin.x, origin.y);
+      const at = sim.pos(botId);
+      const { cost, via } = reachable(survey, at);
+      const homeward = reachable(survey, home).cost;
+      const budget = sim.fuel(botId);
 
-    for (;;) {
-      senseHere();
-      const here = sim.pos(botId);
-      const route = routeTo(key(here.x, here.y), unfinished);
-      if (route === null || route.length === 0) break;
-      walk(route.slice(0, 1));
-    }
-
-    const pads = [...terrain.keys()].filter((k) => terrain.get(k) === Terrain.Pad);
-    const lift = [...terrain.keys()].find((k) => terrain.get(k) === Terrain.Depot);
-    if (lift === undefined || pads.length < 3) return;
-
-    const orders: Key[][] = [];
-    for (const a of pads) {
-      for (const b of pads) {
-        for (const c of pads) {
-          if (a === b || b === c || a === c) continue;
-          orders.push([a, b, c]);
+      let bestVein: { stand: Vec; face: Vec; price: number } | null = null;
+      for (const [id, face] of survey.veins) {
+        if (cut.has(id)) continue;
+        for (const dir of ALL_DIRS) {
+          const stand = step(face, dir);
+          const out = cost.get(key(stand));
+          const back = homeward.get(key(stand));
+          if (out === undefined || back === undefined) continue;
+          const price = out + 2 + back;
+          if (price > budget) continue;
+          if (!bestVein || out < bestVein.price) bestVein = { stand, face, price: out };
         }
       }
-    }
-    let best = orders[0] as Key[];
-    let bestCost = Number.POSITIVE_INFINITY;
-    for (const order of orders) {
-      const stops = [start, ...order, lift];
-      let cost = 0;
-      for (let n = 1; n < stops.length; n++) cost += distance(stops[n - 1] as Key, stops[n] as Key);
-      if (cost < bestCost) {
-        bestCost = cost;
-        best = order;
+      if (bestVein) {
+        walk(pathTo(via, at, bestVein.stand));
+        const dir = dirBetween(sim.pos(botId), bestVein.face);
+        if (dir !== null) sim.mine(botId, dir);
+        cut.add(key(bestVein.face));
+        observe();
+        continue;
       }
+
+      const reserve = (5 - have) * 2 + 2;
+      let frontier: Vec | null = null;
+      let cheapest = Number.POSITIVE_INFINITY;
+      for (const [id, tile] of survey.open) {
+        const out = cost.get(id);
+        const back = homeward.get(id);
+        if (out === undefined || back === undefined || out === 0) continue;
+        if (out + back + reserve > budget) continue;
+        const unknown = ALL_DIRS.some((dir) => !survey.seen.has(key(step(tile, dir))));
+        if (!unknown) continue;
+        const score = out * 2 + manhattan(tile, home);
+        if (score < cheapest) {
+          cheapest = score;
+          frontier = tile;
+        }
+      }
+      if (!frontier) break;
+      walk(pathTo(via, at, frontier));
     }
 
-    for (const stop of [...best, lift]) {
-      const here = sim.pos(botId);
-      const route = routeTo(key(here.x, here.y), (k) => k === stop);
-      if (route !== null) walk(route);
-    }
+    const at = sim.pos(botId);
+    const route = key(at) === key(home) ? [] : pathTo(reachable(survey, at).via, at, home);
+    sim.print(botId, `home ${String(route.length)}`);
+    walk(route);
   },
   source: [
-    'const open = new Map();',
-    'const ground = new Map();',
-    'const key = (x, y) => x + "," + y;',
-    'const parse = (k) => ({ x: Number(k.split(",")[0]), y: Number(k.split(",")[1]) });',
-    'const around = (k) => {',
-    '  const a = parse(k);',
-    '  return [key(a.x, a.y - 1), key(a.x + 1, a.y), key(a.x, a.y + 1), key(a.x - 1, a.y)];',
-    '};',
-    'const towards = (f, t) => (t.y < f.y ? 0 : t.x > f.x ? 1 : t.y > f.y ? 2 : 3);',
-    'const note = (v) => { open.set(key(v.at.x, v.at.y), v.walkable);',
-    '  ground.set(key(v.at.x, v.at.y), v.terrain); };',
-    'const senseHere = () => {',
-    '  note(scan());',
-    '  for (const d of [Dir.North, Dir.East, Dir.South, Dir.West]) look(d).forEach(note);',
-    '};',
-    'const landing = (k) => ground.get(k) === Terrain.Pad || ground.get(k) === Terrain.Depot;',
-    'const unfinished = (k) =>',
-    '  open.get(k) === true && !landing(k) && !around(k).every((n) => open.has(n));',
-    'const routeTo = (from, goal) => {',
-    '  const previous = new Map();',
-    '  const seen = new Set([from]);',
-    '  const queue = [from];',
-    '  let found = null;',
-    '  for (let head = 0; head < queue.length && found === null; head++) {',
-    '    const at = queue[head];',
-    '    if (at !== from && goal(at)) { found = at; break; }',
-    '    for (const next of around(at)) {',
-    '      if (seen.has(next) || open.get(next) !== true) continue;',
-    '      seen.add(next);',
-    '      previous.set(next, at);',
-    '      queue.push(next);',
+    '// Four free rays at every stop; the map they build is what makes the way home a number.',
+    'const home = pos();',
+    'const open = new Map([[`${home.x},${home.y}`, home]]);',
+    'const seen = new Set([`${home.x},${home.y}`]);',
+    'const veins = new Map();',
+    'const cut = new Set();',
+    'const dirs = [Dir.North, Dir.East, Dir.South, Dir.West];',
+    'const k = (p) => `${p.x},${p.y}`;',
+    'const stepTo = (p, d) => ({',
+    '  x: p.x + (d === Dir.East ? 1 : d === Dir.West ? -1 : 0),',
+    '  y: p.y + (d === Dir.South ? 1 : d === Dir.North ? -1 : 0),',
+    '});',
+    'function observe() {',
+    '  const at = pos();',
+    '  seen.add(k(at)); open.set(k(at), at);',
+    '  for (const d of dirs) {',
+    '    for (const v of look(d, 14)) {',
+    '      if (!v.inBounds) break;',
+    '      seen.add(k(v.at));',
+    '      if (v.walkable) open.set(k(v.at), v.at);',
+    '      else if (v.terrain === Terrain.Ore) veins.set(k(v.at), v.at);',
     '    }',
     '  }',
-    '  if (found === null) return null;',
-    '  const route = [];',
-    '  for (let c = found; c !== from; c = previous.get(c)) route.push(c);',
-    '  return route.reverse();',
-    '};',
-    'const distance = (a, b) => {',
-    '  const route = routeTo(a, (k) => k === b);',
-    '  return route === null ? Infinity : route.length;',
-    '};',
-    'const walk = (route) => { for (const n of route) move(towards(pos(), parse(n))); };',
-    'const start = key(pos().x, pos().y);',
-    'for (;;) {',
-    '  senseHere();',
-    '  const route = routeTo(key(pos().x, pos().y), unfinished);',
-    '  if (route === null || route.length === 0) break;',
-    '  walk(route.slice(0, 1));',
     '}',
-    'const pads = [...ground.keys()].filter((k) => ground.get(k) === Terrain.Pad);',
-    'const lift = [...ground.keys()].find((k) => ground.get(k) === Terrain.Depot);',
-    'const orders = [];',
-    'for (const a of pads) for (const b of pads) for (const c of pads) {',
-    '  if (a !== b && b !== c && a !== c) orders.push([a, b, c]);',
+    'function flood(from) {',
+    '  const cost = new Map([[k(from), 0]]); const via = new Map(); const q = [from];',
+    '  for (let i = 0; i < q.length; i++) {',
+    '    const at = q[i];',
+    '    for (const d of dirs) {',
+    '      const n = stepTo(at, d);',
+    '      if (!open.has(k(n)) || cost.has(k(n))) continue;',
+    '      cost.set(k(n), cost.get(k(at)) + 1); via.set(k(n), at); q.push(n);',
+    '    }',
+    '  }',
+    '  return { cost, via };',
     '}',
-    'let best = orders[0];',
-    'let bestCost = Infinity;',
-    'for (const order of orders) {',
-    '  const stops = [start, ...order, lift];',
-    '  let cost = 0;',
-    '  for (let n = 1; n < stops.length; n++) cost += distance(stops[n - 1], stops[n]);',
-    '  if (cost < bestCost) { bestCost = cost; best = order; }',
+    'function route(via, from, to) {',
+    '  const out = []; let at = to;',
+    '  while (k(at) !== k(from)) { out.push(at); at = via.get(k(at)); if (!at) return []; }',
+    '  return out.reverse();',
     '}',
-    'for (const stop of [...best, lift]) {',
-    '  const route = routeTo(key(pos().x, pos().y), (k) => k === stop);',
-    '  if (route !== null) walk(route);',
+    'function drive(path) {',
+    '  for (const n of path) {',
+    '    const at = pos();',
+    '    const d = n.x > at.x ? Dir.East : n.x < at.x ? Dir.West : n.y > at.y ? Dir.South : Dir.North;',
+    '    if (!move(d)) return;',
+    '    observe();',
+    '  }',
     '}',
+    'observe();',
+    'for (let round = 0; round < 400; round++) {',
+    '  const have = inventory(ItemKind.Ore);',
+    '  if (have >= 5) break;',
+    '  const at = pos();',
+    '  const here = flood(at);',
+    '  const back = flood(home).cost;',
+    '  const budget = fuel();',
+    '  let best = null;',
+    '  for (const [id, face] of veins) {',
+    '    if (cut.has(id)) continue;',
+    '    for (const d of dirs) {',
+    '      const stand = stepTo(face, d);',
+    '      const out = here.cost.get(k(stand)); const home2 = back.get(k(stand));',
+    '      if (out === undefined || home2 === undefined) continue;',
+    '      if (out + 2 + home2 > budget) continue;',
+    '      if (!best || out < best.out) best = { stand, face, out };',
+    '    }',
+    '  }',
+    '  if (best) {',
+    '    drive(route(here.via, at, best.stand));',
+    '    const p = pos();',
+    '    const d = best.face.x > p.x ? Dir.East : best.face.x < p.x ? Dir.West : best.face.y > p.y ? Dir.South : Dir.North;',
+    '    mine(d); cut.add(k(best.face)); observe();',
+    '    continue;',
+    '  }',
+    '  const reserve = (5 - have) * 2 + 2;',
+    '  let front = null; let score = Infinity;',
+    '  for (const [id, tile] of open) {',
+    '    const out = here.cost.get(id); const home2 = back.get(id);',
+    '    if (out === undefined || home2 === undefined || out === 0) continue;',
+    '    if (out + home2 + reserve > budget) continue;',
+    '    if (!dirs.some((d) => !seen.has(k(stepTo(tile, d))))) continue;',
+    '    const s = out * 2 + Math.abs(tile.x - home.x) + Math.abs(tile.y - home.y);',
+    '    if (s < score) { score = s; front = tile; }',
+    '  }',
+    '  if (!front) break;',
+    '  drive(route(here.via, at, front));',
+    '}',
+    '// Cost the way back, say what it costs, then drive it. That order is the reservation.',
+    'const at = pos();',
+    'const back2 = k(at) === k(home) ? [] : route(flood(at).via, at, home);',
+    'print(`home ${back2.length}`);',
+    'drive(back2);',
   ].join('\n'),
 };

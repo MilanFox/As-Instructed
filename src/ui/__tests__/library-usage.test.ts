@@ -71,7 +71,7 @@ function reportRun(usage: Usage | null, seed = 2): void {
   useGame.setState({
     save: emptySave(),
     screen: 'workspace',
-    currentLevelId: 'w1-05',
+    currentLevelId: 'w1-03',
     trace: null,
     tick: 78,
     showResults: true,
@@ -271,7 +271,7 @@ describe('the Structure tab says how far a routine has travelled', () => {
 describe('reuse pays nothing on any scoreboard', () => {
   function closedCampaign(): void {
     const save = emptySave();
-    save.levels['w1-05'] = { completed: true, medal: Medal.Gold, stars: [], attempts: 1 };
+    save.levels['w1-03'] = { completed: true, medal: Medal.Gold, stars: [], attempts: 1 };
     save.levels['w4-01'] = { completed: true, medal: Medal.Bronze, stars: [], attempts: 1 };
     useGame.setState({ save });
   }

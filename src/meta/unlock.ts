@@ -1,4 +1,4 @@
-export const LIBRARY_UNLOCK_LEVEL = 'w2-05';
+export const LIBRARY_UNLOCK_LEVEL = 'w2-03';
 
 export const LIBRARY_FIRST_WORLD = 3;
 
@@ -10,7 +10,7 @@ export interface LibraryRequirement {
 
 export const LIBRARY_REQUIREMENTS: Readonly<Record<string, readonly LibraryRequirement[]>> =
   Object.freeze({
-    'w4-05': [
+    'w4-04': [
       {
         name: 'survey',
         signature: 'survey(): void',

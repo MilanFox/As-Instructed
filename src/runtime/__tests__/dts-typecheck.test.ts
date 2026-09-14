@@ -51,7 +51,7 @@ function messages(diagnostics: readonly ts.Diagnostic[]): string[] {
 }
 
 describe('the generated declarations compile', () => {
-  const levels = ['w1-01', 'w1-03', 'w2-04', 'w3-04', 'w4-05', 'w5-03', 'w6-03', 'w7-03'];
+  const levels = ['w1-01', 'w1-02', 'w2-02', 'w3-03', 'w4-04', 'w5-03', 'w6-03', 'w7-03'];
 
   for (const levelId of levels) {
     test(`${levelId}: the ambient file itself is clean`, () => {
@@ -77,7 +77,7 @@ describe('unlocked hardware type-checks', () => {
       'seen.set("0,0", { at: pos(), from: null });',
       'print(`${seen.size} ${readMark() ?? "-"} ${fuel()}`);',
     ].join('\n');
-    expect(messages(check('w4-05', source))).toEqual([]);
+    expect(messages(check('w4-04', source))).toEqual([]);
   });
 
   test('wrong argument types are caught', () => {
@@ -100,7 +100,7 @@ describe('locked hardware is a type error', () => {
   });
 
   test('the same call compiles once the hardware is installed', () => {
-    expect(messages(check('w2-02', 'const tile = scan();\nprint(String(tile.walkable));'))).toEqual(
+    expect(messages(check('w2-01', 'const tile = scan();\nprint(String(tile.walkable));'))).toEqual(
       [],
     );
   });

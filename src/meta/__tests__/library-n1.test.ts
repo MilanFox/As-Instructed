@@ -178,7 +178,7 @@ function seedPublished(source: string, names: readonly string[]): void {
       unlocked: true,
       briefed: true,
       source,
-      published: names.map((name) => ({ name, fromLevel: 'w3-04', at: 1 })),
+      published: names.map((name) => ({ name, fromLevel: 'w3-03', at: 1 })),
     },
     offer: null,
     notice: null,
@@ -211,7 +211,7 @@ function seedMeasured(): void {
     save: {
       ...save,
       profiles: {
-        'w3-04': profile('w3-04', 4, 48, 200),
+        'w3-03': profile('w3-03', 4, 48, 200),
         'w4-01': profile('w4-01', 10, 30, 140),
       },
     },
@@ -290,7 +290,7 @@ describe('Cost, when the cost depends on the arguments', () => {
 
   test('per call is the measured range across work orders, not one blended figure', () => {
     const report = useLibrary.getState().reports()[0];
-    expect(report?.range).toEqual({ low: 3, high: 12, lowLevel: 'w4-01', highLevel: 'w3-04' });
+    expect(report?.range).toEqual({ low: 3, high: 12, lowLevel: 'w4-01', highLevel: 'w3-03' });
     expect(report?.callers.map((each) => each.perCall)).toEqual([12, 3]);
 
     const text = render(RefactorScreen);
@@ -298,7 +298,7 @@ describe('Cost, when the cost depends on the arguments', () => {
   });
 
   test('the opened row states that the arguments drive the cost', () => {
-    expect(expandAll(RefactorScreen)).toContain(REFACTOR.varies(3, 'w4-01', 12, 'w3-04'));
+    expect(expandAll(RefactorScreen)).toContain(REFACTOR.varies(3, 'w4-01', 12, 'w3-03'));
   });
 });
 

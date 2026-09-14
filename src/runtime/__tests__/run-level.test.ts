@@ -96,13 +96,13 @@ describe('locked hardware', () => {
     expect(result.passed).toBe(false);
     expect(result.failure?.kind).toBe('runtime');
     expect(result.failure?.message).toContain('`scan()` is not installed');
-    expect(result.failure?.message).toContain('w2-02');
+    expect(result.failure?.message).toContain('w2-01');
     expect(result.failure?.line).toBe(1);
   });
 
   test('unlocking it makes the same call work', () => {
     const { result } = run('scan();\nmove(Dir.East);', {
-      hardware: unlockedApiNames('w2-02'),
+      hardware: unlockedApiNames('w2-01'),
     });
     expect(result.failure).toBeUndefined();
   });

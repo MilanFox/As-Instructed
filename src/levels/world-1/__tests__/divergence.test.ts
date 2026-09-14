@@ -6,8 +6,8 @@ import { runLevel } from '../../harness.ts';
 import type { LevelDef } from '../../types.ts';
 import { WORLD_1_LEVELS } from '../index.ts';
 import { PAD, w1_01 } from '../w1-01.ts';
+import { w1_02 } from '../w1-02.ts';
 import { w1_03 } from '../w1-03.ts';
-import { w1_05 } from '../w1-05.ts';
 import { at, padPosition, walkableTiles } from '../shared.ts';
 
 function diverge(
@@ -33,7 +33,7 @@ function diverge(
 
 const padOf = (level: LevelDef, seed: number): Vec => must(padPosition(level.build(seed)), 'a pad');
 
-describe('w1-01 and w1-03 name the pad and where the bot actually stopped', () => {
+describe('w1-01 and w1-02 name the pad and where the bot actually stopped', () => {
   test('a route that stops at the pillar is told both coordinates', () => {
     const { met, divergence } = diverge(w1_01, 1, 'reach-pad', (sim, botId) => {
       for (let step = 0; step < 10; step++) sim.move(botId, Dir.East);
@@ -47,16 +47,16 @@ describe('w1-01 and w1-03 name the pad and where the bot actually stopped', () =
     });
   });
 
-  test('w1-03 names the pad this seed drew, and the seeds disagree', () => {
-    const named = w1_03.seeds.map((seed) => {
-      const { met, divergence } = diverge(w1_03, seed, 'reach-pad', (sim, botId) => {
+  test('w1-02 names the pad this seed drew, and the seeds disagree', () => {
+    const named = w1_02.seeds.map((seed) => {
+      const { met, divergence } = diverge(w1_02, seed, 'reach-pad', (sim, botId) => {
         for (let step = 0; step < 5; step++) sim.move(botId, Dir.East);
       });
       expect(met).toBe(false);
       const shown = must(divergence, 'a divergence');
       expect(shown).toEqual({
         where: 'end of run',
-        expected: at(padOf(w1_03, seed)),
+        expected: at(padOf(w1_02, seed)),
         received: at({ x: 6, y: 1 }),
       });
       return shown.expected;
@@ -66,9 +66,9 @@ describe('w1-01 and w1-03 name the pad and where the bot actually stopped', () =
   });
 });
 
-describe('w1-03 says which half of the ration ran out', () => {
+describe('w1-02 says which half of the ration ran out', () => {
   test('asking before every tile is told how many readings it spent', () => {
-    const { met, divergence } = diverge(w1_03, 1, 'within-7-canMove', (sim, botId) => {
+    const { met, divergence } = diverge(w1_02, 1, 'within-7-canMove', (sim, botId) => {
       while (sim.canMove(botId, Dir.East)) sim.move(botId, Dir.East);
     });
 
@@ -82,7 +82,7 @@ describe('w1-03 says which half of the ration ran out', () => {
 
   test('driving blind past the pad is told the ticks it wasted, not the readings it saved', () => {
     const overshoot = 29;
-    const { met, divergence } = diverge(w1_03, 1, 'within-7-canMove', (sim, botId) => {
+    const { met, divergence } = diverge(w1_02, 1, 'within-7-canMove', (sim, botId) => {
       for (let step = 0; step < overshoot; step++) sim.move(botId, Dir.East);
     });
 
@@ -90,14 +90,14 @@ describe('w1-03 says which half of the ration ran out', () => {
     expect(divergence).toEqual({
       where: 'ticks beyond the shortest route',
       expected: 'at most 5',
-      received: String(overshoot - manhattan({ x: 1, y: 1 }, padOf(w1_03, 1))),
+      received: String(overshoot - manhattan({ x: 1, y: 1 }, padOf(w1_02, 1))),
     });
   });
 });
 
-describe('w1-05 names a tile rather than a shortfall', () => {
+describe('w1-03 names a tile rather than a shortfall', () => {
   test('inspect-all names the first floor tile the run never entered', () => {
-    const { met, divergence } = diverge(w1_05, 21, 'inspect-all', () => undefined);
+    const { met, divergence } = diverge(w1_03, 21, 'inspect-all', () => undefined);
 
     expect(met).toBe(false);
     expect(divergence).toEqual({
@@ -109,8 +109,8 @@ describe('w1-05 names a tile rather than a shortfall', () => {
 
   test('one-move-per-tile names the tick and tile the allowance ran out on', () => {
     const filed = 200;
-    const allowed = walkableTiles(w1_05.build(21)).length;
-    const { met, divergence } = diverge(w1_05, 21, 'one-move-per-tile', (sim, botId) => {
+    const allowed = walkableTiles(w1_03.build(21)).length;
+    const { met, divergence } = diverge(w1_03, 21, 'one-move-per-tile', (sim, botId) => {
       for (let step = 0; step < filed; step++) {
         sim.move(botId, step % 2 === 0 ? Dir.East : Dir.West);
       }

@@ -1,30 +1,19 @@
 import { describe, expect, test } from 'vitest';
-import type { Dir as DirType, Objective, Sim } from '../../../engine/index.ts';
-import { Dir, evaluateObjectives, medalFor, senseTotals } from '../../../engine/index.ts';
-import type { LevelRunResult } from '../../harness.ts';
+import { Dir, medalFor } from '../../../engine/index.ts';
 import { runLevel, runReference } from '../../harness.ts';
 import type { LevelDef, ReferenceSolution } from '../../types.ts';
 import { WORLD_1_LEVELS } from '../index.ts';
 import { solution as w1_01Solution } from '../__solutions__/w1-01.ts';
+import { solution as w1_02Solution } from '../__solutions__/w1-02.ts';
 import { solution as w1_03Solution } from '../__solutions__/w1-03.ts';
-import { solution as w1_05Solution } from '../__solutions__/w1-05.ts';
 import { unlockedApiNames } from '../../../runtime/ambient.ts';
 import { compileErrors } from './ambient-check.ts';
 
 const SOLUTIONS: Record<string, ReferenceSolution> = {
   'w1-01': w1_01Solution,
+  'w1-02': w1_02Solution,
   'w1-03': w1_03Solution,
-  'w1-05': w1_05Solution,
 };
-
-const UNCHANGED_BONUS = new Set(['w1-02', 'w1-04']);
-
-const starEarned = (level: LevelDef, result: LevelRunResult): boolean =>
-  evaluateObjectives((level.bonus ?? []) as Objective[], {
-    world: result.world,
-    trace: result.trace,
-    initialWorld: result.initialWorld,
-  }).every((entry) => entry.met);
 
 const byId = (id: string): LevelDef => {
   const level = WORLD_1_LEVELS.find((candidate) => candidate.id === id);
@@ -34,7 +23,7 @@ const byId = (id: string): LevelDef => {
 
 describe('world 1 shape', () => {
   test('three levels, in order, correctly identified', () => {
-    expect(WORLD_1_LEVELS.map((level) => level.id)).toEqual(['w1-01', 'w1-03', 'w1-05']);
+    expect(WORLD_1_LEVELS.map((level) => level.id)).toEqual(['w1-01', 'w1-02', 'w1-03']);
     let previous = 0;
     for (const level of WORLD_1_LEVELS) {
       expect(level.world).toBe(1);
@@ -109,22 +98,6 @@ describe('reference solutions', () => {
           expect(result.ticks).toBeLessThanOrEqual(level.par.ticks);
           expect(medalFor(true, result.ticks, level.par.ticks)).toBe('gold');
         });
-
-        if (UNCHANGED_BONUS.has(level.id)) {
-          test(`earns every bonus on seed ${seed}`, () => {
-            const result = runReference(level, seed, solution);
-            for (const bonus of level.bonus ?? []) {
-              expect({
-                id: bonus.id,
-                met: bonus.evaluate({
-                  world: result.world,
-                  trace: result.trace,
-                  initialWorld: result.initialWorld,
-                }),
-              }).toEqual({ id: bonus.id, met: true });
-            }
-          });
-        }
       }
 
       test('the starter compiles against this level firmware', () => {
@@ -179,8 +152,8 @@ describe('hardcoded answers are rejected', () => {
     expect(result.verdict.passed).toBe(false);
   });
 
-  test('w1-03: a counted loop tuned to the first seed fails a later one', () => {
-    const level = byId('w1-03');
+  test('w1-02: a counted loop tuned to the first seed fails a later one', () => {
+    const level = byId('w1-02');
     const outcomes = level.seeds.map(
       (seed) =>
         runLevel(level, seed, (sim, botId) => {
@@ -191,8 +164,8 @@ describe('hardcoded answers are rejected', () => {
     expect(outcomes.some((passed) => !passed)).toBe(true);
   });
 
-  test('w1-05: a sweep sized for one bay leaves tiles uninspected in another', () => {
-    const level = byId('w1-05');
+  test('w1-03: a sweep sized for one bay leaves tiles uninspected in another', () => {
+    const level = byId('w1-03');
     const outcomes = level.seeds.map(
       (seed) =>
         runLevel(level, seed, (sim, botId) => {
@@ -207,8 +180,8 @@ describe('hardcoded answers are rejected', () => {
     expect(outcomes.every((passed) => !passed)).toBe(true);
   });
 
-  test('w1-05: ignoring the partition leaves the east half untouched', () => {
-    const level = byId('w1-05');
+  test('w1-03: ignoring the partition leaves the east half untouched', () => {
+    const level = byId('w1-03');
     const result = runLevel(level, level.seeds[0] as number, (sim, botId) => {
       let dir: Dir = Dir.East;
       while (sim.canMove(botId, Dir.South)) {
@@ -222,149 +195,5 @@ describe('hardcoded answers are rejected', () => {
     const progress = result.verdict.objectives[0]?.progress;
     expect(progress).toBeDefined();
     expect((progress as [number, number])[0]).toBeLessThan((progress as [number, number])[1]);
-  });
-});
-
-describe('bonus stars are missable', () => {
-  const stride =
-    (tiles: number) =>
-    (sim: Sim, botId: number): void => {
-      while (sim.canMove(botId, Dir.East)) {
-        for (let step = 0; step < tiles; step++) sim.move(botId, Dir.East);
-      }
-    };
-
-  const blindRun =
-    (steps: number) =>
-    (sim: Sim, botId: number): void => {
-      for (let step = 0; step < steps; step++) sim.move(botId, Dir.East);
-    };
-
-  const bumpAlong = (sim: Sim, botId: number): void => {
-    let moved = true;
-    while (moved) moved = sim.move(botId, Dir.East);
-  };
-
-  test('w1-03: striding earns the star on every seed, at either stride the brief allows', () => {
-    const level = byId('w1-03');
-    for (const tiles of [5, 6]) {
-      for (const seed of level.seeds) {
-        const result = runLevel(level, seed, stride(tiles));
-        expect({ seed, tiles, passed: result.verdict.passed, star: starEarned(level, result) }) //
-          .toEqual({ seed, tiles, passed: true, star: true });
-      }
-    }
-  });
-
-  test('w1-03: asking before every tile passes the level and misses the star', () => {
-    const level = byId('w1-03');
-    const solution = SOLUTIONS['w1-03'] as ReferenceSolution;
-    for (const seed of level.seeds) {
-      const result = runReference(level, seed, solution);
-      expect({ seed, passed: result.verdict.passed, star: starEarned(level, result) }) //
-        .toEqual({ seed, passed: true, star: false });
-      expect(senseTotals(result.trace)['canMove']).toBeGreaterThan(7);
-    }
-  });
-
-  test('w1-03: spending no readings at all does not buy the star either', () => {
-    const level = byId('w1-03');
-    for (const seed of level.seeds) {
-      const result = runLevel(level, seed, blindRun(25));
-      expect(result.verdict.passed).toBe(true);
-      expect(senseTotals(result.trace)['canMove']).toBeUndefined();
-    }
-    const reported = runLevel(level, level.seeds[0] as number, blindRun(25));
-    expect(starEarned(level, reported)).toBe(false);
-    const shortest = runLevel(level, level.seeds[2] as number, blindRun(25));
-    expect(starEarned(level, shortest)).toBe(false);
-  });
-
-  test('w1-03: reading the wall by driving into it is the other way through', () => {
-    const level = byId('w1-03');
-    for (const seed of level.seeds) {
-      const result = runLevel(level, seed, bumpAlong);
-      expect({ seed, passed: result.verdict.passed, star: starEarned(level, result) }) //
-        .toEqual({ seed, passed: true, star: true });
-    }
-  });
-
-  const flipEW = (dir: DirType): DirType => (dir === Dir.East ? Dir.West : Dir.East);
-  const flipNS = (dir: DirType): DirType => (dir === Dir.North ? Dir.South : Dir.North);
-
-  const sweep = (sim: Sim, botId: number, dir: DirType): number => {
-    let steps = 0;
-    while (sim.canMove(botId, dir)) {
-      sim.move(botId, dir);
-      steps++;
-    }
-    return steps;
-  };
-
-  const eastHalf = (sim: Sim, botId: number): void => {
-    sweep(sim, botId, Dir.East);
-    let dir: DirType = Dir.West;
-    while (sim.canMove(botId, Dir.North)) {
-      sim.move(botId, Dir.North);
-      sweep(sim, botId, dir);
-      dir = flipEW(dir);
-    }
-  };
-
-  const combedSweep = (sim: Sim, botId: number): void => {
-    const columns = sweep(sim, botId, Dir.East) + 1;
-    if (columns % 2 === 1) {
-      sim.move(botId, Dir.South);
-      sweep(sim, botId, Dir.West);
-      sim.move(botId, Dir.South);
-      let dir: DirType = Dir.South;
-      sweep(sim, botId, dir);
-      for (let column = 2; column <= columns - 1; column++) {
-        sim.move(botId, Dir.East);
-        dir = flipNS(dir);
-        if (dir === Dir.North) {
-          while (sim.pos(botId).y > 3) sim.move(botId, Dir.North);
-        } else {
-          sweep(sim, botId, dir);
-        }
-      }
-      sim.move(botId, Dir.East);
-      sweep(sim, botId, Dir.South);
-    } else {
-      let dir: DirType = Dir.East;
-      while (sim.canMove(botId, Dir.South)) {
-        sim.move(botId, Dir.South);
-        dir = flipEW(dir);
-        sweep(sim, botId, dir);
-      }
-    }
-    eastHalf(sim, botId);
-  };
-
-  test('w1-05: a sweep that matches the bay earns the star on every seed', () => {
-    const level = byId('w1-05');
-    for (const seed of level.seeds) {
-      const result = runLevel(level, seed, combedSweep);
-      expect({ seed, passed: result.verdict.passed, star: starEarned(level, result) }) //
-        .toEqual({ seed, passed: true, star: true });
-    }
-  });
-
-  test('w1-05: the row serpentine passes and misses the star on the bay the game reports', () => {
-    const level = byId('w1-05');
-    const solution = SOLUTIONS['w1-05'] as ReferenceSolution;
-    const reported = runReference(level, level.seeds[0] as number, solution);
-    expect(reported.verdict.passed).toBe(true);
-    expect(medalFor(true, reported.ticks, level.par.ticks)).toBe('gold');
-    expect(starEarned(level, reported)).toBe(false);
-  });
-
-  test('w1-05: the row serpentine only fits the bays with an odd number of rows', () => {
-    const level = byId('w1-05');
-    const solution = SOLUTIONS['w1-05'] as ReferenceSolution;
-    const earned = level.seeds.filter((seed) =>
-      starEarned(level, runReference(level, seed, solution)),
-    );
-    expect(earned).toEqual([1, 6, 8]);
   });
 });

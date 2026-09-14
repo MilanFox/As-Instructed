@@ -3,7 +3,7 @@ import type { ReferenceSolution } from '../../types.ts';
 import { goTo, key, surveyYard } from './driver.ts';
 
 export const solution: ReferenceSolution = {
-  levelId: 'w3-04',
+  levelId: 'w3-03',
   run(sim: Sim, botId: number): void {
     const slots = new Map<number, Vec>();
     const seen = new Set<string>();

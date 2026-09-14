@@ -444,7 +444,7 @@ describe('the offer is routines, not declarations', () => {
       librarySource: LIBRARY_EMPTY_STARTER,
       declarations,
       selection: closureOf(declarations, ['remember']).map((name) => ({ name })),
-      levelId: 'w4-04',
+      levelId: 'w4-03',
     });
 
     expect(plan.refusals).toEqual([]);

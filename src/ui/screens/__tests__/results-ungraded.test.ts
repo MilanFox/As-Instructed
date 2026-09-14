@@ -6,7 +6,7 @@ import { MedalBadge } from '../../components/MedalBadge.tsx';
 import { celebrationFor, reportedMedal, resultWord } from '../../desk/paper/report.ts';
 
 const UNGRADED = getLevel('w1-01');
-const GRADED = getLevel('w1-05');
+const GRADED = getLevel('w1-03');
 const TICKS = 78;
 
 function badge(medal: Medal | null): { className: string; label: string; glyph: unknown } {
