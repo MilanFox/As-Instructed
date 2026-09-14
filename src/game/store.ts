@@ -391,9 +391,7 @@ export const useGame = create<GameState>((set, get) => {
       get().renderer().setTrace(null);
       get().runner().prepare(levelId);
       clearWatchdog();
-      const undelivered = hardwareUnlockedBy(levelId).filter(
-        (name) => !get().save.seenRequisitions.includes(name),
-      );
+      const undelivered = level.hardware;
       set({
         screen: 'workspace',
         currentLevelId: levelId,
@@ -880,11 +878,7 @@ export const useGame = create<GameState>((set, get) => {
     },
 
     signRequisition() {
-      const pending = get().requisition;
       set({ requisition: null });
-      if (!pending) return;
-      const seen = [...new Set([...get().save.seenRequisitions, ...pending.hardware])];
-      persist({ ...get().save, seenRequisitions: seen });
     },
 
     fileReview(rank) {

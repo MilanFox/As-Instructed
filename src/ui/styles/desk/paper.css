@@ -621,9 +621,6 @@
 .desk .doc--memo {
   width: calc(470 * var(--u));
 }
-.desk .doc--standing {
-  width: calc(336 * var(--u));
-}
 
 .desk .doc:focus-visible {
   outline: calc(2 * var(--u)) solid var(--amber);
@@ -1159,9 +1156,6 @@
 }
 .desk .doc--memo {
   width: calc(470 * var(--u));
-}
-.desk .doc--standing {
-  width: calc(336 * var(--u));
 }
 
 .desk .doc:focus-visible {

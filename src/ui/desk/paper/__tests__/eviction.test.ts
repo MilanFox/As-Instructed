@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { useGame } from '../../../../game/store.ts';
 import type { DocPayload, ReportSnapshot } from '../papers.ts';
-import { DESK_CAPACITY, DOC_HOME, filedDocs, looseDocs, trayDocs, usePapers } from '../papers.ts';
+import { DOC_HOME, filedDocs, looseDocs, trayDocs, usePapers } from '../papers.ts';
 
 function reset(): void {
   useGame.setState({ currentLevelId: null });
@@ -51,52 +51,21 @@ function issue(id: string, payload: DocPayload): void {
   });
 }
 
-function readIt(id: string): void {
-  usePapers.getState().takeOut(id);
-  usePapers.getState().lift(id);
-  usePapers.getState().putDown();
-  usePapers.getState().stow(id);
-}
-
-function fillTheDesk(count: number): void {
-  for (let n = 0; n < count; n += 1) {
-    const id = `filler:${String(n)}`;
-    issue(id, { kind: 'order', levelId: `filler-${String(n)}` });
-    readIt(id);
-  }
-}
-
 function reachable(): string[] {
   const state = usePapers.getState();
   return [...looseDocs(state), ...trayDocs(state)].map((doc) => doc.id);
 }
 
-const ISSUED_ONCE: readonly { what: string; id: string; payload: DocPayload }[] = [
-  { what: 'the Performance Review', id: 'memo:4', payload: { kind: 'memo', rank: 4 } },
-  { what: 'the Repository note', id: 'issue:repository', payload: { kind: 'issue' } },
-  {
-    what: 'the hardware requisition',
-    id: 'requisition:w5-01',
-    payload: { kind: 'requisition', levelId: 'w5-01', hardware: ['drill'] },
-  },
-  {
-    what: 'a certificate of closure',
-    id: 'certificate:w8-01:1',
-    payload: { kind: 'certificate', report: { ...report('w8-01'), passed: true } },
-  },
-  { what: 'the standing sheet', id: 'standing', payload: { kind: 'standing' } },
-];
-
-describe('paper the player has not read is never filed for them', () => {
+describe('arriving paper never files the paper already on the desk', () => {
   beforeEach(reset);
 
-  it('keeps the Performance Review while the campaign goes on around it', () => {
+  it('keeps every sheet however much paper arrives after it', () => {
+    useGame.setState({ currentLevelId: 'w8-01' });
     issue('memo:4', { kind: 'memo', rank: 4 });
-    issue('standing', { kind: 'standing' });
     issue('issue:repository', { kind: 'issue' });
-    issue('requisition:w7-01', {
+    issue('requisition:w8-01', {
       kind: 'requisition',
-      levelId: 'w7-01',
+      levelId: 'w8-01',
       hardware: ['survey drone'],
     });
     issue('certificate:w7-05:1', {
@@ -104,42 +73,27 @@ describe('paper the player has not read is never filed for them', () => {
       report: { ...report('w7-05'), passed: true },
     });
     issue('order:w8-01', { kind: 'order', levelId: 'w8-01' });
+
+    expect(reachable()).toEqual(
+      expect.arrayContaining([
+        'memo:4',
+        'issue:repository',
+        'requisition:w8-01',
+        'certificate:w7-05:1',
+        'order:w8-01',
+      ]),
+    );
+    expect(filedDocs(usePapers.getState())).toEqual([]);
+  });
+
+  it('keeps the payload of a sheet the player has never lifted', () => {
+    issue('memo:4', { kind: 'memo', rank: 4 });
     for (let attempt = 1; attempt <= 5; attempt += 1) {
       issue(`halt:w8-01:${String(attempt)}`, { kind: 'halt', report: report('w8-01') });
     }
 
-    expect(reachable()).toContain('memo:4');
     const doc = trayDocs(usePapers.getState()).find((each) => each.id === 'memo:4');
     expect(doc?.payload).toEqual({ kind: 'memo', rank: 4 });
-  });
-
-  for (const { what, id, payload } of ISSUED_ONCE) {
-    it(`keeps ${what} however much paper arrives after it`, () => {
-      issue(id, payload);
-      fillTheDesk(DESK_CAPACITY * 3);
-
-      expect(reachable()).toContain(id);
-      expect(filedDocs(usePapers.getState()).map((doc) => doc.id)).not.toContain(id);
-    });
-  }
-
-  it('keeps the brief for the level that is open, read or not', () => {
-    useGame.setState({ currentLevelId: 'w8-01' });
-    issue('order:w8-01', { kind: 'order', levelId: 'w8-01' });
-    readIt('order:w8-01');
-    fillTheDesk(DESK_CAPACITY * 3);
-
-    expect(reachable()).toContain('order:w8-01');
-  });
-
-  it('still files the oldest sheet the player has read', () => {
-    fillTheDesk(DESK_CAPACITY);
-    expect(reachable()).toHaveLength(DESK_CAPACITY);
-
-    issue('memo:4', { kind: 'memo', rank: 4 });
-
-    expect(filedDocs(usePapers.getState()).map((doc) => doc.id)).toEqual(['filler:0']);
-    expect(reachable()).toHaveLength(DESK_CAPACITY);
   });
 });
 
@@ -211,7 +165,7 @@ describe('a halt notice is filed once its level is no longer open', () => {
     expect(reachable()).toContain('halt:w8-01:1');
   });
 
-  it('does not touch a certificate for a level the player has left', () => {
+  it('files a certificate for a level the player has left', () => {
     issue('certificate:w8-01:1', {
       kind: 'certificate',
       report: { ...report('w8-01'), passed: true },
@@ -220,6 +174,54 @@ describe('a halt notice is filed once its level is no longer open', () => {
 
     usePapers.getState().clearLevelPaper();
 
-    expect(reachable()).toContain('certificate:w8-01:1');
+    expect(reachable()).not.toContain('certificate:w8-01:1');
+    expect(filedDocs(usePapers.getState()).map((doc) => doc.id)).toContain('certificate:w8-01:1');
+  });
+
+  it('files the career notices that belong to no level at all', () => {
+    issue('memo:4', { kind: 'memo', rank: 4 });
+    issue('issue:repository', { kind: 'issue' });
+    useGame.setState({ currentLevelId: 'w8-02' });
+
+    usePapers.getState().clearLevelPaper();
+
+    expect(reachable()).toEqual([]);
+    expect(filedDocs(usePapers.getState()).map((doc) => doc.id)).toEqual(
+      expect.arrayContaining(['memo:4', 'issue:repository']),
+    );
+  });
+});
+
+describe('a requisition belongs to the level that delivers its hardware', () => {
+  beforeEach(reset);
+
+  it('drops the requisition for a level the player has left', () => {
+    issue('requisition:w4-01', { kind: 'requisition', levelId: 'w4-01', hardware: ['look'] });
+    useGame.setState({ currentLevelId: 'w4-02' });
+
+    usePapers.getState().clearLevelPaper();
+
+    expect(reachable()).not.toContain('requisition:w4-01');
+    expect(filedDocs(usePapers.getState()).map((doc) => doc.id)).not.toContain('requisition:w4-01');
+  });
+
+  it('leaves the requisition alone while its level is still open', () => {
+    useGame.setState({ currentLevelId: 'w4-01' });
+    issue('requisition:w4-01', { kind: 'requisition', levelId: 'w4-01', hardware: ['look'] });
+
+    usePapers.getState().clearLevelPaper();
+
+    expect(reachable()).toContain('requisition:w4-01');
+  });
+
+  it('never lets requisitions pile up across a world opened all at once', () => {
+    for (const levelId of ['w4-01', 'w4-02', 'w4-05']) {
+      useGame.setState({ currentLevelId: levelId });
+      usePapers.getState().clearLevelPaper();
+      issue(`requisition:${levelId}`, { kind: 'requisition', levelId, hardware: ['look'] });
+    }
+
+    const held = reachable().filter((id) => id.startsWith('requisition:'));
+    expect(held).toEqual(['requisition:w4-05']);
   });
 });

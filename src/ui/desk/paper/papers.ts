@@ -4,8 +4,7 @@ import { useGame } from '../../../game/store.ts';
 
 export const DESK_KEY = 'bootstrap.desk';
 
-export type DocKind =
-  'order' | 'certificate' | 'halt' | 'requisition' | 'issue' | 'memo' | 'standing';
+export type DocKind = 'order' | 'certificate' | 'halt' | 'requisition' | 'issue' | 'memo';
 
 export interface ReportRow {
   id: string;
@@ -67,8 +66,7 @@ export type DocPayload =
   | { kind: 'halt'; report: ReportSnapshot }
   | { kind: 'requisition'; levelId: string; hardware: readonly string[] }
   | { kind: 'issue' }
-  | { kind: 'memo'; rank: number }
-  | { kind: 'standing' };
+  | { kind: 'memo'; rank: number };
 
 export interface DeskDoc {
   id: string;
@@ -78,7 +76,6 @@ export interface DeskDoc {
   z: number;
   filed: boolean;
   stowed: boolean;
-  read: boolean;
   mark: string | null;
   payload: DocPayload;
 }
@@ -92,20 +89,22 @@ export const DOC_HOME: Record<DocKind, { x: number; y: number; rot: number }> = 
   requisition: { x: 188, y: 234, rot: 1.2 },
   issue: { x: 210, y: 252, rot: -2.0 },
   memo: { x: 200, y: 230, rot: -1.4 },
-  standing: { x: 300, y: 288, rot: 2.6 },
 };
 
 export const DOC_ARRIVAL = { x: 170, y: 236, rot: -1.4 } as const;
 
-export const DESK_CAPACITY = 6;
-
-function briefId(): string | null {
-  const open = useGame.getState().currentLevelId;
-  return open ? `order:${open}` : null;
-}
-
-function evictable(doc: DeskDoc, brief: string | null): boolean {
-  return doc.read && doc.stowed && doc.kind !== 'standing' && doc.id !== brief;
+function belongsTo(doc: DeskDoc, open: string | null): boolean {
+  if (open === null) return false;
+  switch (doc.payload.kind) {
+    case 'order':
+    case 'requisition':
+      return doc.payload.levelId === open;
+    case 'halt':
+    case 'certificate':
+      return doc.payload.report.levelId === open;
+    default:
+      return false;
+  }
 }
 
 function supersedes(next: DeskDoc, doc: DeskDoc): boolean {
@@ -117,6 +116,8 @@ function supersedes(next: DeskDoc, doc: DeskDoc): boolean {
 }
 
 export const PINNABLE: ReadonlySet<DocKind> = new Set<DocKind>(['order', 'requisition']);
+
+const REISSUED: ReadonlySet<DocKind> = new Set<DocKind>(['order', 'requisition']);
 
 export interface PinnedPage {
   head: readonly [string, string];
@@ -199,42 +200,16 @@ export const usePapers = create<PaperState>((set, get) => ({
   issue(doc) {
     const state = get();
     const z = state.top + 1;
-    const next: DeskDoc = {
-      moved: null,
-      filed: false,
-      stowed: false,
-      read: false,
-      mark: null,
-      ...doc,
-      z,
-    };
-    const brief = briefId();
+    const next: DeskDoc = { moved: null, filed: false, stowed: false, mark: null, ...doc, z };
     const without = state.docs.filter((d) => d.id !== next.id);
-    const loose = without.filter((d) => !d.filed);
-    const stale = new Set(loose.filter((d) => supersedes(next, d)).map((d) => d.id));
-    const held = loose.filter((d) => !stale.has(d.id));
-    const overflow = Math.max(0, held.length + 1 - DESK_CAPACITY);
-    const retired = new Set(
-      held
-        .filter((d) => evictable(d, brief))
-        .slice(0, overflow)
-        .map((d) => d.id),
-    );
-    const docs = without
-      .map((d) => (stale.has(d.id) || retired.has(d.id) ? { ...d, filed: true } : d))
-      .concat(next);
+    const stale = new Set(without.filter((d) => !d.filed && supersedes(next, d)).map((d) => d.id));
+    const docs = without.map((d) => (stale.has(d.id) ? { ...d, filed: true } : d)).concat(next);
     set({ docs, top: z });
     persist(get());
   },
 
   lift(id) {
-    set((state) => {
-      const unread = state.docs.some((d) => d.id === id && !d.read);
-      return {
-        lifted: state.lifted === id ? null : id,
-        docs: unread ? state.docs.map((d) => (d.id === id ? { ...d, read: true } : d)) : state.docs,
-      };
-    });
+    set((state) => ({ lifted: state.lifted === id ? null : id }));
     persist(get());
   },
 
@@ -307,20 +282,15 @@ export const usePapers = create<PaperState>((set, get) => ({
   },
 
   clearLevelPaper() {
-    const keep = briefId();
     const open = useGame.getState().currentLevelId;
     set((state) => {
-      const stale = new Set(
-        state.docs
-          .filter((d) => !d.filed && d.payload.kind === 'halt' && d.payload.report.levelId !== open)
-          .map((d) => d.id),
-      );
+      const adrift = state.docs.filter((d) => !d.filed && !belongsTo(d, open));
+      const dropped = new Set(adrift.filter((d) => REISSUED.has(d.kind)).map((d) => d.id));
+      const stale = new Set(adrift.filter((d) => !REISSUED.has(d.kind)).map((d) => d.id));
       const docs = state.docs
-        .filter((d) => d.kind !== 'order' || d.filed || d.id === keep)
+        .filter((d) => !dropped.has(d.id))
         .map((d) => (stale.has(d.id) ? { ...d, filed: true } : d));
-      const gone =
-        state.lifted !== null &&
-        (stale.has(state.lifted) || !docs.some((d) => d.id === state.lifted));
+      const gone = state.lifted !== null && !docs.some((d) => d.id === state.lifted && !d.filed);
       return { docs, lifted: gone ? null : state.lifted };
     });
     persist(get());

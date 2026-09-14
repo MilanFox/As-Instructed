@@ -6,7 +6,7 @@ import { Sheet } from './Sheet.tsx';
 import { WorkOrder } from './WorkOrder.tsx';
 import { ReportSheet } from './ReportSheet.tsx';
 import { RequisitionSheet } from './RequisitionSheet.tsx';
-import { PerformanceMemo, RepositoryNote, StandingSheet } from './Notices.tsx';
+import { PerformanceMemo, RepositoryNote } from './Notices.tsx';
 
 const FILING_MS = 620;
 
@@ -82,8 +82,6 @@ function labelFor(doc: DeskDoc): string {
       return 'Repository provisioning notice';
     case 'memo':
       return 'Performance review memo';
-    case 'standing':
-      return 'Your standing';
   }
 }
 
@@ -106,7 +104,5 @@ function DocumentBody({ doc, fresh }: { doc: DeskDoc; fresh: boolean }): React.J
       return <RepositoryNote docId={doc.id} />;
     case 'memo':
       return <PerformanceMemo docId={doc.id} rank={doc.payload.rank} />;
-    case 'standing':
-      return <StandingSheet />;
   }
 }

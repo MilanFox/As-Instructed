@@ -182,18 +182,16 @@ export function Sheet({
             {pinned ? 'on the copy stand' : 'pin to the copy stand'}
           </button>
         ) : null}
-        {doc.kind === 'standing' ? null : (
-          <button
-            type="button"
-            className="tool"
-            onClick={(event) => {
-              event.stopPropagation();
-              stow(doc.id);
-            }}
-          >
-            put it away
-          </button>
-        )}
+        <button
+          type="button"
+          className="tool"
+          onClick={(event) => {
+            event.stopPropagation();
+            stow(doc.id);
+          }}
+        >
+          put it away
+        </button>
       </div>
       {children}
     </article>

@@ -42,7 +42,6 @@ export interface SaveFile {
   settings: Settings;
   achievements: Record<string, number>;
   stats: CampaignStats;
-  seenRequisitions: string[];
   reviewedRanks: number[];
   firstRunAt?: number;
   routineOrders?: Record<string, string[]>;
@@ -67,7 +66,6 @@ export function emptySave(): SaveFile {
     },
     achievements: {},
     stats: emptyStats(),
-    seenRequisitions: [],
     reviewedRanks: [],
   };
 }
@@ -90,7 +88,6 @@ const MIGRATIONS: Record<number, Migration> = {
     version: 2,
     achievements: {},
     stats: reconstructStats(rescueLevels(raw)),
-    seenRequisitions: [],
   }),
 };
 
@@ -172,7 +169,6 @@ export function migrate(raw: unknown): SaveFile {
     },
     achievements: rescueAchievements(working['achievements']),
     stats: rescueStats(working['stats']),
-    seenRequisitions: rescueStrings(working['seenRequisitions']),
     reviewedRanks: rescueRanks(working['reviewedRanks']),
     ...(isPositive(working['firstRunAt']) ? { firstRunAt: working['firstRunAt'] } : {}),
     ...(rescueRoutineOrders(working['routineOrders']) ?? {}),
@@ -208,11 +204,6 @@ function rescueStats(raw: unknown): CampaignStats {
   if (isPositive(raw['passes'])) stats.passes = raw['passes'];
   if (isPositive(raw['fails'])) stats.fails = raw['fails'];
   return stats;
-}
-
-function rescueStrings(raw: unknown): string[] {
-  if (!Array.isArray(raw)) return [];
-  return [...new Set(raw.filter((value): value is string => typeof value === 'string'))];
 }
 
 function rescueRanks(raw: unknown): number[] {
@@ -293,7 +284,6 @@ export function importSave(current: SaveFile, text: string): SaveFile {
     levels,
     achievements,
     stats: mergeStats(current.stats, incoming.stats),
-    seenRequisitions: [...new Set([...current.seenRequisitions, ...incoming.seenRequisitions])],
     reviewedRanks: [...new Set([...current.reviewedRanks, ...incoming.reviewedRanks])].sort(
       (a, b) => a - b,
     ),

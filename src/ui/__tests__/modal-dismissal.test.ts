@@ -142,12 +142,11 @@ describe('a run leaves paper on the desk', () => {
     expect(ofKind('order')).toHaveLength(1);
   });
 
-  test('the standing sheet is always there, and it is the sheet with no way off the desk', () => {
+  test("nothing but the open level's own paper is on the desk", () => {
+    useGame.setState({ screen: 'workspace', currentLevelId: 'w1-05' });
     deliver();
 
-    const standing = ofKind('standing');
-    expect(standing).toHaveLength(1);
-    expect(standing[0]?.filed).toBe(false);
+    expect(loose().every((doc) => doc.kind === 'order' || doc.kind === 'requisition')).toBe(true);
   });
 });
 
@@ -163,7 +162,7 @@ describe('the paper stays', () => {
     expect(ofKind('certificate').map((doc) => doc.id)).toEqual([issued]);
   });
 
-  test('it survives opening another work order', () => {
+  test('it is filed to the binder, not dropped, when another work order opens', () => {
     runFinished('w1-05', true, 78);
     deliver();
     const issued = ofKind('certificate')[0]?.id;
@@ -172,7 +171,8 @@ describe('the paper stays', () => {
     usePapers.getState().clearLevelPaper();
     deliver();
 
-    expect(ofKind('certificate').map((doc) => doc.id)).toEqual([issued]);
+    expect(ofKind('certificate')).toEqual([]);
+    expect(filedDocs(usePapers.getState()).map((doc) => doc.id)).toContain(issued);
   });
 });
 

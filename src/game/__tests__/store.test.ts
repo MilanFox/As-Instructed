@@ -562,17 +562,23 @@ describe('rewards', () => {
     expect(useGame.getState().failureCursor).toBe(first + 1);
   });
 
-  it('raises a requisition for undelivered hardware, once', () => {
+  it('raises a requisition for the hardware its own level delivers', () => {
     reset();
     useGame.getState().openLevel('w1-01');
     expect(useGame.getState().requisition?.hardware).toEqual(['move', 'pos', 'print', 'wait']);
 
+    useGame.getState().openLevel('w1-03');
+    expect(useGame.getState().requisition?.hardware).toEqual(['canMove']);
+
+    useGame.getState().openLevel('w1-05');
+    expect(useGame.getState().requisition).toBeNull();
+
+    useGame.getState().openLevel('w1-03');
     useGame.getState().signRequisition();
     expect(useGame.getState().requisition).toBeNull();
-    expect(useGame.getState().save.seenRequisitions).toEqual(['move', 'pos', 'print', 'wait']);
 
     useGame.getState().openLevel('w1-01');
-    expect(useGame.getState().requisition).toBeNull();
+    expect(useGame.getState().requisition?.hardware).toEqual(['move', 'pos', 'print', 'wait']);
   });
 
   it('files a review tier once and keeps the ranks in order', () => {

@@ -21,8 +21,6 @@ function issueOnce(
 }
 
 export function deliverPaperwork(): void {
-  issueOnce('standing', 'standing', { kind: 'standing' });
-
   const game = useGame.getState();
 
   if (game.screen === 'workspace' && game.currentLevelId) {

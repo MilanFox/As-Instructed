@@ -1,4 +1,4 @@
-import { BONUS_STAR_POINTS, REVIEW_TIERS, reviewTier } from '../../../game/score.ts';
+import { REVIEW_TIERS } from '../../../game/score.ts';
 import { useGame } from '../../../game/store.ts';
 import { campaignOrder } from '../../../levels/index.ts';
 import { REPOSITORY_ISSUE } from '../../../meta/copy.ts';
@@ -151,67 +151,6 @@ export function PerformanceMemo({
         </button>
       </div>
       <div className="ref">PERSONNEL &amp; SCHEDULING</div>
-    </>
-  );
-}
-
-export function StandingSheet(): React.JSX.Element {
-  const save = useGame((state) => state.save);
-  const report = reportFor(save);
-  const issued = campaignOrder().length;
-  const tier = report.graded ? reviewTier(report.percent) : null;
-
-  return (
-    <>
-      <h1>
-        <b>STANDING</b>
-        <span>#4471</span>
-      </h1>
-      <div className="kicker">PERSONNEL &amp; SCHEDULING · RUNNING RECORD</div>
-
-      {report.graded ? (
-        <h2 className="numeric">
-          {Math.round(report.percent)}%<span className="quiet"> {tier?.grade}</span>
-        </h2>
-      ) : (
-        <h2>NO RESULT ON FILE</h2>
-      )}
-
-      <div className="facts">
-        <div>
-          <b>points</b>
-          <span className="numeric">
-            {report.points} of {report.maxPoints}
-            <span className="quiet"> over {report.closed} graded work orders</span>
-          </span>
-        </div>
-        <div>
-          <b>medals</b>
-          <span className="numeric">
-            {report.gold} gold · {report.silver} silver · {report.bronze} bronze
-          </span>
-        </div>
-        <div>
-          <b>stars</b>
-          <span className="numeric">
-            {report.stars}
-            <span className="quiet"> · {BONUS_STAR_POINTS} pt each</span>
-          </span>
-        </div>
-        <div>
-          <b>issued</b>
-          <span className="numeric">{issued} work orders on this site</span>
-        </div>
-      </div>
-
-      <p className="quiet">
-        {report.graded
-          ? 'A quality average over what is closed, not a progress bar. It moves both ways.'
-          : report.ungraded > 0
-            ? 'Nothing closed so far was graded. A grade appears with the first that is.'
-            : 'Close a work order and a grade appears here. Nothing is graded before that.'}
-      </p>
-      <div className="ref">K&amp;D FORM 9 · RUNNING RECORD</div>
     </>
   );
 }

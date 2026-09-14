@@ -168,7 +168,6 @@ describe('migrate to the reward fields', () => {
     const save = emptySave();
     expect(save.achievements).toEqual({});
     expect(save.stats).toEqual({ runs: 0, passes: 0, fails: 0 });
-    expect(save.seenRequisitions).toEqual([]);
     expect(save.settings.celebrations).toBe(true);
   });
 
@@ -234,14 +233,12 @@ describe('migrate to the reward fields', () => {
       settings: { celebrations: 'yes please' },
       achievements: { 'second-look': 'soon', '': 5 },
       stats: { runs: -4, passes: 'lots' },
-      seenRequisitions: ['scan', 'scan', 7],
     });
 
     expect(migrated.settings.celebrations).toBe(true);
     expect(migrated.achievements['second-look']).toBeGreaterThan(0);
     expect(Object.keys(migrated.achievements)).toEqual(['second-look']);
     expect(migrated.stats.runs).toBe(0);
-    expect(migrated.seenRequisitions).toEqual(['scan']);
   });
 
   it('loads a save written before the review was delivered rather than hosted', () => {
@@ -252,13 +249,11 @@ describe('migrate to the reward fields', () => {
       settings: {},
       achievements: {},
       stats: { runs: 2, passes: 1, fails: 1 },
-      seenRequisitions: ['move'],
     };
     const migrated = migrate(before);
 
     expect(migrated.reviewedRanks).toEqual([]);
     expect(migrated.levels['w1-05']?.medal).toBe('gold');
-    expect(migrated.seenRequisitions).toEqual(['move']);
   });
 
   it('keeps only whole tier ranks out of a hand-edited review history', () => {
@@ -285,12 +280,10 @@ describe('migrate to the reward fields', () => {
     const save = emptySave();
     save.achievements['second-look'] = 4242;
     save.stats = { runs: 9, passes: 4, fails: 5 };
-    save.seenRequisitions = ['scan', 'harvest'];
     const back = parseSave(exportSave(save));
 
     expect(back.achievements['second-look']).toBe(4242);
     expect(back.stats.passes).toBe(4);
-    expect(back.seenRequisitions).toEqual(['scan', 'harvest']);
   });
 });
 
@@ -318,16 +311,6 @@ describe('importSave and the reward fields', () => {
     const merged = importSave(current, JSON.stringify(incoming));
     expect(merged.stats.runs).toBe(20);
     expect(merged.stats.passes).toBe(8);
-  });
-
-  it('unions signed requisitions so hardware is never re-delivered', () => {
-    const current = emptySave();
-    current.seenRequisitions = ['move', 'pos'];
-    const incoming = emptySave();
-    incoming.seenRequisitions = ['pos', 'scan'];
-
-    const merged = importSave(current, JSON.stringify(incoming));
-    expect([...merged.seenRequisitions].sort()).toEqual(['move', 'pos', 'scan']);
   });
 
   it('unions read reviews so a memo is never re-delivered', () => {
@@ -469,7 +452,6 @@ describe('a save written by a build that had fifteen commendations', () => {
     expect(save.levels['w3-03']?.bestTicks).toBe(402);
     expect(save.levels['w3-03']?.attempts).toBe(11);
     expect(save.stats).toEqual({ runs: 42, passes: 17, fails: 25 });
-    expect(save.seenRequisitions).toEqual(['scan']);
     expect(save.reviewedRanks).toEqual([2]);
   });
 

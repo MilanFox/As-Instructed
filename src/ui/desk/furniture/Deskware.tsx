@@ -31,7 +31,6 @@ const TRAY_LABEL: Record<DocKind, string> = {
   requisition: 'HARDWARE REQUISITION',
   issue: 'REPOSITORY NOTICE',
   memo: 'PERFORMANCE REVIEW',
-  standing: 'STANDING',
 };
 
 export function Tray(): React.ReactElement {
