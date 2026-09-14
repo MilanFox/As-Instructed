@@ -24,6 +24,19 @@ export function objectivesOnEverySeed(
   );
 }
 
+export function ticksOnSeeds(
+  results: readonly { seed: number; ticks: number }[],
+  seeds: readonly number[],
+): number | null {
+  const wanted = new Set(seeds);
+  let worst: number | null = null;
+  for (const result of results) {
+    if (!wanted.has(result.seed)) continue;
+    if (worst === null || result.ticks > worst) worst = result.ticks;
+  }
+  return worst;
+}
+
 export interface LevelScore {
   medal: Medal;
   stars: number;

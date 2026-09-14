@@ -1,8 +1,13 @@
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import type { RunResponse } from '../../runtime/protocol.ts';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import type { ObjectiveReport, Trace, Verdict } from '../../engine/index.ts';
+import { Medal } from '../../engine/index.ts';
+import type { PerSeedResult, RunResponse } from '../../runtime/protocol.ts';
 import type { RunSubmission, RunnerPort } from '../../game/ports.ts';
+import type { LevelProgress } from '../../game/save.ts';
+import { emptyProgress, emptySave } from '../../game/save.ts';
+import { medalForLevel } from '../../game/score.ts';
 import { runSeeds, useGame } from '../../game/store.ts';
-import { campaignOrder } from '../../levels/index.ts';
+import { campaignOrder, getLevel } from '../../levels/index.ts';
 import { auditSeedsOf } from '../campaign.ts';
 import { patchDiscrepancy, withDiscrepancy } from '../discrepancy.ts';
 import { emptyLibrary } from '../save.ts';
@@ -148,5 +153,183 @@ describe('the wire from the incident list to the run', () => {
     useGame.getState().run();
 
     expect(runner.requests[1]?.seeds).toEqual([...level.seeds]);
+  });
+});
+
+const AUDITED = 'w1-03';
+const AUDIT_LAYOUT = 4471;
+const OBJECTIVE = 'inspect-all';
+const BONUS = 'one-move-per-tile';
+const FAST = 40;
+const SLOWEST_ON_SCHEDULE = 48;
+const SLOW_OFF_SCHEDULE = 73;
+
+class AnsweringRunner implements RunnerPort {
+  requests: RunSubmission[] = [];
+  readonly answer: (request: RunSubmission) => RunResponse;
+
+  constructor(answer: (request: RunSubmission) => RunResponse) {
+    this.answer = answer;
+  }
+
+  prepare(): void {}
+  run(request: RunSubmission): Promise<RunResponse> {
+    this.requests.push(request);
+    return Promise.resolve(this.answer(request));
+  }
+  cancel(): void {}
+  dispose(): void {}
+}
+
+function reportOf(id: string, met: boolean): ObjectiveReport {
+  return { id, label: id, met };
+}
+
+function layoutResult(
+  seed: number,
+  ticks: number,
+  options: { passed?: boolean; bonus?: boolean } = {},
+): PerSeedResult {
+  const passed = options.passed ?? true;
+  return {
+    seed,
+    passed,
+    ticks,
+    ops: ticks * 2,
+    objectives: [reportOf(OBJECTIVE, passed)],
+    bonus: [reportOf(BONUS, options.bonus ?? true)],
+  };
+}
+
+function folded(results: PerSeedResult[]): RunResponse {
+  const worst = (of: (result: PerSeedResult) => number): number =>
+    results.reduce((most, result) => Math.max(most, of(result)), 0);
+  const everySeed = (
+    id: string,
+    of: (result: PerSeedResult) => ObjectiveReport[],
+  ): ObjectiveReport =>
+    results.flatMap(of).find((entry) => entry.id === id && !entry.met) ?? reportOf(id, true);
+
+  const verdict: Verdict = {
+    passed: results.every((result) => result.passed),
+    objectives: [
+      everySeed(OBJECTIVE, (result) => result.objectives),
+      everySeed(BONUS, (result) => result.bonus ?? []),
+    ],
+    stats: {
+      ticks: worst((result) => result.ticks),
+      ops: worst((result) => result.ops),
+      seeds: results.length,
+      spend: {},
+      senses: {},
+    },
+  };
+  const trace = {
+    endTick: verdict.stats.ticks,
+    events: [],
+    keyframes: [],
+  } as unknown as Trace;
+
+  return { ok: true, results, verdict, trace, traceSeed: results[0]?.seed ?? 0 };
+}
+
+describe('an audit layout gates the close but never grades it', () => {
+  const level = getLevel(AUDITED);
+
+  function onSchedule(): PerSeedResult[] {
+    const seeds = level?.seeds ?? [];
+    return seeds.map((seed, index) =>
+      layoutResult(seed, index === seeds.length - 1 ? SLOWEST_ON_SCHEDULE : FAST),
+    );
+  }
+
+  async function dispatch(results: PerSeedResult[], stored?: LevelProgress): Promise<void> {
+    const runner = new AnsweringRunner((request) =>
+      folded(request.seeds.length === results.length ? results : [results[0] as PerSeedResult]),
+    );
+    useGame.setState({
+      save: {
+        ...emptySave(),
+        ...(stored ? { levels: { [AUDITED]: stored } } : {}),
+      },
+    });
+    useGame.getState().attachRunner(runner);
+    useGame.getState().openLevel(AUDITED);
+    useGame.getState().run();
+    await vi.waitFor(() => expect(useGame.getState().runState).toBe('idle'));
+  }
+
+  beforeEach(() => {
+    useLibrary.getState().hydrate(null);
+    useLibrary.getState().attach(HOST);
+    useLibrary.setState({
+      save: withDiscrepancy(useLibrary.getState().save, discrepancy(AUDITED, AUDIT_LAYOUT)),
+    });
+  });
+
+  afterEach(() => {
+    useLibrary.getState().attach(null);
+    useGame.getState().cancel();
+    useGame.setState({ auditSeeds: {}, save: emptySave() });
+  });
+
+  test('a slow off-schedule layout leaves the medal the schedule earned', async () => {
+    if (!level) throw new Error('w1-03 is not in the campaign');
+    await dispatch([...onSchedule(), layoutResult(AUDIT_LAYOUT, SLOW_OFF_SCHEDULE)]);
+
+    const state = useGame.getState();
+    expect(state.seedResults).toHaveLength(level.seeds.length + 1);
+    expect(state.verdict?.stats.ticks).toBe(SLOWEST_ON_SCHEDULE);
+    expect(medalForLevel(level, true, state.verdict?.stats.ticks ?? 0)).toBe(Medal.Gold);
+    expect(state.save.levels[AUDITED]?.medal).toBe(Medal.Gold);
+    expect(state.save.levels[AUDITED]?.bestTicks).toBe(SLOWEST_ON_SCHEDULE);
+    expect(state.save.levels[AUDITED]?.stars).toEqual([BONUS]);
+  });
+
+  test('the console reports the ticks the schedule spent, not the audit', async () => {
+    await dispatch([...onSchedule(), layoutResult(AUDIT_LAYOUT, SLOW_OFF_SCHEDULE)]);
+
+    const closed = useGame.getState().console.filter((line) => line.kind === 'success');
+    expect(closed.map((line) => line.text)).toEqual([
+      `work order closed — ${String(SLOWEST_ON_SCHEDULE)} ticks`,
+    ]);
+  });
+
+  test('an off-schedule layout that fails still holds the work order open', async () => {
+    await dispatch([
+      ...onSchedule(),
+      layoutResult(AUDIT_LAYOUT, SLOW_OFF_SCHEDULE, { passed: false }),
+    ]);
+
+    const state = useGame.getState();
+    expect(state.verdict?.passed).toBe(false);
+    expect(state.save.levels[AUDITED]?.completed).toBe(false);
+    expect(state.save.levels[AUDITED]?.medal).toBe(Medal.None);
+  });
+
+  test('an off-schedule layout that misses the bonus still withholds the star', async () => {
+    if (!level) throw new Error('w1-03 is not in the campaign');
+    await dispatch([
+      ...onSchedule(),
+      layoutResult(AUDIT_LAYOUT, SLOW_OFF_SCHEDULE, { bonus: false }),
+    ]);
+
+    const state = useGame.getState();
+    expect(state.save.levels[AUDITED]?.stars).toEqual([]);
+    expect(state.save.levels[AUDITED]?.medal).toBe(Medal.Gold);
+  });
+
+  test('a personal best on the schedule is not hidden by a slower audit layout', async () => {
+    await dispatch([...onSchedule(), layoutResult(AUDIT_LAYOUT, SLOW_OFF_SCHEDULE)], {
+      ...emptyProgress(),
+      completed: true,
+      medal: Medal.Silver,
+      bestTicks: 60,
+    });
+
+    expect(useGame.getState().personalBest).toEqual({
+      previous: 60,
+      now: SLOWEST_ON_SCHEDULE,
+    });
   });
 });

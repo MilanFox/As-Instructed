@@ -11,7 +11,7 @@ import type { RunFacts } from './achievements.ts';
 import { earnedBy, getAchievement, isSenseBudget } from './achievements.ts';
 import type { LevelProgress, SaveFile } from './save.ts';
 import { emptyProgress, importSave, loadSave, mergeProgress, writeSave } from './save.ts';
-import { medalForLevel, objectivesOnEverySeed } from './score.ts';
+import { medalForLevel, objectivesOnEverySeed, ticksOnSeeds } from './score.ts';
 
 export type Screen = 'levels' | 'workspace';
 export type RunState = 'idle' | 'running';
@@ -216,6 +216,17 @@ function routinesCalled(results: readonly PerSeedResult[]): string[] {
     }
   }
   return [...names];
+}
+
+// An audit layout is not on the work order's schedule, so it may gate the close but never grade it.
+function onScheduleVerdict(
+  level: LevelDef,
+  acrossSeeds: Verdict,
+  results: readonly PerSeedResult[],
+): Verdict {
+  const ticks = ticksOnSeeds(results, level.seeds);
+  if (ticks === null || ticks === acrossSeeds.stats.ticks) return acrossSeeds;
+  return { ...acrossSeeds, stats: { ...acrossSeeds.stats, ticks } };
 }
 
 function allClosed(group: readonly LevelDef[], levels: Record<string, LevelProgress>): boolean {
@@ -548,9 +559,10 @@ export const useGame = create<GameState>((set, get) => {
       function applyResponse(
         levelDef: LevelDef,
         trace: Trace,
-        verdict: Verdict,
+        acrossSeeds: Verdict,
         results: PerSeedResult[],
       ): void {
+        const verdict = onScheduleVerdict(levelDef, acrossSeeds, results);
         const cap = get().save.settings.consoleCap;
         const prints = trace.events.filter((event): event is PrintEvent => event.kind === 'print');
         const shown = prints.slice(0, cap);
