@@ -954,7 +954,8 @@
   background: rgba(0, 0, 0, 0.05);
   padding: calc(7 * var(--u)) calc(9 * var(--u));
   margin: calc(8 * var(--u)) 0;
-  overflow-x: auto;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
 }
 .desk .doc .md-rule {
   border: 0;
@@ -1490,7 +1491,8 @@
   background: rgba(0, 0, 0, 0.05);
   padding: calc(7 * var(--u)) calc(9 * var(--u));
   margin: calc(8 * var(--u)) 0;
-  overflow-x: auto;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
 }
 .desk .doc .md-rule {
   border: 0;
