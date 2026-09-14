@@ -1,6 +1,6 @@
 import type * as React from 'react';
 import { MEDAL_WORDS, REGRESSION } from '../copy.ts';
-import { needsAttention, summarise, summaryLine } from '../regression.ts';
+import { needsAttention, readershipLines, summarise, summaryLine } from '../regression.ts';
 import { lastKnownGoodRevision } from '../save.ts';
 import { useLibrary } from '../store.ts';
 import type { RegressionEntry } from '../types.ts';
@@ -29,12 +29,22 @@ export function RegressionReport(): React.JSX.Element {
   const accept = useLibrary((state) => state.acceptResults);
   const dismiss = useLibrary((state) => state.dismissSuite);
   const revert = useLibrary((state) => state.revertToLastKnownGood);
+  const readersOf = useLibrary((state) => state.readers);
 
   if (progress) {
     return <p className="lib__note">{REGRESSION.running(progress.done, progress.total)}</p>;
   }
   if (!suite) {
-    return <p className="lib__empty">{REGRESSION.nothingToCheck}</p>;
+    return (
+      <div>
+        <p className="lib__note">{REGRESSION.lede}</p>
+        {readershipLines(readersOf()).map((line) => (
+          <p key={line} className="lib__empty">
+            {line}
+          </p>
+        ))}
+      </div>
+    );
   }
 
   const summary = summarise(suite.run);
@@ -43,6 +53,7 @@ export function RegressionReport(): React.JSX.Element {
 
   return (
     <div>
+      <p className="lib__note">{REGRESSION.lede}</p>
       <p className={attention ? 'lib__warn' : 'lib__note'}>{summaryLine(summary)}</p>
 
       {suite.run.entries.map((entry) => (

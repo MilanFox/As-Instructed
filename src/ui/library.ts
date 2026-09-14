@@ -1,6 +1,8 @@
 import type { Medal } from '../engine/index.ts';
 import type {
+  CompletedWorkOrder,
   LevelFacts,
+  LevelInHand,
   MetaHost,
   MetaRunner,
   RegressionTarget,
@@ -9,6 +11,7 @@ import type {
 import { createMetaRunner, prepareLibrary, useLibrary } from '../meta/index.ts';
 import { emptyProgress } from '../game/save.ts';
 import { isGraded } from '../game/score.ts';
+import type { GameState } from '../game/store.ts';
 import { unlockedHardware, useGame } from '../game/store.ts';
 import { campaignOrder } from '../levels/index.ts';
 import type { RuntimeRunner } from './adapters.ts';
@@ -44,6 +47,26 @@ function targets(): RegressionTarget[] {
       },
     ];
   });
+}
+
+function inHand(): LevelInHand | null {
+  const state = useGame.getState();
+  const levelId = state.currentLevelId;
+  if (!levelId) return null;
+  return { levelId, code: state.code };
+}
+
+function closedWorkOrder(levelId: string, state: GameState): CompletedWorkOrder {
+  return {
+    levelId,
+    code: state.code,
+    ticks: state.verdict?.stats.ticks ?? 0,
+    runs: state.seedResults.map((result) => ({
+      seed: result.seed,
+      ticks: result.ticks,
+      ...(result.libraryUsage ? { libraryUsage: result.libraryUsage } : {}),
+    })),
+  };
 }
 
 function facts(): LevelFacts[] {
@@ -96,6 +119,7 @@ export function mountLibrary(runner: RuntimeRunner): () => void {
   const host: MetaHost = {
     runner: { run: () => Promise.resolve({ passed: false, ticks: 0 }) },
     targets,
+    inHand,
     facts,
     completed,
     applyMedals,
@@ -140,6 +164,7 @@ export function mountLibrary(runner: RuntimeRunner): () => void {
       if (!levelId) return;
       const library = useLibrary.getState();
       library.refreshUnlock();
+      library.recordCompletion(closedWorkOrder(levelId, state));
       library.reviewForPublish(levelId, state.code, unlockedHardware(levelId));
       pending = { levelId, code: state.code };
       void library.recheckDiscrepancies();

@@ -1,11 +1,12 @@
 import { Medal, medalFor } from '../engine/index.ts';
 import type { LibraryUsage } from '../runtime/index.ts';
-import { importedLibraryNames } from '../runtime/index.ts';
+import { importedLibraryNames, importsLibrary } from '../runtime/index.ts';
 import { REGRESSION } from './copy.ts';
 import { hashText, runKey } from './hash.ts';
 import { MAX_CACHE_ENTRIES } from './save.ts';
 import type {
   CachedRun,
+  LevelFacts,
   LevelProfile,
   LibrarySave,
   RegressionEntry,
@@ -40,7 +41,11 @@ export interface RegressionTarget {
   ticks?: number;
 }
 
-function medalAfter(target: RegressionTarget, passed: boolean, ticks: number): Medal {
+function medalAfter(
+  target: Pick<RegressionTarget, 'parTicks' | 'graded'>,
+  passed: boolean,
+  ticks: number,
+): Medal {
   if (target.graded === false) return Medal.None;
   return medalFor(passed, ticks, target.parTicks);
 }
@@ -63,7 +68,7 @@ function yieldToHost(): Promise<void> {
 }
 
 export function keyFor(
-  target: RegressionTarget,
+  target: Pick<RegressionTarget, 'levelId' | 'code' | 'seeds'>,
   libraryHash: string | undefined,
   dependsOnLibrary: boolean,
 ): string {
@@ -230,6 +235,77 @@ export async function runSuite(
 
   run.finishedAt = Date.now();
   return { run, summary: summarise(run), cache, profiles };
+}
+
+export interface CompletedWorkOrder {
+  levelId: string;
+  code: string;
+  ticks: number;
+  runs: readonly { seed: number; ticks: number; libraryUsage?: LibraryUsage }[];
+}
+
+export function completionProfile(
+  order: CompletedWorkOrder,
+  facts: LevelFacts | undefined,
+  libraryHash: string,
+): LevelProfile | null {
+  if (!importsLibrary(order.code)) return null;
+
+  const parTicks = facts?.parTicks ?? 0;
+  const scoring = order.runs.reduce<CompletedWorkOrder['runs'][number] | undefined>(
+    (worst, run) => (worst && worst.ticks >= run.ticks ? worst : run),
+    undefined,
+  );
+
+  return {
+    levelId: order.levelId,
+    key: keyFor(
+      { levelId: order.levelId, code: order.code, seeds: order.runs.map((run) => run.seed) },
+      libraryHash,
+      true,
+    ),
+    passed: true,
+    ticks: order.ticks,
+    medal: medalAfter({ parTicks, graded: facts?.graded }, true, order.ticks),
+    parTicks,
+    usage: scoring?.libraryUsage ?? EMPTY_USAGE,
+    imports: importedLibraryNames(order.code),
+    at: Date.now(),
+  };
+}
+
+export interface LevelInHand {
+  levelId: string;
+  code: string;
+}
+
+export interface LibraryReaders {
+  closed: string[];
+  inHand?: string;
+}
+
+export function libraryReaders(
+  targets: readonly RegressionTarget[],
+  inHand?: LevelInHand | null,
+): LibraryReaders {
+  const closed = targets
+    .filter((target) => importsLibrary(target.code))
+    .map((target) => target.levelId);
+  const readers: LibraryReaders = { closed };
+  if (inHand && !closed.includes(inHand.levelId) && importsLibrary(inHand.code)) {
+    readers.inHand = inHand.levelId;
+  }
+  return readers;
+}
+
+export function readershipLines(readers: LibraryReaders): string[] {
+  if (readers.closed.length === 0 && readers.inHand === undefined) {
+    return [REGRESSION.readsNothing];
+  }
+  const lines: string[] = [];
+  if (readers.closed.length > 0) lines.push(REGRESSION.readsClosed(readers.closed.length));
+  if (readers.inHand !== undefined) lines.push(REGRESSION.readsInHand(readers.inHand));
+  return lines;
 }
 
 export function summarise(run: RegressionRun): RegressionSummary {

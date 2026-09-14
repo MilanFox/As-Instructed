@@ -42,11 +42,14 @@ export function StructureScreen(): React.JSX.Element {
 
   const byName = new Map(structure.functions.map((each) => [each.name, each]));
   const depth = Math.max(...structure.rows.map((row) => row.depth)) + 1;
+  const solo = structure.functions.length === 1;
 
   return (
     <div>
       <p className="lib__note">{STRUCTURE.lede}</p>
-      {structure.flat ? <p className="lib__warn">{STRUCTURE.flat}</p> : null}
+      {structure.flat ? null : <p className="lib__note">{STRUCTURE.nested}</p>}
+      {solo ? <p className="lib__note">{STRUCTURE.single}</p> : null}
+      {structure.flat && !solo ? <p className="lib__warn">{STRUCTURE.flat}</p> : null}
 
       {structure.roots.map((root) => {
         const node = byName.get(root);
@@ -84,9 +87,11 @@ export function StructureScreen(): React.JSX.Element {
         );
       })}
 
-      <p className="lib-modal__footnote">
-        {STRUCTURE.depth(depth)} {STRUCTURE.footnote}
-      </p>
+      {structure.flat ? null : (
+        <p className="lib-modal__footnote">
+          {STRUCTURE.depth(depth)} {STRUCTURE.footnote}
+        </p>
+      )}
     </div>
   );
 }

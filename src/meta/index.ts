@@ -86,6 +86,9 @@ export type { LibraryFunction, LibraryStructure, StructureRow } from './structur
 export { buildStructure } from './structure.ts';
 
 export type {
+  CompletedWorkOrder,
+  LevelInHand,
+  LibraryReaders,
   MetaRunOutcome,
   MetaRunRequest,
   MetaRunner,

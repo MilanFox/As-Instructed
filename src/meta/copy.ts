@@ -106,9 +106,14 @@ export const REFACTOR = {
     'about it.',
   nothingToCost:
     'Publish a subroutine and this tab shows what it costs, per work order that calls it.',
-  neverCalled:
-    'Published, and called by nothing. It is being maintained for its own sake, which the site ' +
-    'has a form for.',
+  nothingMeasured:
+    'Nothing is measured yet. A work order is measured when you close it with code that imports ' +
+    'a subroutine. Publishing to lib.ts or editing it re-measures every closed work order.',
+  neverMeasured: 'No closed work order imports it yet, so it has no measured cost.',
+  neverCalled: (levels: readonly string[]): string =>
+    `Imported by ${levels.join(', ')}, and called zero times there.`,
+  varies: (low: number, lowLevel: string, high: number, highLevel: string): string =>
+    `Cost depends on the arguments: ${low} ticks per call in ${lowLevel}, ${high} in ${highLevel}.`,
   stale:
     'Not measured yet. Re-run the work orders that use it and the numbers arrive on their own.',
   columns: {
@@ -131,17 +136,22 @@ export const REFACTOR = {
     `${count} ${count === 1 ? 'work order goes' : 'work orders go'} from ${from} to ${to}.`,
   noProjection: (name: string): string =>
     `Nothing changes bracket, however cheap \`${name}\` gets. The cost is somewhere else.`,
+  perCallNote:
+    'Per call is measured separately in each work order. A range means the cost depends on the ' +
+    'arguments, not on the subroutine alone.',
   footnote: 'par is a planning figure. it goes down when someone beats it. that is not a warning',
 } as const;
 
 export const STRUCTURE = {
   title: 'REPOSITORY — STRUCTURE',
-  lede:
-    'What each subroutine is built out of. An indented line is called by the line above it, and ' +
-    'carries its ticks with it.',
+  lede: 'Every published subroutine, what it is built out of, and the ticks each one was charged.',
+  nested: 'An indented line is called by the line above it, and carries its ticks with it.',
   empty:
     'Nothing is published yet, so there is nothing to draw. Shared Subroutines is filed as empty ' +
     'rather than as missing.',
+  single:
+    'One subroutine published. This tab draws the calls between subroutines, so it stays a single ' +
+    'line until one of them calls another.',
   flat:
     'Nothing in Shared Subroutines calls anything else in it. Filed as a parts list rather than an ' +
     'assembly.',
@@ -168,8 +178,16 @@ export const STRUCTURE = {
 
 export const REGRESSION = {
   title: 'REGRESSION',
+  lede:
+    'Every closed work order that imports from lib.ts is re-run whenever lib.ts changes. ' +
+    'Nothing on your record moves unless you accept the new result.',
   running: (done: number, total: number): string =>
     `Re-running closed work orders. ${done}/${total}.`,
+  readsNothing: 'Nothing imports from lib.ts. There is nothing to re-run.',
+  readsClosed: (count: number): string =>
+    `${count} closed work ${count === 1 ? 'order imports' : 'orders import'} from lib.ts.`,
+  readsInHand: (levelId: string): string =>
+    `${levelId} imports from lib.ts. It is re-run here once it closes.`,
   clean: 'Every work order that reads Shared Subroutines still closes. Nothing has been raised.',
   nothingToCheck: 'No closed work order reads Shared Subroutines. There is nothing to re-run.',
   degraded: (levelId: string): string => `${levelId} has entered a degraded state.`,
@@ -194,6 +212,16 @@ export const REGRESSION = {
 
 export const DISCREPANCY = {
   badge: 'DISCREPANCY RAISED',
+  lede:
+    'Shipping re-runs one closed work order against a layout that was never on its schedule. ' +
+    'If it does not close on that layout, it is raised here.',
+  schedule: (closed: number, every: number): string =>
+    `The first is raised at ${closed} closed work orders, then one every ${every}. Only work ` +
+    'orders that import from lib.ts are picked, and only one is open at a time.',
+  todo:
+    'Open the work order and run it. The layout stays on its schedule until it passes. Your ' +
+    'medal and your closure do not move either way.',
+  empty: 'Nothing has been raised.',
   ref: (levelId: string): string => `DISCREPANCY 4471-${levelId.replace('-', '')}`,
   title: (levelId: string): string => `${levelId} — one layout it has not met`,
   layout: (seed: number): string => `LAYOUT ${seed}`,

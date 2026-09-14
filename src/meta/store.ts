@@ -16,8 +16,22 @@ import { buildReports } from './profile.ts';
 import type { FunctionReport } from './profile.ts';
 import { buildStructure } from './structure.ts';
 import type { LibraryStructure } from './structure.ts';
-import type { MetaRunner, RegressionSummary, RegressionTarget, SuiteResult } from './regression.ts';
-import { applySuite, runSuite, summarise } from './regression.ts';
+import type {
+  CompletedWorkOrder,
+  LevelInHand,
+  LibraryReaders,
+  MetaRunner,
+  RegressionSummary,
+  RegressionTarget,
+  SuiteResult,
+} from './regression.ts';
+import {
+  applySuite,
+  completionProfile,
+  libraryReaders,
+  runSuite,
+  summarise,
+} from './regression.ts';
 import { emptyLibrary, loadLibrary, recordRevision, revisionOf, writeLibrary } from './save.ts';
 import type { LibraryStorage } from './save.ts';
 import type { Discrepancy, LevelFacts, LibraryRevision, LibrarySave } from './types.ts';
@@ -28,6 +42,7 @@ import { nestedRoutineNames, planPublication, publishableDeclarations } from './
 export interface MetaHost {
   runner: MetaRunner;
   targets(): RegressionTarget[];
+  inHand?(): LevelInHand | null;
   facts(): LevelFacts[];
   completed(): { levelId: string; world: number }[];
   applyMedals(medals: { levelId: string; medal: Medal; ticks: number }[]): void;
@@ -82,6 +97,7 @@ export interface MetaState {
   confirmPublish(selection: PublishSelection[]): Promise<void>;
   skipPublish(forever: boolean): void;
 
+  recordCompletion(order: CompletedWorkOrder): void;
   probeForDiscrepancy(): Promise<void>;
   recheckDiscrepancies(): Promise<void>;
   seeDiscrepancy(id: string): void;
@@ -89,6 +105,7 @@ export interface MetaState {
   openDiscrepancyLevel(id: string): void;
   setMuted(patch: { publish?: boolean; discrepancies?: boolean }): void;
 
+  readers(): LibraryReaders;
   reports(): FunctionReport[];
   structure(): LibraryStructure;
 }
@@ -129,7 +146,7 @@ export const useLibrary = create<MetaState>((set, get) => {
     if (!active) return;
 
     const targets = active.targets();
-    const dependent = targets.filter((target) => importsLibrary(target.code));
+    const dependent = libraryReaders(targets).closed;
     if (dependent.length === 0) {
       set({ suite: null, suiteProgress: null, busy: false });
       write({ ...save, lastKnownGood: revisionId });
@@ -154,7 +171,8 @@ export const useLibrary = create<MetaState>((set, get) => {
       cancelled: () => cancelled,
     });
 
-    const applied = applySuite(save, result, { revisionId });
+    // The suite is async; a work order may have closed and recorded its profile while it ran.
+    const applied = applySuite(get().save, result, { revisionId });
     set({ suite: result, busy: false, suiteProgress: null });
     write(applied.save);
   };
@@ -339,6 +357,22 @@ export const useLibrary = create<MetaState>((set, get) => {
       });
     },
 
+    recordCompletion(order: CompletedWorkOrder): void {
+      const active = requireHost();
+      const save = get().save;
+      if (!active || !save.unlocked) return;
+
+      const facts = active.facts().find((each) => each.id === order.levelId);
+      const profile = completionProfile(order, facts, libraryHashOf(get().source));
+      if (!profile) return;
+
+      write({
+        ...save,
+        profiles: { ...save.profiles, [order.levelId]: profile },
+        updatedAt: Date.now(),
+      });
+    },
+
     async probeForDiscrepancy(): Promise<void> {
       const active = requireHost();
       const save = get().save;
@@ -414,6 +448,12 @@ export const useLibrary = create<MetaState>((set, get) => {
         ...(patch.publish !== undefined ? { publishMuted: patch.publish } : {}),
         ...(patch.discrepancies !== undefined ? { discrepanciesMuted: patch.discrepancies } : {}),
       });
+    },
+
+    readers(): LibraryReaders {
+      const active = requireHost();
+      if (!active) return { closed: [] };
+      return libraryReaders(active.targets(), active.inHand?.());
     },
 
     reports(): FunctionReport[] {

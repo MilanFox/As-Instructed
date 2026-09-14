@@ -1,7 +1,17 @@
 import type * as React from 'react';
 import { DISCREPANCY } from '../copy.ts';
+import { COMPLETIONS_PER_DISCREPANCY, MIN_CLOSED_BEFORE_FIRST } from '../discrepancy.ts';
 import { useLibrary } from '../store.ts';
 import './library.css';
+
+function explainerLines(muted: boolean): string[] {
+  if (muted) return [DISCREPANCY.lede, DISCREPANCY.muted, DISCREPANCY.todo];
+  return [
+    DISCREPANCY.lede,
+    DISCREPANCY.schedule(MIN_CLOSED_BEFORE_FIRST, COMPLETIONS_PER_DISCREPANCY),
+    DISCREPANCY.todo,
+  ];
+}
 
 export function DiscrepancyList(): React.JSX.Element {
   const save = useLibrary((state) => state.save);
@@ -9,10 +19,17 @@ export function DiscrepancyList(): React.JSX.Element {
   const close = useLibrary((state) => state.closeDiscrepancy);
   const setMuted = useLibrary((state) => state.setMuted);
 
+  const explanation = explainerLines(save.discrepanciesMuted).map((line) => (
+    <p key={line} className="lib__note">
+      {line}
+    </p>
+  ));
+
   if (save.discrepancies.length === 0) {
     return (
       <div>
-        <p className="lib__empty">Nothing has been raised.</p>
+        {explanation}
+        <p className="lib__empty">{DISCREPANCY.empty}</p>
         {save.discrepanciesMuted ? (
           <button
             type="button"
@@ -28,6 +45,7 @@ export function DiscrepancyList(): React.JSX.Element {
 
   return (
     <div>
+      {explanation}
       {save.discrepancies.map((entry) => (
         <article key={entry.id} className={entry.closed ? 'lib-disc lib-disc--closed' : 'lib-disc'}>
           <div className="lib-disc__ref">{entry.id}</div>

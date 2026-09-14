@@ -6,9 +6,23 @@ import { bestProjection, upgradeSummary } from '../profile.ts';
 import { useLibrary } from '../store.ts';
 import './library.css';
 
+function perCallCell(report: FunctionReport): string {
+  const range = report.range;
+  if (!range) return '—';
+  return range.low === range.high ? `${range.low}` : `${range.low}–${range.high}`;
+}
+
+function emptyReason(report: FunctionReport): string {
+  if (report.unmeasured.length > 0) return REFACTOR.neverCalled(report.unmeasured);
+  if (report.stale.length > 0) return REFACTOR.stale;
+  return REFACTOR.neverMeasured;
+}
+
 function Row({ report }: { report: FunctionReport }): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const projection = bestProjection(report);
+  const measured = report.callers.length > 0;
+  const range = report.range;
 
   return (
     <>
@@ -30,20 +44,23 @@ function Row({ report }: { report: FunctionReport }): React.JSX.Element {
             <span className="lib__note"> — published from {report.origin.fromLevel}</span>
           ) : null}
         </td>
-        <td className="numeric">{report.callers.length}</td>
-        <td className="numeric">{report.calls}</td>
-        <td className="numeric">{report.ticks}</td>
-        <td className="numeric">{report.perCall}</td>
+        <td className="numeric">{measured ? report.callers.length : '—'}</td>
+        <td className="numeric">{measured ? report.calls : '—'}</td>
+        <td className="numeric">{measured ? report.ticks : '—'}</td>
+        <td className="numeric">{perCallCell(report)}</td>
       </tr>
       {open ? (
         <tr>
           <td colSpan={5}>
-            {report.callers.length === 0 ? (
-              <p className="lib__empty">
-                {report.stale.length > 0 ? REFACTOR.stale : REFACTOR.neverCalled}
-              </p>
+            {!measured ? (
+              <p className="lib__empty">{emptyReason(report)}</p>
             ) : (
               <>
+                {range && range.low !== range.high ? (
+                  <p className="lib__note">
+                    {REFACTOR.varies(range.low, range.lowLevel, range.high, range.highLevel)}
+                  </p>
+                ) : null}
                 {projection ? (
                   <div className="lib-projection">
                     {projection.headline}
@@ -64,6 +81,7 @@ function Row({ report }: { report: FunctionReport }): React.JSX.Element {
                       <th>Work order</th>
                       <th className="numeric">Calls</th>
                       <th className="numeric">Ticks in {report.name}</th>
+                      <th className="numeric">{REFACTOR.columns.perCall}</th>
                       <th className="numeric">Ticks total</th>
                       <th className="numeric">Par</th>
                     </tr>
@@ -76,6 +94,7 @@ function Row({ report }: { report: FunctionReport }): React.JSX.Element {
                         </td>
                         <td className="numeric">{caller.calls}</td>
                         <td className="numeric">{caller.ticks}</td>
+                        <td className="numeric">{caller.perCall}</td>
                         <td className="numeric">{caller.totalTicks}</td>
                         <td className="numeric">{caller.parTicks}</td>
                       </tr>
@@ -103,9 +122,12 @@ export function RefactorScreen(): React.JSX.Element {
     return <p className="lib__empty">{REFACTOR.nothingToCost}</p>;
   }
 
+  const measured = reports.some((report) => report.callers.length > 0);
+
   return (
     <div>
-      <p className="lib__note">{REFACTOR.lede}</p>
+      <p className="lib__note">{measured ? REFACTOR.lede : REFACTOR.nothingMeasured}</p>
+      <p className="lib__note">{REFACTOR.perCallNote}</p>
       <table className="lib-table">
         <thead>
           <tr>
