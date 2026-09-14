@@ -204,6 +204,7 @@ const COMBED: Readonly<Record<number, { moves: number; floor: number }>> = {
   2: { moves: 48, floor: 49 },
   6: { moves: 35, floor: 36 },
   8: { moves: 35, floor: 36 },
+  14: { moves: 43, floor: 43 },
 };
 
 describe('w1-03 one-move-per-tile', () => {

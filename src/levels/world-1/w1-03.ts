@@ -61,7 +61,7 @@ export const w1_03: LevelDef = {
     { label: 'The doorway', value: 'Always the tile at the **southern end** of the partition.' },
     { label: 'An entry', value: 'One tile entered once. Enter it twice and it is filed twice.' },
   ],
-  seeds: [21, 1, 2, 6, 8],
+  seeds: [21, 1, 2, 6, 8, 14],
   par: { ticks: 50 },
   build(seed: number): World {
     const { width, height, divider } = bayLayout(seed);
