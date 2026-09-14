@@ -5,7 +5,7 @@ import { parkedOnPad, rationedSurvey } from './shared.ts';
 
 const START = vec(1, 1);
 const MIN_LENGTH = 8;
-const MAX_LENGTH = 26;
+const MAX_LENGTH = 25;
 
 export const w1_02: LevelDef = {
   id: 'w1-02',
