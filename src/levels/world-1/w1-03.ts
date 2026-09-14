@@ -48,7 +48,7 @@ export const w1_03: LevelDef = {
       'the width of the bay, six to ten columns',
       'the depth of the bay, five to eight rows',
       'the column the partition stands in',
-      'whether each half has an even or an odd number of columns',
+      'whether the columns of each half, and the rows of the bay, come out even or odd',
     ],
   },
   facts: [
@@ -88,7 +88,7 @@ export const w1_03: LevelDef = {
     'The doorway sits at the South end of the partition. A sweep that reaches the bottom row going East drives through it without being told to.',
     'Once the bot is in the east half, the same sweep works again. Only the direction it climbs has changed.',
     'A sweep that ends at the wrong wall has to drive back over a row it already did. Which way you snake decides which wall you end at.',
-    'Count the columns in the west half before committing to a direction. An even count and a row-by-row snake reaches the door on its own. An odd count needs the snake run column by column instead.',
+    'Count the columns in the west half, and the rows, before committing to a direction. A row-by-row snake ends beside the doorway only when the rows are odd. A column-by-column snake ends there only when the columns are even. A half that comes out even both ways reaches it no other way than by spending its one spare move.',
   ],
   docs: ['canMove', 'move'],
 };
