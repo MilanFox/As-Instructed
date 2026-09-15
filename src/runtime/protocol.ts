@@ -26,12 +26,51 @@ export interface LibraryUsage {
   calls: Record<string, { calls: number; ticks: number }>;
 }
 
+export interface TraceShape {
+  moves: number;
+  printed: boolean;
+  markedUnread: boolean;
+}
+
+export function traceShape(trace: Trace): TraceShape {
+  const shape: TraceShape = { moves: 0, printed: false, markedUnread: false };
+  let marked = false;
+  let readBack = false;
+
+  for (const event of trace.events) {
+    switch (event.kind) {
+      case 'move': {
+        if (event.ok) shape.moves += 1;
+        break;
+      }
+      case 'mark': {
+        if (event.text !== null) marked = true;
+        break;
+      }
+      case 'sense': {
+        if (event.name === 'readMark') readBack = true;
+        break;
+      }
+      case 'print': {
+        shape.printed = true;
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  shape.markedUnread = marked && !readBack;
+  return shape;
+}
+
 export interface PerSeedResult {
   seed: number;
   passed: boolean;
   ticks: number;
   ops: number;
   objectives: ObjectiveReport[];
+  shape: TraceShape;
   bonus?: ObjectiveReport[];
   failure?: RuntimeFailure;
   libraryUsage?: LibraryUsage;

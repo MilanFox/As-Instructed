@@ -1,8 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { RunResponse } from '../../runtime/protocol.ts';
+import type {
+  LibraryUsage,
+  PerSeedResult,
+  RunResponse,
+  TraceShape,
+} from '../../runtime/protocol.ts';
 import type { RunSubmission, RunnerPort } from '../ports.ts';
 import { FakeRunner } from '../ports.ts';
-import type { Trace } from '../../engine/index.ts';
+import type { Trace, Verdict } from '../../engine/index.ts';
 import { Medal } from '../../engine/index.ts';
 import type { LevelDef } from '../../levels/index.ts';
 import { campaignOrder, getLevel } from '../../levels/index.ts';
@@ -545,17 +550,6 @@ describe('rewards', () => {
     expect(state.save.achievements).toEqual({});
   });
 
-  it('notices a comment the player wrote, and not the one the starter shipped', async () => {
-    reset();
-    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
-
-    await runOnce(W1_01_SOLUTION);
-    expect(useGame.getState().save.achievements['left-a-comment']).toBeUndefined();
-
-    await runOnce(`// the long way round\n${W1_01_SOLUTION}`);
-    expect(useGame.getState().freshAchievements).toContain('left-a-comment');
-  });
-
   it('notices the diagnostics left in a closing program', async () => {
     reset();
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
@@ -601,14 +595,13 @@ describe('rewards', () => {
     expect(useGame.getState().save.achievements['came-back']).toBeUndefined();
   });
 
-  it('nods at somebody who came back on a later day', async () => {
+  it('leaves a first run stamped on an earlier day exactly where it was', async () => {
     reset();
     const yesterday = Date.now() - 36 * 60 * 60 * 1000;
     useGame.setState({ save: { ...emptySave(), firstRunAt: yesterday } });
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
 
     await runOnce(W1_01_SOLUTION);
-    expect(useGame.getState().freshAchievements).toContain('came-back');
     expect(useGame.getState().save.firstRunAt).toBe(yesterday);
   });
 
@@ -626,20 +619,50 @@ describe('rewards', () => {
     expect(useGame.getState().freshAchievements).not.toContain('site-closed');
   });
 
+  it('counts every sector already signed off, not just the one in hand', async () => {
+    reset();
+    const order = campaignOrder();
+    const closed = Object.fromEntries(
+      order
+        .filter((level) => (level.world === 1 && level.id !== 'w1-01') || level.world === 2)
+        .map((level) => [level.id, { ...emptyProgress(), completed: true }]),
+    );
+    useGame.setState({ save: { ...emptySave(), levels: closed } });
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+
+    await runOnce(W1_01_SOLUTION);
+    const fresh = useGame.getState().freshAchievements;
+    expect(fresh).toContain('sector-closed');
+    expect(fresh).toContain('two-sectors');
+    expect(fresh).not.toContain('four-sectors');
+  });
+
+  it('marks a re-close that came in under the time the player had set', async () => {
+    reset();
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+
+    await runOnce(W1_01_SLOWER);
+    expect(useGame.getState().freshAchievements).not.toContain('own-estimate');
+
+    await runOnce(W1_01_SOLUTION);
+    expect(useGame.getState().personalBest).not.toBeNull();
+    expect(useGame.getState().freshAchievements).toContain('own-estimate');
+  });
+
   it('files a achievement once and never again', async () => {
     reset();
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
-    for (let attempt = 0; attempt < 3; attempt++) await runOnce(W1_01_SOLUTION);
-    expect(useGame.getState().save.achievements['second-look']).toBeUndefined();
-
     await runOnce(W1_01_SOLUTION);
-    const first = useGame.getState().save.achievements['second-look'];
+    expect(useGame.getState().save.achievements['diagnostics-retained']).toBeUndefined();
+
+    await runOnce(`print('here');\n${W1_01_SOLUTION}`);
+    const first = useGame.getState().save.achievements['diagnostics-retained'];
     expect(first).toBeGreaterThan(0);
-    expect(useGame.getState().freshAchievements).toContain('second-look');
+    expect(useGame.getState().freshAchievements).toContain('diagnostics-retained');
 
-    await runOnce(W1_01_SOLUTION);
-    expect(useGame.getState().save.achievements['second-look']).toBe(first);
-    expect(useGame.getState().freshAchievements).not.toContain('second-look');
+    await runOnce(`print('again');\n${W1_01_SOLUTION}`);
+    expect(useGame.getState().save.achievements['diagnostics-retained']).toBe(first);
+    expect(useGame.getState().freshAchievements).not.toContain('diagnostics-retained');
   });
 
   it('remembers revealed hints across a reload', async () => {
@@ -744,11 +767,11 @@ describe('rewards', () => {
 
   it('awards a achievement raised outside a run, idempotently', () => {
     reset();
-    useGame.getState().award('repository');
-    const at = useGame.getState().save.achievements['repository'];
+    useGame.getState().award('swept-clean');
+    const at = useGame.getState().save.achievements['swept-clean'];
     expect(at).toBeGreaterThan(0);
-    useGame.getState().award('repository');
-    expect(useGame.getState().save.achievements['repository']).toBe(at);
+    useGame.getState().award('swept-clean');
+    expect(useGame.getState().save.achievements['swept-clean']).toBe(at);
 
     useGame.getState().award('no-regressions');
     expect(useGame.getState().save.achievements['no-regressions']).toBeUndefined();
@@ -1146,5 +1169,273 @@ describe('the seed survey', () => {
     await runOnce('move(Dir.West);');
     expect(useGame.getState().verdict?.passed).toBe(false);
     expect(useGame.getState().save.levels['w1-03']?.seedsUnlocked).toBeUndefined();
+  });
+});
+
+describe('the facts a single discarded layout used to decide', () => {
+  const DONE = 'done';
+
+  function layout(
+    seed: number,
+    passed: boolean,
+    shape: Partial<TraceShape> = {},
+    libraryUsage?: LibraryUsage,
+  ): PerSeedResult {
+    return {
+      seed,
+      passed,
+      ticks: 10,
+      ops: 20,
+      objectives: [{ id: DONE, label: DONE, met: passed }],
+      shape: { moves: 4, printed: false, markedUnread: false, ...shape },
+      ...(libraryUsage ? { libraryUsage } : {}),
+    };
+  }
+
+  function answer(results: PerSeedResult[]): RunResponse {
+    const passed = results.every((result) => result.passed);
+    const verdict: Verdict = {
+      passed,
+      objectives: [{ id: DONE, label: DONE, met: passed }],
+      stats: { ticks: 10, ops: 20, seeds: results.length, spend: {}, senses: {} },
+    };
+    return {
+      ok: true,
+      results,
+      verdict,
+      trace: { endTick: 10, events: [], keyframes: [] } as unknown as Trace,
+      traceSeed: results[0]?.seed ?? 0,
+    };
+  }
+
+  async function dispatch(levelId: string, results: PerSeedResult[], code?: string): Promise<void> {
+    const runner = new ScriptedRunner();
+    useGame.getState().attachRunner(runner);
+    pickUp(levelId);
+    if (code !== undefined) useGame.getState().setCode(code);
+    useGame.getState().run();
+    runner.settle(runner.requests.length - 1, answer(results));
+    await vi.waitFor(() => expect(useGame.getState().runState).toBe('idle'));
+  }
+
+  function everyLayoutOf(levelId: string): number[] {
+    return [...((getLevel(levelId) as LevelDef).seeds ?? [])];
+  }
+
+  it('reads the bot moving on a layout whose trace was thrown away', async () => {
+    reset();
+    const seeds = everyLayoutOf('w1-03');
+    expect(seeds.length).toBeGreaterThan(1);
+    await dispatch(
+      'w1-03',
+      seeds.map((seed, index) => layout(seed, true, index === 0 ? { moves: 0 } : { moves: 4 })),
+    );
+
+    expect(useGame.getState().verdict?.passed).toBe(true);
+    expect(useGame.getState().freshAchievements).not.toContain('did-not-move');
+  });
+
+  it('holds the bot still only when it held still on every layout', async () => {
+    reset();
+    await dispatch(
+      'w1-03',
+      everyLayoutOf('w1-03').map((seed) => layout(seed, true, { moves: 0 })),
+    );
+
+    expect(useGame.getState().freshAchievements).toContain('did-not-move');
+  });
+
+  it('reads the prints and the mark off every layout, not the one on the sheet', async () => {
+    reset();
+    await dispatch(
+      'w1-03',
+      everyLayoutOf('w1-03').map((seed) =>
+        layout(seed, true, { printed: true, markedUnread: true }),
+      ),
+    );
+
+    const fresh = useGame.getState().freshAchievements;
+    expect(fresh).toContain('diagnostics-retained');
+    expect(fresh).toContain('note-on-the-ground');
+  });
+
+  it('withholds both when one layout printed and read its mark back', async () => {
+    reset();
+    const seeds = everyLayoutOf('w1-03');
+    await dispatch(
+      'w1-03',
+      seeds.map((seed, index) =>
+        layout(seed, true, index === 0 ? { printed: true, markedUnread: true } : {}),
+      ),
+    );
+
+    const fresh = useGame.getState().freshAchievements;
+    expect(fresh).not.toContain('diagnostics-retained');
+    expect(fresh).not.toContain('note-on-the-ground');
+  });
+
+  it('counts the layouts the work order declares, not the audit layout behind them', async () => {
+    reset();
+    useGame.setState({ auditSeeds: { 'w1-01': { seeds: [4471], note: 'raised' } } });
+    const declared = everyLayoutOf('w1-01');
+    expect(declared).toHaveLength(1);
+
+    await dispatch('w1-01', [layout(declared[0] as number, true), layout(4471, false)]);
+    useGame.setState({ auditSeeds: {} });
+
+    expect(useGame.getState().verdict?.passed).toBe(false);
+    expect(useGame.getState().freshAchievements).not.toContain('one-layout');
+  });
+
+  it('will not call a one-layout order a first dispatch either', async () => {
+    reset();
+    useGame.setState({ auditSeeds: { 'w1-01': { seeds: [4471], note: 'raised' } } });
+    const declared = everyLayoutOf('w1-01');
+
+    await dispatch('w1-01', [layout(declared[0] as number, true), layout(4471, true)]);
+    useGame.setState({ auditSeeds: {} });
+
+    expect(useGame.getState().verdict?.passed).toBe(true);
+    expect(useGame.getState().freshAchievements).not.toContain('first-dispatch');
+  });
+
+  it('still marks one declared layout right and the rest wrong', async () => {
+    reset();
+    const seeds = everyLayoutOf('w1-03');
+    await dispatch(
+      'w1-03',
+      seeds.map((seed, index) => layout(seed, index === 0)),
+    );
+
+    expect(useGame.getState().freshAchievements).toContain('one-layout');
+  });
+
+  it('books a published subroutine against a work order only once it closes', async () => {
+    reset();
+    const usage: LibraryUsage = { ticks: 5, calls: { noop: { calls: 1, ticks: 5 } } };
+    await dispatch('w1-01', [layout(everyLayoutOf('w1-01')[0] as number, false, {}, usage)]);
+
+    expect(useGame.getState().verdict?.passed).toBe(false);
+    expect(useGame.getState().save.routineOrders).toBeUndefined();
+  });
+
+  it('books it on a close, where the subroutine was charged for the work', async () => {
+    reset();
+    const usage: LibraryUsage = { ticks: 5, calls: { noop: { calls: 1, ticks: 5 } } };
+    await dispatch('w1-01', [layout(everyLayoutOf('w1-01')[0] as number, true, {}, usage)]);
+
+    expect(useGame.getState().save.routineOrders).toEqual({ noop: ['w1-01'] });
+    expect(useGame.getState().freshAchievements).toContain('off-the-shelf');
+  });
+
+  it('books nothing for a subroutine that was called and charged no ticks', async () => {
+    reset();
+    const usage: LibraryUsage = { ticks: 0, calls: { noop: { calls: 3, ticks: 0 } } };
+    await dispatch('w1-01', [layout(everyLayoutOf('w1-01')[0] as number, true, {}, usage)]);
+
+    expect(useGame.getState().save.routineOrders).toBeUndefined();
+    expect(useGame.getState().freshAchievements).toContain('off-the-shelf');
+  });
+
+  it('reads a whole program that is one call on the repository', async () => {
+    reset();
+    const usage: LibraryUsage = { ticks: 5, calls: { sweep: { calls: 1, ticks: 5 } } };
+    const seed = everyLayoutOf('w1-01')[0] as number;
+    await dispatch(
+      'w1-01',
+      [layout(seed, true, {}, usage)],
+      "import { sweep } from 'lib';\n\nsweep();\n",
+    );
+
+    expect(useGame.getState().freshAchievements).toContain('the-whole-thing');
+  });
+
+  it('does not read two calls as one, however short the program', async () => {
+    reset();
+    const usage: LibraryUsage = { ticks: 5, calls: { sweep: { calls: 1, ticks: 5 } } };
+    const seed = everyLayoutOf('w1-01')[0] as number;
+    await dispatch(
+      'w1-01',
+      [layout(seed, true, {}, usage)],
+      "import { sweep } from 'lib';\n\nsweep();\nsweep();\n",
+    );
+
+    expect(useGame.getState().freshAchievements).not.toContain('the-whole-thing');
+  });
+
+  it('notices the same source closing a work order in another sector', async () => {
+    reset();
+    const source = 'move(Dir.East);\n';
+    useGame.setState({
+      save: {
+        ...emptySave(),
+        levels: { 'w2-01': { ...emptyProgress(), completed: true, code: source } },
+      },
+    });
+
+    await dispatch('w1-01', [layout(everyLayoutOf('w1-01')[0] as number, true)], source);
+
+    expect(useGame.getState().freshAchievements).toContain('one-program-two-sectors');
+  });
+
+  it('will not file one sector against itself', async () => {
+    reset();
+    const source = 'move(Dir.East);\n';
+    useGame.setState({
+      save: {
+        ...emptySave(),
+        levels: { 'w1-02': { ...emptyProgress(), completed: true, code: source } },
+      },
+    });
+
+    await dispatch('w1-01', [layout(everyLayoutOf('w1-01')[0] as number, true)], source);
+
+    expect(useGame.getState().freshAchievements).not.toContain('one-program-two-sectors');
+  });
+
+  it('pays a sector on estimate when every order in it came in at or under par', async () => {
+    reset();
+    const rest = campaignOrder().filter((level) => level.world === 1 && level.id !== 'w1-01');
+    useGame.setState({
+      save: {
+        ...emptySave(),
+        levels: Object.fromEntries(
+          rest.map((level) => [
+            level.id,
+            { ...emptyProgress(), completed: true, medal: Medal.Gold },
+          ]),
+        ),
+      },
+    });
+
+    await dispatch('w1-01', [layout(everyLayoutOf('w1-01')[0] as number, true)]);
+
+    expect(useGame.getState().freshAchievements).toContain('sector-on-estimate');
+  });
+
+  it('withholds it where one order in the sector came in over', async () => {
+    reset();
+    const rest = campaignOrder().filter((level) => level.world === 1 && level.id !== 'w1-01');
+    useGame.setState({
+      save: {
+        ...emptySave(),
+        levels: Object.fromEntries(
+          rest.map((level) => [
+            level.id,
+            {
+              ...emptyProgress(),
+              completed: true,
+              medal: level.id === 'w1-03' ? Medal.Silver : Medal.Gold,
+            },
+          ]),
+        ),
+      },
+    });
+
+    await dispatch('w1-01', [layout(everyLayoutOf('w1-01')[0] as number, true)]);
+
+    const fresh = useGame.getState().freshAchievements;
+    expect(fresh).toContain('sector-closed');
+    expect(fresh).not.toContain('sector-on-estimate');
   });
 });

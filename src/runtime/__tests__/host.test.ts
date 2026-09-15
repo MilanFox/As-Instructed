@@ -3,6 +3,7 @@ import type { Trace, Verdict } from '../../engine/index.ts';
 import { Runner } from '../host.ts';
 import type { WorkerLike } from '../host.ts';
 import type { RunRequest, RunResponse, WorkerRequestMessage } from '../protocol.ts';
+import { traceShape } from '../protocol.ts';
 
 class FakeWorker implements WorkerLike {
   onmessage: ((event: MessageEvent) => void) | null = null;
@@ -54,7 +55,7 @@ function okResponse(seed: number): RunResponse {
   } as Verdict;
   return {
     ok: true,
-    results: [{ seed, passed: true, ticks: 6, ops: 6, objectives: [] }],
+    results: [{ seed, passed: true, ticks: 6, ops: 6, objectives: [], shape: traceShape(trace) }],
     verdict,
     trace,
     traceSeed: seed,

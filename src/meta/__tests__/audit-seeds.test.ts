@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { ObjectiveReport, Trace, Verdict } from '../../engine/index.ts';
 import { Medal } from '../../engine/index.ts';
-import type { PerSeedResult, RunResponse } from '../../runtime/protocol.ts';
+import type { PerSeedResult, RunResponse, TraceShape } from '../../runtime/protocol.ts';
 import type { RunSubmission, RunnerPort } from '../../game/ports.ts';
 import type { LevelProgress } from '../../game/save.ts';
 import { emptyProgress, emptySave } from '../../game/save.ts';
@@ -189,7 +189,7 @@ function reportOf(id: string, met: boolean): ObjectiveReport {
 function layoutResult(
   seed: number,
   ticks: number,
-  options: { passed?: boolean; bonus?: boolean } = {},
+  options: { passed?: boolean; bonus?: boolean; shape?: TraceShape } = {},
 ): PerSeedResult {
   const passed = options.passed ?? true;
   return {
@@ -198,6 +198,7 @@ function layoutResult(
     ticks,
     ops: ticks * 2,
     objectives: [reportOf(OBJECTIVE, passed)],
+    shape: options.shape ?? { moves: 1, printed: false, markedUnread: false },
     bonus: [reportOf(BONUS, options.bonus ?? true)],
   };
 }

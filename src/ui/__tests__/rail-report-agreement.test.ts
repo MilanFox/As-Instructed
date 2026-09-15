@@ -36,6 +36,7 @@ const { runLevel, runReference } = await import('../../levels/harness.ts');
 const { Dir, evaluateObjectives, senseTotals } = await import('../../engine/index.ts');
 const { SOLUTIONS } = await import('../../levels/__tests__/solutions.ts');
 const { aggregate } = await import('../../runtime/aggregate.ts');
+const { traceShape } = await import('../../runtime/protocol.ts');
 
 type LevelDef = ReturnType<typeof campaignOrder>[number];
 type RunResult = ReturnType<typeof runLevel>;
@@ -182,6 +183,7 @@ function seedRunsOf(
         ticks: run.verdict.stats.ticks,
         ops: run.ops,
         objectives: run.verdict.objectives,
+        shape: traceShape(run.trace),
         ...(bonus.length > 0 ? { bonus } : {}),
       },
       trace: run.trace,

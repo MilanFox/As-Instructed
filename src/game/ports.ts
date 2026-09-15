@@ -9,6 +9,7 @@ import {
   senseTotals,
 } from '../engine/index.ts';
 import type { RunResponse } from '../runtime/protocol.ts';
+import { traceShape } from '../runtime/protocol.ts';
 import { getLevel } from '../levels/index.ts';
 
 export interface RunSubmission {
@@ -144,6 +145,7 @@ export class FakeRunner implements RunnerPort {
         ticks: verdict.stats.ticks,
         ops: verdict.stats.ops,
         objectives: required.objectives,
+        shape: traceShape(trace),
         ...(bonus.length > 0 ? { bonus } : {}),
       })),
       ...(verdict.passed ? {} : { failedSeed: seed }),

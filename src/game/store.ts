@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import type { EventOrigin, PrintEvent, Trace, TraceEvent, Verdict } from '../engine/index.ts';
 import { Medal, eventIndexAt, usesFuel } from '../engine/index.ts';
-import type { PerSeedResult, RuntimeFailure } from '../runtime/protocol.ts';
+import type { PerSeedResult, RuntimeFailure, TraceShape } from '../runtime/protocol.ts';
 import { WORKER_TIMEOUT_MS } from '../runtime/protocol.ts';
+import { findModuleStatements } from '../runtime/index.ts';
 import type { LevelDef } from '../levels/index.ts';
 import { campaignOrder, getLevel, hardwareUnlockedBy, nextLevel } from '../levels/index.ts';
 import type { RendererPort, RunnerPort } from './ports.ts';
@@ -11,7 +12,7 @@ import type { RunFacts } from './achievements.ts';
 import { earnedBy, getAchievement, isSenseBudget } from './achievements.ts';
 import type { LevelProgress, SaveFile } from './save.ts';
 import { emptyProgress, importSave, loadSave, mergeProgress, writeSave } from './save.ts';
-import { medalForLevel, objectivesOnEverySeed, ticksOnSeeds } from './score.ts';
+import { medalForLevel, medalOf, objectivesOnEverySeed, ticksOnSeeds } from './score.ts';
 
 export type Screen = 'levels' | 'workspace';
 export type RunState = 'idle' | 'running';
@@ -254,83 +255,34 @@ function firstLevelId(): string | null {
 
 const COMMENT = /\/\*[\s\S]*?\*\/|\/\/[^\n]*/g;
 
-function commentsIn(source: string): string[] {
-  return (source.match(COMMENT) ?? []).map((text) => text.trim());
-}
+const ONE_CALL = /^(?:return\s+)?[A-Za-z_$][\w$]*\s*\([^()]*\)\s*;?$/;
 
 function dispatchedNothing(source: string): boolean {
   return source.replace(COMMENT, '').trim().length === 0;
 }
 
-interface TraceShape {
-  moves: number;
-  waited: number;
-  turnsInPlace: number;
-  onOneTile: number;
-  printed: boolean;
-  markedUnread: boolean;
+function withoutImports(source: string): string {
+  let out = '';
+  let cursor = 0;
+  for (const statement of findModuleStatements(source)) {
+    if (statement.keyword !== 'import') continue;
+    out += source.slice(cursor, statement.start);
+    cursor = statement.end;
+  }
+  return out + source.slice(cursor);
 }
 
-function traceShape(trace: Trace | null): TraceShape {
-  const shape: TraceShape = {
-    moves: 0,
-    waited: 0,
-    turnsInPlace: 0,
-    onOneTile: 0,
-    printed: false,
-    markedUnread: false,
+function dispatchedOneCall(source: string): boolean {
+  return ONE_CALL.test(withoutImports(source).replace(COMMENT, '').trim());
+}
+
+function foldShapes(results: readonly PerSeedResult[]): TraceShape {
+  if (results.length === 0) return { moves: 0, printed: false, markedUnread: false };
+  return {
+    moves: results.reduce((most, result) => Math.max(most, result.shape.moves), 0),
+    printed: results.every((result) => result.shape.printed),
+    markedUnread: results.every((result) => result.shape.markedUnread),
   };
-  if (!trace) return shape;
-
-  const turning = new Map<number, number>();
-  const gathers = new Map<string, number>();
-  let marked = false;
-  let readBack = false;
-
-  for (const event of trace.events) {
-    switch (event.kind) {
-      case 'move': {
-        turning.set(event.botId, 0);
-        if (event.ok) shape.moves += 1;
-        break;
-      }
-      case 'turn': {
-        const spun = (turning.get(event.botId) ?? 0) + 1;
-        turning.set(event.botId, spun);
-        shape.turnsInPlace = Math.max(shape.turnsInPlace, spun);
-        break;
-      }
-      case 'wait': {
-        shape.waited += event.ticks;
-        break;
-      }
-      case 'harvest':
-      case 'mine': {
-        const tile = `${event.at.x},${event.at.y}`;
-        const worked = (gathers.get(tile) ?? 0) + 1;
-        gathers.set(tile, worked);
-        shape.onOneTile = Math.max(shape.onOneTile, worked);
-        break;
-      }
-      case 'mark': {
-        if (event.text !== null) marked = true;
-        break;
-      }
-      case 'sense': {
-        if (event.name === 'readMark') readBack = true;
-        break;
-      }
-      case 'print': {
-        shape.printed = true;
-        break;
-      }
-      default:
-        break;
-    }
-  }
-
-  shape.markedUnread = marked && !readBack;
-  return shape;
 }
 
 function routinesCalled(results: readonly PerSeedResult[]): string[] {
@@ -338,6 +290,16 @@ function routinesCalled(results: readonly PerSeedResult[]): string[] {
   for (const result of results) {
     for (const [name, use] of Object.entries(result.libraryUsage?.calls ?? {})) {
       if (use.calls > 0) names.add(name);
+    }
+  }
+  return [...names];
+}
+
+function routinesCharged(results: readonly PerSeedResult[]): string[] {
+  const names = new Set<string>();
+  for (const result of results) {
+    for (const [name, use] of Object.entries(result.libraryUsage?.calls ?? {})) {
+      if (use.ticks > 0) names.add(name);
     }
   }
   return [...names];
@@ -363,6 +325,38 @@ function allStarred(group: readonly LevelDef[], levels: Record<string, LevelProg
   return group.every((level) => {
     const stars = levels[level.id]?.stars ?? [];
     return (level.bonus ?? []).every((bonus) => stars.includes(bonus.id));
+  });
+}
+
+function allAtPar(group: readonly LevelDef[], levels: Record<string, LevelProgress>): boolean {
+  if (!allClosed(group, levels)) return false;
+  return group.every((level) => {
+    const progress = levels[level.id] as LevelProgress;
+    const medal = medalOf(level, progress);
+    return medal === null || medal === Medal.Gold;
+  });
+}
+
+function sectorsClosed(order: readonly LevelDef[], levels: Record<string, LevelProgress>): number {
+  const worlds = [...new Set(order.map((level) => level.world))];
+  return worlds.filter((world) =>
+    allClosed(
+      order.filter((level) => level.world === world),
+      levels,
+    ),
+  ).length;
+}
+
+function closedElsewhere(
+  order: readonly LevelDef[],
+  levels: Record<string, LevelProgress>,
+  level: LevelDef,
+  source: string,
+): boolean {
+  if (source.trim().length === 0) return false;
+  return order.some((other) => {
+    const progress = levels[other.id];
+    return other.world !== level.world && progress?.completed === true && progress.code === source;
   });
 }
 
@@ -1008,16 +1002,22 @@ export const useGame = create<GameState>((set, get) => {
 
         const routineOrders = { ...state.save.routineOrders };
         const called = routinesCalled(results);
-        for (const name of called) {
-          const orders = routineOrders[name] ?? [];
-          if (!orders.includes(levelDef.id)) routineOrders[name] = [...orders, levelDef.id];
+        if (verdict.passed) {
+          for (const name of routinesCharged(results)) {
+            const orders = routineOrders[name] ?? [];
+            if (!orders.includes(levelDef.id)) routineOrders[name] = [...orders, levelDef.id];
+          }
         }
 
         const order = campaignOrder();
         const sector = order.filter((level) => level.world === levelDef.world);
-        const starter = new Set(commentsIn(levelDef.starter));
-        const shape = traceShape(state.trace);
+        const shape = foldShapes(results);
         const startedAt = state.save.firstRunAt;
+        const onSchedule = results.filter((result) => levelDef.seeds.includes(result.seed));
+        const beaten =
+          verdict.passed &&
+          previous.bestTicks !== undefined &&
+          verdict.stats.ticks < previous.bestTicks;
 
         const facts: RunFacts = {
           passed: verdict.passed,
@@ -1025,33 +1025,27 @@ export const useGame = create<GameState>((set, get) => {
           senseBudgetMet: verdict.objectives.some(
             (objective) => objective.met && isSenseBudget(objective.id),
           ),
-          returnedForStar: previous.completed && previous.stars.length === 0 && earned.length > 0,
           world: levelDef.world,
           ticks: verdict.stats.ticks,
-          ops: verdict.stats.ops,
           parTicks: medal === null ? null : levelDef.par.ticks,
-          seeds: results.length,
-          seedsPassed: results.filter((result) => result.passed).length,
-          waited: shape.waited,
+          beatOwnBest: beaten,
+          seeds: levelDef.seeds.length,
+          seedsPassed: onSchedule.filter((result) => result.passed).length,
           moves: shape.moves,
-          turnsInPlace: shape.turnsInPlace,
-          onOneTile: shape.onOneTile,
           printed: shape.printed,
           markedUnread: shape.markedUnread,
           emptyProgram: dispatchedNothing(source),
-          wroteComment: commentsIn(source).some((text) => !starter.has(text)),
           unchanged,
           routineCalled: called.length > 0,
           routineOrders: Math.max(0, ...Object.values(routineOrders).map((ids) => ids.length)),
+          singleCall: dispatchedOneCall(source),
+          sameProgramOtherSector: closedElsewhere(order, levels, levelDef, source),
           sectorClosed: allClosed(sector, levels),
+          sectorsClosed: sectorsClosed(order, levels),
+          sectorAtPar: allAtPar(sector, levels),
           sectorStarred: allStarred(sector, levels),
           siteClosed: allClosed(order, levels),
           siteStarred: allStarred(order, levels),
-          unclosedRuns: stats.fails,
-          hour: new Date(now).getHours(),
-          laterDay:
-            startedAt !== undefined &&
-            new Date(startedAt).toDateString() !== new Date(now).toDateString(),
         };
 
         const achievements = { ...state.save.achievements };
@@ -1061,11 +1055,6 @@ export const useGame = create<GameState>((set, get) => {
           achievements[id] = now;
           fresh.push(id);
         }
-
-        const beaten =
-          verdict.passed &&
-          previous.bestTicks !== undefined &&
-          verdict.stats.ticks < previous.bestTicks;
 
         set({
           freshAchievements: fresh,

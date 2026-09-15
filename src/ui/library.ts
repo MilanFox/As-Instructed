@@ -7,8 +7,15 @@ import type {
   MetaRunner,
   RegressionTarget,
   RunnerLike,
+  SuiteResult,
 } from '../meta/index.ts';
-import { createMetaRunner, prepareLibrary, useLibrary } from '../meta/index.ts';
+import {
+  createMetaRunner,
+  needsAttention,
+  prepareLibrary,
+  summarise,
+  useLibrary,
+} from '../meta/index.ts';
 import { emptyProgress } from '../game/save.ts';
 import { isGraded } from '../game/score.ts';
 import type { GameState } from '../game/store.ts';
@@ -112,6 +119,12 @@ function setLevelCode(levelId: string, code: string): void {
   state.replaceSave({ ...state.save, levels });
 }
 
+export function sweptClean(suite: SuiteResult | null): boolean {
+  if (!suite || suite.run.cancelled === true) return false;
+  const summary = summarise(suite.run);
+  return summary.total > 0 && !needsAttention(summary);
+}
+
 export function mountLibrary(runner: RuntimeRunner): () => void {
   activeRunner = runner;
   useLibrary.getState().hydrate();
@@ -147,10 +160,15 @@ export function mountLibrary(runner: RuntimeRunner): () => void {
   });
 
   const unsubscribeLibrary = useLibrary.subscribe((state, previous) => {
-    if (state.save.source !== previous.save.source) void installTypes();
+    const rewritten = state.save.source !== previous.save.source;
+    if (rewritten) void installTypes();
 
-    if (state.save.published.length > previous.save.published.length) {
-      useGame.getState().award('repository');
+    if (rewritten || state.save.published.length !== previous.save.published.length) {
+      if (!useLibrary.getState().structure().flat) useGame.getState().award('built-on-it');
+    }
+
+    if (state.suite !== previous.suite && sweptClean(state.suite)) {
+      useGame.getState().award('swept-clean');
     }
   });
 

@@ -2,6 +2,7 @@ import type { CostOverrides, EventOrigin, Trace, Verdict } from '../engine/index
 import { Sim, buildVerdict, cloneWorld, evaluateObjectives, senseTotals } from '../engine/index.ts';
 import type { LevelDef } from '../levels/index.ts';
 import type { LibraryRequest, LibraryUsage, PerSeedResult, RuntimeFailure } from './protocol.ts';
+import { traceShape } from './protocol.ts';
 import { buildPlayerScope } from './api-bindings.ts';
 import { toRuntimeFailure, toVerdictFailure } from './errors.ts';
 import {
@@ -109,6 +110,7 @@ export function runSeed(options: SeedRunOptions): SeedRun {
     ticks: verdict.stats.ticks,
     ops: verdict.stats.ops,
     objectives: verdict.objectives,
+    shape: traceShape(trace),
   };
   const bonus = level.bonus ?? [];
   if (bonus.length > 0) {

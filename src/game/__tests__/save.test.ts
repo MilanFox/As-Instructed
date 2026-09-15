@@ -231,13 +231,13 @@ describe('migrate to the reward fields', () => {
       updatedAt: 1,
       levels: {},
       settings: { celebrations: 'yes please' },
-      achievements: { 'second-look': 'soon', '': 5 },
+      achievements: { 'off-the-shelf': 'soon', '': 5 },
       stats: { runs: -4, passes: 'lots' },
     });
 
     expect(migrated.settings.celebrations).toBe(true);
-    expect(migrated.achievements['second-look']).toBeGreaterThan(0);
-    expect(Object.keys(migrated.achievements)).toEqual(['second-look']);
+    expect(migrated.achievements['off-the-shelf']).toBeGreaterThan(0);
+    expect(Object.keys(migrated.achievements)).toEqual(['off-the-shelf']);
     expect(migrated.stats.runs).toBe(0);
   });
 
@@ -278,11 +278,11 @@ describe('migrate to the reward fields', () => {
 
   it('round-trips the reward fields through export', () => {
     const save = emptySave();
-    save.achievements['second-look'] = 4242;
+    save.achievements['off-the-shelf'] = 4242;
     save.stats = { runs: 9, passes: 4, fails: 5 };
     const back = parseSave(exportSave(save));
 
-    expect(back.achievements['second-look']).toBe(4242);
+    expect(back.achievements['off-the-shelf']).toBe(4242);
     expect(back.stats.passes).toBe(4);
   });
 });
@@ -290,15 +290,15 @@ describe('migrate to the reward fields', () => {
 describe('importSave and the reward fields', () => {
   it('unions achievements and keeps the earlier date for each', () => {
     const current = emptySave();
-    current.achievements = { 'second-look': 500, 'minimal-observation': 900 };
+    current.achievements = { 'off-the-shelf': 500, 'minimal-observation': 900 };
     const incoming = emptySave();
-    incoming.achievements = { 'second-look': 100, 'raised-again': 700 };
+    incoming.achievements = { 'off-the-shelf': 100, 'did-not-move': 700 };
 
     const merged = importSave(current, JSON.stringify(incoming));
     expect(merged.achievements).toEqual({
-      'second-look': 100,
+      'off-the-shelf': 100,
       'minimal-observation': 900,
-      'raised-again': 700,
+      'did-not-move': 700,
     });
   });
 
@@ -327,7 +327,7 @@ describe('importSave and the reward fields', () => {
     const current = emptySave();
     current.levels['w1-01'] = { ...emptyProgress(), code: 'mine();' };
     const incoming = emptySave();
-    incoming.achievements = { 'second-look': 1 };
+    incoming.achievements = { 'off-the-shelf': 1 };
 
     const merged = importSave(current, JSON.stringify(incoming));
     expect(merged.levels['w1-01']?.code).toBe('mine();');
@@ -395,7 +395,7 @@ describe('a save that names a withdrawn work order', () => {
   });
 });
 
-describe('a save written by a build that had fifteen achievements', () => {
+describe('a save written by the build before the achievement set was reworked', () => {
   const beforeTheCut = JSON.stringify({
     version: SAVE_VERSION,
     updatedAt: 1,
@@ -420,6 +420,8 @@ describe('a save written by a build that had fifteen achievements', () => {
       'second-look': 600,
       'raised-again': 700,
       repository: 800,
+      'off-the-shelf': 900,
+      'in-service': 1000,
     },
     stats: { runs: 42, passes: 17, fails: 25 },
     seenRequisitions: ['scan'],
@@ -437,11 +439,17 @@ describe('a save written by a build that had fifteen achievements', () => {
     }
   });
 
+  it('drops an id the rework retired, which is the whole of the migration', () => {
+    const { achievements } = parseSave(beforeTheCut);
+    for (const id of ['second-look', 'raised-again', 'repository']) {
+      expect(achievements[id], id).toBeUndefined();
+    }
+  });
+
   it('keeps the surviving achievements, dates and all', () => {
     const { achievements } = parseSave(beforeTheCut);
-    expect(achievements['second-look']).toBe(600);
-    expect(achievements['raised-again']).toBe(700);
-    expect(achievements['repository']).toBe(800);
+    expect(achievements['off-the-shelf']).toBe(900);
+    expect(achievements['in-service']).toBe(1000);
   });
 
   it('loses nothing else the player had', () => {
@@ -467,12 +475,13 @@ describe('a save written by a build that had fifteen achievements', () => {
 
   it('does not resurrect a retired achievement through import', () => {
     const current = emptySave();
-    current.achievements = { 'second-look': 10 };
+    current.achievements = { 'off-the-shelf': 10 };
     const merged = importSave(current, beforeTheCut);
 
     expect(merged.achievements['filed']).toBeUndefined();
-    expect(merged.achievements['second-look']).toBe(10);
-    expect(merged.achievements['repository']).toBe(800);
+    expect(merged.achievements['repository']).toBeUndefined();
+    expect(merged.achievements['off-the-shelf']).toBe(10);
+    expect(merged.achievements['in-service']).toBe(1000);
   });
 });
 

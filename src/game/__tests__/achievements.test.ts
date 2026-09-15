@@ -13,31 +13,27 @@ function facts(patch: Partial<RunFacts> = {}): RunFacts {
     passed: true,
     attempt: 3,
     senseBudgetMet: false,
-    returnedForStar: false,
     world: 3,
     ticks: 40,
-    ops: 400,
     parTicks: 40,
+    beatOwnBest: false,
     seeds: 3,
     seedsPassed: 3,
-    waited: 0,
     moves: 30,
-    turnsInPlace: 1,
-    onOneTile: 1,
     printed: false,
     markedUnread: false,
     emptyProgram: false,
-    wroteComment: false,
     unchanged: false,
     routineCalled: false,
     routineOrders: 0,
+    singleCall: false,
+    sameProgramOtherSector: false,
     sectorClosed: false,
+    sectorsClosed: 0,
+    sectorAtPar: false,
     sectorStarred: false,
     siteClosed: false,
     siteStarred: false,
-    unclosedRuns: 4,
-    hour: 14,
-    laterDay: false,
     ...patch,
   };
 }
@@ -88,8 +84,9 @@ describe('the achievement list', () => {
 
   it('can award every achievement it prints', () => {
     const reachable = new Set(everythingEarned());
+    const granted = new Set(['built-on-it', 'swept-clean']);
     const unreachable = ACHIEVEMENTS.map((achievement) => achievement.id).filter(
-      (id) => id !== 'repository' && !reachable.has(id),
+      (id) => !granted.has(id) && !reachable.has(id),
     );
     expect(unreachable).toEqual([]);
   });
@@ -97,31 +94,24 @@ describe('the achievement list', () => {
 
 function everythingEarned(): string[] {
   const runs: Partial<RunFacts>[] = [
-    { attempt: 10, senseBudgetMet: true, returnedForStar: true },
-    { ticks: 10, parTicks: 40, waited: 8, moves: 0, printed: true },
-    { ticks: 400, parTicks: 40, onOneTile: 20, turnsInPlace: 4, markedUnread: true },
-    { ops: 1_000_000, routineCalled: true, routineOrders: 4 },
-    { sectorClosed: true, sectorStarred: true, siteClosed: true, siteStarred: true },
-    { passed: false, emptyProgram: true, wroteComment: true, unchanged: true },
+    { attempt: 1, senseBudgetMet: true, beatOwnBest: true },
+    { ticks: 10, parTicks: 40, moves: 0, printed: true, markedUnread: true },
+    { ticks: 400, parTicks: 40, routineCalled: true, singleCall: true },
+    { routineOrders: 4, sameProgramOtherSector: true },
+    { sectorClosed: true, sectorsClosed: 6, sectorAtPar: true },
+    { sectorStarred: true, siteClosed: true, siteStarred: true },
+    { passed: false, emptyProgram: true, unchanged: true },
     { passed: false, seeds: 5, seedsPassed: 1 },
-    { world: 8, unclosedRuns: 100, hour: 4, laterDay: true },
+    { world: 8 },
   ];
   return runs.flatMap((patch) => earnedBy(facts(patch)));
 }
 
 describe('earnedBy, on a closed work order', () => {
-  it('rewards coming back to a closed order for its star', () => {
-    expect(earnedBy(facts({ returnedForStar: true }))).toContain('came-back-for-it');
-    expect(earnedBy(facts({ returnedForStar: false }))).not.toContain('came-back-for-it');
-  });
-
-  it('awards the persistence tiers at four runs and at ten', () => {
-    expect(earnedBy(facts({ attempt: 3 }))).not.toContain('second-look');
-    expect(earnedBy(facts({ attempt: 4 }))).toContain('second-look');
-    expect(earnedBy(facts({ attempt: 9 }))).not.toContain('raised-again');
-    expect(earnedBy(facts({ attempt: 10 }))).toEqual(
-      expect.arrayContaining(['second-look', 'raised-again']),
-    );
+  it('pays a first-run close only where several layouts had to agree', () => {
+    expect(earnedBy(facts({ attempt: 1, seeds: 3 }))).toContain('first-dispatch');
+    expect(earnedBy(facts({ attempt: 2, seeds: 3 }))).not.toContain('first-dispatch');
+    expect(earnedBy(facts({ attempt: 1, seeds: 1 }))).not.toContain('first-dispatch');
   });
 
   it('pays the information budget only where one was offered and met', () => {
@@ -129,9 +119,9 @@ describe('earnedBy, on a closed work order', () => {
     expect(earnedBy(facts({ senseBudgetMet: false }))).not.toContain('minimal-observation');
   });
 
-  it('notices a run at half par and a run at ten times par', () => {
-    expect(earnedBy(facts({ ticks: 20, parTicks: 40 }))).toContain('under-the-estimate');
-    expect(earnedBy(facts({ ticks: 21, parTicks: 40 }))).not.toContain('under-the-estimate');
+  it('notices a run under par and a run at ten times par', () => {
+    expect(earnedBy(facts({ ticks: 39, parTicks: 40 }))).toContain('under-the-estimate');
+    expect(earnedBy(facts({ ticks: 40, parTicks: 40 }))).not.toContain('under-the-estimate');
     expect(earnedBy(facts({ ticks: 400, parTicks: 40 }))).toContain('outside-the-estimate');
     expect(earnedBy(facts({ ticks: 399, parTicks: 40 }))).not.toContain('outside-the-estimate');
   });
@@ -142,11 +132,33 @@ describe('earnedBy, on a closed work order', () => {
     expect(earnedBy(facts({ ticks: 1, parTicks: null }))).not.toContain('under-the-estimate');
   });
 
+  it('notices a re-close that came in faster than the one before it', () => {
+    expect(earnedBy(facts({ beatOwnBest: true }))).toContain('own-estimate');
+    expect(earnedBy(facts({ beatOwnBest: false }))).not.toContain('own-estimate');
+  });
+
   it('notices the repository doing part of the work, and doing it repeatedly', () => {
     expect(earnedBy(facts({ routineCalled: true }))).toContain('off-the-shelf');
     expect(earnedBy(facts({ routineCalled: false }))).not.toContain('off-the-shelf');
     expect(earnedBy(facts({ routineOrders: 3 }))).not.toContain('in-service');
     expect(earnedBy(facts({ routineOrders: 4 }))).toContain('in-service');
+  });
+
+  it('asks a one-line program to be a call on the repository, not just one line', () => {
+    expect(earnedBy(facts({ singleCall: true, routineCalled: true }))).toContain('the-whole-thing');
+    expect(earnedBy(facts({ singleCall: true, routineCalled: false }))).not.toContain(
+      'the-whole-thing',
+    );
+    expect(earnedBy(facts({ singleCall: false, routineCalled: true }))).not.toContain(
+      'the-whole-thing',
+    );
+  });
+
+  it('notices one program filed against two sectors', () => {
+    expect(earnedBy(facts({ sameProgramOtherSector: true }))).toContain('one-program-two-sectors');
+    expect(earnedBy(facts({ sameProgramOtherSector: false }))).not.toContain(
+      'one-program-two-sectors',
+    );
   });
 
   it('closes out a sector and the whole site', () => {
@@ -155,6 +167,29 @@ describe('earnedBy, on a closed work order', () => {
     expect(earnedBy(facts({ siteClosed: true }))).toContain('site-closed');
     expect(earnedBy(facts({ siteStarred: true }))).toContain('site-starred');
     expect(earnedBy(facts())).not.toEqual(expect.arrayContaining(['sector-closed', 'site-closed']));
+  });
+
+  it('marks the second, fourth and sixth sector and nothing in between', () => {
+    expect(earnedBy(facts({ sectorsClosed: 1 }))).toEqual([]);
+    expect(earnedBy(facts({ sectorsClosed: 2 }))).toEqual(['two-sectors']);
+    expect(earnedBy(facts({ sectorsClosed: 3 }))).toEqual(['two-sectors']);
+    expect(earnedBy(facts({ sectorsClosed: 4 }))).toEqual(['two-sectors', 'four-sectors']);
+    expect(earnedBy(facts({ sectorsClosed: 6 }))).toEqual([
+      'two-sectors',
+      'four-sectors',
+      'six-sectors',
+    ]);
+  });
+
+  it('pays a sector that came in on estimate only once every order in it did', () => {
+    expect(earnedBy(facts({ sectorAtPar: true }))).toContain('sector-on-estimate');
+    expect(earnedBy(facts({ sectorAtPar: false }))).not.toContain('sector-on-estimate');
+  });
+
+  it('marks the eighth sector on a close, not on a dispatch', () => {
+    expect(earnedBy(facts({ world: 8 }))).toContain('last-sector');
+    expect(earnedBy(facts({ world: 7 }))).not.toContain('last-sector');
+    expect(earnedBy(facts({ world: 8, passed: false }))).not.toContain('last-sector');
   });
 
   it('notices the diagnostics nobody took back out', () => {
@@ -167,30 +202,9 @@ describe('earnedBy, on a closed work order', () => {
     expect(earnedBy(facts({ moves: 1 }))).not.toContain('did-not-move');
   });
 
-  it('notices a shift spent mostly holding still', () => {
-    expect(earnedBy(facts({ ticks: 40, waited: 21 }))).toContain('standing-still');
-    expect(earnedBy(facts({ ticks: 40, waited: 20 }))).not.toContain('standing-still');
-    expect(earnedBy(facts({ ticks: 0, waited: 0 }))).not.toContain('standing-still');
-  });
-
   it('notices a mark that was written and never read back', () => {
     expect(earnedBy(facts({ markedUnread: true }))).toContain('note-on-the-ground');
     expect(earnedBy(facts({ markedUnread: false }))).not.toContain('note-on-the-ground');
-  });
-
-  it('notices twenty goes at the same tile', () => {
-    expect(earnedBy(facts({ onOneTile: 19 }))).not.toContain('one-tile');
-    expect(earnedBy(facts({ onOneTile: 20 }))).toContain('one-tile');
-  });
-
-  it('notices a bot turning all the way around', () => {
-    expect(earnedBy(facts({ turnsInPlace: 3 }))).not.toContain('full-revolution');
-    expect(earnedBy(facts({ turnsInPlace: 4 }))).toContain('full-revolution');
-  });
-
-  it('notices a million operations', () => {
-    expect(earnedBy(facts({ ops: 999_999 }))).not.toContain('considerable-computation');
-    expect(earnedBy(facts({ ops: 1_000_000 }))).toContain('considerable-computation');
   });
 
   it('awards nothing for closing a work order on the second run', () => {
@@ -207,11 +221,6 @@ describe('earnedBy, on a run that did not close', () => {
     expect(failed({ emptyProgram: false })).not.toContain('empty-dispatch');
   });
 
-  it('still notices a comment the player wrote', () => {
-    expect(failed({ wroteComment: true })).toContain('left-a-comment');
-    expect(failed({ wroteComment: false })).not.toContain('left-a-comment');
-  });
-
   it('still notices the same program sent twice', () => {
     expect(failed({ unchanged: true })).toContain('resubmitted');
     expect(failed({ unchanged: false })).not.toContain('resubmitted');
@@ -223,29 +232,8 @@ describe('earnedBy, on a run that did not close', () => {
     expect(failed({ seeds: 1, seedsPassed: 1 })).not.toContain('one-layout');
   });
 
-  it('notices arriving in the eighth sector', () => {
-    expect(failed({ world: 8 })).toContain('last-sector');
-    expect(failed({ world: 7 })).not.toContain('last-sector');
-  });
-
-  it('notices a hundred runs that went nowhere', () => {
-    expect(failed({ unclosedRuns: 99 })).not.toContain('hundred-runs');
-    expect(failed({ unclosedRuns: 100 })).toContain('hundred-runs');
-  });
-
-  it('notices a dispatch in the small hours', () => {
-    expect(failed({ hour: 4 })).toContain('core-hours');
-    expect(failed({ hour: 1 })).not.toContain('core-hours');
-    expect(failed({ hour: 5 })).not.toContain('core-hours');
-  });
-
-  it('notices somebody coming back another day', () => {
-    expect(failed({ laterDay: true })).toContain('came-back');
-    expect(failed({ laterDay: false })).not.toContain('came-back');
-  });
-
   it('takes nothing that needs the order closed', () => {
-    expect(failed({ attempt: 10, senseBudgetMet: true, ticks: 1, moves: 0 })).toEqual([]);
+    expect(failed({ attempt: 1, senseBudgetMet: true, ticks: 1, moves: 0, world: 8 })).toEqual([]);
   });
 });
 

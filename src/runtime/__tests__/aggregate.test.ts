@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import type { Trace, Verdict } from '../../engine/index.ts';
 import { FailureCode } from '../../engine/index.ts';
 import { aggregate } from '../aggregate.ts';
+import { traceShape } from '../protocol.ts';
 import type { SeedRun } from '../run-level.ts';
 
 function seedRun(options: {
@@ -39,6 +40,7 @@ function seedRun(options: {
     ticks: verdict.stats.ticks,
     ops: verdict.stats.ops,
     objectives: verdict.objectives,
+    shape: traceShape(trace),
   };
 
   return { result, trace, verdict };
