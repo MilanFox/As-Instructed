@@ -1,8 +1,16 @@
 import type { Budget } from '../../game/budgets.ts';
 import type { ObjectiveRow } from './useWorkspace.ts';
 
-export function budgetReadout(budget: Budget): string {
-  return `${String(budget.used)} / ${String(budget.limit)} ${budget.unit}`;
+export function budgetReadout(
+  budget: Budget,
+  state: 'over' | 'met' | 'active' | 'open' = 'open',
+): string {
+  const numbers = budget.unit
+    ? `${String(budget.used)} / ${String(budget.limit)} ${budget.unit}`
+    : `${String(budget.used)} / ${String(budget.limit)}`;
+  if (state === 'over') return `${numbers} · over by ${String(budget.over)}`;
+  const spare = budget.limit - budget.used;
+  return state === 'met' && spare > 0 ? `${numbers} · ${String(spare)} spare` : numbers;
 }
 
 export interface ObjectiveItemProps {
@@ -19,7 +27,7 @@ export function ObjectiveItem({ row }: ObjectiveItemProps): React.ReactElement {
   const done = progress ? progress[0] : budget ? budget.used : 0;
   const pct = span > 0 ? Math.max(0, Math.min(100, (done / span) * 100)) : 0;
   const readout = budget
-    ? budgetReadout(budget)
+    ? budgetReadout(budget, state)
     : progress
       ? `${String(progress[0])} / ${String(progress[1])}${row.unit ? ` ${row.unit}` : ''}`
       : null;
@@ -39,7 +47,7 @@ export function ObjectiveItem({ row }: ObjectiveItemProps): React.ReactElement {
           {row.label}
         </span>
         {readout === null ? null : (
-          <span className="progress-meter">
+          <span className="progress-meter" data-kind={budget ? 'budget' : 'progress'}>
             <span
               className="progress-meter__track"
               role="progressbar"

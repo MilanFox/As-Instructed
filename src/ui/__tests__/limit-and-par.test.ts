@@ -221,10 +221,11 @@ describe('the work order prints both numbers and gives each its own word', () =>
   test('the one that ends the work order is the objective that ends it', () => {
     const level = getLevel(LIMIT_AS_OBJECTIVE) as LevelDef;
     const counted = tickObjectiveOf(level) as Objective;
+    const limit = limitOf(level) as number;
     openLevel(LIMIT_AS_OBJECTIVE, 180);
 
     expect(readouts(render(OrderCard)).get(counted.label)).toBe(
-      `180 / ${String(limitOf(level))} ticks`,
+      `180 / ${String(limit)} ticks · ${String(limit - 180)} spare`,
     );
   });
 

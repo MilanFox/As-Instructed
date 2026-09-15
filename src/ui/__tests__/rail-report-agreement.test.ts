@@ -107,6 +107,7 @@ interface Row {
   label: string;
   state: string;
   gauge: boolean;
+  kind: string;
   readout: string;
 }
 
@@ -117,6 +118,7 @@ function rowsOf(component: () => unknown): Row[] {
     label: within([row], hasClass('objective-row__label'))[0]?.text ?? '',
     state: String(row.attrs['data-state'] ?? ''),
     gauge: within([row], hasClass('progress-meter')).length > 0,
+    kind: String(within([row], hasClass('progress-meter'))[0]?.attrs['data-kind'] ?? ''),
     readout: within([row], hasClass('progress-meter__read'))[0]?.text ?? '',
   }));
 }
@@ -214,5 +216,21 @@ describe('one objective, two screens', () => {
     const probes = rowsOf(OrderCard).find((row) => row.label.endsWith(bonus));
     expect(probes?.gauge).toBe(true);
     expect(probes?.readout).toBe(rowsOf(Report).find((row) => row.label.endsWith(bonus))?.readout);
+  });
+
+  test('a met budget with slack is kinded apart from a progress meter and names its headroom', () => {
+    const level = campaignOrder().find((each) => each.id === 'w1-03') as LevelDef;
+    show(level, reference(level));
+
+    for (const screen of [rowsOf(OrderCard), rowsOf(Report)]) {
+      const tiles = screen.find((row) => !row.label.startsWith('BONUS'));
+      const moves = screen.find((row) => row.label.startsWith('BONUS'));
+
+      expect(tiles?.kind).toBe('progress');
+      expect(tiles?.readout).toMatch(/^\d+ \/ \d+ tiles$/);
+      expect(moves?.kind).toBe('budget');
+      expect(moves?.state).toBe('met');
+      expect(moves?.readout).toMatch(/^\d+ \/ \d+ moves · \d+ spare$/);
+    }
   });
 });

@@ -314,13 +314,14 @@
 
 .progress-meter {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 3px 8px;
   align-items: center;
   margin-top: 6px;
 }
 
 .progress-meter__track {
-  flex: 1 1 auto;
+  flex: 1 1 96px;
   height: 7px;
   background: #17202b;
 }
@@ -336,6 +337,38 @@
 }
 
 .objective-row[data-state='over'] .progress-meter__fill {
+  background: var(--danger);
+}
+
+/* A budget's track is the whole allowance, not a distance still to cover, so its unspent
+   part is tinted rather than left void and the ceiling is capped. A met budget therefore
+   reads as an allowance closed with room to spare, never as a progress bar stopped short. */
+.progress-meter[data-kind='budget'] .progress-meter__track {
+  position: relative;
+  background: color-mix(in srgb, var(--accent) 20%, #17202b);
+}
+
+.objective-row[data-state='met'] .progress-meter[data-kind='budget'] .progress-meter__track {
+  background: color-mix(in srgb, var(--gold) 24%, #17202b);
+}
+
+.objective-row[data-state='over'] .progress-meter[data-kind='budget'] .progress-meter__track {
+  background: color-mix(in srgb, var(--danger) 26%, #17202b);
+}
+
+.progress-meter[data-kind='budget'] .progress-meter__track::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 2px;
+  height: 100%;
+  background: var(--ink-dim);
+  content: '';
+}
+
+.objective-row[data-state='over']
+  .progress-meter[data-kind='budget']
+  .progress-meter__track::after {
   background: var(--danger);
 }
 
