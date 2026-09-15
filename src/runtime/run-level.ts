@@ -1,10 +1,15 @@
-import type { CostOverrides, Trace, Verdict } from '../engine/index.ts';
+import type { CostOverrides, EventOrigin, Trace, Verdict } from '../engine/index.ts';
 import { Sim, buildVerdict, cloneWorld, evaluateObjectives, senseTotals } from '../engine/index.ts';
 import type { LevelDef } from '../levels/index.ts';
 import type { LibraryRequest, LibraryUsage, PerSeedResult, RuntimeFailure } from './protocol.ts';
 import { buildPlayerScope } from './api-bindings.ts';
 import { toRuntimeFailure, toVerdictFailure } from './errors.ts';
-import { linkProgram, moduleStack, resolveModuleLocation } from './modules.ts';
+import {
+  captureModuleLocation,
+  linkProgram,
+  moduleStack,
+  resolveModuleLocation,
+} from './modules.ts';
 import { measureWrapperOffset } from './wrapper.ts';
 import { topFrameLine } from './errors.ts';
 
@@ -19,6 +24,7 @@ export interface SeedRunOptions {
   costOverrides?: CostOverrides;
   maxTicks?: number;
   maxOps?: number;
+  debug?: boolean;
 }
 
 export interface SeedRun {
@@ -56,10 +62,17 @@ export function runSeed(options: SeedRunOptions): SeedRun {
     program: options.lineMap,
     lib: options.library?.lineMap,
   };
+  const locate = options.debug
+    ? (): EventOrigin | undefined => {
+        const found = captureModuleLocation(wrapperOffset(), maps);
+        return found === undefined ? undefined : { file: found.file, line: found.line };
+      }
+    : undefined;
+
   const linked = linkProgram({
     programJs: js,
     libraryJs: options.library?.js,
-    scope: buildPlayerScope(sim, botId, unlockedHardware),
+    scope: buildPlayerScope(sim, botId, unlockedHardware, locate),
     meter: options.library ? { now: () => sim.ticks } : undefined,
   });
 

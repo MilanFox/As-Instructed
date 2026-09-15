@@ -7,7 +7,7 @@ import {
   OpLimitError,
   OutOfFuelError,
 } from './errors.ts';
-import type { SenseEvent, Trace } from './trace.ts';
+import type { EventOrigin, SenseEvent, Trace } from './trace.ts';
 import { KEYFRAME_INTERVAL, MAX_SENSE_EVENTS, TraceBuilder } from './trace.ts';
 import type { Bot, Dir, ItemKind, ItemStack, Machine, Message, Tile, Vec, World } from './types.ts';
 import { FED_BY, MANUAL_ONLY, Terrain } from './types.ts';
@@ -149,6 +149,10 @@ export class Sim {
 
   finish(): Trace {
     return this.builder.build(this.peakClock, this.keyframeInterval);
+  }
+
+  attributeTo(origin: EventOrigin | undefined): void {
+    this.builder.attributeTo(origin);
   }
 
   noteObjective(id: string, state: 'met' | 'lost'): void {

@@ -804,6 +804,27 @@ export interface ModuleLineMaps {
   lib?: readonly number[] | undefined;
 }
 
+function sourceFileOf(source: string | undefined): SourceFile | undefined {
+  if (source === PROGRAM_SOURCE_URL) return 'program';
+  if (source === LIBRARY_SOURCE_URL) return 'lib';
+  return undefined;
+}
+
+function playerLocation(
+  file: SourceFile,
+  reportedLine: number,
+  column: number | undefined,
+  wrapperOffset: number,
+  maps: ModuleLineMaps,
+): ModuleLocation | undefined {
+  const emitted = toPlayerLine(reportedLine, wrapperOffset);
+  if (emitted < 1) return undefined;
+  const map = file === 'program' ? maps.program : maps.lib;
+  const line = toSourceLine(emitted, map);
+  const remapped = map !== undefined && map.length > 0;
+  return column === undefined || remapped ? { file, line } : { file, line, column };
+}
+
 export function resolveModuleLocation(
   stack: string | undefined,
   wrapperOffset: number,
@@ -813,22 +834,69 @@ export function resolveModuleLocation(
 
   for (const frame of parseStackFrames(stack)) {
     if (frame.line === undefined) continue;
-    const file: SourceFile | undefined =
-      frame.source === PROGRAM_SOURCE_URL
-        ? 'program'
-        : frame.source === LIBRARY_SOURCE_URL
-          ? 'lib'
-          : undefined;
+    const file = sourceFileOf(frame.source);
     if (!file) continue;
+    const found = playerLocation(file, frame.line, frame.column, wrapperOffset, maps);
+    if (found) return found;
+  }
 
-    const emitted = toPlayerLine(frame.line, wrapperOffset);
-    if (emitted < 1) continue;
-    const map = file === 'program' ? maps.program : maps.lib;
-    const line = toSourceLine(emitted, map);
-    const remapped = map !== undefined && map.length > 0;
-    return frame.column === undefined || remapped
-      ? { file, line }
-      : { file, line, column: frame.column };
+  return undefined;
+}
+
+const PROBE_FRAMES = 8;
+
+interface RawFrame {
+  getScriptNameOrSourceURL?: () => string | null | undefined;
+  getFileName?: () => string | null | undefined;
+  getEvalOrigin?: () => string | null | undefined;
+  getLineNumber?: () => number | null | undefined;
+}
+
+type StackTracePreparer = { prepareStackTrace?: unknown };
+
+const structured = (_error: unknown, frames: unknown): unknown => frames;
+
+function text(value: string | null | undefined): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
+function count(value: number | null | undefined): number | undefined {
+  return typeof value === 'number' ? value : undefined;
+}
+
+export function captureModuleLocation(
+  wrapperOffset: number,
+  maps: ModuleLineMaps = {},
+): ModuleLocation | undefined {
+  // Formatting a stack of eval frames into a string costs ~40µs a call, which is the whole budget.
+  const holder = Error as StackTracePreparer;
+  const prepare = holder.prepareStackTrace;
+  const limit = Error.stackTraceLimit;
+  let captured: unknown;
+  try {
+    holder.prepareStackTrace = structured;
+    Error.stackTraceLimit = PROBE_FRAMES;
+    captured = new Error().stack;
+  } finally {
+    Error.stackTraceLimit = limit;
+    holder.prepareStackTrace = prepare;
+  }
+
+  if (typeof captured === 'string') return resolveModuleLocation(captured, wrapperOffset, maps);
+  if (!Array.isArray(captured)) return undefined;
+
+  for (const frame of captured as RawFrame[]) {
+    const source =
+      text(frame.getScriptNameOrSourceURL?.()) ??
+      text(frame.getFileName?.()) ??
+      text(frame.getEvalOrigin?.());
+    const file = sourceFileOf(source);
+    if (!file) continue;
+    const reportedLine = count(frame.getLineNumber?.());
+    if (reportedLine === undefined) continue;
+    // The column is never read back off an event, so the call that computes it is skipped.
+    const found = playerLocation(file, reportedLine, undefined, wrapperOffset, maps);
+    if (found) return found;
   }
 
   return undefined;

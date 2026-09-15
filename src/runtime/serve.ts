@@ -51,6 +51,7 @@ export function serveRunRequest(request: RunRequest): RunResponse {
         ...(request.costOverrides !== undefined ? { costOverrides: request.costOverrides } : {}),
         ...(request.maxTicks !== undefined ? { maxTicks: request.maxTicks } : {}),
         ...(request.maxOps !== undefined ? { maxOps: request.maxOps } : {}),
+        ...(request.debug === true ? { debug: true } : {}),
       }),
     );
   }

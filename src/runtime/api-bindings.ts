@@ -1,4 +1,4 @@
-import type { Dir, ItemKind, Machine, Sim, Tile, Vec } from '../engine/index.ts';
+import type { Dir, EventOrigin, ItemKind, Machine, Sim, Tile, Vec } from '../engine/index.ts';
 import {
   Dir as DirValue,
   IllegalActionError,
@@ -14,11 +14,39 @@ import { apiFunctionsFor, requiredTypesFor } from './ambient.ts';
 
 export type PlayerFunction = (...args: unknown[]) => unknown;
 
-type Binder = (sim: Sim, botId: number, unlocked: readonly ApiFunctionSpec[]) => PlayerFunction;
+type Attribute = (fn: PlayerFunction) => PlayerFunction;
+
+type Binder = (
+  sim: Sim,
+  botId: number,
+  unlocked: readonly ApiFunctionSpec[],
+  attribute: Attribute,
+) => PlayerFunction;
+
+const PLAIN: Attribute = (fn) => fn;
+
+function attributing(sim: Sim, locate: () => EventOrigin | undefined): Attribute {
+  return (fn) =>
+    (...args): unknown => {
+      let origin: EventOrigin | undefined;
+      try {
+        origin = locate();
+      } catch {
+        origin = undefined;
+      }
+      sim.attributeTo(origin);
+      try {
+        return fn(...args);
+      } finally {
+        sim.attributeTo(undefined);
+      }
+    };
+}
 
 function botHandles(
   sim: Sim,
   unlocked: readonly ApiFunctionSpec[],
+  attribute: Attribute,
 ): (id: number) => Record<string, PlayerFunction> {
   const members = perBotApi(unlocked);
   const cache = new Map<number, Record<string, PlayerFunction>>();
@@ -30,7 +58,7 @@ function botHandles(
     const handle: Record<string, PlayerFunction> = {};
     for (const fn of members) {
       const binder = BINDERS[fn.name];
-      if (binder) handle[fn.name] = binder(sim, id, unlocked);
+      if (binder) handle[fn.name] = attribute(binder(sim, id, unlocked, attribute));
     }
     cache.set(id, handle);
     return handle;
@@ -252,8 +280,8 @@ const BINDERS: Record<string, Binder> = {
     },
   bots: (sim) => (): number[] => sim.botIds(),
   clock: (sim, botId) => (): number => sim.clock(botId),
-  bot: (sim, _botId, unlocked) => {
-    const handleFor = botHandles(sim, unlocked);
+  bot: (sim, _botId, unlocked, attribute) => {
+    const handleFor = botHandles(sim, unlocked, attribute);
     return (id): unknown => handleFor(Number(id));
   },
   sync: (sim) => (): number => sim.sync(),
@@ -310,9 +338,11 @@ export function buildPlayerScope(
   sim: Sim,
   botId: number,
   unlockedHardware: readonly string[],
+  locate?: () => EventOrigin | undefined,
 ): PlayerScope {
   const functions = apiFunctionsFor(unlockedHardware);
   const api: Record<string, PlayerFunction> = {};
+  const attribute = locate === undefined ? PLAIN : attributing(sim, locate);
 
   for (const fn of functions) {
     const binder = BINDERS[fn.name];
@@ -322,7 +352,7 @@ export function buildPlayerScope(
           'api-spec.ts and api-bindings.ts have drifted apart.',
       );
     }
-    api[fn.name] = binder(sim, botId, functions);
+    api[fn.name] = attribute(binder(sim, botId, functions, attribute));
   }
 
   const values: Record<string, unknown> = {};

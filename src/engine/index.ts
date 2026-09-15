@@ -100,7 +100,7 @@ export type {
   ObjectiveEvent,
   FxEvent,
 } from './trace.ts';
-export type { RefuelEvent, SenseEvent, SpendEvent } from './trace.ts';
+export type { EventOrigin, RefuelEvent, SenseEvent, SpendEvent } from './trace.ts';
 export {
   FUEL_BURNING,
   KEYFRAME_INTERVAL,

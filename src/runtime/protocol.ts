@@ -12,6 +12,7 @@ export interface RunRequest {
   maxOps?: number;
   library?: LibraryRequest;
   timeoutMs?: number;
+  debug?: boolean;
 }
 
 export interface LibraryRequest {

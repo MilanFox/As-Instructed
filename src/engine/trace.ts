@@ -20,8 +20,14 @@ export const KEYFRAME_INTERVAL = 500;
 
 export const MAX_SENSE_EVENTS = 20_000;
 
+export interface EventOrigin {
+  file: 'program' | 'lib';
+  line: number;
+}
+
 interface AtTick {
   t: number;
+  origin?: EventOrigin;
 }
 
 interface BotAction extends AtTick {
@@ -186,6 +192,12 @@ function isBotAction(event: TraceEvent): event is TraceEvent & BotAction {
   return 'botId' in event && 'dt' in event;
 }
 
+function sameOrigin(left: EventOrigin | undefined, right: EventOrigin | undefined): boolean {
+  if (left === right) return true;
+  if (left === undefined || right === undefined) return false;
+  return left.file === right.file && left.line === right.line;
+}
+
 export function applyEvent(world: World, event: TraceEvent): void {
   switch (event.kind) {
     case 'move': {
@@ -344,17 +356,30 @@ export class TraceBuilder {
   private readonly maxSenseEvents: number;
   private senseEventCount = 0;
   private readonly senseOverflow = new Map<string, SenseEvent>();
+  private origin: EventOrigin | undefined;
 
   constructor(initialWorld: World, maxSenseEvents: number = MAX_SENSE_EVENTS) {
     this.initialWorld = cloneWorld(initialWorld);
     this.maxSenseEvents = maxSenseEvents;
   }
 
+  attributeTo(origin: EventOrigin | undefined): void {
+    this.origin = origin;
+  }
+
   push(event: TraceEvent): void {
+    const origin = this.origin;
+    if (origin !== undefined) {
+      event.origin = origin;
+      if (event.kind === 'print' && event.line === undefined && origin.file === 'program') {
+        event.line = origin.line;
+      }
+    }
     this.events.push(event);
   }
 
   pushSense(event: SenseEvent): void {
+    const origin = this.origin;
     const last = this.events[this.events.length - 1];
     if (
       last !== undefined &&
@@ -366,6 +391,8 @@ export class TraceBuilder {
       last.detail === event.detail
     ) {
       last.count += event.count;
+      // A coalesced event stands for calls from more than one place; one of their lines would be a lie.
+      if (last.origin !== undefined && !sameOrigin(last.origin, origin)) delete last.origin;
       return;
     }
 
@@ -389,6 +416,7 @@ export class TraceBuilder {
       return;
     }
 
+    if (origin !== undefined) event.origin = origin;
     this.events.push(event);
     this.senseEventCount += 1;
   }
