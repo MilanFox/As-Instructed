@@ -1,4 +1,4 @@
-export const AUDIO_SETTINGS_KEY = 'bootstrap.audio';
+export const AUDIO_SETTINGS_KEY = 'as-instructed.audio';
 
 export type Bus = 'sfx' | 'ui' | 'ambience';
 

@@ -10,7 +10,7 @@ import type {
   PublishedFunction,
 } from './types.ts';
 
-export const LIBRARY_SAVE_KEY = 'bootstrap.library';
+export const LIBRARY_SAVE_KEY = 'as-instructed.library';
 export const LIBRARY_SAVE_VERSION = 1;
 
 export const MAX_REVISIONS = 40;

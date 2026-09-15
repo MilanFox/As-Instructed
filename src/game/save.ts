@@ -2,7 +2,7 @@ import { Medal } from '../engine/index.ts';
 import { levelIsGraded } from '../levels/index.ts';
 import { RETIRED_ACHIEVEMENTS } from './achievements.ts';
 
-export const SAVE_KEY = 'bootstrap.save';
+export const SAVE_KEY = 'as-instructed.save';
 export const SAVE_VERSION = 2;
 
 export interface LevelProgress {
