@@ -6,6 +6,7 @@ import { exportSave } from '../../game/save.ts';
 import { currentLevel, useGame } from '../../game/store.ts';
 import { pathFor } from '../router.ts';
 import { IconMap } from '../components/Icons.tsx';
+import { GAME_TITLE, GameMark } from '../components/GameMark.tsx';
 import { Interlock } from './LockedLevel.tsx';
 import '../styles/screens.css';
 
@@ -40,6 +41,13 @@ const MEDAL_MARK: Record<string, string> = {
 };
 
 const NARROW = 1040;
+
+// The lockup is centred in the gap the tally and the dossier leave along the top. The tally is
+// sized by its own contents, so that gap is measured rather than derived from the viewport; below
+// the width the lockup needs, the title is dropped instead of run underneath either panel.
+const MARK_WIDTH = 340;
+const MARK_GUTTER = 32;
+const MARK_BAND = 72;
 
 interface Point {
   x: number;
@@ -243,15 +251,25 @@ function hatchPlot(points: readonly Point[], radius: number): string {
 }
 
 // Narrow puts the dossier on the bottom edge instead of the right, so the sites move with it.
-function buildPlan(w: number, h: number, counts: readonly number[], narrow: boolean): Plan {
+// `band` is the strip the title lockup occupies along the top; the sites start below it rather
+// than under it, which is also what keeps the pins clear of it.
+function buildPlan(
+  w: number,
+  h: number,
+  counts: readonly number[],
+  narrow: boolean,
+  band: number,
+): Plan {
   const rnd = mulberry(PLAN_SEED);
   const radius = narrow
     ? Math.max(30, Math.min(46, Math.min(w, h) * 0.07))
-    : Math.max(42, Math.min(76, Math.min(w, h) * 0.088));
+    : Math.max(42, Math.min(76, Math.min(w, h - band) * 0.088));
   const spanX = narrow ? Math.max(200, w - 196) : Math.max(300, w - 600);
-  const spanY = narrow ? Math.max(120, h - Math.min(h * 0.42, 320) - 240) : Math.max(240, h - 250);
+  const spanY = narrow
+    ? Math.max(120, h - Math.min(h * 0.42, 320) - 240)
+    : Math.max(240, h - 250 - band);
   const originX = narrow ? 98 : 104;
-  const originY = narrow ? 92 : 78;
+  const originY = narrow ? 92 : 78 + band;
 
   const centres: Point[] = SITE_SPOTS.map((spot) => ({
     x: originX + spot.x * spanX,
@@ -520,7 +538,9 @@ export function LevelSelect(): JSX.Element {
   const file = useRef<HTMLInputElement | null>(null);
   const pins = useRef(new Map<number, HTMLButtonElement>());
   const rows = useRef(new Map<number, HTMLAnchorElement>());
-  const [box, setBox] = useState({ w: 1440, h: 860 });
+  const tally = useRef<HTMLElement | null>(null);
+  const dossier = useRef<HTMLElement | null>(null);
+  const [box, setBox] = useState({ w: 1440, h: 860, aside: 0, flank: 1440 });
   const [seals, setSeals] = useState(false);
   const [picked, setPicked] = useState<number | null>(null);
   const [pinAt, setPinAt] = useState(0);
@@ -535,11 +555,19 @@ export function LevelSelect(): JSX.Element {
       const rect = node.getBoundingClientRect();
       const w = Math.round(rect.width);
       const h = Math.round(rect.height);
-      setBox((was) => (was.w === w && was.h === h ? was : { w, h }));
+      const aside = Math.round(tally.current?.getBoundingClientRect().right ?? 0);
+      const flank = Math.round(dossier.current?.getBoundingClientRect().left ?? w);
+      setBox((was) =>
+        was.w === w && was.h === h && was.aside === aside && was.flank === flank
+          ? was
+          : { w, h, aside, flank },
+      );
     };
     measure();
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
     observer?.observe(node);
+    if (tally.current) observer?.observe(tally.current);
+    if (dossier.current) observer?.observe(dossier.current);
     window.addEventListener('resize', measure);
     return () => {
       observer?.disconnect();
@@ -549,6 +577,7 @@ export function LevelSelect(): JSX.Element {
 
   const campaign = useMemo(() => buildCampaign(save), [save]);
   const narrow = box.w < NARROW;
+  const titled = !narrow && box.flank - box.aside >= MARK_WIDTH + 2 * MARK_GUTTER;
   const plan = useMemo(
     () =>
       buildPlan(
@@ -556,8 +585,9 @@ export function LevelSelect(): JSX.Element {
         box.h,
         campaign.sites.map((site) => site.orders.length),
         narrow,
+        titled ? MARK_BAND : 0,
       ),
-    [box.w, box.h, campaign.sites, narrow],
+    [box.w, box.h, campaign.sites, narrow, titled],
   );
 
   const stopped = blocked
@@ -604,7 +634,7 @@ export function LevelSelect(): JSX.Element {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = 'bootstrap-progress.json';
+    anchor.download = 'as-instructed-progress.json';
     anchor.click();
     URL.revokeObjectURL(url);
   };
@@ -705,6 +735,16 @@ export function LevelSelect(): JSX.Element {
         })}
       </svg>
 
+      {titled ? (
+        <h1
+          className="survey__title"
+          style={{ left: `${String(box.aside)}px`, right: `${String(box.w - box.flank)}px` }}
+        >
+          <GameMark size={46} />
+          <span className="survey__title-text">{GAME_TITLE}</span>
+        </h1>
+      ) : null}
+
       <ul className="survey__pins" aria-label="Survey sites" onKeyDown={onPinKeys}>
         {campaign.sites.map((entry, i) => {
           const plot = plan.plots[i];
@@ -758,7 +798,11 @@ export function LevelSelect(): JSX.Element {
         })}
       </ul>
 
-      <section className="survey-frame survey__tally" aria-label="Campaign survey totals">
+      <section
+        className="survey-frame survey__tally"
+        aria-label="Campaign survey totals"
+        ref={tally}
+      >
         <div className="survey-frame__body">
           <div className="survey-bar">
             <span>Orbital survey</span>
@@ -840,6 +884,7 @@ export function LevelSelect(): JSX.Element {
       <section
         className="survey-frame dossier"
         aria-label="Site dossier"
+        ref={dossier}
         style={{ '--world': `var(--world-${String(chosen + 1)})` } as Vars}
         {...(blocked ? { inert: true } : {})}
       >

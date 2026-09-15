@@ -240,6 +240,35 @@
   }
 }
 
+/* ---- the title: centred in the gap the tally and the dossier leave along the top ---- */
+
+/* left and right come from the measured panel edges, so the lockup centres in the real gap. */
+.survey__title {
+  position: fixed;
+  top: var(--survey-inset);
+  z-index: 4;
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  pointer-events: none;
+}
+
+.survey__title .game-mark {
+  flex: none;
+}
+
+.survey__title-text {
+  margin-right: -0.32em;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 23px;
+  font-weight: 600;
+  letter-spacing: 0.32em;
+  white-space: nowrap;
+}
+
 /* ---- site pins: the hit areas and name plates that sit over the plan ---- */
 
 .survey__pins {
