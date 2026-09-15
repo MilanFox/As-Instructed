@@ -114,31 +114,29 @@ export function Dossier({ workspace }: DossierProps): React.ReactElement | null 
               <span className="note">{hint}</span>
             </div>
           ))}
-          {shown >= workspace.hints.length ? null : (
-            <button
-              type="button"
-              className="control"
-              style={{ marginTop: 10 }}
-              onClick={() => workspace.revealHint(shown + 1)}
-            >
-              Request note {String(shown + 1)} of {String(workspace.hints.length)}
-            </button>
+          {shown >= workspace.hints.length && workspace.seedsUnlocked ? null : (
+            <div className="field-note-asks">
+              {shown >= workspace.hints.length ? null : (
+                <button
+                  type="button"
+                  className="control"
+                  onClick={() => workspace.revealHint(shown + 1)}
+                >
+                  Request note {String(shown + 1)} of {String(workspace.hints.length)}
+                </button>
+              )}
+              {workspace.seedsUnlocked ? null : (
+                <button type="button" className="control" onClick={() => workspace.unlockSeeds()}>
+                  Request the seed survey
+                </button>
+              )}
+            </div>
           )}
           {workspace.seedsUnlocked ? null : (
-            <>
-              <button
-                type="button"
-                className="control"
-                style={{ marginTop: 10 }}
-                onClick={() => workspace.unlockSeeds()}
-              >
-                Request the seed survey
-              </button>
-              <p className="note" style={{ marginTop: 8 }}>
-                The survey draws any seed on this order&rsquo;s schedule as an unrun board. It does
-                not run your program and it grades nothing.
-              </p>
-            </>
+            <p className="note field-note-asks__caption">
+              The survey draws any seed on this order&rsquo;s schedule. You can dispatch against a
+              drawn seed, but a single-seed run is never graded.
+            </p>
           )}
         </div>
       )}

@@ -256,6 +256,20 @@ export function Workspace(): React.ReactElement {
         />
       </PanelBoundary>
 
+      {/* The drawer stands over the work order card and takes its Site map button with it.
+          Same action, parked in the strip of board the drawer leaves — and at compact the
+          drawer is the whole width, so there is no strip and no second way out to offer. */}
+      {open && !compact && overlayOpen !== 'library' ? (
+        <button
+          type="button"
+          className="control control--tight drawer-escape"
+          style={{ '--ws-escape-x': `${String(mapInset)}px` } as React.CSSProperties}
+          onClick={() => workspace.goto('levels')}
+        >
+          Site map
+        </button>
+      ) : null}
+
       <button
         type="button"
         className="drawer-handle"
