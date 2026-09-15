@@ -503,10 +503,6 @@ html[data-art='signal'] {
   text-shadow: var(--glow);
 }
 
-[data-art='signal'] .achievement__seal {
-  border-radius: 0;
-}
-
 [data-art='signal'] .screen {
   font-family: var(--font-mono);
 }

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 
+import { getAchievement } from '../../game/achievements.ts';
 import type { ReportSnapshot } from '../paper/papers.ts';
 import { ObjectiveItem } from './ObjectiveItem.tsx';
 import { OverlayPanel, PanelBar, ReportLine, StatCell } from './OverlayPanel.tsx';
@@ -144,13 +145,22 @@ export function ReportSheet({ report, onDismiss, onNext }: ReportSheetProps): Re
         {report.achievements.length === 0 ? null : (
           <>
             <PanelBar sub>Achievements</PanelBar>
-            <div className="chip-row">
-              {report.achievements.map((name) => (
-                <span className="chip" key={name}>
-                  {name}
-                </span>
-              ))}
-            </div>
+            <ul>
+              {report.achievements.map((id) => {
+                const achievement = getAchievement(id);
+                return (
+                  <li className="achievement" key={id}>
+                    <span className="achievement__seal" aria-hidden="true">
+                      ★
+                    </span>
+                    <div className="achievement__text">
+                      <p className="achievement__title">{achievement?.title ?? id}</p>
+                      {achievement ? <p className="achievement__note">{achievement.note}</p> : null}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
           </>
         )}
 
