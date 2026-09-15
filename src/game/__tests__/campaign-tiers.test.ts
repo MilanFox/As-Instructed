@@ -6,9 +6,9 @@ import type { LevelProgress, SaveFile } from '../save.ts';
 import { Medal } from '../score.ts';
 import { levelsByWorld } from '../../levels/index.ts';
 
-// The rule the site-starred commendation is awarded by, copied from allStarred in
+// The rule the site-starred achievement is awarded by, copied from allStarred in
 // src/game/store.ts. The map may not claim a site is fully starred where that would not fire.
-function commendationStarred(save: SaveFile, world: number): boolean {
+function achievementStarred(save: SaveFile, world: number): boolean {
   const group = levelsByWorld().find((entry) => entry.world.id === world)?.levels ?? [];
   if (group.length === 0) return false;
   if (!group.every((level) => save.levels[level.id]?.completed === true)) return false;
@@ -74,7 +74,7 @@ describe('the fixture covers the case the rule is vacuous on', () => {
   });
 });
 
-describe('the starred tier is the site-starred commendation, drawn', () => {
+describe('the starred tier is the site-starred achievement, drawn', () => {
   const saves: [string, SaveFile][] = [
     ['nothing closed', emptySave()],
     ['closed, no bonus met', everyOrder(BOOT, () => ({ medal: Medal.Gold }))],
@@ -102,8 +102,8 @@ describe('the starred tier is the site-starred commendation, drawn', () => {
   ];
 
   for (const [name, save] of saves) {
-    test(`${name}: the map and the commendation agree`, () => {
-      expect([name, siteFor(save, BOOT).starred]).toEqual([name, commendationStarred(save, BOOT)]);
+    test(`${name}: the map and the achievement agree`, () => {
+      expect([name, siteFor(save, BOOT).starred]).toEqual([name, achievementStarred(save, BOOT)]);
     });
   }
 
@@ -119,7 +119,7 @@ describe('the starred tier is the site-starred commendation, drawn', () => {
     const save = everyOrder(BOOT, () => ({ medal: Medal.Gold, stars: ['not-an-objective'] }));
 
     expect(siteFor(save, BOOT).starred).toBe(false);
-    expect(commendationStarred(save, BOOT)).toBe(false);
+    expect(achievementStarred(save, BOOT)).toBe(false);
   });
 });
 

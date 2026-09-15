@@ -164,7 +164,7 @@ describe('the medal figure builds instead of trailing off', () => {
   });
 });
 
-describe('commendations land as one ascending phrase', () => {
+describe('achievements land as one ascending phrase', () => {
   function pitch(seed: number): number {
     const { buffer, rate } = renderOne('commend', seed);
     let crossings = 0;
@@ -179,7 +179,7 @@ describe('commendations land as one ascending phrase', () => {
     return counted > 0 ? (crossings / counted) * rate * 0.5 : 0;
   }
 
-  it('climbs one rung per commendation', () => {
+  it('climbs one rung per achievement', () => {
     const steps = [0, 1, 2, 3].map(pitch);
     for (let i = 1; i < steps.length; i++) {
       expect(steps[i]).toBeGreaterThan(steps[i - 1] as number);

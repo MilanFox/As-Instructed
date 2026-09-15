@@ -53,7 +53,7 @@ export interface ReportSnapshot {
   failureLine: number | null;
   passedSeed: number | null;
   bonusSeed: number | null;
-  commendations: readonly string[];
+  achievements: readonly string[];
   personalBest: { previous: number; now: number } | null;
   points: number | null;
   stars: number;

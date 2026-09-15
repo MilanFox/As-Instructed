@@ -38,7 +38,7 @@ export interface CampaignSite {
   starred: boolean;
 }
 
-export interface CampaignCommendation {
+export interface CampaignAchievement {
   achievement: Achievement;
   earnedAt: number | null;
 }
@@ -46,7 +46,7 @@ export interface CampaignCommendation {
 export interface Campaign {
   sites: CampaignSite[];
   orders: CampaignOrder[];
-  commendations: CampaignCommendation[];
+  achievements: CampaignAchievement[];
   earnedCount: number;
   points: number;
   maxPoints: number;
@@ -113,13 +113,13 @@ export function buildCampaign(save: SaveFile): Campaign {
       complete,
       perfect: complete && par === orders.length,
       // An order with no bonus is starred vacuously, which is what keeps this in step with the
-      // site-starred commendation in src/game/store.ts rather than a site short of its own tier.
+      // site-starred achievement in src/game/store.ts rather than a site short of its own tier.
       starred: complete && orders.every((order) => order.stars === order.maxStars),
     };
   });
 
   const orders = sites.flatMap((site) => site.orders);
-  const commendations: CampaignCommendation[] = ACHIEVEMENTS.filter(
+  const achievements: CampaignAchievement[] = ACHIEVEMENTS.filter(
     (achievement) => !achievement.hidden || save.achievements[achievement.id] !== undefined,
   ).map((achievement) => ({
     achievement,
@@ -129,8 +129,8 @@ export function buildCampaign(save: SaveFile): Campaign {
   return {
     sites,
     orders,
-    commendations,
-    earnedCount: commendations.filter((entry) => entry.earnedAt !== null).length,
+    achievements,
+    earnedCount: achievements.filter((entry) => entry.earnedAt !== null).length,
     points: sites.reduce((sum, site) => sum + site.points, 0),
     maxPoints: sites.reduce((sum, site) => sum + site.maxPoints, 0),
     closed: sites.reduce((sum, site) => sum + site.closed, 0),

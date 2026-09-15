@@ -53,7 +53,7 @@ function runFinished(levelId: string, passed: boolean, ticks: number): void {
     resultId: useGame.getState().resultId + 1,
     seedResults: [],
     failure: null,
-    freshCommendations: [],
+    freshAchievements: [],
     personalBest: null,
     verdict: {
       passed,

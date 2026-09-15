@@ -163,7 +163,7 @@ export function snapshotReport(state: GameState): ReportSnapshot | null {
     failureLine: state.failure?.line ?? null,
     passedSeed: passedSeed && failedSeed ? passedSeed.seed : null,
     bonusSeed,
-    commendations: [...state.freshCommendations],
+    achievements: [...state.freshAchievements],
     personalBest: state.personalBest,
     points: passed ? levelPoints(medal, stars) : null,
     stars,

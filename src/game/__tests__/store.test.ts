@@ -70,7 +70,7 @@ function reset(): void {
     showResults: false,
     resultId: 0,
     failureCursor: 0,
-    freshCommendations: [],
+    freshAchievements: [],
     personalBest: null,
     requisition: null,
     tick: 0,
@@ -533,7 +533,7 @@ describe('playback', () => {
 });
 
 describe('rewards', () => {
-  it('pays no commendation for an ordinary close', async () => {
+  it('pays no achievement for an ordinary close', async () => {
     reset();
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
     pickUp('w1-01');
@@ -541,7 +541,7 @@ describe('rewards', () => {
 
     const state = useGame.getState();
     expect(state.verdict?.passed).toBe(true);
-    expect(state.freshCommendations).toEqual([]);
+    expect(state.freshAchievements).toEqual([]);
     expect(state.save.achievements).toEqual({});
   });
 
@@ -553,7 +553,7 @@ describe('rewards', () => {
     expect(useGame.getState().save.achievements['left-a-comment']).toBeUndefined();
 
     await runOnce(`// the long way round\n${W1_01_SOLUTION}`);
-    expect(useGame.getState().freshCommendations).toContain('left-a-comment');
+    expect(useGame.getState().freshAchievements).toContain('left-a-comment');
   });
 
   it('notices the diagnostics left in a closing program', async () => {
@@ -562,7 +562,7 @@ describe('rewards', () => {
     await runOnce(`print('here');\n${W1_01_SOLUTION}`);
 
     expect(useGame.getState().verdict?.passed).toBe(true);
-    expect(useGame.getState().freshCommendations).toContain('diagnostics-retained');
+    expect(useGame.getState().freshAchievements).toContain('diagnostics-retained');
   });
 
   it('notices a program with nothing in it, on a run that closed nothing', async () => {
@@ -571,7 +571,7 @@ describe('rewards', () => {
     await runOnce('// TODO\n\n');
 
     expect(useGame.getState().verdict?.passed).toBe(false);
-    expect(useGame.getState().freshCommendations).toContain('empty-dispatch');
+    expect(useGame.getState().freshAchievements).toContain('empty-dispatch');
   });
 
   it('notices the same program dispatched twice, and only on the second', async () => {
@@ -579,10 +579,10 @@ describe('rewards', () => {
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
 
     await runOnce(W1_01_SOLUTION);
-    expect(useGame.getState().freshCommendations).not.toContain('resubmitted');
+    expect(useGame.getState().freshAchievements).not.toContain('resubmitted');
 
     await runOnce(W1_01_SOLUTION);
-    expect(useGame.getState().freshCommendations).toContain('resubmitted');
+    expect(useGame.getState().freshAchievements).toContain('resubmitted');
 
     await runOnce(W1_01_SLOWER);
     expect(useGame.getState().save.achievements['resubmitted']).toBeGreaterThan(0);
@@ -608,7 +608,7 @@ describe('rewards', () => {
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
 
     await runOnce(W1_01_SOLUTION);
-    expect(useGame.getState().freshCommendations).toContain('came-back');
+    expect(useGame.getState().freshAchievements).toContain('came-back');
     expect(useGame.getState().save.firstRunAt).toBe(yesterday);
   });
 
@@ -622,11 +622,11 @@ describe('rewards', () => {
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
 
     await runOnce(W1_01_SOLUTION);
-    expect(useGame.getState().freshCommendations).toContain('sector-closed');
-    expect(useGame.getState().freshCommendations).not.toContain('site-closed');
+    expect(useGame.getState().freshAchievements).toContain('sector-closed');
+    expect(useGame.getState().freshAchievements).not.toContain('site-closed');
   });
 
-  it('files a commendation once and never again', async () => {
+  it('files a achievement once and never again', async () => {
     reset();
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
     for (let attempt = 0; attempt < 3; attempt++) await runOnce(W1_01_SOLUTION);
@@ -635,11 +635,11 @@ describe('rewards', () => {
     await runOnce(W1_01_SOLUTION);
     const first = useGame.getState().save.achievements['second-look'];
     expect(first).toBeGreaterThan(0);
-    expect(useGame.getState().freshCommendations).toContain('second-look');
+    expect(useGame.getState().freshAchievements).toContain('second-look');
 
     await runOnce(W1_01_SOLUTION);
     expect(useGame.getState().save.achievements['second-look']).toBe(first);
-    expect(useGame.getState().freshCommendations).not.toContain('second-look');
+    expect(useGame.getState().freshAchievements).not.toContain('second-look');
   });
 
   it('remembers revealed hints across a reload', async () => {
@@ -742,7 +742,7 @@ describe('rewards', () => {
     expect(useGame.getState().save.settings.celebrations).toBe(false);
   });
 
-  it('awards a commendation raised outside a run, idempotently', () => {
+  it('awards a achievement raised outside a run, idempotently', () => {
     reset();
     useGame.getState().award('repository');
     const at = useGame.getState().save.achievements['repository'];
@@ -752,7 +752,7 @@ describe('rewards', () => {
 
     useGame.getState().award('no-regressions');
     expect(useGame.getState().save.achievements['no-regressions']).toBeUndefined();
-    expect(useGame.getState().freshCommendations).not.toContain('no-regressions');
+    expect(useGame.getState().freshAchievements).not.toContain('no-regressions');
   });
 });
 
@@ -814,7 +814,7 @@ const RUN_SHAPED = [
   'failedSeed',
   'failure',
   'showResults',
-  'freshCommendations',
+  'freshAchievements',
   'personalBest',
   'tick',
   'endTick',

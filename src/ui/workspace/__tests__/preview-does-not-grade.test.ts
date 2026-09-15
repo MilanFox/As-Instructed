@@ -113,7 +113,7 @@ function place(level: LevelDef, run: RunResult, runMode: RunMode): void {
     verdict: run.verdict,
     seedResults: [],
     failure: null,
-    freshCommendations: [],
+    freshAchievements: [],
     personalBest: null,
     showResults: false,
   });

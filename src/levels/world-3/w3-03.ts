@@ -223,7 +223,7 @@ export const w3_03: LevelDef = {
     {
       label: 'Empty rack slots',
       value:
-        'Not a walkway. `scan(dir).terrain` reads `rack` on a slot and `floor` on an aisle. One step into a slot that started the shift empty loses the commendation. Aisles are free, and so are slots that started the shift full.',
+        'Not a walkway. `scan(dir).terrain` reads `rack` on a slot and `floor` on an aisle. One step into a slot that started the shift empty loses the star. Aisles are free, and so are slots that started the shift full.',
     },
   ],
   seeds: [1, 2, 3, 4],

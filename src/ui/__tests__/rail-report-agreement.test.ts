@@ -162,7 +162,7 @@ function show(level: LevelDef, run: RunResult): void {
     showResults: true,
     seedResults: [],
     failure: null,
-    freshCommendations: [],
+    freshAchievements: [],
     personalBest: null,
     verdict: { ...run.verdict, objectives: [...run.verdict.objectives, ...bonus] },
   });
@@ -204,7 +204,7 @@ function showAggregate(level: LevelDef, runs: SeedRun[]): void {
     showResults: true,
     seedResults: response.results,
     failure: null,
-    freshCommendations: [],
+    freshAchievements: [],
     personalBest: null,
     verdict: response.verdict,
   });

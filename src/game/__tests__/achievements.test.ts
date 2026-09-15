@@ -42,13 +42,13 @@ function facts(patch: Partial<RunFacts> = {}): RunFacts {
   };
 }
 
-describe('the commendation list', () => {
+describe('the achievement list', () => {
   it('has no duplicate ids', () => {
     const ids = ACHIEVEMENTS.map((achievement) => achievement.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('gives every commendation a title, a requirement and a note', () => {
+  it('gives every achievement a title, a requirement and a note', () => {
     for (const achievement of ACHIEVEMENTS) {
       expect(achievement.title.length, achievement.id).toBeGreaterThan(0);
       expect(achievement.requirement.length, achievement.id).toBeGreaterThan(0);
@@ -86,7 +86,7 @@ describe('the commendation list', () => {
     for (const id of everythingEarned()) expect(getAchievement(id), id).toBeDefined();
   });
 
-  it('can award every commendation it prints', () => {
+  it('can award every achievement it prints', () => {
     const reachable = new Set(everythingEarned());
     const unreachable = ACHIEVEMENTS.map((achievement) => achievement.id).filter(
       (id) => id !== 'repository' && !reachable.has(id),

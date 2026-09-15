@@ -282,7 +282,7 @@ describe('the dossier and the interlock occupy the same box', () => {
   });
 });
 
-describe('the commendations tab is measured off the panel it opens', () => {
+describe('the achievements tab is measured off the panel it opens', () => {
   test('the tab stands on the frames own inset, clear of the cut it opens beside', () => {
     expect(value('bottom', rule('.survey-seals-tab'))).toBe(
       'calc(var(--survey-inset) + var(--survey-cut))',
@@ -296,7 +296,7 @@ describe('the commendations tab is measured off the panel it opens', () => {
 
   test('narrow lifts the tab over the sheet rather than over a guess', () => {
     const narrow = /\.survey\[data-narrow='true'] \.survey-seals-tab\s*\{[^}]*\}/.exec(CSS)?.[0];
-    if (!narrow) throw new Error('no narrow rule for the commendations tab');
+    if (!narrow) throw new Error('no narrow rule for the achievements tab');
     const bottom = value('bottom', narrow);
 
     expect(bottom).toContain('var(--survey-sheet)');

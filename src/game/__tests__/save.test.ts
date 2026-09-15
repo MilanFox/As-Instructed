@@ -164,7 +164,7 @@ describe('mergeProgress', () => {
 });
 
 describe('migrate to the reward fields', () => {
-  it('gives a fresh save empty commendations, zeroed stats and ceremony on', () => {
+  it('gives a fresh save empty achievements, zeroed stats and ceremony on', () => {
     const save = emptySave();
     expect(save.achievements).toEqual({});
     expect(save.stats).toEqual({ runs: 0, passes: 0, fails: 0 });
@@ -197,7 +197,7 @@ describe('migrate to the reward fields', () => {
     expect(migrated.settings.speed).toBe(2);
   });
 
-  it('reconstructs no commendation from a version 1 save, because none of the five follows', () => {
+  it('reconstructs no achievement from a version 1 save, because none of the five follows', () => {
     const v1 = {
       version: 1,
       updatedAt: 1,
@@ -288,7 +288,7 @@ describe('migrate to the reward fields', () => {
 });
 
 describe('importSave and the reward fields', () => {
-  it('unions commendations and keeps the earlier date for each', () => {
+  it('unions achievements and keeps the earlier date for each', () => {
     const current = emptySave();
     current.achievements = { 'second-look': 500, 'minimal-observation': 900 };
     const incoming = emptySave();
@@ -395,7 +395,7 @@ describe('a save that names a withdrawn work order', () => {
   });
 });
 
-describe('a save written by a build that had fifteen commendations', () => {
+describe('a save written by a build that had fifteen achievements', () => {
   const beforeTheCut = JSON.stringify({
     version: SAVE_VERSION,
     updatedAt: 1,
@@ -430,14 +430,14 @@ describe('a save written by a build that had fifteen commendations', () => {
     expect(() => parseSave(beforeTheCut)).not.toThrow();
   });
 
-  it('drops every retired commendation', () => {
+  it('drops every retired achievement', () => {
     const { achievements } = parseSave(beforeTheCut);
     for (const id of ['filed', 'within-budget', 'first-run', 'no-contact', 'sector-gold']) {
       expect(achievements[id], id).toBeUndefined();
     }
   });
 
-  it('keeps the surviving commendations, dates and all', () => {
+  it('keeps the surviving achievements, dates and all', () => {
     const { achievements } = parseSave(beforeTheCut);
     expect(achievements['second-look']).toBe(600);
     expect(achievements['raised-again']).toBe(700);
@@ -455,7 +455,7 @@ describe('a save written by a build that had fifteen commendations', () => {
     expect(save.reviewedRanks).toEqual([2]);
   });
 
-  it('keeps a commendation id this build has never heard of', () => {
+  it('keeps a achievement id this build has never heard of', () => {
     const fromAheadOfUs = JSON.stringify({
       ...(JSON.parse(beforeTheCut) as Record<string, unknown>),
       achievements: { 'shipped-it-twice': 900, filed: 100 },
@@ -465,7 +465,7 @@ describe('a save written by a build that had fifteen commendations', () => {
     expect(achievements['filed']).toBeUndefined();
   });
 
-  it('does not resurrect a retired commendation through import', () => {
+  it('does not resurrect a retired achievement through import', () => {
     const current = emptySave();
     current.achievements = { 'second-look': 10 };
     const merged = importSave(current, beforeTheCut);

@@ -220,7 +220,7 @@ export interface WorkspaceData {
   dismissResults(): void;
   advanceToNextLevel(): void;
   personalBest: { previous: number; now: number } | null;
-  freshCommendations: readonly string[];
+  freshAchievements: readonly string[];
 
   requisition: { levelId: string; hardware: string[] } | null;
   signRequisition(): void;
@@ -322,7 +322,7 @@ export function useWorkspace(): WorkspaceData {
   const dismissResults = useGame((state) => state.dismissResults);
   const advanceToNextLevel = useGame((state) => state.advanceToNextLevel);
   const personalBest = useGame((state) => state.personalBest);
-  const freshCommendations = useGame((state) => state.freshCommendations);
+  const freshAchievements = useGame((state) => state.freshAchievements);
   const requisition = useGame((state) => state.requisition);
   const signRequisition = useGame((state) => state.signRequisition);
   const fileReview = useGame((state) => state.fileReview);
@@ -642,7 +642,7 @@ export function useWorkspace(): WorkspaceData {
     dismissResults,
     advanceToNextLevel,
     personalBest,
-    freshCommendations,
+    freshAchievements,
     requisition,
     signRequisition,
     notices,

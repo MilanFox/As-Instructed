@@ -30,6 +30,6 @@ Vitest collects only `src/**/*.test.ts`, so `__tests__/` also holds fixtures and
 
 ## Copy
 
-- Jokes: brief flavour, memos, failure messages, commendations, #4470's starter comments.
+- Jokes: brief flavour, memos, failure messages, achievements, #4470's starter comments.
 - Factual, no personality: API docs, type signatures, error text, objective labels, `hints`.
 - Enforced by test: brief ≤ 110 words, no code in `hints`, divergence strings ≤ 44 chars.

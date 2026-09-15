@@ -81,7 +81,7 @@ export interface GameState {
   showResults: boolean;
   resultId: number;
   failureCursor: number;
-  freshCommendations: string[];
+  freshAchievements: string[];
   personalBest: { previous: number; now: number } | null;
   requisition: { levelId: string; hardware: string[] } | null;
   auditSeeds: Readonly<Record<string, AuditSeeds>>;
@@ -423,7 +423,7 @@ export const useGame = create<GameState>((set, get) => {
       showResults: true,
       resultId: get().resultId + 1,
       failureCursor: get().failureCursor + 1,
-      freshCommendations: [],
+      freshAchievements: [],
       personalBest: null,
     };
   }
@@ -630,7 +630,7 @@ export const useGame = create<GameState>((set, get) => {
     showResults: false,
     resultId: 0,
     failureCursor: 0,
-    freshCommendations: [],
+    freshAchievements: [],
     personalBest: null,
     requisition: null,
     auditSeeds: {},
@@ -718,7 +718,7 @@ export const useGame = create<GameState>((set, get) => {
         failedSeed: null,
         failure: null,
         showResults: false,
-        freshCommendations: [],
+        freshAchievements: [],
         personalBest: null,
         requisition: undelivered.length > 0 ? { levelId, hardware: undelivered } : null,
         surveySeed: null,
@@ -838,7 +838,7 @@ export const useGame = create<GameState>((set, get) => {
         traceSeed: null,
         failedSeed: null,
         showResults: false,
-        freshCommendations: [],
+        freshAchievements: [],
         personalBest: null,
         eventCursor: null,
         debugNote: null,
@@ -1068,7 +1068,7 @@ export const useGame = create<GameState>((set, get) => {
           verdict.stats.ticks < previous.bestTicks;
 
         set({
-          freshCommendations: fresh,
+          freshAchievements: fresh,
           personalBest: beaten
             ? { previous: previous.bestTicks as number, now: verdict.stats.ticks }
             : null,
@@ -1168,7 +1168,7 @@ export const useGame = create<GameState>((set, get) => {
       if (getAchievement(id) === undefined) return;
       if (save.achievements[id] !== undefined) return;
       persist({ ...save, achievements: { ...save.achievements, [id]: Date.now() } });
-      set({ freshCommendations: [...get().freshCommendations, id] });
+      set({ freshAchievements: [...get().freshAchievements, id] });
     },
 
     // Every cursor move lands here, including the renderer's and the conductor's, so the event

@@ -32,7 +32,7 @@ function report(levelId: string): ReportSnapshot {
     failureLine: null,
     passedSeed: null,
     bonusSeed: null,
-    commendations: [],
+    achievements: [],
     personalBest: null,
     points: null,
     stars: 0,

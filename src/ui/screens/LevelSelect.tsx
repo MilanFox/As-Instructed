@@ -961,11 +961,11 @@ export function LevelSelect(): JSX.Element {
         data-on={String(seals)}
         aria-expanded={seals}
         aria-controls="survey-seals"
-        aria-label={`Commendations, ${String(campaign.earnedCount)} of ${String(campaign.commendations.length)} awarded`}
+        aria-label={`Achievements, ${String(campaign.earnedCount)} of ${String(campaign.achievements.length)} awarded`}
         onClick={() => setSeals((was) => !was)}
       >
         <span className="survey-seals-tab__text">
-          Commendations {campaign.earnedCount}/{campaign.commendations.length}
+          Achievements {campaign.earnedCount}/{campaign.achievements.length}
         </span>
       </button>
 
@@ -973,15 +973,15 @@ export function LevelSelect(): JSX.Element {
         className="survey-frame survey-seals"
         id="survey-seals"
         data-on={String(seals)}
-        aria-label="Commendations"
+        aria-label="Achievements"
         {...(seals ? {} : { inert: true })}
       >
         <div className="survey-frame__body">
           <div className="survey-bar">
-            <span>Commendations</span>
+            <span>Achievements</span>
             <span className="survey-bar__tools">
               <span>
-                {campaign.earnedCount}/{campaign.commendations.length} awarded
+                {campaign.earnedCount}/{campaign.achievements.length} awarded
               </span>
               <button
                 type="button"
@@ -993,7 +993,7 @@ export function LevelSelect(): JSX.Element {
             </span>
           </div>
           <ul className="survey-seals__grid">
-            {campaign.commendations.map((entry) => {
+            {campaign.achievements.map((entry) => {
               const won = entry.earnedAt !== null;
               return (
                 <li key={entry.achievement.id} className="survey-seal" data-on={String(won)}>

@@ -141,11 +141,11 @@ export function ReportSheet({ report, onDismiss, onNext }: ReportSheetProps): Re
           </>
         )}
 
-        {report.commendations.length === 0 ? null : (
+        {report.achievements.length === 0 ? null : (
           <>
-            <PanelBar sub>Commendations</PanelBar>
+            <PanelBar sub>Achievements</PanelBar>
             <div className="chip-row">
-              {report.commendations.map((name) => (
+              {report.achievements.map((name) => (
                 <span className="chip" key={name}>
                   {name}
                 </span>

@@ -324,7 +324,7 @@ describe('the end-of-run arc, staged', () => {
     expect(engine.activeVoices).toBe(0);
   });
 
-  it('lets commendations through even while a storm is thinning everything else', () => {
+  it('lets achievements through even while a storm is thinning everything else', () => {
     const { conductor, engine } = rig([]);
     for (let i = 0; i < 4; i++) conductor.commend(i, i * 0.12);
     expect(engine.activeVoices).toBeGreaterThan(1);
