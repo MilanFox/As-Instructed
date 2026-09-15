@@ -57,7 +57,11 @@ export function aggregate(runs: SeedRun[]): RunResponse {
   }
 
   const failedIndex = runs.findIndex((run) => !run.result.passed);
-  const reportedIndex = failedIndex === -1 ? 0 : failedIndex;
+  const missedBonusIndex = runs.findIndex((run) =>
+    (run.result.bonus ?? []).some((objective) => !objective.met),
+  );
+  const divergedIndex = failedIndex === -1 ? missedBonusIndex : failedIndex;
+  const reportedIndex = divergedIndex === -1 ? 0 : divergedIndex;
   const reported = runs[reportedIndex] as SeedRun;
 
   const verdict: Verdict = {

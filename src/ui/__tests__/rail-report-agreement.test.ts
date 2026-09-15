@@ -33,11 +33,13 @@ const { useGame } = await import('../../game/store.ts');
 const { emptySave } = await import('../../game/save.ts');
 const { campaignOrder } = await import('../../levels/index.ts');
 const { runLevel, runReference } = await import('../../levels/harness.ts');
-const { evaluateObjectives, senseTotals } = await import('../../engine/index.ts');
+const { Dir, evaluateObjectives, senseTotals } = await import('../../engine/index.ts');
 const { SOLUTIONS } = await import('../../levels/__tests__/solutions.ts');
+const { aggregate } = await import('../../runtime/aggregate.ts');
 
 type LevelDef = ReturnType<typeof campaignOrder>[number];
 type RunResult = ReturnType<typeof runLevel>;
+type SeedRun = Parameters<typeof aggregate>[0][number];
 
 function OrderCard(): unknown {
   return WorkOrderCard({ workspace: useWorkspace() });
@@ -123,14 +125,18 @@ function rowsOf(component: () => unknown): Row[] {
   }));
 }
 
-function show(level: LevelDef, run: RunResult): void {
-  const bonus = evaluateObjectives(level.bonus ?? [], {
+function bonusOf(level: LevelDef, run: RunResult): ReturnType<typeof evaluateObjectives> {
+  return evaluateObjectives(level.bonus ?? [], {
     world: run.world,
     trace: run.trace,
     initialWorld: run.initialWorld,
     ops: run.ops,
     senses: senseTotals(run.trace),
   });
+}
+
+function show(level: LevelDef, run: RunResult): void {
+  const bonus = bonusOf(level, run);
   useGame.setState({
     save: emptySave(),
     screen: 'workspace',
@@ -148,6 +154,48 @@ function show(level: LevelDef, run: RunResult): void {
   });
 }
 
+function seedRunsOf(
+  level: LevelDef,
+  drive: (level: LevelDef, seed: number) => RunResult,
+): SeedRun[] {
+  return level.seeds.map((seed) => {
+    const run = drive(level, seed);
+    const bonus = bonusOf(level, run);
+    return {
+      result: {
+        seed,
+        passed: run.verdict.passed,
+        ticks: run.verdict.stats.ticks,
+        ops: run.ops,
+        objectives: run.verdict.objectives,
+        ...(bonus.length > 0 ? { bonus } : {}),
+      },
+      trace: run.trace,
+      verdict: run.verdict,
+    };
+  });
+}
+
+function showAggregate(level: LevelDef, runs: SeedRun[]): void {
+  const response = aggregate(runs);
+  if (!response.ok) throw new Error(`${level.id} came back with no run at all`);
+  useGame.setState({
+    save: emptySave(),
+    screen: 'workspace',
+    currentLevelId: level.id,
+    trace: response.trace,
+    traceSeed: response.traceSeed,
+    tick: response.trace.endTick,
+    runMode: 'dispatch',
+    showResults: true,
+    seedResults: response.results,
+    failure: null,
+    freshCommendations: [],
+    personalBest: null,
+    verdict: response.verdict,
+  });
+}
+
 interface Disagreement {
   level: string;
   label: string;
@@ -155,11 +203,11 @@ interface Disagreement {
   report: Row;
 }
 
-function sweep(drive: (level: LevelDef) => RunResult): { rows: number; found: Disagreement[] } {
+function sweep(present: (level: LevelDef) => void): { rows: number; found: Disagreement[] } {
   const found: Disagreement[] = [];
   let rows = 0;
   for (const level of campaignOrder()) {
-    show(level, drive(level));
+    present(level);
     const order = rowsOf(OrderCard);
     const report = rowsOf(Report);
     expect(
@@ -178,21 +226,49 @@ function sweep(drive: (level: LevelDef) => RunResult): { rows: number; found: Di
 
 const seedOf = (level: LevelDef): number => level.seeds[0] ?? 1;
 
-const idle = (level: LevelDef): RunResult => runLevel(level, seedOf(level), () => {});
+const idleAt = (level: LevelDef, seed: number): RunResult => runLevel(level, seed, () => {});
 
-const reference = (level: LevelDef): RunResult =>
-  runReference(level, seedOf(level), SOLUTIONS[level.id] as never);
+const referenceAt = (level: LevelDef, seed: number): RunResult =>
+  runReference(level, seed, SOLUTIONS[level.id] as never);
+
+const idle = (level: LevelDef): RunResult => idleAt(level, seedOf(level));
+
+const reference = (level: LevelDef): RunResult => referenceAt(level, seedOf(level));
+
+const onOneSeed =
+  (drive: (level: LevelDef) => RunResult) =>
+  (level: LevelDef): void =>
+    show(level, drive(level));
+
+const onEverySeed =
+  (drive: (level: LevelDef, seed: number) => RunResult) =>
+  (level: LevelDef): void =>
+    showAggregate(level, seedRunsOf(level, drive));
 
 describe('one objective, two screens', () => {
   test('a run that did nothing is described the same way on both', () => {
-    const { rows, found } = sweep(idle);
+    const { rows, found } = sweep(onOneSeed(idle));
 
     expect(found).toEqual([]);
     expect(rows).toBeGreaterThan(campaignOrder().length);
   });
 
   test('and so is the reference solution', () => {
-    const { rows, found } = sweep(reference);
+    const { rows, found } = sweep(onOneSeed(reference));
+
+    expect(found).toEqual([]);
+    expect(rows).toBeGreaterThan(campaignOrder().length);
+  });
+
+  test('and so is a folded run, where the reading may come from a seed the board is not', () => {
+    const { rows, found } = sweep(onEverySeed(idleAt));
+
+    expect(found).toEqual([]);
+    expect(rows).toBeGreaterThan(campaignOrder().length);
+  });
+
+  test('and so is the reference solution folded across every seed it runs on', () => {
+    const { rows, found } = sweep(onEverySeed(referenceAt));
 
     expect(found).toEqual([]);
     expect(rows).toBeGreaterThan(campaignOrder().length);
@@ -243,6 +319,37 @@ describe('one objective, two screens', () => {
       expect(footprint?.kind).toBe('budget');
       expect(footprint?.state).toBe('met');
       expect(footprint?.readout).toMatch(/^\d+ \/ \d+ tiles · \d+ spare$/);
+    }
+  });
+
+  test('a bonus missed on one seed reads that seed, not the one that kept it', () => {
+    const level = campaignOrder().find((each) => each.id === 'w1-03') as LevelDef;
+    const wasteful = level.seeds[level.seeds.length - 1] as number;
+    expect(level.seeds.length).toBeGreaterThan(1);
+    expect(level.seeds[0]).not.toBe(wasteful);
+
+    const runs = seedRunsOf(level, (each, seed) =>
+      runLevel(each, seed, (sim, botId) => {
+        (SOLUTIONS[each.id] as never as { run(sim: unknown, bot: number): void }).run(sim, botId);
+        if (seed === wasteful) for (let spent = 0; spent < 3; spent++) sim.move(botId, Dir.North);
+      }),
+    );
+
+    expect(runs.every((run) => run.result.passed)).toBe(true);
+    expect(
+      runs.filter((run) => run.result.bonus?.some((row) => !row.met)).map((run) => run.result.seed),
+    ).toEqual([wasteful]);
+
+    showAggregate(level, runs);
+
+    for (const screen of [rowsOf(OrderCard), rowsOf(Report)]) {
+      const tiles = screen.find((row) => !row.label.startsWith('BONUS')) as Row;
+      const moves = screen.find((row) => row.label.startsWith('BONUS')) as Row;
+      const [, used, allowance] = /^(\d+) \/ (\d+) moves · over by \d+$/.exec(moves.readout) ?? [];
+
+      expect(tiles.readout).toMatch(/^\d+ \/ \d+ tiles$/);
+      expect(moves.state).toBe('over');
+      expect(Number(used)).toBeGreaterThan(Number(allowance));
     }
   });
 });
