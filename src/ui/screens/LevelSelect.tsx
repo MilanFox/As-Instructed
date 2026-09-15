@@ -51,6 +51,9 @@ const PLOT_SQUASH = 0.9;
 
 interface Plot {
   path: string;
+  stipple: string;
+  ink: string;
+  rings: string;
   cx: number;
   cy: number;
   r: number;
@@ -145,6 +148,98 @@ function scatter(rnd: () => number, count: number): Point[] {
   }
 
   return spots;
+}
+
+const INK_STEP = 0.17;
+const STIPPLE_STEP = 0.15;
+const CONTOUR_RINGS = [0.74, 0.52, 0.31];
+
+function centreOf(points: readonly Point[]): Point {
+  const sum = points.reduce((total, point) => ({ x: total.x + point.x, y: total.y + point.y }), {
+    x: 0,
+    y: 0,
+  });
+  return { x: sum.x / points.length, y: sum.y / points.length };
+}
+
+function inside(point: Point, polygon: readonly Point[]): boolean {
+  let within = false;
+  for (let i = 0; i < polygon.length; i++) {
+    const a = polygon[i];
+    const b = polygon[(i + 1) % polygon.length];
+    if (!a || !b) continue;
+    if (a.y > point.y === b.y > point.y) continue;
+    if (point.x < ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y) + a.x) within = !within;
+  }
+  return within;
+}
+
+// A closed parcel is stippled: dots on a jittered grid, so the texture is even without reading as
+// a screen pattern. The grid is walked in place of rejection sampling because the plot is small.
+function stipplePlot(points: readonly Point[], radius: number, rnd: () => number): string {
+  const centre = centreOf(points);
+  const inset = points.map((point) => ({
+    x: centre.x + (point.x - centre.x) * 0.9,
+    y: centre.y + (point.y - centre.y) * 0.9,
+  }));
+  const step = radius * STIPPLE_STEP;
+  let path = '';
+  for (let y = centre.y - radius; y <= centre.y + radius; y += step) {
+    for (let x = centre.x - radius; x <= centre.x + radius; x += step) {
+      const dot = { x: x + (rnd() - 0.5) * step, y: y + (rnd() - 0.5) * step };
+      if (!inside(dot, inset)) continue;
+      path += `M${round(dot.x)} ${round(dot.y)}h0.01`;
+    }
+  }
+  return path;
+}
+
+// Contours are the parcel's own boundary drawn in, so a mastered site reads as high ground rather
+// than as a second outline of some other shape.
+function contourPlot(points: readonly Point[], rnd: () => number): string {
+  const centre = centreOf(points);
+  return CONTOUR_RINGS.map(
+    (scale) =>
+      points
+        .map((point, i) => {
+          const pull = scale * (0.94 + rnd() * 0.12);
+          const x = centre.x + (point.x - centre.x) * pull;
+          const y = centre.y + (point.y - centre.y) * pull;
+          return `${i === 0 ? 'M' : 'L'}${round(x)} ${round(y)}`;
+        })
+        .join('') + 'Z',
+  ).join('');
+}
+
+// Inking a closed site in is a fill, and a fill on a survey plan is hatching. The plot is an
+// arbitrary polygon, so each 45-degree line is cut against every edge and the crossings paired off
+// — half-open on the upper end so a vertex is counted once and the crossings always come in twos.
+function hatchPlot(points: readonly Point[], radius: number): string {
+  const level = (point: Point): number => point.x - point.y;
+  const levels = points.map(level);
+  const step = radius * INK_STEP;
+  let path = '';
+  for (let c = Math.min(...levels) + step / 2; c < Math.max(...levels); c += step) {
+    const crossings: Point[] = [];
+    for (let i = 0; i < points.length; i++) {
+      const from = points[i];
+      const to = points[(i + 1) % points.length];
+      if (!from || !to) continue;
+      const a = level(from);
+      const b = level(to);
+      if (c < Math.min(a, b) || c >= Math.max(a, b)) continue;
+      const t = (c - a) / (b - a);
+      crossings.push({ x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t });
+    }
+    crossings.sort((one, two) => one.x - two.x);
+    for (let k = 0; k + 1 < crossings.length; k += 2) {
+      const from = crossings[k];
+      const to = crossings[k + 1];
+      if (!from || !to) continue;
+      path += `M${round(from.x)} ${round(from.y)}L${round(to.x)} ${round(to.y)}`;
+    }
+  }
+  return path;
 }
 
 // Narrow puts the dossier on the bottom edge instead of the right, so the sites move with it.
@@ -296,6 +391,9 @@ function buildPlan(w: number, h: number, counts: readonly number[], narrow: bool
 
     return {
       path: `${line(points)}Z`,
+      stipple: stipplePlot(points, radius, rnd),
+      ink: hatchPlot(points, radius),
+      rings: contourPlot(points, rnd),
       cx: centre.x,
       cy: centre.y,
       r: radius,
@@ -308,13 +406,27 @@ function buildPlan(w: number, h: number, counts: readonly number[], narrow: bool
   return { gridLight, gridHeavy, stations, dust, hatch, contours, ridges, ticks, legs, plots };
 }
 
-// Corner brackets, not a closed ring: at pip size a ring would be counted as another marker.
-function reticle(x: number, y: number, size: number): string {
-  const half = size / 2;
-  const arm = size * 0.32;
-  const corner = (sx: number, sy: number): string =>
-    `M${round(x + sx * half - sx * arm)} ${round(y + sy * half)}h${round(sx * arm)}v${round(-sy * arm)}`;
-  return corner(-1, -1) + corner(1, -1) + corner(-1, 1) + corner(1, 1);
+// A marker with every bonus met is promoted to a triangulation station: a ring around the dot with
+// four cardinal ticks crossing it, all one path. The ticks stop inside PING_REACH so that an order
+// that is both up next and fully starred reads as a pulse leaving a station, not as one shape.
+const PING_REACH = 1.5;
+
+function station(x: number, y: number, size: number): string {
+  const ring = size * 1.15;
+  const from = size * 0.75;
+  const to = size * 1.45;
+  const arc = `M${round(x - ring)} ${round(y)}a${round(ring)} ${round(ring)} 0 1 0 ${round(ring * 2)} 0a${round(ring)} ${round(ring)} 0 1 0 ${round(-ring * 2)} 0`;
+  const ticks = [
+    `M${round(x)} ${round(y - from)}V${round(y - to)}`,
+    `M${round(x)} ${round(y + from)}V${round(y + to)}`,
+    `M${round(x - from)} ${round(y)}H${round(x - to)}`,
+    `M${round(x + from)} ${round(y)}H${round(x + to)}`,
+  ].join('');
+  return arc + ticks;
+}
+
+function allBonusMet(order: CampaignOrder): boolean {
+  return order.maxStars > 0 && order.stars === order.maxStars;
 }
 
 export function pad(value: number): string {
@@ -325,12 +437,20 @@ export function siteLabel(site: CampaignSite): string {
   if (!site.unlocked) {
     return `Site ${pad(site.world.id)}, ${site.world.name}, unsurveyed, ${String(site.issued)} work orders on hold`;
   }
-  return `Site ${pad(site.world.id)}, ${site.world.name}, ${String(site.closed)} of ${String(site.issued)} work orders closed`;
+  const walked = `Site ${pad(site.world.id)}, ${site.world.name}, ${String(site.closed)} of ${String(site.issued)} work orders closed`;
+  if (!site.complete) return walked;
+  const tiers = [
+    'site complete',
+    ...(site.perfect ? ['every work order at par'] : []),
+    ...(site.starred ? ['every bonus objective met'] : []),
+  ];
+  return `${walked}, ${tiers.join(', ')}`;
 }
 
 export function orderLabel(order: CampaignOrder): string {
   const medal = order.medal && order.medal !== 'none' ? `, ${order.medal}` : '';
-  return `Work order ${order.id}, ${order.level.title}, ${order.status.toLowerCase()}${medal}`;
+  const bonus = allBonusMet(order) ? ', all bonus objectives met' : '';
+  return `Work order ${order.id}, ${order.level.title}, ${order.status.toLowerCase()}${medal}${bonus}`;
 }
 
 // The row is a real link; the router owns the URL, so the click only has to skip the reload.
@@ -536,8 +656,16 @@ export function LevelSelect(): JSX.Element {
               data-open={String(entry.unlocked)}
               data-on={String(i === chosen)}
               data-stop={String(i === stopped)}
+              data-done={String(entry.complete)}
+              data-par={String(entry.perfect)}
+              data-starred={String(entry.starred)}
             >
               <path className="plot__shape" d={plot.path} />
+              {entry.complete && !entry.perfect ? (
+                <path className="plot__stipple" d={plot.stipple} />
+              ) : null}
+              {entry.perfect ? <path className="plot__ink" d={plot.ink} /> : null}
+              {entry.starred ? <path className="plot__rings" d={plot.rings} /> : null}
               {i === chosen ? <path className="plot__bracket" d={plot.bracket} /> : null}
               {plot.markers.map((mark, k) => {
                 const order = entry.orders[k];
@@ -548,21 +676,19 @@ export function LevelSelect(): JSX.Element {
                     className="plot-mark"
                     data-status={order.status}
                     data-medal={order.medal ?? 'none'}
+                    data-station={String(allBonusMet(order))}
                   >
                     {order.isNext ? (
-                      <>
-                        <path
-                          className="plot-mark__reticle"
-                          d={reticle(mark.x, mark.y, plot.pip * 3)}
-                        />
-                        <rect
-                          className="plot-mark__ping"
-                          x={mark.x - plot.pip * 1.5}
-                          y={mark.y - plot.pip * 1.5}
-                          width={plot.pip * 3}
-                          height={plot.pip * 3}
-                        />
-                      </>
+                      <rect
+                        className="plot-mark__ping"
+                        x={mark.x - plot.pip * PING_REACH}
+                        y={mark.y - plot.pip * PING_REACH}
+                        width={plot.pip * PING_REACH * 2}
+                        height={plot.pip * PING_REACH * 2}
+                      />
+                    ) : null}
+                    {allBonusMet(order) ? (
+                      <path className="plot-mark__station" d={station(mark.x, mark.y, plot.pip)} />
                     ) : null}
                     <rect
                       className="plot-mark__pip"
@@ -606,6 +732,9 @@ export function LevelSelect(): JSX.Element {
                 }}
                 data-open={String(entry.unlocked)}
                 data-on={String(i === chosen)}
+                data-done={String(entry.complete)}
+                data-par={String(entry.perfect)}
+                data-starred={String(entry.starred)}
                 tabIndex={i === pinAt ? 0 : -1}
                 aria-pressed={i === chosen}
                 aria-label={siteLabel(entry)}

@@ -35,6 +35,7 @@ export interface CampaignSite {
   unlocked: boolean;
   complete: boolean;
   perfect: boolean;
+  starred: boolean;
 }
 
 export interface CampaignCommendation {
@@ -111,6 +112,9 @@ export function buildCampaign(save: SaveFile): Campaign {
       unlocked: orders.some((order) => order.playable),
       complete,
       perfect: complete && par === orders.length,
+      // An order with no bonus is starred vacuously, which is what keeps this in step with the
+      // site-starred commendation in src/game/store.ts rather than a site short of its own tier.
+      starred: complete && orders.every((order) => order.stars === order.maxStars),
     };
   });
 

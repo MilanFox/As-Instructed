@@ -143,6 +143,42 @@
   opacity: 1;
 }
 
+/* Three tiers, drawn the way a plat draws them. A parcel still being worked is an open traverse,
+   so its boundary is broken; closing every order closes the traverse and stipples the interior;
+   all at par rules the interior instead; every bonus met contours it. The last two are independent
+   — a site can be starred without being at par — so each is drawn from its own fact and never
+   stands in for the other. */
+.plot[data-open='true'] .plot__shape {
+  stroke-dasharray: 11 6;
+}
+
+.plot[data-done='true'] .plot__shape {
+  stroke-dasharray: none;
+  stroke-width: 3;
+}
+
+.plot__stipple {
+  fill: none;
+  stroke: var(--world);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  opacity: 0.6;
+}
+
+.plot__ink {
+  fill: none;
+  stroke: var(--world);
+  stroke-width: 1.5;
+  opacity: 0.55;
+}
+
+.plot__rings {
+  fill: none;
+  stroke: var(--world);
+  stroke-width: 1.5;
+  opacity: 0.85;
+}
+
 .plot-mark__pip {
   fill: var(--survey-fill);
   stroke: var(--world);
@@ -174,11 +210,13 @@
   stroke-dasharray: 3 3;
 }
 
-.plot-mark__reticle {
+/* Every bonus objective met promotes the marker to a triangulation station. It is a ring and four
+   ticks, held still, where the order up next is a square that pulses — the two never read alike. */
+.plot-mark__station {
   fill: none;
   stroke: var(--accent-2);
-  stroke-width: 2;
-  stroke-dasharray: 9 16;
+  stroke-width: 1.6;
+  stroke-linecap: round;
 }
 
 .plot-mark__ping {
@@ -235,6 +273,7 @@
   gap: 2px;
   width: 188px;
   padding: 6px 9px;
+  border: 1px dashed var(--border-strong);
   border-left: 3px solid var(--world);
   background: rgb(5 8 12 / 82%);
   text-align: left;
@@ -294,6 +333,27 @@
 .pin[data-on='true'] .pin__name,
 .pin[data-on='true'] .pin__tally {
   color: #000;
+}
+
+/* The plate carries the plot's three tiers in miniature: the rule around it closes, then it takes
+   the same ruled hatching, then a second rule steps inside it the way a contour does. */
+.pin[data-done='true'] .pin__plate {
+  border-color: var(--world);
+  border-style: solid;
+}
+
+.pin[data-par='true'] .pin__plate::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.22;
+  background: repeating-linear-gradient(45deg, transparent 0 4px, var(--world) 4px 5px);
+  pointer-events: none;
+}
+
+.pin[data-starred='true'] .pin__plate {
+  outline: 1px solid var(--world);
+  outline-offset: -4px;
 }
 
 /* ---- the framed object every panel is built from ---- */

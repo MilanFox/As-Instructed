@@ -5,11 +5,12 @@ import type { CampaignOrder, CampaignSite, OrderStatus } from '../../../game/cam
 import { Medal, isGraded } from '../../../game/score.ts';
 import { emptySave } from '../../../game/save.ts';
 import type { SaveFile } from '../../../game/save.ts';
-import { levelsByWorld } from '../../../levels/index.ts';
+import { getLevel, levelsByWorld } from '../../../levels/index.ts';
 import { orderLabel, siteLabel } from '../LevelSelect.tsx';
 
 const UNGRADED = 'w1-01';
 const GRADED = 'w1-03';
+const BONUS_ORDER = 'w1-02';
 
 const STATUSES: readonly OrderStatus[] = ['CLOSED', 'OPEN', 'ON HOLD'];
 
@@ -36,6 +37,19 @@ function bootSectorInProgress(): SaveFile {
 
 function bootSectorClosed(medal: Medal): SaveFile {
   return close(bootSectorInProgress(), GRADED, medal);
+}
+
+function bonusIds(levelId: string): string[] {
+  return (getLevel(levelId)?.bonus ?? []).map((objective) => objective.id);
+}
+
+function allStarred(medal: Medal): SaveFile {
+  const save = bootSectorClosed(medal);
+  for (const id of [UNGRADED, BONUS_ORDER, GRADED]) {
+    const progress = save.levels[id];
+    if (progress) progress.stars = bonusIds(id);
+  }
+  return save;
 }
 
 describe('the fixture the browser was driven against', () => {
@@ -145,6 +159,47 @@ describe('the survey names a site by how much of it has been walked', () => {
     const save = bootSectorInProgress();
     const site = siteFor(save, 1);
     expect(siteLabel(site)).toContain(`${String(site.closed)} of ${String(site.issued)}`);
+  });
+
+  test('a site closed to its last order says so, over and above the count', () => {
+    const closed = siteLabel(siteFor(bootSectorClosed(Medal.Silver), 1));
+
+    expect(siteLabel(siteFor(bootSectorInProgress(), 1))).not.toContain('site complete');
+    expect(closed).toContain('site complete');
+    expect(closed).not.toContain('at par');
+    expect(closed).not.toContain('bonus');
+  });
+
+  test('each further tier is named, and only once the site has reached it', () => {
+    const atPar = siteLabel(siteFor(bootSectorClosed(Medal.Gold), 1));
+    const starred = siteLabel(siteFor(allStarred(Medal.Gold), 1));
+
+    expect(atPar).toContain('every work order at par');
+    expect(atPar).not.toContain('bonus');
+    expect(starred).toContain('every work order at par');
+    expect(starred).toContain('every bonus objective met');
+  });
+
+  test('a site starred short of par is not read as being at par', () => {
+    const label = siteLabel(siteFor(allStarred(Medal.Silver), 1));
+
+    expect(label).toContain('every bonus objective met');
+    expect(label).not.toContain('at par');
+  });
+
+  test('a work order with every bonus met announces it', () => {
+    const bonus = getLevel(BONUS_ORDER)?.bonus ?? [];
+    const save = emptySave();
+    save.levels[BONUS_ORDER] = {
+      completed: true,
+      medal: Medal.None,
+      stars: bonus.map((objective) => objective.id),
+      attempts: 1,
+    };
+
+    expect(bonus.length).toBeGreaterThan(0);
+    expect(orderLabel(orderFor(save, BONUS_ORDER))).toContain('all bonus objectives met');
+    expect(orderLabel(orderFor(bootSectorInProgress(), BONUS_ORDER))).not.toContain('bonus');
   });
 
   test('every work order carries one of the three states and nothing else', () => {
