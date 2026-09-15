@@ -127,7 +127,7 @@ describe('the accessible name does not announce finished work as unfinished', ()
 });
 
 describe('the survey names a site by how much of it has been walked', () => {
-  test('an unsurveyed site does not claim a name it has not earned', () => {
+  test('a site names itself whether or not it has been walked', () => {
     const campaign = buildCampaign(emptySave());
     const first = campaign.sites[0];
     const last = campaign.sites[campaign.sites.length - 1];
@@ -135,9 +135,9 @@ describe('the survey names a site by how much of it has been walked', () => {
 
     expect([first.world.id, first.unlocked]).toEqual([1, true]);
     expect(last.unlocked).toBe(false);
-    expect(siteLabel(last)).toContain('unsurveyed');
-    expect(siteLabel(last)).not.toContain(last.world.name);
+    expect(siteLabel(last)).toContain(last.world.name);
     expect(siteLabel(first)).toContain(first.world.name);
+    expect(siteLabel(last)).toContain('unsurveyed');
     expect(siteLabel(first)).not.toContain('unsurveyed');
   });
 
@@ -228,8 +228,10 @@ describe('the dossier and the interlock occupy the same box', () => {
 });
 
 describe('the commendations tab is measured off the panel it opens', () => {
-  test('the shut tab sits on the frames own inset', () => {
-    expect(value('bottom', rule('.survey-seals-tab'))).toBe('var(--survey-inset)');
+  test('the tab stands on the frames own inset, clear of the cut it opens beside', () => {
+    expect(value('bottom', rule('.survey-seals-tab'))).toBe(
+      'calc(var(--survey-inset) + var(--survey-cut))',
+    );
   });
 
   test('the open tab travels the width the panel declares', () => {

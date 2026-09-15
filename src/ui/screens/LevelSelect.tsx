@@ -323,7 +323,7 @@ export function pad(value: number): string {
 
 export function siteLabel(site: CampaignSite): string {
   if (!site.unlocked) {
-    return `Site ${pad(site.world.id)}, unsurveyed, ${String(site.issued)} work orders on hold`;
+    return `Site ${pad(site.world.id)}, ${site.world.name}, unsurveyed, ${String(site.issued)} work orders on hold`;
   }
   return `Site ${pad(site.world.id)}, ${site.world.name}, ${String(site.closed)} of ${String(site.issued)} work orders closed`;
 }
@@ -614,9 +614,7 @@ export function LevelSelect(): JSX.Element {
               >
                 <span className="pin__plate" aria-hidden="true">
                   <span className="pin__no">Site {pad(entry.world.id)}</span>
-                  <span className="pin__name">
-                    {entry.unlocked ? entry.world.name : 'Unsurveyed'}
-                  </span>
+                  <span className="pin__name">{entry.world.name}</span>
                   <span className="pin__tally">
                     {!entry.unlocked
                       ? 'plan not walked'
@@ -718,11 +716,7 @@ export function LevelSelect(): JSX.Element {
       >
         <div className="survey-frame__body">
           <div className="survey-bar">
-            <span>
-              {site
-                ? `Site ${pad(site.world.id)} — ${site.unlocked ? site.world.name : 'Unsurveyed'}`
-                : 'No site'}
-            </span>
+            <span>{site ? `Site ${pad(site.world.id)} — ${site.world.name}` : 'No site'}</span>
             <span className="survey-bar__tools">
               {site ? `${String(site.closed)}/${String(site.issued)}` : '—'}
             </span>
@@ -733,9 +727,7 @@ export function LevelSelect(): JSX.Element {
           </div>
           <div className="site-brief" data-open={String(site?.unlocked ?? false)}>
             <span className="site-brief__kicker">Briefing</span>
-            <p className="site-brief__body">
-              {site?.unlocked ? site.world.blurb : 'Plan not walked. No briefing filed.'}
-            </p>
+            <p className="site-brief__body">{site ? site.world.blurb : 'No briefing filed.'}</p>
           </div>
           <ul className="dossier__rows" aria-label="Work orders on this site" onKeyDown={onRowKeys}>
             {orders.map((order, i) => (

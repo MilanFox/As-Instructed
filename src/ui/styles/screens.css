@@ -493,6 +493,13 @@
   width: var(--survey-dossier);
 }
 
+/* The cut takes the corner the first bar starts in, so that bar opens past the diagonal. */
+.dossier .survey-bar:first-child,
+.survey-interlock .survey-bar:first-child {
+  padding-top: calc(7px + var(--survey-cut) * 0.45);
+  padding-left: calc(var(--space-3) + var(--survey-cut) * 0.45);
+}
+
 .site-brief {
   display: flex;
   flex: none;
@@ -528,11 +535,6 @@
 
 .site-brief[data-open='false'] .site-brief__body {
   color: var(--ink-dim);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.2em;
-  line-height: 1.4;
-  text-transform: uppercase;
 }
 
 .dossier__rows {
@@ -707,11 +709,14 @@
 
 /* ---- commendations: a notched tab on the left edge ---- */
 
+/* Open, the tab stands on the panel's right edge, and that edge stops where the cut starts. */
 .survey-seals-tab {
   position: fixed;
-  bottom: var(--survey-inset);
+  bottom: calc(var(--survey-inset) + var(--survey-cut));
   left: 0;
   z-index: 6;
+  display: grid;
+  place-items: center;
   width: 46px;
   height: 232px;
   padding: 0;

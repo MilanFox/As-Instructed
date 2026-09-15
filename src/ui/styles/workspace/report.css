@@ -95,6 +95,11 @@
   animation: ws-arrive 190ms cubic-bezier(0.6, 0, 0.3, 1) both;
 }
 
+/* The sheet's last row would otherwise run into the cut on the bottom left corner. */
+.report-sheet .scroll-pane {
+  padding-bottom: var(--ws-cut);
+}
+
 @keyframes ws-arrive {
   from {
     clip-path: inset(0 0 0 100%);
