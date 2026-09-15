@@ -1,7 +1,7 @@
 import { ART_IDS, DIRECTIONS, applyArtDirection, isArtId } from '../render/theme.ts';
 import type { ArtId } from '../render/theme.ts';
 
-export const ART_KEY = 'bootstrap.art';
+export const ART_KEY = 'as-instructed.art';
 
 export const DEFAULT_ART: ArtId = 'deepsite';
 

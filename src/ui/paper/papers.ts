@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { Budget } from '../../game/budgets.ts';
 import { useGame } from '../../game/store.ts';
 
-export const DESK_KEY = 'bootstrap.desk';
+export const DESK_KEY = 'as-instructed.desk';
 
 export type DocKind = 'order' | 'certificate' | 'halt' | 'requisition' | 'issue' | 'memo';
 
