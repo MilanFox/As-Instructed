@@ -80,14 +80,6 @@ export function TransportDeck({
           <button
             type="button"
             className="control control--tight"
-            onClick={() => workspace.step(-10)}
-            aria-label="Back ten ticks"
-          >
-            −10
-          </button>
-          <button
-            type="button"
-            className="control control--tight"
             onClick={() => workspace.step(-1)}
             aria-label="Back one tick"
           >
@@ -108,14 +100,6 @@ export function TransportDeck({
             aria-label="Forward one tick"
           >
             +1
-          </button>
-          <button
-            type="button"
-            className="control control--tight"
-            onClick={() => workspace.step(10)}
-            aria-label="Forward ten ticks"
-          >
-            +10
           </button>
         </span>
 
