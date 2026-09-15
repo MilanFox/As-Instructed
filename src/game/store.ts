@@ -22,6 +22,11 @@ export interface AuditSeeds {
   note: string;
 }
 
+export interface BlockedLevel {
+  levelId: string;
+  reason: 'locked' | 'unknown';
+}
+
 export interface ConsoleLine {
   id: number;
   t: number;
@@ -36,9 +41,14 @@ export const BASE_TICKS_PER_SECOND = 4;
 
 const UI_WATCHDOG_MS = WORKER_TIMEOUT_MS + 2000;
 
+// Every keystroke resets the loaded run, so the replacement is only worth running once the
+// typing stops.
+const PRIME_IDLE_MS = 400;
+
 export interface GameState {
   screen: Screen;
   currentLevelId: string | null;
+  blocked: BlockedLevel | null;
   save: SaveFile;
   code: string;
 
@@ -120,6 +130,8 @@ export function runSeeds(own: readonly number[], audit?: AuditSeeds): number[] {
 
 let lineId = 0;
 let watchdog: ReturnType<typeof setTimeout> | null = null;
+let primeTimer: ReturnType<typeof setTimeout> | null = null;
+let primeGeneration = 0;
 
 let lastDispatched: { levelId: string; attempt: number; source: string } | null = null;
 
@@ -303,15 +315,33 @@ export const useGame = create<GameState>((set, get) => {
     };
   }
 
+  function cancelPrime(): void {
+    if (primeTimer) clearTimeout(primeTimer);
+    primeTimer = null;
+    primeGeneration += 1;
+  }
+
+  function schedulePrime(): void {
+    cancelPrime();
+    primeTimer = setTimeout(() => {
+      primeTimer = null;
+      const state = get();
+      if (state.runState === 'running' || state.previewState === 'running') return;
+      if (state.trace !== null || state.currentLevelId === null) return;
+      primeTrace(state.currentLevelId, state.code);
+    }, PRIME_IDLE_MS);
+  }
+
   function primeTrace(levelId: string, code: string): void {
     const level = getLevel(levelId);
     if (!level) return;
     const token = get().runToken;
+    const generation = primeGeneration;
     get()
       .runner()
       .run({ code, levelId, seeds: [level.seeds[0] as number] })
       .then((response) => {
-        if (get().runToken !== token || !response.ok) return;
+        if (get().runToken !== token || primeGeneration !== generation || !response.ok) return;
         get().renderer().setTrace(response.trace);
         get().renderer().seek(0);
         set({
@@ -329,6 +359,7 @@ export const useGame = create<GameState>((set, get) => {
   return {
     screen: 'levels',
     currentLevelId: startLevel,
+    blocked: null,
     save,
     code: startLevel ? (save.levels[startLevel]?.code ?? getLevel(startLevel)?.starter ?? '') : '',
 
@@ -390,22 +421,33 @@ export const useGame = create<GameState>((set, get) => {
 
     goto(screen) {
       get().pause();
-      set({ screen });
+      set({ screen, blocked: null });
     },
 
     openLevel(levelId) {
       const level = getLevel(levelId);
-      if (!level) return;
+      if (!level) {
+        get().pause();
+        set({ screen: 'levels', blocked: { levelId, reason: 'unknown' } });
+        return;
+      }
+      if (!isLevelUnlocked(get().save, levelId)) {
+        get().pause();
+        set({ screen: 'levels', blocked: { levelId, reason: 'locked' } });
+        return;
+      }
       const stored = get().save.levels[levelId];
       get().pause();
       get().renderer().setWorld(level.world);
       get().renderer().setTrace(null);
       get().runner().prepare(levelId);
       clearWatchdog();
+      cancelPrime();
       const undelivered = level.hardware;
       set({
         screen: 'workspace',
         currentLevelId: levelId,
+        blocked: null,
         code: stored?.code ?? level.starter,
         runState: 'idle',
         runToken: get().runToken + 1,
@@ -432,8 +474,10 @@ export const useGame = create<GameState>((set, get) => {
 
     setCode(code) {
       const id = get().currentLevelId;
-      if (code !== get().code && get().trace !== null) get().resetPreview();
+      const changed = code !== get().code;
+      if (changed && get().trace !== null) get().resetPreview();
       set({ code });
+      if (changed) schedulePrime();
       if (!id) return;
       const levels = { ...get().save.levels };
       levels[id] = { ...(levels[id] ?? emptyProgress()), code };
@@ -486,6 +530,7 @@ export const useGame = create<GameState>((set, get) => {
       const audit = state.auditSeeds[level.id];
       const seeds = runSeeds(level.seeds, audit);
       const token = state.runToken + 1;
+      cancelPrime();
       state.pause();
       set({
         runToken: token,
@@ -761,6 +806,7 @@ export const useGame = create<GameState>((set, get) => {
 
       const seeds = [level.seeds[0] as number];
       const token = state.runToken + 1;
+      cancelPrime();
       state.pause();
       set({
         runToken: token,
@@ -859,6 +905,7 @@ export const useGame = create<GameState>((set, get) => {
 
     resetPreview() {
       const state = get();
+      cancelPrime();
       if (state.previewState === 'running') cancelPreview();
       else if (state.runState === 'running') state.cancel();
 
@@ -874,6 +921,9 @@ export const useGame = create<GameState>((set, get) => {
         endTick: 0,
         runMode: null,
         showResults: false,
+        failure: null,
+        console: [],
+        suppressed: 0,
       });
     },
 
@@ -1020,6 +1070,28 @@ export function isLevelUnlocked(save: SaveFile, levelId: string): boolean {
   if (world === undefined) return false;
   const before = order.filter((candidate) => candidate.world === world - 1);
   return before.length > 0 && before.every((c) => save.levels[c.id]?.completed === true);
+}
+
+export interface LockReason {
+  opensOnClosing: string | null;
+  previousWorld: number | null;
+  outstanding: string[];
+}
+
+export function lockReason(save: SaveFile, levelId: string): LockReason | null {
+  const order = campaignOrder();
+  const index = order.findIndex((level) => level.id === levelId);
+  if (index < 0 || isLevelUnlocked(save, levelId)) return null;
+
+  const world = order[index]?.world ?? 0;
+  const before = order.filter((candidate) => candidate.world === world - 1);
+  return {
+    opensOnClosing: order[Math.max(0, index - LEVELS_OPENED_BY_A_CLOSE)]?.id ?? null,
+    previousWorld: before.length > 0 ? world - 1 : null,
+    outstanding: before
+      .filter((candidate) => !save.levels[candidate.id]?.completed)
+      .map((candidate) => candidate.id),
+  };
 }
 
 export function unlockedHardware(levelId: string): string[] {

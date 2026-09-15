@@ -16,6 +16,7 @@ import { Settings } from './screens/Settings.tsx';
 import { LevelSelect } from './screens/LevelSelect.tsx';
 import { Workspace } from './workspace/Workspace.tsx';
 import './art.ts';
+import './router.ts';
 import './styles/fonts.css';
 import './styles/app.css';
 import './styles/settings.css';

@@ -2,14 +2,14 @@ import { describe, expect, test, vi } from 'vitest';
 import type { ActEvent, World } from '../../engine/index.ts';
 import { FED_BY, Terrain, machineById, tileAt } from '../../engine/index.ts';
 import { FakeRunner } from '../../game/ports.ts';
-import { emptySave } from '../../game/save.ts';
+import { emptyProgress, emptySave } from '../../game/save.ts';
 import { objectivesOnEverySeed } from '../../game/score.ts';
 import { useGame } from '../../game/store.ts';
 import { unlockedApiNames } from '../../runtime/ambient.ts';
 import { aggregate } from '../../runtime/aggregate.ts';
 import { runSeed } from '../../runtime/run-level.ts';
 import type { LevelDef, ReferenceSolution } from '../types.ts';
-import { getLevel } from '../index.ts';
+import { campaignOrder, getLevel } from '../index.ts';
 import { runReference } from '../harness.ts';
 import { SOLUTIONS } from './solutions.ts';
 import { formErrandOnly } from './naive.ts';
@@ -154,7 +154,11 @@ describe('a partly-correct program is credited per objective, per seed', () => {
   });
 
   test('the credit survives the run that earned it', async () => {
-    useGame.setState({ save: emptySave() });
+    const opened = emptySave();
+    for (const level of campaignOrder()) {
+      if (level.world === 7) opened.levels[level.id] = { ...emptyProgress(), completed: true };
+    }
+    useGame.setState({ save: opened });
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
     useGame.getState().openLevel('w8-05');
     useGame.getState().setCode(IDLE);

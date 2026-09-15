@@ -14,6 +14,7 @@ import { isLevelUnlocked, useGame } from '../../game/store.ts';
 import { campaignOrder, levelsByWorld } from '../../levels/index.ts';
 import { MedalBadge } from '../components/MedalBadge.tsx';
 import type { LevelDef, WorldMeta } from '../../levels/index.ts';
+import { LockedLevel } from './LockedLevel.tsx';
 import '../styles/screens.css';
 
 type StyleVars = CSSProperties & Record<`--${string}`, string>;
@@ -182,6 +183,11 @@ function LockGlyph(): JSX.Element {
 }
 
 export function LevelSelect(): JSX.Element {
+  const blocked = useGame((state) => state.blocked);
+  return blocked ? <LockedLevel blocked={blocked} /> : <SiteMap />;
+}
+
+function SiteMap(): JSX.Element {
   const save = useGame((state) => state.save);
   const openLevel = useGame((state) => state.openLevel);
 

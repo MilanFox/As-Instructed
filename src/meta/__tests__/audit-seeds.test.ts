@@ -157,6 +157,7 @@ describe('the wire from the incident list to the run', () => {
 });
 
 const AUDITED = 'w1-03';
+const OPENS_AUDITED = 'w1-01';
 const AUDIT_LAYOUT = 4471;
 const OBJECTIVE = 'inspect-all';
 const BONUS = 'one-move-per-tile';
@@ -250,7 +251,10 @@ describe('an audit layout gates the close but never grades it', () => {
     useGame.setState({
       save: {
         ...emptySave(),
-        ...(stored ? { levels: { [AUDITED]: stored } } : {}),
+        levels: {
+          [OPENS_AUDITED]: { ...emptyProgress(), completed: true },
+          ...(stored ? { [AUDITED]: stored } : {}),
+        },
       },
     });
     useGame.getState().attachRunner(runner);
