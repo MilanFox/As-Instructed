@@ -168,6 +168,12 @@ export interface WorkspaceData {
   hintsRevealed: number;
   revealHint(count: number): void;
 
+  seedsUnlocked: boolean;
+  surveySeed: number | null;
+  surveyHolding: boolean;
+  unlockSeeds(): void;
+  showSeed(seed: number | null): void;
+
   report: ReportSnapshot | null;
   closePending: boolean;
   closeOut(): void;
@@ -277,6 +283,13 @@ export function useWorkspace(): WorkspaceData {
   const banked = useGame((state) =>
     levelId ? (state.save.levels[levelId]?.objectives ?? NO_BANKED) : NO_BANKED,
   );
+  const seedsUnlocked = useGame((state) =>
+    levelId ? state.save.levels[levelId]?.seedsUnlocked === true : false,
+  );
+  const surveySeed = useGame((state) => state.surveySeed);
+  const surveyHolding = useGame((state) => state.heldRun !== null);
+  const unlockSeeds = useGame((state) => state.unlockSeeds);
+  const showSeed = useGame((state) => state.showSeed);
 
   const docs = usePapers((state) => state.docs);
 
@@ -332,8 +345,8 @@ export function useWorkspace(): WorkspaceData {
 
   const board = useMemo<World | null>(() => {
     if (trace) return replayTo(trace, flooredTick);
-    return level ? level.build(level.seeds[0] as number) : null;
-  }, [level, trace, flooredTick]);
+    return level ? level.build(surveySeed ?? (level.seeds[0] as number)) : null;
+  }, [level, trace, flooredTick, surveySeed]);
 
   const showFuel = useMemo(() => (level ? levelUsesFuel(level) : false), [level]);
   const fuel = useMemo<FuelRow | null>(() => {
@@ -378,8 +391,9 @@ export function useWorkspace(): WorkspaceData {
   }, [level, grade]);
 
   const initialWorld = useMemo<World | null>(
-    () => trace?.initialWorld ?? (level ? level.build(level.seeds[0] as number) : null),
-    [level, trace],
+    () =>
+      trace?.initialWorld ?? (level ? level.build(surveySeed ?? (level.seeds[0] as number)) : null),
+    [level, trace, surveySeed],
   );
 
   const legend = useMemo(() => legendFor(initialWorld), [initialWorld]);
@@ -544,6 +558,11 @@ export function useWorkspace(): WorkspaceData {
     hints: level?.hints ?? NO_HINTS,
     hintsRevealed,
     revealHint,
+    seedsUnlocked,
+    surveySeed,
+    surveyHolding,
+    unlockSeeds,
+    showSeed,
     report,
     closePending,
     closeOut,

@@ -75,11 +75,37 @@ export function Dossier({ workspace }: DossierProps): React.ReactElement | null 
         )}
         <p className="board-row">
           <span className="board-tag">Seeds</span>
-          <span className="note">{brief.seeds.join(' · ')}</span>
+          {workspace.seedsUnlocked ? (
+            <span className="seed-picker">
+              {brief.seeds.map((seed) => (
+                <button
+                  key={seed}
+                  type="button"
+                  className="control control--tight"
+                  aria-label={`Draw seed ${String(seed)}`}
+                  aria-pressed={workspace.surveySeed === seed}
+                  onClick={() => workspace.showSeed(seed)}
+                >
+                  {String(seed)}
+                </button>
+              ))}
+              {workspace.surveySeed === null ? null : (
+                <button
+                  type="button"
+                  className="control control--tight"
+                  onClick={() => workspace.showSeed(null)}
+                >
+                  {workspace.surveyHolding ? 'Return to the run' : 'Close the survey'}
+                </button>
+              )}
+            </span>
+          ) : (
+            <span className="note">{brief.seeds.join(' · ')}</span>
+          )}
         </p>
       </div>
 
-      {workspace.hints.length === 0 ? null : (
+      {workspace.hints.length === 0 && workspace.seedsUnlocked ? null : (
         <div className="dossier-section">
           <h2 className="dossier-section__title">Field notes</h2>
           {workspace.hints.slice(0, shown).map((hint, index) => (
@@ -97,6 +123,22 @@ export function Dossier({ workspace }: DossierProps): React.ReactElement | null 
             >
               Request note {String(shown + 1)} of {String(workspace.hints.length)}
             </button>
+          )}
+          {workspace.seedsUnlocked ? null : (
+            <>
+              <button
+                type="button"
+                className="control"
+                style={{ marginTop: 10 }}
+                onClick={() => workspace.unlockSeeds()}
+              >
+                Request the seed survey
+              </button>
+              <p className="note" style={{ marginTop: 8 }}>
+                The survey draws any seed on this order&rsquo;s schedule as an unrun board. It does
+                not run your program and it grades nothing.
+              </p>
+            </>
           )}
         </div>
       )}

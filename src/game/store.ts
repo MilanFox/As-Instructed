@@ -22,6 +22,12 @@ export interface AuditSeeds {
   note: string;
 }
 
+export interface HeldRun {
+  trace: Trace;
+  tick: number;
+  endTick: number;
+}
+
 export interface BlockedLevel {
   levelId: string;
   reason: 'locked' | 'unknown';
@@ -69,6 +75,8 @@ export interface GameState {
   personalBest: { previous: number; now: number } | null;
   requisition: { levelId: string; hardware: string[] } | null;
   auditSeeds: Readonly<Record<string, AuditSeeds>>;
+  surveySeed: number | null;
+  heldRun: HeldRun | null;
 
   tick: number;
   endTick: number;
@@ -92,6 +100,8 @@ export interface GameState {
   setCode(code: string): void;
   resetCode(): void;
   revealHint(count: number): void;
+  unlockSeeds(): void;
+  showSeed(seed: number | null): void;
   setPanel(panel: 'brief' | 'console' | 'docs' | 'library'): void;
   setDocsOpen(open: boolean): void;
   setLayout(patch: Partial<SaveFile['settings']['layout']>): void;
@@ -126,6 +136,42 @@ export interface GameState {
 export function runSeeds(own: readonly number[], audit?: AuditSeeds): number[] {
   if (!audit) return [...own];
   return [...own, ...audit.seeds.filter((seed) => !own.includes(seed))];
+}
+
+export function earnsSeedSurvey(
+  level: LevelDef,
+  medal: Medal | null,
+  earned: readonly string[],
+): boolean {
+  if (medal !== Medal.Gold) return false;
+  return (level.bonus ?? []).every((objective) => earned.includes(objective.id));
+}
+
+export interface SurveyView {
+  surveySeed: number | null;
+  heldRun: HeldRun | null;
+  trace: Trace | null;
+  tick: number;
+  endTick: number;
+}
+
+// The renderer only draws a preview world while it holds no trace, so surveying a seed has to
+// take the run's trace off the board — and hand it back untouched when the survey closes.
+export function surveyTransition(current: SurveyView, seed: number | null): SurveyView {
+  if (seed === null) {
+    const held = current.heldRun;
+    return {
+      surveySeed: null,
+      heldRun: null,
+      trace: held?.trace ?? current.trace,
+      tick: held?.tick ?? current.tick,
+      endTick: held?.endTick ?? current.endTick,
+    };
+  }
+  const held =
+    current.heldRun ??
+    (current.trace ? { trace: current.trace, tick: current.tick, endTick: current.endTick } : null);
+  return { surveySeed: seed, heldRun: held, trace: null, tick: 0, endTick: 0 };
 }
 
 let lineId = 0;
@@ -328,6 +374,7 @@ export const useGame = create<GameState>((set, get) => {
       const state = get();
       if (state.runState === 'running' || state.previewState === 'running') return;
       if (state.trace !== null || state.currentLevelId === null) return;
+      if (state.surveySeed !== null) return;
       primeTrace(state.currentLevelId, state.code);
     }, PRIME_IDLE_MS);
   }
@@ -342,6 +389,7 @@ export const useGame = create<GameState>((set, get) => {
       .run({ code, levelId, seeds: [level.seeds[0] as number] })
       .then((response) => {
         if (get().runToken !== token || primeGeneration !== generation || !response.ok) return;
+        if (get().surveySeed !== null) return;
         get().renderer().setTrace(response.trace);
         get().renderer().seek(0);
         set({
@@ -380,6 +428,8 @@ export const useGame = create<GameState>((set, get) => {
     personalBest: null,
     requisition: null,
     auditSeeds: {},
+    surveySeed: null,
+    heldRun: null,
 
     tick: 0,
     endTick: 0,
@@ -463,6 +513,8 @@ export const useGame = create<GameState>((set, get) => {
         freshCommendations: [],
         personalBest: null,
         requisition: undelivered.length > 0 ? { levelId, hardware: undelivered } : null,
+        surveySeed: null,
+        heldRun: null,
         tick: 0,
         endTick: 0,
         console: [],
@@ -476,6 +528,8 @@ export const useGame = create<GameState>((set, get) => {
       const id = get().currentLevelId;
       const changed = code !== get().code;
       if (changed && get().trace !== null) get().resetPreview();
+      // A survey has the run off the board, so the edit retires it there instead.
+      else if (changed && get().heldRun !== null) set({ heldRun: null });
       set({ code });
       if (changed) schedulePrime();
       if (!id) return;
@@ -500,6 +554,31 @@ export const useGame = create<GameState>((set, get) => {
       persist({ ...get().save, levels });
     },
 
+    unlockSeeds() {
+      const id = get().currentLevelId;
+      if (!id) return;
+      const levels = { ...get().save.levels };
+      const progress = levels[id] ?? emptyProgress();
+      if (progress.seedsUnlocked === true) return;
+      levels[id] = { ...progress, seedsUnlocked: true };
+      persist({ ...get().save, levels });
+    },
+
+    showSeed(seed) {
+      const state = get();
+      const level = currentLevel(state);
+      if (!level || seed === state.surveySeed) return;
+      if (seed !== null && !level.seeds.includes(seed)) return;
+      if (seed !== null && state.save.levels[level.id]?.seedsUnlocked !== true) return;
+
+      cancelPrime();
+      state.pause();
+      const next = surveyTransition(state, seed);
+      state.renderer().setTrace(next.trace);
+      if (next.trace) state.renderer().seek(next.tick);
+      set(next);
+    },
+
     setPanel(panel) {
       set({ brief: panel });
     },
@@ -519,11 +598,12 @@ export const useGame = create<GameState>((set, get) => {
     },
 
     run() {
-      const state = get();
-      if (state.runState === 'running') {
-        state.cancel();
+      if (get().runState === 'running') {
+        get().cancel();
         return;
       }
+      get().showSeed(null);
+      const state = get();
       const level = state.currentLevelId ? getLevel(state.currentLevelId) : undefined;
       if (!level) return;
 
@@ -683,6 +763,9 @@ export const useGame = create<GameState>((set, get) => {
           objectives: [...(previous.objectives ?? []), ...closed],
           ...(verdict.passed ? { bestTicks: verdict.stats.ticks } : {}),
           ...(verdict.passed && !previous.clearedAt ? { clearedAt: Date.now() } : {}),
+          ...(verdict.passed && earnsSeedSurvey(levelDef, medal, earned)
+            ? { seedsUnlocked: true }
+            : {}),
           code: get().code,
         });
         next.attempts = attempt;
@@ -794,13 +877,14 @@ export const useGame = create<GameState>((set, get) => {
     },
 
     preview() {
-      const state = get();
-      if (state.runState === 'running') return;
-      if (state.previewState === 'running') {
+      if (get().runState === 'running') return;
+      if (get().previewState === 'running') {
         cancelPreview();
         pushLines([{ t: 0, kind: 'system', text: 'preview cancelled' }]);
         return;
       }
+      get().showSeed(null);
+      const state = get();
       const level = state.currentLevelId ? getLevel(state.currentLevelId) : undefined;
       if (!level) return;
 
@@ -917,6 +1001,8 @@ export const useGame = create<GameState>((set, get) => {
         seedResults: [],
         traceSeed: null,
         failedSeed: null,
+        surveySeed: null,
+        heldRun: null,
         tick: 0,
         endTick: 0,
         runMode: null,

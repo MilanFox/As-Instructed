@@ -2,11 +2,20 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { RunResponse } from '../../runtime/protocol.ts';
 import type { RunSubmission, RunnerPort } from '../ports.ts';
 import { FakeRunner } from '../ports.ts';
+import type { Trace } from '../../engine/index.ts';
+import { Medal } from '../../engine/index.ts';
+import type { LevelDef } from '../../levels/index.ts';
 import { campaignOrder, getLevel } from '../../levels/index.ts';
 import type { SaveFile } from '../save.ts';
 import { emptyProgress, emptySave } from '../save.ts';
 import type { GameState } from '../store.ts';
-import { LEVELS_OPENED_BY_A_CLOSE, isLevelUnlocked, useGame } from '../store.ts';
+import {
+  LEVELS_OPENED_BY_A_CLOSE,
+  earnsSeedSurvey,
+  isLevelUnlocked,
+  surveyTransition,
+  useGame,
+} from '../store.ts';
 
 class ScriptedRunner implements RunnerPort {
   private readonly pending: {
@@ -107,6 +116,19 @@ const W1_01_ROUTE = [
 ];
 
 const W1_01_SOLUTION = W1_01_ROUTE.join('\n');
+
+// Five rows is odd, so a row-by-row snake ends against the far wall: gold and the star.
+const W1_03_SNAKE = [
+  'function sweep(dir) { while (canMove(dir)) move(dir); }',
+  'function flip(dir) { return dir === Dir.East ? Dir.West : Dir.East; }',
+  'function snake(climb) {',
+  '  let heading = Dir.East;',
+  '  sweep(heading);',
+  '  while (canMove(climb)) { move(climb); heading = flip(heading); sweep(heading); }',
+  '}',
+  'snake(Dir.South);',
+  'snake(Dir.North);',
+].join('\n');
 
 const W1_01_SLOWER = [...W1_01_ROUTE.slice(0, 5), 'wait(3);', ...W1_01_ROUTE.slice(5)].join('\n');
 
@@ -348,6 +370,7 @@ describe('preview', () => {
   it('does not disturb a dispatch already recorded on the same work order', async () => {
     reset();
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+    pickUp('w1-01');
     await runOnce(W1_01_SOLUTION);
     const recorded = useGame.getState().save;
     expect(recorded.levels['w1-01']?.completed).toBe(true);
@@ -513,6 +536,7 @@ describe('rewards', () => {
   it('pays no commendation for an ordinary close', async () => {
     reset();
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+    pickUp('w1-01');
     await runOnce(W1_01_SOLUTION);
 
     const state = useGame.getState();
@@ -630,6 +654,7 @@ describe('rewards', () => {
   it('tallies a failed run without taking anything away', async () => {
     reset();
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+    pickUp('w1-01');
     await runOnce(W1_01_SOLUTION);
     expect(useGame.getState().save.stats.passes).toBe(1);
 
@@ -782,6 +807,8 @@ const RUN_SHAPED = [
   'previewState',
   'trace',
   'verdict',
+  'surveySeed',
+  'heldRun',
   'seedResults',
   'traceSeed',
   'failedSeed',
@@ -898,5 +925,158 @@ describe('a freshly opened work order carries no run', () => {
 
     expect(runShape(useGame.getState())).toEqual(AT_REST);
     expect(useGame.getState().save.stats).toEqual({ runs: 0, passes: 0, fails: 0 });
+  });
+});
+
+describe('earnsSeedSurvey', () => {
+  const level = getLevel('w1-03') as LevelDef;
+  const everyBonus = (level.bonus ?? []).map((objective) => objective.id);
+
+  it('is asked of an order that actually has a bonus to sweep', () => {
+    expect(everyBonus.length).toBeGreaterThan(0);
+  });
+
+  it('opens on gold with every bonus taken', () => {
+    expect(earnsSeedSurvey(level, Medal.Gold, everyBonus)).toBe(true);
+  });
+
+  it('stays shut on gold with a bonus still open', () => {
+    expect(earnsSeedSurvey(level, Medal.Gold, [])).toBe(false);
+  });
+
+  it('stays shut below gold, however clean the sweep', () => {
+    expect(earnsSeedSurvey(level, Medal.Silver, everyBonus)).toBe(false);
+    expect(earnsSeedSurvey(level, Medal.Bronze, everyBonus)).toBe(false);
+    expect(earnsSeedSurvey(level, null, everyBonus)).toBe(false);
+  });
+});
+
+describe('surveyTransition', () => {
+  const trace = { endTick: 40 } as unknown as Trace;
+  const watching = { surveySeed: null, heldRun: null, trace, tick: 12, endTick: 40 };
+  const empty = { surveySeed: null, heldRun: null, trace: null, tick: 0, endTick: 0 };
+
+  it('takes the run off the board and holds on to it', () => {
+    expect(surveyTransition(watching, 4)).toEqual({
+      surveySeed: 4,
+      heldRun: { trace, tick: 12, endTick: 40 },
+      trace: null,
+      tick: 0,
+      endTick: 0,
+    });
+  });
+
+  it('leaves the scrubber pointing at nothing while the survey is open', () => {
+    const entered = surveyTransition(watching, 4);
+    expect(entered.trace).toBeNull();
+    expect(entered.endTick).toBe(0);
+  });
+
+  it('keeps the first hold while the player walks the schedule', () => {
+    const entered = surveyTransition(watching, 4);
+    const moved = surveyTransition(entered, 7);
+    expect(moved.surveySeed).toBe(7);
+    expect(moved.heldRun).toBe(entered.heldRun);
+  });
+
+  it('hands the run back on the way out, at the tick it was left on', () => {
+    expect(surveyTransition(surveyTransition(watching, 4), null)).toEqual(watching);
+  });
+
+  it('holds nothing when there was no run to hold', () => {
+    const entered = surveyTransition(empty, 4);
+    expect(entered.heldRun).toBeNull();
+    expect(surveyTransition(entered, null)).toEqual(empty);
+  });
+});
+
+describe('the seed survey', () => {
+  it('refuses a seed until the order has released the survey', () => {
+    reset();
+    pickUp('w1-02');
+    useGame.getState().showSeed(4);
+    expect(useGame.getState().surveySeed).toBeNull();
+
+    useGame.getState().unlockSeeds();
+    expect(useGame.getState().save.levels['w1-02']?.seedsUnlocked).toBe(true);
+    expect(useGame.getState().surveySeed).toBeNull();
+
+    useGame.getState().showSeed(4);
+    expect(useGame.getState().surveySeed).toBe(4);
+  });
+
+  it('refuses a seed the work order does not run', () => {
+    reset();
+    pickUp('w1-02');
+    useGame.getState().unlockSeeds();
+    useGame.getState().showSeed(999);
+    expect(useGame.getState().surveySeed).toBeNull();
+  });
+
+  it('hands a dispatched run back without dispatching it again', async () => {
+    reset();
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+    pickUp('w1-02');
+    useGame.getState().unlockSeeds();
+    await runOnce('move(Dir.East);');
+    const dispatched = useGame.getState().trace;
+    expect(dispatched).not.toBeNull();
+
+    useGame.getState().showSeed(7);
+    expect(useGame.getState().trace).toBeNull();
+    expect(useGame.getState().endTick).toBe(0);
+    expect(useGame.getState().heldRun?.trace).toBe(dispatched);
+
+    useGame.getState().showSeed(null);
+    expect(useGame.getState().trace).toBe(dispatched);
+    expect(useGame.getState().endTick).toBeGreaterThan(0);
+    expect(useGame.getState().heldRun).toBeNull();
+  });
+
+  it('retires the held run when the program it graded is edited', async () => {
+    reset();
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+    pickUp('w1-02');
+    useGame.getState().unlockSeeds();
+    await runOnce('move(Dir.East);');
+    useGame.getState().showSeed(7);
+    expect(useGame.getState().heldRun).not.toBeNull();
+
+    useGame.getState().setCode('move(Dir.West);');
+    expect(useGame.getState().heldRun).toBeNull();
+    expect(useGame.getState().surveySeed).toBe(7);
+  });
+
+  it('is left behind by a new dispatch', async () => {
+    reset();
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+    pickUp('w1-02');
+    useGame.getState().unlockSeeds();
+    useGame.getState().showSeed(7);
+    await runOnce('move(Dir.East);');
+    expect(useGame.getState().surveySeed).toBeNull();
+    expect(useGame.getState().heldRun).toBeNull();
+    expect(useGame.getState().trace).not.toBeNull();
+  });
+
+  it('is released by a gold run that leaves no bonus open', async () => {
+    reset();
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+    pickUp('w1-03');
+    await runOnce(W1_03_SNAKE);
+
+    const progress = useGame.getState().save.levels['w1-03'];
+    expect(progress?.medal).toBe(Medal.Gold);
+    expect(progress?.stars).toEqual((getLevel('w1-03')?.bonus ?? []).map((row) => row.id));
+    expect(progress?.seedsUnlocked).toBe(true);
+  });
+
+  it('is not released by a run that closed nothing', async () => {
+    reset();
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+    pickUp('w1-03');
+    await runOnce('move(Dir.West);');
+    expect(useGame.getState().verdict?.passed).toBe(false);
+    expect(useGame.getState().save.levels['w1-03']?.seedsUnlocked).toBeUndefined();
   });
 });

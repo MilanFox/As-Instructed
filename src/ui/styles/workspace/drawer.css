@@ -218,6 +218,12 @@
   color: #000;
 }
 
+.seed-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .field-note {
   padding: 10px 0;
 }

@@ -15,6 +15,7 @@ export interface LevelProgress {
   attempts: number;
   clearedAt?: number;
   hintsRevealed?: number;
+  seedsUnlocked?: boolean;
 }
 
 export interface Layout {
@@ -127,6 +128,7 @@ function rescueLevels(raw: unknown): Record<string, LevelProgress> {
     if (isPositive(value['attempts'])) progress.attempts = value['attempts'];
     if (isPositive(value['clearedAt'])) progress.clearedAt = value['clearedAt'];
     if (isPositive(value['hintsRevealed'])) progress.hintsRevealed = value['hintsRevealed'];
+    if (value['seedsUnlocked'] === true) progress.seedsUnlocked = true;
     levels[id] = progress;
   }
   return levels;
@@ -319,6 +321,7 @@ export function mergeProgress(
   if (code !== undefined) merged.code = code;
   const hints = Math.max(current.hintsRevealed ?? 0, next.hintsRevealed ?? 0);
   if (hints > 0) merged.hintsRevealed = hints;
+  if (current.seedsUnlocked === true || next.seedsUnlocked === true) merged.seedsUnlocked = true;
   const ticks = minDefined(current.bestTicks, next.bestTicks);
   if (ticks !== undefined) merged.bestTicks = ticks;
   const clearedAt = minDefined(current.clearedAt, next.clearedAt);

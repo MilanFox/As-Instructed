@@ -12,7 +12,7 @@ import {
   migrate,
   parseSave,
 } from '../save.ts';
-import type { SaveFile } from '../save.ts';
+import type { LevelProgress, SaveFile } from '../save.ts';
 
 describe('migrate', () => {
   it('reads a current-version save unchanged', () => {
@@ -527,5 +527,39 @@ describe('the fields that outlive a session', () => {
   it('takes an incoming start date when there was none to keep', () => {
     const merged = importSave(emptySave(), exportSave({ ...emptySave(), firstRunAt: 700 }));
     expect(merged.firstRunAt).toBe(700);
+  });
+});
+
+describe('the seed survey unlock', () => {
+  it('survives a save round trip, because rescueLevels parses it', () => {
+    const save = emptySave();
+    save.levels['w1-02'] = { ...emptyProgress(), seedsUnlocked: true };
+    expect(parseSave(exportSave(save)).levels['w1-02']?.seedsUnlocked).toBe(true);
+  });
+
+  it('reads back as version 2, so it needs no migration of its own', () => {
+    const save = emptySave();
+    save.levels['w1-02'] = { ...emptyProgress(), seedsUnlocked: true };
+    expect(parseSave(exportSave(save)).version).toBe(SAVE_VERSION);
+  });
+
+  it('is written out only once it is true', () => {
+    const save = emptySave();
+    save.levels['w1-02'] = emptyProgress();
+    const reloaded = parseSave(exportSave(save));
+    expect(reloaded.levels['w1-02']).not.toHaveProperty('seedsUnlocked');
+    expect(exportSave(reloaded)).not.toContain('seedsUnlocked');
+  });
+
+  it('survives a save written before the field existed', () => {
+    const legacy = { version: 2, levels: { 'w1-02': { completed: true, attempts: 3 } } };
+    expect(migrate(legacy).levels['w1-02']?.seedsUnlocked).toBeUndefined();
+  });
+
+  it('merges as a union, so an import can never take it back', () => {
+    const unlocked: LevelProgress = { ...emptyProgress(), seedsUnlocked: true };
+    expect(mergeProgress(unlocked, emptyProgress()).seedsUnlocked).toBe(true);
+    expect(mergeProgress(emptyProgress(), unlocked).seedsUnlocked).toBe(true);
+    expect(mergeProgress(emptyProgress(), emptyProgress())).not.toHaveProperty('seedsUnlocked');
   });
 });

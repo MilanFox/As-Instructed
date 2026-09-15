@@ -36,6 +36,7 @@ export function FeedCanvas({
   const endTick = useGame((state) => state.endTick);
   const celebrations = useGame((state) => state.save.settings.celebrations);
   const level = useGame(currentLevel);
+  const surveySeed = useGame((state) => state.surveySeed);
   const docs = usePapers((state) => state.docs);
 
   const [readout, setReadout] = useState<TileReadout | null>(null);
@@ -46,8 +47,9 @@ export function FeedCanvas({
   viewRef.current = onView;
 
   const world = useMemo<World | null>(
-    () => trace?.initialWorld ?? (level ? level.build(level.seeds[0] as number) : null),
-    [level, trace],
+    () =>
+      trace?.initialWorld ?? (level ? level.build(surveySeed ?? (level.seeds[0] as number)) : null),
+    [level, trace, surveySeed],
   );
 
   const flooredTick = Math.floor(tick);
