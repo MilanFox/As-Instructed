@@ -26,7 +26,7 @@ interface Pending {
 function defaultWorkerFactory(): WorkerLike {
   return new Worker(new URL('./sim.worker.ts', import.meta.url), {
     type: 'module',
-    name: 'bootstrap-sim',
+    name: 'as-instructed-sim',
   });
 }
 

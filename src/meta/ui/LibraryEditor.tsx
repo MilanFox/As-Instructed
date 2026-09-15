@@ -9,7 +9,7 @@ import { useLibrary } from '../store.ts';
 import './library.css';
 
 const COMPILE_DEBOUNCE_MS = 400;
-const MARKER_OWNER = 'bootstrap-library';
+const MARKER_OWNER = 'as-instructed-library';
 
 export function LibraryEditor(): React.JSX.Element {
   const source = useLibrary((state) => state.source);

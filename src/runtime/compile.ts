@@ -8,8 +8,8 @@ export type MonacoApi = typeof MonacoEditor;
 type TextModel = MonacoEditor.editor.ITextModel;
 type TsDiagnostic = MonacoEditor.languages.typescript.Diagnostic;
 
-export const PLAYER_FILE_PATH = 'file:///bootstrap/program.ts';
-const AMBIENT_FILE_PATH = 'file:///bootstrap/firmware.d.ts';
+export const PLAYER_FILE_PATH = 'file:///as-instructed/program.ts';
+const AMBIENT_FILE_PATH = 'file:///as-instructed/firmware.d.ts';
 
 const MODULE_DETECTION_FORCE = 3;
 
@@ -201,8 +201,8 @@ export async function compilePlayerCode(
   };
 }
 
-export const LIB_FILE_PATH = 'file:///bootstrap/lib.ts';
-const LIB_TYPES_PATH = 'file:///bootstrap/lib.d.ts';
+export const LIB_FILE_PATH = 'file:///as-instructed/lib.ts';
+const LIB_TYPES_PATH = 'file:///as-instructed/lib.d.ts';
 
 const EMPTY_LIB_TYPES = `declare module 'lib' {\n  export {};\n}\n`;
 

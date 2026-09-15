@@ -3,7 +3,7 @@ import { loader } from '@monaco-editor/react';
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
 
-export const THEME = 'bootstrap-dark';
+export const THEME = 'as-instructed-dark';
 
 interface MonacoEnvironmentHost {
   MonacoEnvironment?: { getWorker(moduleId: string, label: string): Worker };
@@ -62,7 +62,7 @@ export function setupMonaco(): typeof monaco {
   return monaco;
 }
 
-const WARM_UP_PATH = 'inmemory://bootstrap/typescript.ts';
+const WARM_UP_PATH = 'inmemory://as-instructed/typescript.ts';
 
 const REGISTRATION_POLL_MS = 20;
 const REGISTRATION_ATTEMPTS = 100;

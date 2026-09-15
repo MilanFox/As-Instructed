@@ -67,7 +67,7 @@ const setup = vi.hoisted(() => {
       release?.();
     },
     module: {
-      THEME: 'bootstrap-dark',
+      THEME: 'as-instructed-dark',
       monaco,
       setupMonaco: () => monaco,
       typescriptRegistered: () => registration,

@@ -13,8 +13,8 @@ export interface RunnerLike {
   run(request: RunRequest): Promise<RunResponse>;
 }
 
-const SCRATCH_PROGRAM_PATH = 'file:///bootstrap/regression/program.ts';
-const SCRATCH_LIBRARY_PATH = 'file:///bootstrap/regression/lib.ts';
+const SCRATCH_PROGRAM_PATH = 'file:///as-instructed/regression/program.ts';
+const SCRATCH_LIBRARY_PATH = 'file:///as-instructed/regression/lib.ts';
 
 interface Emitted {
   js: string;

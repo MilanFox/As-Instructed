@@ -16,8 +16,8 @@ export const METER_BINDING = '__meter__';
 
 export const LIBRARY_FRAME_NAME = '__library__';
 
-export const PROGRAM_SOURCE_URL = 'bootstrap:///program.ts';
-export const LIBRARY_SOURCE_URL = 'bootstrap:///lib.ts';
+export const PROGRAM_SOURCE_URL = 'as-instructed:///program.ts';
+export const LIBRARY_SOURCE_URL = 'as-instructed:///lib.ts';
 
 export type SourceFile = 'program' | 'lib';
 

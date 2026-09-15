@@ -5,7 +5,7 @@ const SOLUTION_PATTERN = /__solutions__/;
 
 function forbidSolutionsInBundle(): Plugin {
   return {
-    name: 'bootstrap:forbid-solutions',
+    name: 'as-instructed:forbid-solutions',
     apply: 'build',
     resolveId(source, importer) {
       if (!importer) return null;

@@ -8,7 +8,7 @@ import {
 } from './api-spec.ts';
 
 const DTS_HEADER = [
-  '// BOOTSTRAP — bot firmware API.',
+  '// AS INSTRUCTED — bot firmware API.',
   '// Generated from src/runtime/api-spec.ts. Do not edit; it is rebuilt on every level load.',
   '// Only the hardware installed on this bot is declared here.',
 ].join('\n');

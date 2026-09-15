@@ -1,9 +1,9 @@
 {
-  "name": "bootstrap",
+  "name": "as-instructed",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "BOOTSTRAP - or: How I Learned to Stop Worrying and Automate the Regolith.",
+  "description": "AS INSTRUCTED - or: How I Learned to Stop Worrying and Automate the Regolith.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

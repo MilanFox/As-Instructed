@@ -1,4 +1,4 @@
-# BOOTSTRAP
+# AS INSTRUCTED
 
 A browser puzzle-programming game. You are a contractor at Kessler & Daughters
 Terraforming Ltd: you write real TypeScript for grid-world robots on planets you never

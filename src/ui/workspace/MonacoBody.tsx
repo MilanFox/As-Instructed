@@ -6,7 +6,7 @@ import { currentLevel, resolveEventCursor, useGame } from '../../game/store.ts';
 import { LIB_FILE_PATH, PLAYER_FILE_PATH } from '../../runtime/index.ts';
 import { THEME, monaco, setupMonaco } from '../monaco-setup.ts';
 
-const RUNTIME_MARKER_OWNER = 'bootstrap-runtime';
+const RUNTIME_MARKER_OWNER = 'as-instructed-runtime';
 
 const STEP_DECORATION = {
   isWholeLine: true,
@@ -151,7 +151,7 @@ export function MonacoBody({
     if (model && model.getValue() !== code) model.setValue(code);
     editor.addCommand(api.KeyMod.CtrlCmd | api.KeyCode.Enter, () => runRef.current());
     editor.addAction({
-      id: 'bootstrap.goToFirstEventFromLine',
+      id: 'as-instructed.goToFirstEventFromLine',
       label: 'Go to the first event from this line',
       contextMenuGroupId: 'navigation',
       keybindings: [api.KeyMod.Alt | api.KeyCode.KeyE],

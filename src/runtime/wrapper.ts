@@ -61,7 +61,7 @@ export function wrapProgram(emittedJs: string): string {
 
 export function measureWrapperOffset(parseLine: (stack: string) => number | undefined): number {
   try {
-    const probe = new Function(`throw new Error('bootstrap:probe');`) as () => void;
+    const probe = new Function(`throw new Error('as-instructed:probe');`) as () => void;
     probe();
   } catch (error) {
     const stack = error instanceof Error ? error.stack : undefined;
