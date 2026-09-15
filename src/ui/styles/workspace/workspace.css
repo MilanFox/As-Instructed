@@ -8,6 +8,7 @@
   --ws-fill: #05080c;
   --ws-cut: 22px;
   --ws-inset: 16px;
+  --ws-deck-left: calc(var(--ws-telemetry) + var(--ws-inset) + 22px);
   --ws-slide: 240ms cubic-bezier(0.16, 0.88, 0.28, 1);
   --ws-slam: 170ms cubic-bezier(0.5, 0, 0.75, 0);
 
@@ -23,6 +24,7 @@
 .workspace[data-drawer='open'] {
   --ws-shift: var(--ws-drawer);
   --ws-handle-x: var(--ws-drawer);
+  --ws-deck-left: calc(var(--ws-inset) + 66px);
 }
 
 .workspace p {
