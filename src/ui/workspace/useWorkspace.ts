@@ -19,7 +19,12 @@ import { worldMeta } from '../../levels/index.ts';
 import { REPOSITORY_ISSUE } from '../../meta/copy.ts';
 import { useLibrary } from '../../meta/store.ts';
 import type { ApiFunctionSpec, RuntimeFailure } from '../../runtime/index.ts';
-import { PLAYER_API } from '../../runtime/index.ts';
+import {
+  PLAYER_API,
+  apiFunctionsFor,
+  requiredTypesFor,
+  typeDeclarationFor,
+} from '../../runtime/index.ts';
 import { fillPlaceholders, reportFor } from '../screens/review.ts';
 import { CATEGORIES, costLabel, levelCost } from '../reference/api.ts';
 import type { LegendSection } from '../reference/legend.ts';
@@ -91,6 +96,12 @@ export interface ReferenceEntry {
   description: string;
   cost: string;
   category: string;
+}
+
+export interface TypeEntry {
+  name: string;
+  declaration: string;
+  doc: string;
 }
 
 export interface NoticeData {
@@ -174,6 +185,7 @@ export interface WorkspaceData {
   dismissNotice(id: string): void;
 
   reference: readonly ReferenceEntry[];
+  types: readonly TypeEntry[];
   legend: readonly LegendSection[];
 }
 
@@ -424,6 +436,16 @@ export function useWorkspace(): WorkspaceData {
       }));
   }, [level]);
 
+  const types = useMemo<TypeEntry[]>(() => {
+    if (!level) return [];
+    const installed = apiFunctionsFor(unlockedHardware(level.id));
+    return requiredTypesFor(installed).map((type) => ({
+      name: type.name,
+      declaration: typeDeclarationFor(type, installed),
+      doc: type.doc,
+    }));
+  }, [level]);
+
   const notices = useMemo<NoticeData[]>(() => {
     const open: NoticeData[] = [];
     const review = reportFor(save);
@@ -535,6 +557,7 @@ export function useWorkspace(): WorkspaceData {
     notices,
     dismissNotice,
     reference,
+    types,
     legend,
   };
 }

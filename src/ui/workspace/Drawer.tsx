@@ -104,7 +104,11 @@ export function Drawer({
           data-on={String(tab === 'manual')}
           {...(tab === 'manual' ? {} : { inert: true })}
         >
-          <ApiManual reference={workspace.reference} legend={workspace.legend} />
+          <ApiManual
+            reference={workspace.reference}
+            types={workspace.types}
+            legend={workspace.legend}
+          />
         </div>
       </div>
 

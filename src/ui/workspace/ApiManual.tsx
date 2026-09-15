@@ -1,25 +1,58 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 
-import { Markdown } from '../components/Markdown.tsx';
-import { GUIDES, MEMORY } from '../reference/api.ts';
+import { InlineMarkdown, Markdown } from '../components/Markdown.tsx';
+import { GUIDES, MEMORY, typeParts } from '../reference/api.ts';
 import type { LegendSection } from '../reference/legend.ts';
-import type { ReferenceEntry } from './useWorkspace.ts';
+import type { ReferenceEntry, TypeEntry } from './useWorkspace.ts';
 
-type ManualPage = 'commands' | 'board' | 'guides';
+type ManualPage = 'commands' | 'types' | 'board' | 'guides';
 
 const PAGES: readonly { id: ManualPage; label: string }[] = [
   { id: 'commands', label: 'Commands' },
+  { id: 'types', label: 'Types' },
   { id: 'board', label: 'On this board' },
   { id: 'guides', label: 'Guides' },
 ];
 
 export interface ApiManualProps {
   reference: readonly ReferenceEntry[];
+  types: readonly TypeEntry[];
   legend: readonly LegendSection[];
 }
 
-export function ApiManual({ reference, legend }: ApiManualProps): React.ReactElement {
+interface TypeLinksProps {
+  text: string;
+  names: readonly string[];
+  onOpen: (name: string) => void;
+}
+
+function TypeLinks({ text, names, onOpen }: TypeLinksProps): React.ReactElement {
+  const parts = useMemo(() => typeParts(text, names), [text, names]);
+  return (
+    <>
+      {parts.map((part, index) => {
+        const name = part.type;
+        if (name === null) return <Fragment key={index}>{part.text}</Fragment>;
+        return (
+          <button
+            key={index}
+            type="button"
+            className="type-link"
+            onClick={() => {
+              onOpen(name);
+            }}
+          >
+            {part.text}
+          </button>
+        );
+      })}
+    </>
+  );
+}
+
+export function ApiManual({ reference, types, legend }: ApiManualProps): React.ReactElement {
   const [page, setPage] = useState<ManualPage>('commands');
+  const [wanted, setWanted] = useState<string | null>(null);
 
   const groups = useMemo(() => {
     const byCategory = new Map<string, ReferenceEntry[]>();
@@ -28,6 +61,26 @@ export function ApiManual({ reference, legend }: ApiManualProps): React.ReactEle
     }
     return [...byCategory];
   }, [reference]);
+
+  const names = useMemo(() => types.map((type) => type.name), [types]);
+
+  const otherNames = useMemo(
+    () => new Map(types.map((type) => [type.name, names.filter((name) => name !== type.name)])),
+    [types, names],
+  );
+
+  useEffect(() => {
+    if (wanted === null) return;
+    const entry = document.getElementById(`manual-type-${wanted}`);
+    entry?.scrollIntoView({ block: 'start' });
+    entry?.focus();
+    setWanted(null);
+  }, [wanted]);
+
+  const openType = (name: string): void => {
+    setPage('types');
+    setWanted(name);
+  };
 
   const onPageKey = (event: React.KeyboardEvent<HTMLDivElement>): void => {
     const step = event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0;
@@ -74,11 +127,47 @@ export function ApiManual({ reference, legend }: ApiManualProps): React.ReactEle
               <h2 className="dossier-section__title">{category}</h2>
               {entries.map((entry) => (
                 <div className="api-entry" key={entry.name}>
-                  <span className="api-entry__signature">{entry.signature}</span>
+                  <span className="api-entry__signature">
+                    <TypeLinks text={entry.signature} names={names} onOpen={openType} />
+                  </span>
                   <p className="api-entry__doc">{entry.description}</p>
                   <span className="api-entry__cost">{entry.cost}</span>
                 </div>
               ))}
+            </div>
+          ))
+        )}
+      </div>
+
+      <div
+        role="tabpanel"
+        id="manual-page-types"
+        aria-labelledby="manual-tab-types"
+        hidden={page !== 'types'}
+      >
+        {types.length === 0 ? (
+          <p className="empty-note">No hardware fitted yet.</p>
+        ) : (
+          types.map((entry) => (
+            <div
+              className="dossier-section manual-type"
+              key={entry.name}
+              id={`manual-type-${entry.name}`}
+              tabIndex={-1}
+            >
+              <h2 className="dossier-section__title">{entry.name}</h2>
+              <pre className="guide-example">
+                <code>
+                  <TypeLinks
+                    text={entry.declaration}
+                    names={otherNames.get(entry.name) ?? names}
+                    onOpen={openType}
+                  />
+                </code>
+              </pre>
+              <p className="api-entry__doc">
+                <InlineMarkdown source={entry.doc} />
+              </p>
             </div>
           ))
         )}

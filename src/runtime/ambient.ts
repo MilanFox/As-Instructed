@@ -84,9 +84,13 @@ function jsDocForType(type: ApiTypeSpec): string {
   return `/** ${safeForJsDoc(type.doc)} */`;
 }
 
-function declarationFor(type: ApiTypeSpec, unlocked: readonly ApiFunctionSpec[]): string {
+export function typeDeclarationFor(
+  type: ApiTypeSpec,
+  unlocked: readonly ApiFunctionSpec[],
+  docFor?: (fn: ApiFunctionSpec) => string,
+): string {
   if (type.name !== 'Bot') return type.declaration;
-  return botHandleDeclaration(perBotApi(unlocked), jsDoc);
+  return botHandleDeclaration(perBotApi(unlocked), docFor);
 }
 
 export function buildAmbientDts(unlockedHardware: string[]): string {
@@ -96,7 +100,7 @@ export function buildAmbientDts(unlockedHardware: string[]): string {
   const blocks: string[] = [DTS_HEADER];
 
   for (const type of types) {
-    blocks.push(`${jsDocForType(type)}\n${declarationFor(type, functions)}`);
+    blocks.push(`${jsDocForType(type)}\n${typeDeclarationFor(type, functions, jsDoc)}`);
   }
 
   for (const fn of functions) {

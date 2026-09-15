@@ -138,6 +138,25 @@ export function costLabel(cost: number | string): string {
   return `${cost} ticks`;
 }
 
+export interface TypePart {
+  text: string;
+  type: string | null;
+}
+
+export function typeParts(text: string, names: readonly string[]): TypePart[] {
+  if (names.length === 0) return [{ text, type: null }];
+  const pattern = new RegExp(`\\b(?:${names.join('|')})\\b`, 'g');
+  const parts: TypePart[] = [];
+  let last = 0;
+  for (let hit = pattern.exec(text); hit !== null; hit = pattern.exec(text)) {
+    if (hit.index > last) parts.push({ text: text.slice(last, hit.index), type: null });
+    parts.push({ text: hit[0], type: hit[0] });
+    last = hit.index + hit[0].length;
+  }
+  if (last < text.length) parts.push({ text: text.slice(last), type: null });
+  return parts;
+}
+
 export function matches(haystack: string, needle: string): boolean {
   return needle === '' || haystack.includes(needle);
 }

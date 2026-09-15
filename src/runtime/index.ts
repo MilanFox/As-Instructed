@@ -32,6 +32,7 @@ export {
   buildAmbientDts,
   renderSignature,
   requiredTypesFor,
+  typeDeclarationFor,
   unlockedApiNames,
 } from './ambient.ts';
 
