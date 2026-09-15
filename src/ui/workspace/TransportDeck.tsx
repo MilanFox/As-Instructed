@@ -82,6 +82,26 @@ export function TransportDeck({
         {workspace.ungraded === null ? null : (
           <span className="debug-strip__grade">{workspace.ungraded}</span>
         )}
+        <span className="transport__group debug-strip__step">
+          <button
+            type="button"
+            className="control control--tight"
+            onClick={() => workspace.stepEvent(-1)}
+            disabled={noTrace}
+            aria-label="Back one event"
+          >
+            «
+          </button>
+          <button
+            type="button"
+            className="control control--tight"
+            onClick={() => workspace.stepEvent(1)}
+            disabled={noTrace}
+            aria-label="Forward one event"
+          >
+            »
+          </button>
+        </span>
         <span className="debug-strip__text">{describeDebug(workspace.debug)}</span>
         {shutLib ? (
           <button
@@ -140,27 +160,6 @@ export function TransportDeck({
             aria-label="Forward one tick"
           >
             +1
-          </button>
-        </span>
-
-        <span className="transport__group">
-          <button
-            type="button"
-            className="control control--tight"
-            onClick={() => workspace.stepEvent(-1)}
-            disabled={noTrace}
-            aria-label="Back one event"
-          >
-            «
-          </button>
-          <button
-            type="button"
-            className="control control--tight"
-            onClick={() => workspace.stepEvent(1)}
-            disabled={noTrace}
-            aria-label="Forward one event"
-          >
-            »
           </button>
         </span>
 

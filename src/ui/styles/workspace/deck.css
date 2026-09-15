@@ -83,6 +83,16 @@
   text-transform: uppercase;
 }
 
+.debug-strip__step {
+  flex: none;
+}
+
+/* The event pair reads against the event counter, so it stays smaller than the tick transport. */
+.debug-strip__step .control {
+  padding: 2px 7px;
+  font-size: 11px;
+}
+
 /* A flex item only ellipsises once it is allowed to shrink below its content. */
 .debug-strip__text {
   flex: 1 1 auto;
