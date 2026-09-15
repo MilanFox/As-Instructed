@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { isGraded } from '../game/score.ts';
 import { currentLevel, useGame } from '../game/store.ts';
-import { CanvasRenderer, RuntimeRunner } from './adapters.ts';
+import { RuntimeRunner } from './adapters.ts';
 import { exportSave } from '../game/save.ts';
 import { worldMeta } from '../levels/index.ts';
 import { PublishDialog } from '../meta/ui/PublishDialog.tsx';
@@ -32,7 +32,6 @@ export function App(): React.JSX.Element {
     const state = useGame.getState();
     const runner = new RuntimeRunner();
     state.attachRunner(runner);
-    state.attachRenderer(new CanvasRenderer());
     const detachAudio = mountAudio();
     const detachLibrary = mountLibrary(runner);
     const level = state.currentLevelId;
