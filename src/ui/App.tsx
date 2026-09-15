@@ -3,7 +3,8 @@ import { useGame } from '../game/store.ts';
 import { RuntimeRunner } from './adapters.ts';
 import { PublishDialog } from '../meta/ui/PublishDialog.tsx';
 import { useLibrary } from '../meta/store.ts';
-import { mountAudio } from './audio.ts';
+import { audio, mountAudio } from './audio.ts';
+import { mountCues } from './cues.ts';
 import { mountLibrary } from './library.ts';
 import { ModalBoundary } from './components/ModalBoundary.tsx';
 import { usePaperwork } from './paper/usePaperwork.ts';
@@ -29,11 +30,20 @@ export function App(): React.JSX.Element {
     const runner = new RuntimeRunner();
     state.attachRunner(runner);
     const detachAudio = mountAudio();
+    const detachCues = mountCues({
+      achievement: (index, after) => {
+        audio.achievement(index, after);
+      },
+      pulse: () => {
+        useGame.getState().renderer().pulse('achievement');
+      },
+    });
     const detachLibrary = mountLibrary(runner);
     const level = state.currentLevelId;
     if (level) runner.prepare(level);
     return () => {
       detachLibrary();
+      detachCues();
       detachAudio();
     };
   }, []);

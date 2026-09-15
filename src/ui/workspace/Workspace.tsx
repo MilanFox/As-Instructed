@@ -188,7 +188,7 @@ export function Workspace(): React.ReactElement {
   }, [workspace]);
 
   const watching = running || workspace.playing;
-  const report = sheetOpen ? workspace.report : null;
+  const report = sheetOpen && !workspace.closePending ? workspace.report : null;
 
   return (
     <div
