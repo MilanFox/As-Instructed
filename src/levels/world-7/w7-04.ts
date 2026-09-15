@@ -22,6 +22,7 @@ const DEPOT_X = 2;
 const YARD_X0 = 8;
 const WALK_OUT = YARD_X0 - DEPOT_X;
 const JOB_PREFIX = 'job-';
+const FIX_BUDGET = 12;
 
 export type Shape = 'uniform' | 'spread' | 'skewed' | 'bimodal' | 'heavy';
 
@@ -265,6 +266,10 @@ export const w7_04: LevelDef = {
       value:
         'One line, `last <job> <tick>`: the job whose final `use()` landed latest — not necessarily the last one you dispatched — and the clock reading of the bot that closed it, straight after that use.',
     },
+    {
+      label: 'Fixes',
+      value: `For the star: close the board having called \`pos()\` at most ${String(FIX_BUDGET)} times in the shift, every bot's calls counted together. The fleet moves only where your program sends it, and \`move()\` reports whether the step took. Nothing else is counted — \`probe()\`, \`canMove()\` and \`clock()\` are all unlimited.`,
+    },
   ],
   seeds: [1, 2, 3, 4, 5],
   par: { ticks: 79 },
@@ -338,6 +343,9 @@ export const w7_04: LevelDef = {
       },
       { divergence: misreadDecider },
     ),
+    Objectives.withinSenses('pos', FIX_BUDGET, {
+      label: `Close the board on ${String(FIX_BUDGET)} pos() calls or fewer`,
+    }),
   ],
   starter: [
     '// NOTE(4470): the board is not sorted. it has never been sorted',
@@ -354,6 +362,7 @@ export const w7_04: LevelDef = {
     'Two bots do not become free at the same moment. The interesting question at any point is which one is free soonest, and you can answer it without asking the bot.',
     'The last job to be started decides when the shift ends. It is much better for that job to be a short one.',
     'A bot that is nearer to a job finishes it sooner. That matters, but not as much as the number written on the job.',
+    'Nothing moves a bot except your own program. Read each one out of the depot once, then keep its tile yourself as you send it about, and the yard never has to be asked again.',
   ],
   docs: ['bots', 'sync', 'probe', 'use'],
 };

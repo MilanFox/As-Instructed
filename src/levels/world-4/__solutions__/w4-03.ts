@@ -70,16 +70,21 @@ export const solution: ReferenceSolution = {
       return route === null ? Number.POSITIVE_INFINITY : route.length;
     };
 
+    let standing = sim.pos(botId);
+
     const walk = (route: Key[]): void => {
-      for (const next of route) sim.move(botId, towards(sim.pos(botId), parse(next)));
+      for (const next of route) {
+        const to = parse(next);
+        sim.move(botId, towards(standing, to));
+        standing = to;
+      }
     };
 
-    const origin = sim.pos(botId);
-    const start = key(origin.x, origin.y);
+    const start = key(standing.x, standing.y);
 
     for (;;) {
       senseHere();
-      const here = sim.pos(botId);
+      const here = standing;
       const route = routeTo(key(here.x, here.y), unfinished);
       if (route === null || route.length === 0) break;
       walk(route.slice(0, 1));
@@ -111,7 +116,7 @@ export const solution: ReferenceSolution = {
     }
 
     for (const stop of [...best, lift]) {
-      const here = sim.pos(botId);
+      const here = standing;
       const route = routeTo(key(here.x, here.y), (k) => k === stop);
       if (route !== null) walk(route);
     }
@@ -159,11 +164,18 @@ export const solution: ReferenceSolution = {
     '  const route = routeTo(a, (k) => k === b);',
     '  return route === null ? Infinity : route.length;',
     '};',
-    'const walk = (route) => { for (const n of route) move(towards(pos(), parse(n))); };',
-    'const start = key(pos().x, pos().y);',
+    'let standing = pos();',
+    'const walk = (route) => {',
+    '  for (const n of route) {',
+    '    const to = parse(n);',
+    '    move(towards(standing, to));',
+    '    standing = to;',
+    '  }',
+    '};',
+    'const start = key(standing.x, standing.y);',
     'for (;;) {',
     '  senseHere();',
-    '  const route = routeTo(key(pos().x, pos().y), unfinished);',
+    '  const route = routeTo(key(standing.x, standing.y), unfinished);',
     '  if (route === null || route.length === 0) break;',
     '  walk(route.slice(0, 1));',
     '}',
@@ -182,7 +194,7 @@ export const solution: ReferenceSolution = {
     '  if (cost < bestCost) { bestCost = cost; best = order; }',
     '}',
     'for (const stop of [...best, lift]) {',
-    '  const route = routeTo(key(pos().x, pos().y), (k) => k === stop);',
+    '  const route = routeTo(key(standing.x, standing.y), (k) => k === stop);',
     '  if (route !== null) walk(route);',
     '}',
   ].join('\n'),

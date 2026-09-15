@@ -6,7 +6,7 @@ import { playerApi } from './_api.ts';
 export const solution: ReferenceSolution = {
   levelId: 'w5-01',
   run(sim: Sim, botId: number): void {
-    const { probe, move, use, pos } = playerApi(sim, botId, 'w5-01');
+    const { probe, move, use } = playerApi(sim, botId, 'w5-01');
 
     const reactor = probe('reactor');
     const stations: MachineView[] = [];
@@ -21,8 +21,13 @@ export const solution: ReferenceSolution = {
     if (reactor === null || first === undefined) return;
     const dir = first.at.x > reactor.at.x ? Dir.East : Dir.West;
 
+    const stride = dir === Dir.East ? 1 : -1;
+    let x = reactor.at.x;
     for (const station of stations) {
-      while (pos().x !== station.at.x) move(dir);
+      while (x !== station.at.x) {
+        move(dir);
+        x += stride;
+      }
       use();
     }
   },
@@ -37,8 +42,14 @@ export const solution: ReferenceSolution = {
     'stations.sort((a, b) => a.vars.index - b.vars.index);',
     '',
     'const dir = reactor !== null && stations[0].at.x > reactor.at.x ? Dir.East : Dir.West;',
+    'const stride = dir === Dir.East ? 1 : -1;',
+    '',
+    'let x = reactor.at.x;',
     'for (const station of stations) {',
-    '  while (pos().x !== station.at.x) move(dir);',
+    '  while (x !== station.at.x) {',
+    '    move(dir);',
+    '    x += stride;',
+    '  }',
     '  use();',
     '}',
   ].join('\n'),

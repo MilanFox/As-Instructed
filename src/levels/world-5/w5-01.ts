@@ -18,6 +18,7 @@ import { at, firstNotIn } from './objectives.ts';
 
 const WIDTH = 22;
 const HEIGHT = 5;
+const FIX_BUDGET = 4;
 const ROW = 2;
 const WEST_END = 1;
 const EAST_END = WIDTH - 2;
@@ -184,7 +185,11 @@ export const w5_01: LevelDef = {
     {
       label: 'What a station reports',
       value:
-        '`index` — its place in the chain, the reactor being 0. `feed` — the index of the machine that feeds it.',
+        '`index` — its place in the chain, the reactor being 0. `feed` — the index of the machine that feeds it. `at` — the tile it stands on.',
+    },
+    {
+      label: 'Fixes',
+      value: `For the star: bring the line up having called \`pos()\` at most ${String(FIX_BUDGET)} times in the shift. Every call counts, wherever it is made. Nothing else on this level is counted — \`probe()\` and \`move()\` are both unlimited, and a \`move()\` along the line returns whether it took.`,
     },
   ],
   seeds: [1, 2, 3],
@@ -255,6 +260,9 @@ export const w5_01: LevelDef = {
       },
       { divergence: doubledBack },
     ),
+    Objectives.withinSenses('pos', FIX_BUDGET, {
+      label: `Bring the line up on ${String(FIX_BUDGET)} pos() calls or fewer`,
+    }),
   ],
   starter: [
     '// probe(id) reads any machine in the world. use() switches the one under the bot.',
@@ -266,6 +274,7 @@ export const w5_01: LevelDef = {
     'The reactor is not at the same end every shift. Where it is, is in the world, and reading the world costs nothing.',
     'probe() answers about any machine by id, not only the one under the bot. Ask about a station that might not be there and it tells you so.',
     'Every substation reports the index of the machine that feeds it. Start at the reactor and follow that chain outward; the order comes out of the chain, not out of the map.',
+    'A probe already hands back the tile every machine stands on, and the bot starts on the reactor. One step along the line changes the bot column by one, so its place on the line after any number of steps is arithmetic, not a question for the world.',
   ],
   docs: ['probe', 'use', 'move'],
 };

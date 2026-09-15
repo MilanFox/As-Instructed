@@ -83,8 +83,9 @@ export const solution: ReferenceSolution = {
 
     observe();
 
+    let mined = 0;
     for (let round = 0; round < 400; round++) {
-      const have = sim.inventory(botId, ItemKind.Ore);
+      const have = mined;
       if (have >= 5) break;
 
       const at = sim.pos(botId);
@@ -108,7 +109,7 @@ export const solution: ReferenceSolution = {
       if (bestVein) {
         walk(pathTo(via, at, bestVein.stand));
         const dir = dirBetween(sim.pos(botId), bestVein.face);
-        if (dir !== null) sim.mine(botId, dir);
+        if (dir !== null && sim.mine(botId, dir) === ItemKind.Ore) mined++;
         cut.add(key(bestVein.face));
         observe();
         continue;
@@ -190,8 +191,9 @@ export const solution: ReferenceSolution = {
     '  }',
     '}',
     'observe();',
+    'let mined = 0;',
     'for (let round = 0; round < 400; round++) {',
-    '  const have = inventory(ItemKind.Ore);',
+    '  const have = mined;',
     '  if (have >= 5) break;',
     '  const at = pos();',
     '  const here = flood(at);',
@@ -212,7 +214,8 @@ export const solution: ReferenceSolution = {
     '    drive(route(here.via, at, best.stand));',
     '    const p = pos();',
     '    const d = best.face.x > p.x ? Dir.East : best.face.x < p.x ? Dir.West : best.face.y > p.y ? Dir.South : Dir.North;',
-    '    mine(d); cut.add(k(best.face)); observe();',
+    '    if (mine(d) === ItemKind.Ore) mined++;',
+    '    cut.add(k(best.face)); observe();',
     '    continue;',
     '  }',
     '  const reserve = (5 - have) * 2 + 2;',

@@ -30,6 +30,7 @@ import { botEndsOn, died, endedOn } from './objectives.ts';
 const CELLS = 19;
 const SIZE = 40;
 export const ORE_QUOTA = 5;
+const FIX_BUDGET = 3;
 
 const WALL = Terrain.Wall;
 
@@ -219,6 +220,10 @@ export const w4_04: LevelDef = {
       label: 'The return note',
       value: `For the star: the moment the ${String(ORE_QUOTA)}th ore is cut, and before the bot moves again, file one line \`home <n>\` — the number of moves the trip back is going to take. Then take exactly that many.`,
     },
+    {
+      label: 'The hold',
+      value: `For the star: bring the quota up having called \`inventory()\` at most ${String(FIX_BUDGET)} times in the shift. A \`mine(dir)\` that returns an item put exactly one ore in the hold, and one that returns nothing put none, so the tally is the bot's own. \`fuel()\` and \`look()\` are not counted.`,
+    },
   ],
   seeds: [1, 2, 3, 4, 5],
   par: { ticks: 700 },
@@ -252,6 +257,9 @@ export const w4_04: LevelDef = {
       },
       { divergence: unfiled },
     ),
+    Objectives.withinSenses('inventory', FIX_BUDGET, {
+      label: `Cut the quota on ${String(FIX_BUDGET)} inventory() calls or fewer`,
+    }),
   ],
   starter: [
     "// import { survey, pathTo } from 'lib';",
@@ -266,6 +274,7 @@ export const w4_04: LevelDef = {
     'The bot can work out how far it is from the lift at any moment, as long as it wrote down how it got there.',
     'Before each step, ask what it would take to get home from where that step lands you. When the answer is more than the tank holds, you went too far one step ago.',
     'A program that can answer that question can also write the answer down. Work the route back out of the map you kept, count it, say it, and then drive it — in that order.',
+    'Every cut that yields says so as it happens. A running tally kept at the moment of cutting answers how full the hold is, and the hold never fills by any other means.',
   ],
   docs: ['look', 'mine', 'fuel', 'refuel', 'memory'],
 };

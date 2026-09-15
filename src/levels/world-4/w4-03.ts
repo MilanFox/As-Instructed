@@ -28,6 +28,7 @@ import {
 
 const CELLS = 14;
 const SIZE = 30;
+const FIX_BUDGET = 4;
 
 const MODES = ['spread', 'clustered', 'mixed', 'clustered'] as const;
 type Mode = (typeof MODES)[number];
@@ -241,6 +242,10 @@ export const w4_03: LevelDef = {
         'It pays for one look around and one good circuit. It does not pay for three separate trips.',
     },
     {
+      label: 'Fixes',
+      value: `For the star: finish the circuit having called \`pos()\` at most ${String(FIX_BUDGET)} times in the shift. Every route the bot drives is built out of tiles it has already written down, and a step onto a named tile puts it on that tile. \`look()\` and \`scan()\` are not counted.`,
+    },
+    {
       label: 'The Repository',
       value:
         'Nothing here needs it. But the two halves you write get names later: `survey` and `pathTo`.',
@@ -271,6 +276,9 @@ export const w4_03: LevelDef = {
       (ctx) => tookBestOrder(ctx),
       { divergence: orderTaken },
     ),
+    Objectives.withinSenses('pos', FIX_BUDGET, {
+      label: `Finish the circuit on ${String(FIX_BUDGET)} pos() calls or fewer`,
+    }),
   ],
   starter: [
     '// NOTE(4470): i kept mine like this. key(x, y) names a tile, the',
@@ -290,6 +298,7 @@ export const w4_03: LevelDef = {
     'The first thing produces no movement towards any collection point and that is fine. It produces a description of the cave.',
     'Once the cave is written down, the bot no longer has to be anywhere for you to work out how far apart two tiles are.',
     'There are six ways to order three stops. Six is a small enough number to simply try all of them.',
+    'A route is a list of tiles chosen before the bot moves. Walking one tells you where the bot ends up without the bot having to be asked, as long as the program keeps the last tile it sent it to.',
   ],
   docs: ['look', 'coordinates', 'memory'],
 };

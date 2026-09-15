@@ -35,9 +35,18 @@ export const solution: ReferenceSolution = {
       sim.wait(id, dt);
       fleet.clock[id] = t;
     };
+    let span = 0;
     const cross = (id: number, dir: Dir): void => {
+      if (span > 0) {
+        go(id, dir, span);
+        return;
+      }
       go(id, dir, 1);
-      while (!sim.canMove(id, Dir.North)) go(id, dir, 1);
+      span = 1;
+      while (!sim.canMove(id, Dir.North)) {
+        go(id, dir, 1);
+        span++;
+      }
     };
 
     let waiting = fleet.ids.slice();

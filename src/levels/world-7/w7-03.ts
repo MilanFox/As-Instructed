@@ -15,6 +15,7 @@ import type { LevelDef } from '../types.ts';
 import { at, blockedMoves, firstBump, localSeed } from './shared.ts';
 
 const HEIGHT = 9;
+const FIX_BUDGET = 16;
 export const AISLE = 7;
 export const SILO_X = 1;
 
@@ -140,6 +141,10 @@ export const w7_03: LevelDef = {
       value:
         "Free, and it asks `move`'s own question about the tick this bot would arrive on. Only another bot moving can change the answer, so a `canMove` answered by that same `move` never bounces.",
     },
+    {
+      label: 'Fixes',
+      value: `For the star: clear the yard having called \`canMove()\` at most ${String(FIX_BUDGET)} times in the shift, every bot's calls counted together. The tunnel is dug once and is the same length for every bot and every crossing, both ways. Nothing else is counted.`,
+    },
   ],
   seeds: [1, 2, 3, 4],
   par: { ticks: 200 },
@@ -178,6 +183,9 @@ export const w7_03: LevelDef = {
       (ctx) => blockedMoves(ctx.trace.events) === 0,
       { divergence: (ctx) => firstBump(ctx.trace.events) },
     ),
+    Objectives.withinSenses('canMove', FIX_BUDGET, {
+      label: `Clear the yard on ${String(FIX_BUDGET)} canMove() calls or fewer`,
+    }),
   ],
   starter: [
     '// The tunnel row is y = 7. Everything crosses on it.',
@@ -192,6 +200,7 @@ export const w7_03: LevelDef = {
     'Both bots are being polite. Politeness is symmetric. Something here needs to not be.',
     'You know every cost before the run starts, so you can work out the tick a bot reaches the tunnel mouth without asking it. The question is not whether the tunnel is free now. It is when.',
     'A queue that runs one way empties faster than a queue that alternates. Once the tunnel is pointed one way, ask what it costs you to turn it around, and how many bots you should send before you pay that.',
+    'Feeling for the far end of the tunnel is worth doing once. It is the same length for the bot behind, and the same length again on the way back, so the figure is worth keeping rather than finding a second time.',
   ],
   docs: ['ticks', 'wait', 'sync', 'canMove', 'pickup', 'drop'],
 };

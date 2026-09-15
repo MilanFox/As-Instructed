@@ -105,6 +105,11 @@ export const w5_02: LevelDef = {
       value:
         'Ten `probe` calls for the whole shift, whatever you point them at. Nothing else reports continuity.',
     },
+    {
+      label: 'Fixes',
+      value:
+        'For the star: find the break and patch it on **eight** `probe` calls or fewer. Two hundred segments halve to one in eight readings exactly, so the star is the clean halving and nothing less.',
+    },
   ],
   seeds: [1, 2, 3, 4, 5],
   par: { ticks: 2 },
@@ -170,7 +175,6 @@ export const w5_02: LevelDef = {
   ],
   bonus: [
     Objectives.withinSenses('probe', 8, {
-      id: 'eight-probes',
       label: 'Locate the break using at most 8 probes',
     }),
   ],

@@ -59,18 +59,29 @@ export const solution: ReferenceSolution = {
       return path.reverse();
     };
 
+    const standing = new Map<number, Vec>(fleet.map((hand) => [hand.id, hand.at]));
+    const shift: Record<Dir, [number, number]> = {
+      [Dir.North]: [0, -1],
+      [Dir.East]: [1, 0],
+      [Dir.South]: [0, 1],
+      [Dir.West]: [-1, 0],
+    };
+
     const walk = (hand: Hand, to: Vec): void => {
       for (let attempt = 0; attempt < 400; attempt++) {
-        const from = sim.pos(hand.id);
+        const from = standing.get(hand.id) as Vec;
         if (from.x === to.x && from.y === to.y) return;
         const taken = new Set<string>();
         for (const other of fleet) {
-          if (other.id !== hand.id) taken.add(key(sim.pos(other.id)));
+          if (other.id !== hand.id) taken.add(key(standing.get(other.id) as Vec));
         }
         let moved = 0;
         for (const dir of route(from, to, taken)) {
           if (!sim.canMove(hand.id, dir)) break;
           sim.move(hand.id, dir);
+          const was = standing.get(hand.id) as Vec;
+          const [dx, dy] = shift[dir];
+          standing.set(hand.id, { x: was.x + dx, y: was.y + dy });
           hand.clock++;
           moved++;
         }
@@ -145,16 +156,21 @@ export const solution: ReferenceSolution = {
     '  }',
     '  return path.reverse();',
     '};',
+    'const standing = new Map(fleet.map((h) => [h.id, h.at]));',
+    'const shift = { [Dir.North]: [0, -1], [Dir.East]: [1, 0], [Dir.South]: [0, 1], [Dir.West]: [-1, 0] };',
     'const walk = (hand, to) => {',
     '  for (let attempt = 0; attempt < 400; attempt++) {',
-    '    const from = bot(hand.id).pos();',
+    '    const from = standing.get(hand.id);',
     '    if (from.x === to.x && from.y === to.y) return;',
     '    const taken = new Set();',
-    '    for (const o of fleet) if (o.id !== hand.id) taken.add(k(bot(o.id).pos()));',
+    '    for (const o of fleet) if (o.id !== hand.id) taken.add(k(standing.get(o.id)));',
     '    let moved = 0;',
     '    for (const dir of route(from, to, taken)) {',
     '      if (!bot(hand.id).canMove(dir)) break;',
     '      bot(hand.id).move(dir);',
+    '      const was = standing.get(hand.id);',
+    '      const [dx, dy] = shift[dir];',
+    '      standing.set(hand.id, { x: was.x + dx, y: was.y + dy });',
     '      hand.clock++;',
     '      moved++;',
     '    }',
