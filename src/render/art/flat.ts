@@ -1,8 +1,8 @@
 import type { ArtDirection } from './types.ts';
 
-export const standard: ArtDirection = {
-  id: 'standard',
-  label: 'Standard',
+export const flat: ArtDirection = {
+  id: 'flat',
+  label: 'Flat',
 
   palette: {
     bgVoid: '#0a0e14',

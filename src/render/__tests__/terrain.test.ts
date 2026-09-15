@@ -11,7 +11,7 @@ function key(over: Partial<TerrainKey> = {}): TerrainKey {
     biome: 'hangar',
     revision: 0,
     cacheTilePx: 48,
-    art: 'standard',
+    art: 'flat',
     ...over,
   };
 }

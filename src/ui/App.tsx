@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { isGraded } from '../game/score.ts';
 import { currentLevel, useGame } from '../game/store.ts';
 import { CanvasRenderer, RuntimeRunner } from './adapters.ts';
@@ -8,16 +8,17 @@ import { PublishDialog } from '../meta/ui/PublishDialog.tsx';
 import { useLibrary } from '../meta/store.ts';
 import { mountAudio } from './audio.ts';
 import { mountLibrary } from './library.ts';
-import { IconMap, IconSound } from './components/Icons.tsx';
+import { IconMap } from './components/Icons.tsx';
 import { ModalBoundary } from './components/ModalBoundary.tsx';
 import { usePaperwork } from './paper/usePaperwork.ts';
 import { useKeyboard } from './hooks/useKeyboard.ts';
-import { AudioSettings } from './screens/AudioSettings.tsx';
+import { Settings } from './screens/Settings.tsx';
 import { LevelSelect } from './screens/LevelSelect.tsx';
 import { Workspace } from './workspace/Workspace.tsx';
 import './art.ts';
 import './styles/fonts.css';
 import './styles/app.css';
+import './styles/settings.css';
 import './styles/art/signal.css';
 import './styles/art/deepsite.css';
 
@@ -50,6 +51,7 @@ export function App(): React.JSX.Element {
           <LevelSelect />
         </div>
       ) : null}
+      <Settings />
       <div className="modal-layer">
         <ModalBoundary
           label="The publish offer"
@@ -72,7 +74,6 @@ function TopBar(): React.JSX.Element {
   const save = useGame((state) => state.save);
   const importSaveFile = useGame((state) => state.importSaveFile);
   const fileRef = useRef<HTMLInputElement | null>(null);
-  const [sound, setSound] = useState(false);
 
   const running = runState === 'running';
   const ticks = verdict?.stats.ticks;
@@ -145,16 +146,6 @@ function TopBar(): React.JSX.Element {
           </button>
         ) : null}
 
-        <button
-          type="button"
-          className="icon-btn"
-          onClick={() => setSound(true)}
-          title="Sound settings"
-          aria-label="Sound settings"
-        >
-          <IconSound />
-        </button>
-
         <button type="button" className="btn btn--ghost" onClick={onExport} title="Export progress">
           export
         </button>
@@ -199,8 +190,6 @@ function TopBar(): React.JSX.Element {
           </button>
         ) : null}
       </div>
-
-      {sound ? <AudioSettings onClose={() => setSound(false)} /> : null}
     </header>
   );
 }

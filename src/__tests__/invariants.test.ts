@@ -87,7 +87,7 @@ test('the palette is the same twelve colours in the canvas and the stylesheet', 
   const cssValue = (text: string, name: string): string | undefined =>
     new RegExp(`${name}:\\s*(#[0-9a-f]{3,8})`, 'i').exec(text)?.[1]?.toLowerCase();
 
-  const baseline = DIRECTIONS.standard.palette;
+  const baseline = DIRECTIONS.flat.palette;
   const keys = Object.keys(baseline);
   expect(keys.length).toBe(12);
   for (const key of keys) {

@@ -1,0 +1,55 @@
+.settings-trigger {
+  position: fixed;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  z-index: 30;
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--bg-panel) 82%, transparent);
+}
+
+.overlay--corner {
+  place-items: end;
+  padding: var(--space-4) var(--space-4) calc(var(--space-4) + 36px);
+  background: color-mix(in srgb, var(--bg-void) 32%, transparent);
+  backdrop-filter: none;
+}
+
+.settings-flyout {
+  width: min(340px, 100%);
+  max-height: min(520px, 100%);
+}
+
+.settings-flyout:focus-visible {
+  outline-offset: -2px;
+}
+
+.settings__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.settings__group + .settings__group {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.settings__legend {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  padding: 0;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.settings__group > .settings__note {
+  margin: 0 0 var(--space-1);
+  grid-column: auto;
+}

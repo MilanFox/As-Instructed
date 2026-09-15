@@ -516,7 +516,7 @@ it('every direction either authors all three live layers or none of them', () =>
     const hooks = [art.drawMachine, art.drawCrop, art.drawItem].filter(Boolean).length;
     return `${id}:${String(hooks)}`;
   });
-  expect(answered).toEqual(['standard:0', 'signal:3', 'deepsite:3']);
+  expect(answered).toEqual(['deepsite:3', 'signal:3', 'flat:0']);
 });
 
 const DRAW_OPS =
@@ -530,7 +530,7 @@ function drawCalls(stream: string): number {
 
 const NEAR_TILE_PX = 48;
 
-const SHIPPING: readonly ArtId[] = ART_IDS.filter((id) => id !== 'standard');
+const SHIPPING: readonly ArtId[] = ART_IDS.filter((id) => id !== 'flat');
 
 const DPRS: readonly number[] = [1, 2];
 

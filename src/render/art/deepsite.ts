@@ -2774,7 +2774,7 @@ function paintItem(paint: ItemPaint): void {
 
 export const deepsite: ArtDirection = {
   id: 'deepsite',
-  label: 'Deep Site',
+  label: 'Standard',
 
   palette: PALETTE,
 

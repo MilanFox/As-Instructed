@@ -14,7 +14,7 @@ export { alpha, luminance, mix, shade } from './art/color.ts';
 export type { ArtDirection, ArtId, Metrics, TrailRamp } from './art/types.ts';
 export { ART_IDS, DIRECTIONS, isArtId } from './art/index.ts';
 
-let current: ArtDirection = DIRECTIONS.standard;
+let current: ArtDirection = DIRECTIONS.flat;
 
 let version = 0;
 

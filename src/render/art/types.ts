@@ -2,7 +2,7 @@ import type { World } from '../../engine/index.ts';
 import type { BotPose } from '../timeline.ts';
 import type { Biome, TileSet } from '../tiles.ts';
 
-export type ArtId = 'standard' | 'signal' | 'deepsite';
+export type ArtId = 'flat' | 'signal' | 'deepsite';
 
 export interface Palette {
   bgVoid: string;

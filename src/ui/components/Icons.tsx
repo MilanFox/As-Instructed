@@ -101,6 +101,16 @@ export function IconTarget(): React.JSX.Element {
   );
 }
 
+export function IconSliders(): React.JSX.Element {
+  return (
+    <svg {...BASE}>
+      <path d="M2.5 4.5h7M12.5 4.5h1M2.5 11.5h1M6.5 11.5h7" />
+      <circle cx="11" cy="4.5" r="1.6" />
+      <circle cx="5" cy="11.5" r="1.6" />
+    </svg>
+  );
+}
+
 export function IconSound(): React.JSX.Element {
   return (
     <svg {...BASE}>
