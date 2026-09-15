@@ -74,8 +74,6 @@ const KNOWN_DEAD: readonly string[] = [
   'src/meta/index.ts toFragment',
   'src/meta/save.ts toFragment',
   'src/meta/types.ts ProgressFacts',
-  'src/meta/ui/LibraryPanel.tsx LibraryPanel',
-  'src/meta/ui/LibraryPanel.tsx libraryStatusLine',
 ];
 
 const KNOWN_TEST_ONLY: readonly [number, number] = [84, 45];

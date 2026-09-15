@@ -40,8 +40,8 @@ export function useKeyboard(): void {
           const papers = usePapers.getState();
           if (papers.lifted) papers.putDown();
           else if (useLibrary.getState().offer) useLibrary.getState().skipPublish(false);
-          else if (overlayState().open === 'docs') closeOverlay();
-          else if (useLibrary.getState().panelOpen) useLibrary.getState().setPanelOpen(false);
+          else if (overlayState().open === 'docs' || overlayState().open === 'library')
+            closeOverlay();
           else if (state.screen !== 'levels' && !isEditorTarget(event.target)) state.goto('levels');
         },
 

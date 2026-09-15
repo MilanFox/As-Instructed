@@ -25,6 +25,7 @@
   .workspace {
     --ws-telemetry: min(400px, calc(100vw - var(--ws-inset) * 2));
     --ws-drawer: 100vw;
+    --ws-lib: calc(100vw - 46px);
     --ws-cut: 16px;
     --ws-inset: 12px;
   }
@@ -110,6 +111,11 @@
     bottom: auto;
   }
 
+  .library-handle {
+    top: calc(50% + 101px);
+    bottom: auto;
+  }
+
   .closed-banner__row {
     flex-wrap: wrap;
     gap: 14px;
@@ -120,6 +126,7 @@
 @media (width <= 600px) {
   .workspace {
     --ws-telemetry: calc(100vw - var(--ws-inset) * 2);
+    --ws-lib: calc(100vw - 38px);
     --ws-cut: 12px;
     font-size: 12px;
   }
@@ -155,6 +162,13 @@
     width: 38px;
     height: 148px;
     letter-spacing: 0.22em;
+  }
+
+  .library-handle {
+    top: calc(50% + 86px);
+    width: 38px;
+    height: 108px;
+    letter-spacing: 0.16em;
   }
 
   .closed-banner__id,

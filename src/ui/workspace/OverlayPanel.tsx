@@ -4,6 +4,7 @@ export interface OverlayPanelProps {
   open?: boolean;
   label?: string;
   id?: string;
+  inert?: boolean;
 }
 
 export function OverlayPanel({
@@ -12,6 +13,7 @@ export function OverlayPanel({
   open,
   label,
   id,
+  inert,
 }: OverlayPanelProps): React.ReactElement {
   return (
     <section
@@ -19,6 +21,7 @@ export function OverlayPanel({
       id={id}
       data-open={open === undefined ? undefined : String(open)}
       aria-label={label}
+      {...(inert === true ? { inert: true } : {})}
     >
       <div className="overlay-panel__body">{children}</div>
     </section>

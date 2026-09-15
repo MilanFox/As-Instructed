@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { PanelBoundary } from '../components/PanelBoundary.tsx';
-import { closeOverlay, useOverlay } from '../hooks/useOverlay.ts';
+import { closeOverlay, overlayState, useOverlay } from '../hooks/useOverlay.ts';
 import { COMPACT_QUERY } from './breakpoints.ts';
 import { ClosedBanner } from './ClosedBanner.tsx';
 import type { DrawerTab } from './Drawer.tsx';
@@ -9,6 +9,7 @@ import { Drawer } from './Drawer.tsx';
 import { FeedCanvas } from './FeedCanvas.tsx';
 import { Postings } from './Postings.tsx';
 import { ReportSheet } from './ReportSheet.tsx';
+import { Subroutines } from './Subroutines.tsx';
 import { TelemetryPanel } from './TelemetryPanel.tsx';
 import { TransportDeck } from './TransportDeck.tsx';
 import { useFeedZoom } from './useFeedZoom.ts';
@@ -23,6 +24,7 @@ import '../styles/workspace/deck.css';
 import '../styles/workspace/drawer.css';
 import '../styles/workspace/report.css';
 import '../styles/workspace/banner.css';
+import '../styles/workspace/library.css';
 import '../styles/workspace/reflow.css';
 
 function drawerWidth(): number {
@@ -147,7 +149,8 @@ export function Workspace(): React.ReactElement {
 
   // The shortcut store drives the drawer, and shutting the drawer by any route drives the
   // store back. The ref tells an incoming request apart from our own echo of it.
-  const referenceRequested = useOverlay().open === 'docs';
+  const overlayOpen = useOverlay().open;
+  const referenceRequested = overlayOpen === 'docs';
   const requestHandled = useRef(referenceRequested);
 
   useEffect(() => {
@@ -166,6 +169,8 @@ export function Workspace(): React.ReactElement {
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape') return;
+      // The subroutines sheet stands over the drawer, so escape dismisses that first.
+      if (overlayState().open === 'library') return;
       setOpen((was) => {
         if (was) handleRef.current?.focus();
         return false;
@@ -189,6 +194,7 @@ export function Workspace(): React.ReactElement {
     <div
       className="workspace"
       data-drawer={open ? 'open' : 'shut'}
+      data-library={overlayOpen === 'library' ? 'open' : 'shut'}
       data-watch={String(watching)}
       data-sheet={report ? 'open' : 'shut'}
     >
@@ -261,6 +267,10 @@ export function Workspace(): React.ReactElement {
       >
         <span className="drawer-handle__text">Workbench</span>
       </button>
+
+      <PanelBoundary label="Shared Subroutines">
+        <Subroutines />
+      </PanelBoundary>
 
       {report ? (
         <PanelBoundary label="The run report">

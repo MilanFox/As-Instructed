@@ -1,7 +1,7 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { useGame } from '../../game/store.ts';
 
-export type OverlayId = 'brief' | 'console' | 'docs';
+export type OverlayId = 'brief' | 'console' | 'docs' | 'library';
 
 export interface OverlayState {
   open: OverlayId | null;

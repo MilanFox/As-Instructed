@@ -34,13 +34,12 @@ export function mountAudio(): () => void {
       if (!state.showResults && !state.verdict) audio.ui('cancel');
     }
 
-    if (state.brief !== previous.brief) audio.ui('panelOpen');
+    if (state.brief !== previous.brief) {
+      audio.ui(state.brief === 'brief' ? 'panelClose' : 'panelOpen');
+    }
   });
 
   const unsubscribeLibrary = useLibrary.subscribe((state, previous) => {
-    if (state.panelOpen !== previous.panelOpen) {
-      audio.ui(state.panelOpen ? 'panelOpen' : 'panelClose');
-    }
     if (state.offer && !previous.offer) audio.ui('panelOpen');
   });
 

@@ -15,6 +15,7 @@ const SHEETS = [
   'drawer',
   'report',
   'banner',
+  'library',
   'reflow',
 ] as const;
 
@@ -113,6 +114,7 @@ function resolve(selector: string, property: string, viewport: number): string |
 }
 
 const OPEN = ".workspace[data-drawer='open']";
+const LIBRARY_OPEN = ".workspace[data-library='open']";
 
 // The attribute selector outranks the bare class, so an open drawer takes its value first
 // whichever sheet declared it.
@@ -234,18 +236,21 @@ describe('an open drawer is never covered by the HUD', () => {
   }
 });
 
-describe('the drawer handle stays reachable', () => {
-  test('the handle is pinned to the viewport and offset by --ws-handle-x alone', () => {
-    expect(['position', resolve('.drawer-handle', 'position', ROOMY)]).toEqual([
-      'position',
-      'fixed',
-    ]);
-    expect(['left', resolve('.drawer-handle', 'left', ROOMY)]).toEqual(['left', '0']);
-    expect(['transform', resolve('.drawer-handle', 'transform', ROOMY)]).toEqual([
-      'transform',
-      'translateX(var(--ws-handle-x))',
-    ]);
-  });
+const FLAPS = [
+  ['the workbench flap', '.drawer-handle'],
+  ['the subroutines flap', '.library-handle'],
+] as const;
+
+const RIDE = 'translateX(max(var(--ws-handle-x), var(--ws-lib-x)))';
+
+describe('the flaps stay reachable', () => {
+  for (const [name, selector] of FLAPS) {
+    test(`${name} is pinned to the viewport and rides whichever surface is further out`, () => {
+      expect(['position', resolve(selector, 'position', ROOMY)]).toEqual(['position', 'fixed']);
+      expect(['left', resolve(selector, 'left', ROOMY)]).toEqual(['left', '0']);
+      expect(['transform', resolve(selector, 'transform', ROOMY)]).toEqual(['transform', RIDE]);
+    });
+  }
 
   for (const width of [ROOMY, ...BREAKPOINTS]) {
     test(`an open drawer leaves the whole handle on screen at ${String(width)}px`, () => {
@@ -274,6 +279,18 @@ describe('the drawer handle stays reachable', () => {
         true,
       ]);
     });
+
+    for (const [name, selector] of FLAPS) {
+      test(`an open flyout leaves ${name} on screen at ${String(width)}px`, () => {
+        const offset = px(resolve(LIBRARY_OPEN, '--ws-lib-x', width) ?? '0px', width, true);
+        const flap = px(resolve(selector, 'width', width) ?? '0px', width, true);
+
+        expect([`${name} at ${String(width)}px`, offset > 0 && offset + flap <= width]).toEqual([
+          `${name} at ${String(width)}px`,
+          true,
+        ]);
+      });
+    }
   }
 });
 

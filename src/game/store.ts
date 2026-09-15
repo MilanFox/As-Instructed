@@ -80,7 +80,7 @@ export interface GameState {
   suppressed: number;
 
   docsOpen: boolean;
-  brief: 'brief' | 'console' | 'docs';
+  brief: 'brief' | 'console' | 'docs' | 'library';
 
   attachRunner(runner: RunnerPort): void;
   attachRenderer(renderer: RendererPort): void;
@@ -92,7 +92,7 @@ export interface GameState {
   setCode(code: string): void;
   resetCode(): void;
   revealHint(count: number): void;
-  setPanel(panel: 'brief' | 'console' | 'docs'): void;
+  setPanel(panel: 'brief' | 'console' | 'docs' | 'library'): void;
   setDocsOpen(open: boolean): void;
   setLayout(patch: Partial<SaveFile['settings']['layout']>): void;
   setAuditSeeds(seeds: Readonly<Record<string, AuditSeeds>>): void;

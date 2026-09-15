@@ -35,7 +35,7 @@
   z-index: 7;
   display: grid;
   place-items: center;
-  transform: translateX(var(--ws-handle-x));
+  transform: translateX(max(var(--ws-handle-x), var(--ws-lib-x)));
   transition: transform var(--ws-slide);
   width: 46px;
   height: 178px;

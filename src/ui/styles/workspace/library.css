@@ -1,0 +1,102 @@
+/* ---- shared subroutines: ~/lib.ts, a second file rather than a page of the workbench ---- */
+
+.workspace {
+  --ws-lib: min(920px, calc(100vw - 66px));
+  --ws-lib-x: 0px;
+}
+
+.workspace[data-library='open'] {
+  --ws-lib-x: var(--ws-lib);
+}
+
+/* The flap rides out on whichever surface is further open, so it is never buried by one. */
+.library-handle {
+  position: fixed;
+  bottom: 322px;
+  left: 0;
+  z-index: 7;
+  display: grid;
+  place-items: center;
+  transform: translateX(max(var(--ws-handle-x), var(--ws-lib-x)));
+  transition: transform var(--ws-slide);
+  width: 46px;
+  height: 128px;
+  padding: 0;
+  border: 0;
+  background: var(--ws-edge);
+  color: #000;
+  font-family: var(--font-prose);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  cursor: pointer;
+  clip-path: polygon(0 0, 100% 16px, 100% calc(100% - 16px), 0 100%);
+  filter: drop-shadow(8px 8px 0 rgb(0 0 0 / 78%));
+}
+
+.workspace[data-library='shut'] .library-handle {
+  transition-duration: var(--ws-slam);
+}
+
+.library-handle:hover,
+.library-handle[aria-expanded='true'] {
+  background: var(--accent);
+}
+
+.library-handle__text {
+  display: block;
+  writing-mode: vertical-rl;
+}
+
+.library-flyout {
+  --ws-clip: polygon(
+    0 0,
+    100% 0,
+    100% calc(100% - var(--ws-cut)),
+    calc(100% - var(--ws-cut)) 100%,
+    0 100%
+  );
+
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 9;
+  width: var(--ws-lib);
+  transform: translateX(-100%);
+  transition: transform var(--ws-slide);
+}
+
+.library-flyout[data-open='true'] {
+  transform: translateX(0);
+}
+
+.library-flyout .lib {
+  flex: 1 1 auto;
+  min-height: 0;
+  background: transparent;
+}
+
+.library-flyout .lib__tabs {
+  flex-wrap: wrap;
+  gap: 2px;
+  border-bottom: 2px solid var(--ws-edge);
+  background: #000;
+}
+
+.library-flyout .lib__tab {
+  background: transparent;
+  font-family: var(--font-prose);
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+.library-flyout .lib__tab[aria-selected='true'] {
+  background: var(--ws-edge);
+  color: #000;
+  box-shadow: none;
+}
+
+.library-flyout .lib__body {
+  background: var(--ws-fill);
+}
