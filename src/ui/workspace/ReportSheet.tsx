@@ -99,6 +99,7 @@ export function ReportSheet({ report, onDismiss, onNext }: ReportSheetProps): Re
                 active: false,
                 ...(row.progress ? { progress: row.progress } : {}),
                 ...(row.budget ? { budget: row.budget } : {}),
+                ...(row.unit ? { unit: row.unit } : {}),
               }}
             />
           ))}

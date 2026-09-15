@@ -62,7 +62,7 @@ export function snapshotReport(state: GameState): ReportSnapshot | null {
       met: result.objectives.some((entry) => entry.id === id && entry.met),
     }));
 
-  const rowFor = (objective: { id: string; label: string }): ReportRow => {
+  const rowFor = (objective: { id: string; label: string; unit?: string }): ReportRow => {
     const reading = reported.get(objective.id) ?? {
       id: objective.id,
       label: objective.label,
@@ -78,6 +78,8 @@ export function snapshotReport(state: GameState): ReportSnapshot | null {
     };
     if (reading.progress) row.progress = reading.progress;
     if (budget) row.budget = budget;
+    const unit = reading.unit ?? objective.unit;
+    if (unit) row.unit = unit;
     if (multiSeed && !bonus) row.seeds = seedMarks(objective.id);
     return row;
   };

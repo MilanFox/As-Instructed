@@ -1,7 +1,10 @@
 import { describe, expect, test } from 'vitest';
+import { evaluateObjectives } from '../../engine/index.ts';
 import { budgetFor, declaredUnit, meterFor } from '../budgets.ts';
 import type { ObjectiveReading } from '../budgets.ts';
 import { campaignOrder } from '../../levels/index.ts';
+import { runReference } from '../../levels/harness.ts';
+import { SOLUTIONS } from '../../levels/__tests__/solutions.ts';
 
 const MINTED = /^within-(\d+)-([A-Za-z]+)$/;
 
@@ -53,6 +56,49 @@ describe('budgets that are still read out of their own English', () => {
         expect([level.id, objective.id, readsItsLabel]).toEqual([level.id, objective.id, false]);
       }
     }
+  });
+});
+
+const UNDECLARED_SLACK: readonly string[] = [
+  'w2-02/crop-spoilage',
+  'w2-03/tile-footprint',
+  'w5-05/budget',
+];
+
+/**
+ * An objective the reference meets while its meter still reads short of its total is a
+ * budget: the slack is the point. Unless it declares what it counts, the readout is a
+ * bare fraction beside a tick, and `meterFor` has to guess the number from the label.
+ */
+function metWithSlack(): string[] {
+  const found = new Set<string>();
+  for (const level of campaignOrder()) {
+    const solution = SOLUTIONS[level.id];
+    if (!solution) continue;
+    const defs = [...level.objectives, ...(level.bonus ?? [])];
+    for (const seed of level.seeds) {
+      const run = runReference(level, seed, solution);
+      const reports = evaluateObjectives(defs, {
+        world: run.world,
+        trace: run.trace,
+        initialWorld: run.initialWorld,
+        ops: run.ops,
+      });
+      for (const objective of defs) {
+        if (objective.meter || MINTED.test(objective.id)) continue;
+        const report = reports.find((each) => each.id === objective.id);
+        if (!report?.met || !report.progress) continue;
+        const [done, total] = report.progress;
+        if (done < total) found.add(`${level.id}/${objective.id}`);
+      }
+    }
+  }
+  return [...found].sort();
+}
+
+describe('budgets whose slack is visible but whose meter is not declared', () => {
+  test('are exactly the set on record', () => {
+    expect(metWithSlack()).toEqual([...UNDECLARED_SLACK].sort());
   });
 });
 

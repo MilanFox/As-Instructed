@@ -81,6 +81,7 @@ export function inspectedEveryTile(label = 'Enter every floor tile in the bay'):
   };
   return Objectives.custom('inspect-all', label, (ctx) => done(ctx) === total(ctx).length, {
     progress: (ctx) => [done(ctx), total(ctx).length],
+    unit: 'tiles',
     divergence: (ctx) => {
       const seen = visitedTiles(ctx);
       const skipped = total(ctx).find((tile) => !seen.has(key(tile)));
@@ -173,6 +174,8 @@ export function oneMovePerFloorTile(label: string): Objective {
   const budget = (ctx: ObjectiveContext): number => walkableTiles(ctx.initialWorld).length;
   return Objectives.custom('one-move-per-tile', label, (ctx) => movesIssued(ctx) <= budget(ctx), {
     progress: (ctx) => [Math.min(movesIssued(ctx), budget(ctx)), budget(ctx)],
+    meter: { kind: 'events', event: 'move' },
+    unit: 'moves',
     divergence: (ctx) => {
       const allowed = budget(ctx);
       const over = moveAfter(ctx, allowed);

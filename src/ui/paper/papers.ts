@@ -13,6 +13,7 @@ export interface ReportRow {
   bonus: boolean;
   progress?: [number, number];
   budget?: Budget;
+  unit?: string;
   seeds?: readonly { seed: number; met: boolean }[];
 }
 
