@@ -26,8 +26,8 @@ vi.mock('zustand', async () => {
 });
 
 const { App } = await import('../App.tsx');
-const { deliverPaperwork } = await import('../desk/paper/usePaperwork.ts');
-const { usePapers, looseDocs, trayDocs, filedDocs } = await import('../desk/paper/papers.ts');
+const { deliverPaperwork } = await import('../paper/usePaperwork.ts');
+const { usePapers, looseDocs, trayDocs, filedDocs } = await import('../paper/papers.ts');
 const { useGame } = await import('../../game/store.ts');
 const { useLibrary } = await import('../../meta/store.ts');
 const { emptySave } = await import('../../game/save.ts');

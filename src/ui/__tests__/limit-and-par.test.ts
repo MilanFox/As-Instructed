@@ -25,9 +25,10 @@ vi.mock('zustand', async () => {
   };
 });
 
-const { Rail: ObjectiveRail } = await import('../desk/terminal/Rail.tsx');
-const { ReportSheet } = await import('../desk/paper/ReportSheet.tsx');
-const { snapshotReport } = await import('../desk/paper/report.ts');
+const { WorkOrderCard } = await import('../workspace/WorkOrderCard.tsx');
+const { ReportSheet } = await import('../workspace/ReportSheet.tsx');
+const { useWorkspace } = await import('../workspace/useWorkspace.ts');
+const { snapshotReport } = await import('../paper/report.ts');
 const { useGame } = await import('../../game/store.ts');
 const { emptySave } = await import('../../game/save.ts');
 const { getLevel, campaignOrder } = await import('../../levels/index.ts');
@@ -36,33 +37,101 @@ const { isGraded } = await import('../../game/score.ts');
 type LevelDef = NonNullable<ReturnType<typeof getLevel>>;
 type Objective = LevelDef['objectives'][number];
 
-function Results(): unknown {
-  const report = snapshotReport(useGame.getState() as never);
-  return report ? ReportSheet({ report } as never) : null;
+function OrderCard(): unknown {
+  return WorkOrderCard({ workspace: useWorkspace() });
+}
+
+function Report(): unknown {
+  const report = snapshotReport(useGame.getState());
+  return report ? ReportSheet({ report }) : null;
 }
 
 type Props = Record<string, unknown>;
 
-function words(node: unknown): string {
-  if (node === null || node === undefined || typeof node === 'boolean') return '';
-  if (typeof node === 'string' || typeof node === 'number') return String(node);
-  if (Array.isArray(node)) return node.map(words).join(' ');
+interface Drawn {
+  classes: string[];
+  text: string;
+  children: Drawn[];
+}
+
+function draw(node: unknown): Drawn[] {
+  if (node === null || node === undefined || typeof node === 'boolean') return [];
+  if (typeof node === 'string' || typeof node === 'number') {
+    return [{ classes: [], text: String(node), children: [] }];
+  }
+  if (Array.isArray(node)) return node.flatMap(draw);
   const element = node as { type?: unknown; props?: Props };
   const props = element.props;
-  if (!props) return '';
+  if (!props) return [];
   const type = element.type;
-  if (typeof type === 'function') {
-    return words((type as (props: Props) => unknown)(props));
-  }
-  return words(props['children']);
+  if (typeof type === 'function') return draw((type as (props: Props) => unknown)(props));
+  if (typeof type !== 'string') return draw(props['children']);
+  const children = draw(props['children']);
+  return [
+    {
+      classes: String(props['className'] ?? '')
+        .split(/\s+/)
+        .filter(Boolean),
+      text: children
+        .map((child) => child.text)
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim(),
+      children,
+    },
+  ];
+}
+
+function within(nodes: Drawn[], match: (node: Drawn) => boolean): Drawn[] {
+  const found: Drawn[] = [];
+  const walk = (list: Drawn[]): void => {
+    for (const node of list) {
+      if (match(node)) found.push(node);
+      walk(node.children);
+    }
+  };
+  walk(nodes);
+  return found;
+}
+
+const hasClass =
+  (name: string) =>
+  (node: Drawn): boolean =>
+    node.classes.includes(name);
+
+function render(component: () => unknown): Drawn[] {
+  driver.reset();
+  return draw(component());
 }
 
 function screen(component: () => unknown): string {
-  driver.reset();
-  return words(component()).replace(/\s+/g, ' ').trim();
+  return render(component)
+    .map((node) => node.text)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
-const GRADED_WITH_A_LIMIT = 'w8-01';
+function cells(tree: Drawn[]): Map<string, string> {
+  const pairs = within(tree, hasClass('stat-cell')).map((cell): [string, string] => [
+    within([cell], hasClass('stat-cell__label'))[0]?.text ?? '',
+    within([cell], hasClass('stat-cell__value'))[0]?.text ?? '',
+  ]);
+  return new Map(pairs);
+}
+
+function readouts(tree: Drawn[]): Map<string, string> {
+  const pairs = within(tree, hasClass('objective-row')).map((row): [string, string] => [
+    within([row], hasClass('objective-row__label'))[0]?.text ?? '',
+    within([row], hasClass('progress-meter__read'))[0]?.text ?? '',
+  ]);
+  return new Map(pairs);
+}
+
+// The limit is stated by an objective of its own here, and by the shift budget on w2-03.
+const LIMIT_AS_OBJECTIVE = 'w8-01';
+const LIMIT_AS_BUDGET = 'w2-03';
+const NO_LIMIT = 'w1-03';
 const UNGRADED = 'w1-01';
 
 function tickObjectiveOf(level: LevelDef): Objective | undefined {
@@ -73,8 +142,12 @@ function tickObjectiveOf(level: LevelDef): Objective | undefined {
 
 function limitOf(level: LevelDef): number | undefined {
   const objective = tickObjectiveOf(level);
-  const at = objective?.progress?.({ trace: { endTick: 0 } } as never);
-  return at?.[1];
+  try {
+    // Some deadlines are measured off the board, which this empty source cannot supply.
+    return objective?.progress?.({ trace: { endTick: 0 } } as never)?.[1];
+  } catch {
+    return undefined;
+  }
 }
 
 function openLevel(id: string, ticks: number): void {
@@ -88,6 +161,7 @@ function openLevel(id: string, ticks: number): void {
     currentLevelId: id,
     trace: null,
     tick: ticks,
+    runMode: 'dispatch',
     showResults: true,
     seedResults: [],
     verdict: {
@@ -112,6 +186,7 @@ beforeEach(() => {
     screen: 'workspace',
     verdict: null,
     trace: null,
+    runMode: null,
     seedResults: [],
     showResults: false,
     tick: 0,
@@ -119,106 +194,130 @@ beforeEach(() => {
   driver.reset();
 });
 
-describe('the rail prints both numbers and gives each its own word', () => {
+describe('the work order prints both numbers and gives each its own word', () => {
   test('the fixture is a level where the two numbers really are different', () => {
-    const level = getLevel(GRADED_WITH_A_LIMIT);
+    const level = getLevel(LIMIT_AS_OBJECTIVE);
     expect(level && isGraded(level)).toBe(true);
     expect(level && limitOf(level)).toBeDefined();
     expect(level && limitOf(level)).not.toBe(level?.par.ticks);
   });
 
-  test('both numbers are on the rail', () => {
-    const level = getLevel(GRADED_WITH_A_LIMIT) as LevelDef;
-    openLevel(GRADED_WITH_A_LIMIT, 180);
-    const text = screen(ObjectiveRail);
+  test('both numbers are on the work order', () => {
+    const level = getLevel(LIMIT_AS_OBJECTIVE) as LevelDef;
+    openLevel(LIMIT_AS_OBJECTIVE, 180);
+    const text = screen(OrderCard);
 
     expect(text).toContain(String(limitOf(level)));
     expect(text).toContain(String(level.par.ticks));
   });
 
-  test('the one that ends the work order is called a limit', () => {
-    const level = getLevel(GRADED_WITH_A_LIMIT) as LevelDef;
-    openLevel(GRADED_WITH_A_LIMIT, 180);
+  test('the one that moves the medal is a cell called par', () => {
+    const level = getLevel(LIMIT_AS_OBJECTIVE) as LevelDef;
+    openLevel(LIMIT_AS_OBJECTIVE, 180);
 
-    expect(screen(ObjectiveRail)).toMatch(
-      new RegExp(`limit 180 / ${String(limitOf(level))} ticks`),
-    );
+    expect(cells(render(OrderCard)).get('Par')).toBe(`${String(level.par.ticks)} t`);
   });
 
-  test('the one that moves the medal is called par', () => {
-    const level = getLevel(GRADED_WITH_A_LIMIT) as LevelDef;
-    openLevel(GRADED_WITH_A_LIMIT, 180);
+  test('the one that ends the work order is the objective that ends it', () => {
+    const level = getLevel(LIMIT_AS_OBJECTIVE) as LevelDef;
+    const counted = tickObjectiveOf(level) as Objective;
+    openLevel(LIMIT_AS_OBJECTIVE, 180);
 
-    expect(screen(ObjectiveRail)).toMatch(new RegExp(`par 180 / ${String(level.par.ticks)}`));
+    expect(readouts(render(OrderCard)).get(counted.label)).toBe(
+      `180 / ${String(limitOf(level))} ticks`,
+    );
   });
 
   test('the two are not introduced by the same word, which is the whole defect', () => {
-    const level = getLevel(GRADED_WITH_A_LIMIT) as LevelDef;
-    openLevel(GRADED_WITH_A_LIMIT, 180);
-    const text = screen(ObjectiveRail);
+    const level = getLevel(LIMIT_AS_OBJECTIVE) as LevelDef;
+    const counted = tickObjectiveOf(level) as Objective;
+    openLevel(LIMIT_AS_OBJECTIVE, 180);
+    const tree = render(OrderCard);
 
-    const wordBefore = (readout: string): string =>
-      new RegExp(`(\\S+)\\s+${readout.replace('/', '\\/')}`).exec(text)?.[1] ?? '';
+    const parWord = [...cells(tree)].find(
+      ([, value]) => value === `${String(level.par.ticks)} t`,
+    )?.[0];
+    const limitWord = [...readouts(tree)].find(([, value]) =>
+      value.startsWith(`180 / ${String(limitOf(level))}`),
+    )?.[0];
 
-    const limitWord = wordBefore(`180 / ${String(limitOf(level))}`);
-    const parWord = wordBefore(`180 / ${String(level.par.ticks)}`);
-
-    expect(limitWord).not.toBe('');
-    expect(parWord).not.toBe('');
+    expect(parWord).toBe('Par');
+    expect(limitWord).toBe(counted.label);
     expect(limitWord).not.toBe(parWord);
   });
 
-  test('and the screen says which is which, where both are on it', () => {
-    openLevel(GRADED_WITH_A_LIMIT, 180);
+  test('a shift budget is a cell of its own rather than a second par', () => {
+    const level = getLevel(LIMIT_AS_BUDGET) as LevelDef;
+    const stop = level.budget?.maxTicks as number;
+    expect(stop).not.toBe(level.par.ticks);
+    openLevel(LIMIT_AS_BUDGET, 40);
+    const stats = cells(render(OrderCard));
 
-    expect(screen(ObjectiveRail)).toContain('par sets the medal. the limit ends the work order.');
+    expect(stats.get('Par')).toBe(`${String(level.par.ticks)} t`);
+    expect(stats.get('Limit')).toBe(`${String(stop)} t`);
   });
 
-  test('the note is not drawn where there is only one number to confuse', () => {
-    const plain = campaignOrder().find(
-      (level) =>
-        isGraded(level) &&
-        level.budget?.maxTicks === undefined &&
-        tickObjectiveOf(level) === undefined,
-    );
-    expect(plain, 'a graded level with no tick limit').toBeDefined();
-    if (!plain) return;
+  test('a work order with no limit says so rather than printing par twice', () => {
+    const level = getLevel(NO_LIMIT) as LevelDef;
+    expect(isGraded(level)).toBe(true);
+    expect(limitOf(level)).toBeUndefined();
+    expect(level.budget?.maxTicks).toBeUndefined();
 
-    openLevel(plain.id, 40);
-    const text = screen(ObjectiveRail);
+    openLevel(NO_LIMIT, 40);
+    const stats = cells(render(OrderCard));
 
-    expect(text).toContain('par');
-    expect(text).not.toContain('the limit ends the work order');
+    expect(stats.get('Par')).toBe(`${String(level.par.ticks)} t`);
+    expect(stats.get('Limit')).toBe('none');
+  });
+
+  test('every graded work order in the campaign fills both cells', () => {
+    const graded = campaignOrder().filter((level) => isGraded(level));
+    expect(graded.length).toBeGreaterThan(0);
+
+    for (const level of graded) {
+      openLevel(level.id, 40);
+      const stats = cells(render(OrderCard));
+
+      expect(stats.get('Par'), level.id).toBe(`${String(level.par.ticks)} t`);
+      expect(stats.get('Limit'), level.id).not.toBe(stats.get('Par'));
+    }
   });
 });
 
 describe('an ungraded work order has no par to print', () => {
-  test('the rail calls the clock ticks and never par', () => {
+  test('the work order leaves par blank and still counts the clock', () => {
     openLevel(UNGRADED, 78);
-    const text = screen(ObjectiveRail);
+    const stats = cells(render(OrderCard));
 
-    expect(text).not.toMatch(/\bpar\b/);
-    expect(text).toContain('ticks 78');
+    expect(stats.get('Par')).toBe('—');
+    expect(stats.get('Ticks')).toBe('78');
+  });
+
+  test('a graded work order prints the number instead', () => {
+    const level = getLevel(NO_LIMIT) as LevelDef;
+    openLevel(NO_LIMIT, 78);
+
+    expect(cells(render(OrderCard)).get('Par')).toBe(`${String(level.par.ticks)} t`);
   });
 
   test('the report prints par on a graded work order', () => {
-    const level = getLevel('w1-03');
-    openLevel('w1-03', 78);
+    const level = getLevel(NO_LIMIT) as LevelDef;
+    openLevel(NO_LIMIT, 78);
 
-    expect(screen(Results)).toContain(`par ${String(level?.par.ticks)}`);
+    expect(cells(render(Report)).get('Par')).toBe(String(level.par.ticks));
   });
 
   test('and prints no par at all on an ungraded one', () => {
     openLevel(UNGRADED, 78);
 
-    expect(screen(Results)).not.toMatch(/\bpar\b/i);
+    expect(cells(render(Report)).get('Par')).toBe('—');
   });
 
   test('the clock itself is still reported either way', () => {
     openLevel(UNGRADED, 78);
-    expect(screen(Results)).toContain('ticks 78');
+    expect(cells(render(Report)).get('Ticks')).toBe('78');
 
-    openLevel('w1-03', 78);
-    expect(screen(Results)).toContain('ticks 78');
+    openLevel(NO_LIMIT, 78);
+    expect(cells(render(Report)).get('Ticks')).toBe('78');
   });
 });

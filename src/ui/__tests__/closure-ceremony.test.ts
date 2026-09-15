@@ -4,8 +4,8 @@ import { runReference } from '../../levels/harness.ts';
 import { campaignOrder } from '../../levels/index.ts';
 import { solution as w2_03 } from '../../levels/world-2/__solutions__/w2-03.ts';
 import { useGame } from '../../game/store.ts';
-import { DOC_HOME, filedDocs, looseDocs, usePapers } from '../desk/paper/papers.ts';
-import { snapshotReport } from '../desk/paper/report.ts';
+import { DOC_HOME, filedDocs, looseDocs, usePapers } from '../paper/papers.ts';
+import { snapshotReport } from '../paper/report.ts';
 
 const level = campaignOrder().find((each) => each.id === 'w2-03');
 

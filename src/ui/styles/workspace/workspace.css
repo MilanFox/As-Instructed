@@ -1,0 +1,61 @@
+.workspace {
+  --ws-order: 384px;
+  --ws-telemetry: 322px;
+  --ws-drawer: 684px;
+  --ws-shift: 0px;
+  --ws-handle-x: 0px;
+  --ws-edge: var(--ink);
+  --ws-fill: #05080c;
+  --ws-cut: 22px;
+  --ws-slide: 240ms cubic-bezier(0.16, 0.88, 0.28, 1);
+  --ws-slam: 170ms cubic-bezier(0.5, 0, 0.75, 0);
+
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  font-family: var(--font-prose);
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+}
+
+.workspace[data-drawer='open'] {
+  --ws-shift: var(--ws-drawer);
+  --ws-handle-x: var(--ws-drawer);
+}
+
+.workspace p {
+  margin: 0;
+}
+
+.workspace ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.workspace__map {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.workspace__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--ws-slide);
+}
+
+.workspace[data-drawer='open'] .workspace__scrim {
+  opacity: 0.28;
+  pointer-events: auto;
+}
+
+.workspace[data-watch='true'] .workspace__scrim {
+  opacity: 0;
+  pointer-events: none;
+}

@@ -10,11 +10,11 @@ import { mountAudio } from './audio.ts';
 import { mountLibrary } from './library.ts';
 import { IconMap, IconSound } from './components/Icons.tsx';
 import { ModalBoundary } from './components/ModalBoundary.tsx';
-import { Desk } from './desk/Desk.tsx';
-import { usePaperwork } from './desk/paper/usePaperwork.ts';
+import { usePaperwork } from './paper/usePaperwork.ts';
 import { useKeyboard } from './hooks/useKeyboard.ts';
 import { AudioSettings } from './screens/AudioSettings.tsx';
 import { LevelSelect } from './screens/LevelSelect.tsx';
+import { Workspace } from './workspace/Workspace.tsx';
 import './art.ts';
 import './styles/fonts.css';
 import './styles/app.css';
@@ -44,7 +44,7 @@ export function App(): React.JSX.Element {
   return (
     <div className="app">
       {screen === 'levels' ? <TopBar /> : null}
-      {screen === 'workspace' ? <Desk /> : null}
+      {screen === 'workspace' ? <Workspace /> : null}
       {screen === 'levels' ? (
         <div className="screen">
           <LevelSelect />

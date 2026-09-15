@@ -1,0 +1,235 @@
+/* ---- drawer: the editor and everything there is to read ---- */
+
+.drawer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  width: var(--ws-drawer);
+  min-height: 0;
+  border-right: 2px solid var(--ws-edge);
+  background: var(--ws-fill);
+  box-shadow: 12px 0 0 rgb(0 0 0 / 70%);
+  transform: translateX(-100%);
+  transition: transform var(--ws-slide);
+}
+
+.workspace[data-drawer='open'] .drawer {
+  transform: translateX(0);
+}
+
+/* The slam has to land before the eye does, so the close is quicker than the open. */
+.workspace[data-drawer='shut'] .drawer,
+.workspace[data-drawer='shut'] .transport-deck,
+.workspace[data-drawer='shut'] .work-order,
+.workspace[data-drawer='shut'] .workspace__scrim {
+  transition-duration: var(--ws-slam);
+}
+
+.drawer-handle {
+  position: fixed;
+  bottom: 132px;
+  left: 0;
+  z-index: 7;
+  transform: translateX(var(--ws-handle-x));
+  transition: transform var(--ws-slide);
+  width: 46px;
+  height: 178px;
+  padding: 0;
+  border: 0;
+  background: var(--ws-edge);
+  color: #000;
+  font-family: var(--font-prose);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  cursor: pointer;
+  clip-path: polygon(0 0, 100% 16px, 100% calc(100% - 16px), 0 100%);
+  filter: drop-shadow(8px 8px 0 rgb(0 0 0 / 78%));
+}
+
+.workspace[data-drawer='shut'] .drawer-handle {
+  transition-duration: var(--ws-slam);
+}
+
+.drawer-handle:hover {
+  background: var(--accent);
+}
+
+.drawer-handle__text {
+  display: block;
+  writing-mode: vertical-rl;
+}
+
+.drawer-tabs {
+  display: flex;
+  flex: none;
+  gap: 6px;
+  align-items: center;
+  padding: 8px 10px;
+  background: #000;
+  border-bottom: 2px solid var(--ws-edge);
+}
+
+.drawer-tabs__spacer {
+  flex: 1 1 auto;
+}
+
+.drawer__stack {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.drawer-page {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+  background: var(--ws-fill);
+}
+
+/* The editor never unmounts and never changes size — the reading pages slide over it. */
+.drawer-page--code {
+  z-index: 0;
+}
+
+.drawer-page--read {
+  z-index: 1;
+  overflow-y: auto;
+  transition:
+    transform var(--ws-slide),
+    opacity 120ms linear;
+}
+
+.drawer-page--read[data-on='false'] {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-24px);
+}
+
+.drawer__foot {
+  display: flex;
+  flex: none;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-top: 2px solid var(--ws-edge);
+  background: #000;
+}
+
+.drawer__foot .readout {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dossier-section {
+  padding: 14px 16px;
+}
+
+.dossier-section + .dossier-section {
+  border-top: 2px solid var(--border-strong);
+}
+
+.dossier-section__title {
+  margin: 0 0 9px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+
+.fact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 2px;
+  background: var(--border-strong);
+  border: 2px solid var(--border-strong);
+}
+
+.dossier-fact {
+  padding: 8px 10px;
+  background: var(--ws-fill);
+}
+
+.board-row {
+  display: flex;
+  margin: 0;
+  gap: 8px;
+  align-items: baseline;
+  padding: 6px 0;
+}
+
+.board-tag {
+  flex: none;
+  width: 84px;
+  padding: 3px 5px;
+  background: var(--border-strong);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.board-tag[data-kind='redrawn'] {
+  background: var(--accent-2);
+  color: #000;
+}
+
+.field-note {
+  padding: 10px 0;
+}
+
+.field-note + .field-note {
+  border-top: 2px solid #0e141c;
+}
+
+.field-note__index {
+  color: var(--ink-dim);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.api-entry {
+  padding: 12px 0;
+}
+
+.api-entry + .api-entry {
+  border-top: 2px solid #0e141c;
+}
+
+.api-entry__signature {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+
+.api-entry__doc {
+  margin: 5px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.api-entry__cost {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 6px;
+  background: var(--border-strong);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}

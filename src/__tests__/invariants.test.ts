@@ -52,7 +52,7 @@ test('a constant declared in two files has one value', () => {
 });
 
 test('the silver rule the player is shown states both halves of it', () => {
-  const shown = read('src/ui/desk/furniture/reference.ts')
+  const shown = read('src/ui/reference/api.ts')
     .split('\n')
     .filter((line) => /silver/i.test(line))
     .join('\n');

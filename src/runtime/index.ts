@@ -1,5 +1,4 @@
 export type {
-  ApiCategory,
   LibraryRequest,
   LibraryUsage,
   ApiFunctionSpec,
@@ -15,7 +14,7 @@ export type {
   WorkerRequestMessage,
   WorkerResponseMessage,
 } from './protocol.ts';
-export { WORKER_TIMEOUT_MS } from './protocol.ts';
+export { ApiCategory, WORKER_TIMEOUT_MS } from './protocol.ts';
 
 export {
   PLAYER_API,

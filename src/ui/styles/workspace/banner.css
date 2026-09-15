@@ -1,0 +1,107 @@
+/* ---- the close-out slam ---- */
+
+.closed-banner {
+  position: fixed;
+  top: 50%;
+  right: -2px;
+  left: -2px;
+  z-index: 9;
+  border-top: 2px solid var(--ws-edge);
+  border-bottom: 2px solid var(--ws-edge);
+  background: #000;
+  transform: translateY(-50%);
+  animation: ws-slam 190ms cubic-bezier(0.6, 0, 0.3, 1) both;
+}
+
+@keyframes ws-slam {
+  from {
+    clip-path: inset(46% 0 46% 0);
+    opacity: 0;
+  }
+
+  to {
+    clip-path: inset(0 0 0 0);
+    opacity: 1;
+  }
+}
+
+.closed-banner__row {
+  display: flex;
+  gap: 22px;
+  align-items: center;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 26px 32px;
+}
+
+.closed-banner__id {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: clamp(38px, 5vw, 76px);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  line-height: 0.82;
+}
+
+.closed-banner__word {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: clamp(38px, 5vw, 76px);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 0.9;
+  text-transform: uppercase;
+}
+
+.closed-banner__medal {
+  flex: none;
+  padding: 10px 14px;
+  background: var(--ink-dim);
+  color: #000;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+.closed-banner__medal[data-medal='gold'] {
+  background: var(--gold);
+}
+
+.closed-banner__medal[data-medal='silver'] {
+  background: var(--silver);
+}
+
+.closed-banner__medal[data-medal='bronze'] {
+  background: var(--bronze);
+}
+
+.closed-banner__sub {
+  display: block;
+  margin: 6px 0 0;
+  color: var(--ink-dim);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+.closed-banner__file {
+  flex: none;
+  padding: 18px 26px;
+  border: 0;
+  background: var(--accent);
+  color: #000;
+  font-family: var(--font-prose);
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  cursor: pointer;
+  clip-path: polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
+}
+
+.closed-banner__file:hover {
+  background: #fff;
+}

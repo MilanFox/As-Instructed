@@ -3,7 +3,7 @@ import { Medal, levelPoints, medalForLevel } from '../../../game/score.ts';
 import { getLevel } from '../../../levels/index.ts';
 import { personalBestLine } from '../../copy.ts';
 import { MedalBadge } from '../../components/MedalBadge.tsx';
-import { celebrationFor, reportedMedal, resultWord } from '../../desk/paper/report.ts';
+import { celebrationFor, reportedMedal, resultWord } from '../../paper/report.ts';
 
 const UNGRADED = getLevel('w1-01');
 const GRADED = getLevel('w1-03');

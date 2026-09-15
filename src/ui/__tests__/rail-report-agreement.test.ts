@@ -25,9 +25,10 @@ vi.mock('zustand', async () => {
   };
 });
 
-const { Rail: ObjectiveRail } = await import('../desk/terminal/Rail.tsx');
-const { ReportSheet } = await import('../desk/paper/ReportSheet.tsx');
-const { snapshotReport } = await import('../desk/paper/report.ts');
+const { WorkOrderCard } = await import('../workspace/WorkOrderCard.tsx');
+const { ReportSheet } = await import('../workspace/ReportSheet.tsx');
+const { useWorkspace } = await import('../workspace/useWorkspace.ts');
+const { snapshotReport } = await import('../paper/report.ts');
 const { useGame } = await import('../../game/store.ts');
 const { emptySave } = await import('../../game/save.ts');
 const { campaignOrder } = await import('../../levels/index.ts');
@@ -37,15 +38,21 @@ const { SOLUTIONS } = await import('../../levels/__tests__/solutions.ts');
 
 type LevelDef = ReturnType<typeof campaignOrder>[number];
 type RunResult = ReturnType<typeof runLevel>;
-function Results(): unknown {
-  const report = snapshotReport(useGame.getState() as never);
-  return report ? ReportSheet({ report } as never) : null;
+
+function OrderCard(): unknown {
+  return WorkOrderCard({ workspace: useWorkspace() });
+}
+
+function Report(): unknown {
+  const report = snapshotReport(useGame.getState());
+  return report ? ReportSheet({ report }) : null;
 }
 
 type Props = Record<string, unknown>;
 
 interface Drawn {
   classes: string[];
+  attrs: Props;
   text: string;
   children: Drawn[];
 }
@@ -53,7 +60,7 @@ interface Drawn {
 function draw(node: unknown): Drawn[] {
   if (node === null || node === undefined || typeof node === 'boolean') return [];
   if (typeof node === 'string' || typeof node === 'number') {
-    return [{ classes: [], text: String(node), children: [] }];
+    return [{ classes: [], attrs: {}, text: String(node), children: [] }];
   }
   if (Array.isArray(node)) return node.flatMap(draw);
   const element = node as { type?: unknown; props?: Props };
@@ -68,6 +75,7 @@ function draw(node: unknown): Drawn[] {
       classes: String(props['className'] ?? '')
         .split(/\s+/)
         .filter(Boolean),
+      attrs: props,
       text: children
         .map((child) => child.text)
         .join(' ')
@@ -90,26 +98,26 @@ function within(nodes: Drawn[], match: (node: Drawn) => boolean): Drawn[] {
   return found;
 }
 
+const hasClass =
+  (name: string) =>
+  (node: Drawn): boolean =>
+    node.classes.includes(name);
+
 interface Row {
   label: string;
+  state: string;
   gauge: boolean;
-  over: boolean;
-  limit: boolean;
   readout: string;
 }
 
 function rowsOf(component: () => unknown): Row[] {
   driver.reset();
   const tree = draw(component());
-  return within(tree, (node) => node.classes.includes('objective')).map((row) => ({
-    label: within([row], (node) => node.classes.includes('objective__label'))[0]?.text ?? '',
-    gauge: row.classes.includes('objective--budget'),
-    over: row.classes.includes('objective--over'),
-    limit: within([row], (node) => node.classes.includes('objective__gate')).length > 0,
-    readout:
-      within([row], (node) =>
-        node.classes.some((mark) => mark.startsWith('objective__progress')),
-      )[0]?.text ?? '',
+  return within(tree, hasClass('objective-row')).map((row) => ({
+    label: within([row], hasClass('objective-row__label'))[0]?.text ?? '',
+    state: String(row.attrs['data-state'] ?? ''),
+    gauge: within([row], hasClass('progress-meter')).length > 0,
+    readout: within([row], hasClass('progress-meter__read'))[0]?.text ?? '',
   }));
 }
 
@@ -128,6 +136,7 @@ function show(level: LevelDef, run: RunResult): void {
     trace: run.trace,
     traceSeed: run.seed,
     tick: run.trace.endTick,
+    runMode: 'dispatch',
     showResults: true,
     seedResults: [],
     failure: null,
@@ -140,7 +149,7 @@ function show(level: LevelDef, run: RunResult): void {
 interface Disagreement {
   level: string;
   label: string;
-  rail: Row;
+  order: Row;
   report: Row;
 }
 
@@ -149,17 +158,17 @@ function sweep(drive: (level: LevelDef) => RunResult): { rows: number; found: Di
   let rows = 0;
   for (const level of campaignOrder()) {
     show(level, drive(level));
-    const rail = rowsOf(ObjectiveRail);
-    const report = rowsOf(Results);
+    const order = rowsOf(OrderCard);
+    const report = rowsOf(Report);
     expect(
       report.map((row) => row.label),
       level.id,
-    ).toEqual(rail.map((row) => row.label));
-    rows += rail.length;
-    rail.forEach((row, index) => {
+    ).toEqual(order.map((row) => row.label));
+    rows += order.length;
+    order.forEach((row, index) => {
       const twin = report[index] as Row;
       if (JSON.stringify(row) === JSON.stringify(twin)) return;
-      found.push({ level: level.id, label: row.label, rail: row, report: twin });
+      found.push({ level: level.id, label: row.label, order: row, report: twin });
     });
   }
   return { rows, found };
@@ -190,20 +199,22 @@ describe('one objective, two screens', () => {
   test('and the agreement is not the agreement of two empty screens', () => {
     const gauges = campaignOrder().flatMap((level) => {
       show(level, idle(level));
-      return rowsOf(ObjectiveRail).filter((row) => row.gauge);
+      return rowsOf(OrderCard).filter((row) => row.gauge);
     });
 
     expect(gauges.length).toBeGreaterThan(0);
     expect(gauges.some((row) => /\d+ \/ \d+ \w/.test(row.readout))).toBe(true);
   });
 
-  test('a bonus that declares its meter is a gauge on the rail too', () => {
+  test('a bonus that declares its meter is a gauge on the work order too', () => {
     const level = campaignOrder().find((each) => each.id === 'w5-02') as LevelDef;
     show(level, reference(level));
 
-    const bonus = level.bonus?.[0]?.label;
-    const probes = rowsOf(ObjectiveRail).find((row) => row.label === bonus);
+    const bonus = level.bonus?.[0]?.label as string;
+    const probes = rowsOf(OrderCard).find((row) => row.label.endsWith(bonus));
     expect(probes?.gauge).toBe(true);
-    expect(probes?.readout).toBe(rowsOf(Results).find((row) => row.label === bonus)?.readout);
+    expect(probes?.readout).toBe(
+      rowsOf(Report).find((row) => row.label.endsWith(bonus))?.readout,
+    );
   });
 });

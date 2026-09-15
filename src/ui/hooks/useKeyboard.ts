@@ -1,9 +1,8 @@
 import { useEffect } from 'react';
 import { useGame } from '../../game/store.ts';
 import { useLibrary } from '../../meta/index.ts';
-import { usePapers } from '../desk/paper/papers.ts';
-import { toggleDeskFocus } from '../desk/focus.ts';
-import { KEY_LIST, type KeyId } from '../desk/terminal/keys.ts';
+import { usePapers } from '../paper/papers.ts';
+import { KEY_LIST, type KeyId } from './keys.ts';
 import { closeOverlay, overlayState, toggleOverlay } from './useOverlay.ts';
 
 function isEditorTarget(target: EventTarget | null): boolean {
@@ -44,10 +43,6 @@ export function useKeyboard(): void {
           else if (overlayState().open === 'docs') closeOverlay();
           else if (useLibrary.getState().panelOpen) useLibrary.getState().setPanelOpen(false);
           else if (state.screen !== 'levels' && !isEditorTarget(event.target)) state.goto('levels');
-        },
-
-        focus: () => {
-          toggleDeskFocus();
         },
 
         play: () => {

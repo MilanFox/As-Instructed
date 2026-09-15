@@ -25,8 +25,8 @@ vi.mock('zustand', async () => {
   };
 });
 
-const { ReportSheet } = await import('../desk/paper/ReportSheet.tsx');
-const { snapshotReport } = await import('../desk/paper/report.ts');
+const { ReportSheet } = await import('../workspace/ReportSheet.tsx');
+const { snapshotReport } = await import('../paper/report.ts');
 const { StructureScreen } = await import('../../meta/ui/StructureScreen.tsx');
 const { useGame } = await import('../../game/store.ts');
 const { useLibrary } = await import('../../meta/store.ts');
@@ -39,7 +39,7 @@ const { reportFor } = await import('../screens/review.ts');
 
 function Results(): unknown {
   const report = snapshotReport(useGame.getState() as never);
-  return report ? ReportSheet({ report } as never) : null;
+  return report ? ReportSheet({ report }) : null;
 }
 
 type Props = Record<string, unknown>;
@@ -155,7 +155,10 @@ describe('the report says what the Repository did on this run', () => {
 
 describe('the line is a fact, not a scoreline', () => {
   function withoutTheLine(text: string): string {
-    return text.replace(/\d+ routines? from the Repository, \d+ ticks? inside (?:it|them)\./, '');
+    return text.replace(
+      / ?On record Repository \d+ routines? from the Repository, \d+ ticks? inside (?:it|them)\./,
+      '',
+    );
   }
 
   test('the report reads exactly the same everywhere else', () => {
@@ -179,9 +182,9 @@ describe('the line is a fact, not a scoreline', () => {
     const used = screen(Results);
 
     const scoreline = (text: string): string =>
-      /ticks \d+.*?(?= seeds )/.exec(text)?.[0] ?? 'no scoreline';
+      /Ticks \d+.*?(?= Objectives )/.exec(text)?.[0] ?? 'no scoreline';
 
-    expect(scoreline(bare)).toMatch(/pts/);
+    expect(scoreline(bare)).toMatch(/Points \d/);
     expect(scoreline(used)).toBe(scoreline(bare));
   });
 });
