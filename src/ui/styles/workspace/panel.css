@@ -59,6 +59,21 @@
   left: calc(var(--ws-shift) + var(--ws-deck-left));
 }
 
+/* An open drawer costs the deck 684px of its left, which is more than the transport row can
+   give up, so the deck takes the right gutter back and runs under the column instead. The two
+   are then sized against one shared band rather than against each other's content: the deck
+   may not grow past --ws-deck-band off the bottom edge and the column may not reach into it.
+   The run log is what gives, because the alternative is a column whose height races the run
+   output — it reaches the bottom of the screen on any run long enough to fill it. */
+.workspace[data-drawer='open'] .transport-deck {
+  right: var(--ws-deck-right);
+  max-height: var(--ws-deck-band);
+}
+
+.workspace[data-drawer='open'] .hud-right {
+  max-height: calc(100vh - var(--ws-inset) - var(--ws-deck-band) - 12px);
+}
+
 .panel-bar {
   display: flex;
   flex: none;

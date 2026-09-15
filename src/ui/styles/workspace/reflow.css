@@ -65,7 +65,7 @@
   }
 
   .workspace .transport-deck {
-    right: var(--ws-inset);
+    right: var(--ws-deck-right);
     left: var(--ws-inset);
   }
 

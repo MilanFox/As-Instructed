@@ -15,6 +15,7 @@
   left: calc(var(--ws-shift) + 66px);
   transition:
     left var(--ws-slide),
+    right var(--ws-slide),
     transform var(--ws-slide);
 }
 
@@ -123,8 +124,11 @@
   cursor: default;
 }
 
+/* The basis is the width the row wraps at, not a preferred size — the scrubber takes every
+   spare pixel anyway — so it is the smallest usable track, and the row stays on one line for
+   as long as the track is still worth dragging. */
 .scrubber {
-  flex: 1 1 150px;
+  flex: 1 1 90px;
   min-width: 90px;
   height: 22px;
   margin: 0;
