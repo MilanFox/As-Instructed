@@ -125,6 +125,20 @@ function rowsOf(component: () => unknown): Row[] {
   }));
 }
 
+interface Line {
+  label: string;
+  value: string;
+}
+
+function linesOf(component: () => unknown): Line[] {
+  driver.reset();
+  const tree = draw(component());
+  return within(tree, hasClass('report-line')).map((line) => ({
+    label: within([line], hasClass('report-line__label'))[0]?.text ?? '',
+    value: within([line], hasClass('report-line__value'))[0]?.text ?? '',
+  }));
+}
+
 function bonusOf(level: LevelDef, run: RunResult): ReturnType<typeof evaluateObjectives> {
   return evaluateObjectives(level.bonus ?? [], {
     world: run.world,
@@ -235,6 +249,15 @@ const idle = (level: LevelDef): RunResult => idleAt(level, seedOf(level));
 
 const reference = (level: LevelDef): RunResult => referenceAt(level, seedOf(level));
 
+function wastefulRuns(level: LevelDef, wasteful: number): SeedRun[] {
+  return seedRunsOf(level, (each, seed) =>
+    runLevel(each, seed, (sim, botId) => {
+      (SOLUTIONS[each.id] as never as { run(sim: unknown, bot: number): void }).run(sim, botId);
+      if (seed === wasteful) for (let spent = 0; spent < 3; spent++) sim.move(botId, Dir.North);
+    }),
+  );
+}
+
 const onOneSeed =
   (drive: (level: LevelDef) => RunResult) =>
   (level: LevelDef): void =>
@@ -328,12 +351,7 @@ describe('one objective, two screens', () => {
     expect(level.seeds.length).toBeGreaterThan(1);
     expect(level.seeds[0]).not.toBe(wasteful);
 
-    const runs = seedRunsOf(level, (each, seed) =>
-      runLevel(each, seed, (sim, botId) => {
-        (SOLUTIONS[each.id] as never as { run(sim: unknown, bot: number): void }).run(sim, botId);
-        if (seed === wasteful) for (let spent = 0; spent < 3; spent++) sim.move(botId, Dir.North);
-      }),
-    );
+    const runs = wastefulRuns(level, wasteful);
 
     expect(runs.every((run) => run.result.passed)).toBe(true);
     expect(
@@ -351,5 +369,47 @@ describe('one objective, two screens', () => {
       expect(moves.state).toBe('over');
       expect(Number(used)).toBeGreaterThan(Number(allowance));
     }
+  });
+
+  test('and the sheet says out loud which seed dropped the star', () => {
+    const level = campaignOrder().find((each) => each.id === 'w1-03') as LevelDef;
+    const wasteful = level.seeds[level.seeds.length - 1] as number;
+    const kept = level.seeds[0] as number;
+    const runs = wastefulRuns(level, wasteful);
+
+    showAggregate(level, runs);
+    const lines = linesOf(Report);
+    const bonusLabel = level.bonus?.[0]?.label as string;
+
+    expect(lines.find((line) => line.label === 'Bonus')?.value).toBe(
+      `Missed on seed ${String(wasteful)}`,
+    );
+    const spent = runs.find((run) => run.result.seed === wasteful)?.result.bonus?.[0]
+      ?.progress as [number, number];
+    expect(lines.find((line) => line.label === `Seed ${String(wasteful)}`)?.value).toBe(
+      `${bonusLabel} (${String(spent[0])}/${String(spent[1])})`,
+    );
+    expect(lines.find((line) => line.label === `Seed ${String(kept)}`)?.value).toBe('closed');
+  });
+
+  test('and no seed is named when there is no star to account for', () => {
+    const level = campaignOrder().find((each) => each.id === 'w1-03') as LevelDef;
+    const wasteful = level.seeds[level.seeds.length - 1] as number;
+    const named = (): boolean => linesOf(Report).some((line) => line.label === 'Bonus');
+
+    showAggregate(level, seedRunsOf(level, referenceAt));
+    expect(named()).toBe(false);
+
+    showAggregate(level, seedRunsOf(level, idleAt));
+    expect(named()).toBe(false);
+
+    const onlyWasteful = wastefulRuns(level, wasteful).filter(
+      (run) => run.result.seed === wasteful,
+    );
+    showAggregate(level, onlyWasteful);
+    expect(named()).toBe(false);
+    expect(linesOf(Report).find((line) => line.label === `Seed ${String(wasteful)}`)?.value).toBe(
+      'closed',
+    );
   });
 });

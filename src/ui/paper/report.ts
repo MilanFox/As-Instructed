@@ -1,3 +1,4 @@
+import type { ObjectiveReport } from '../../engine/index.ts';
 import type { BudgetSource } from '../../game/budgets.ts';
 import { budgetFor, failureCauses } from '../../game/budgets.ts';
 import { playbackFor } from '../../game/playback.ts';
@@ -110,6 +111,16 @@ export function snapshotReport(state: GameState): ReportSnapshot | null {
   const failedSeed = state.seedResults.find((result) => !result.passed);
   const passedSeed = state.seedResults.find((result) => result.passed);
 
+  const namesBonusSeed = passed && multiSeed;
+  const bonusSeed = namesBonusSeed
+    ? (state.seedResults.find((result) => (result.bonus ?? []).some((entry) => !entry.met))?.seed ??
+      null)
+    : null;
+  const seedNote = (entry: ObjectiveReport): string =>
+    entry.progress
+      ? `${entry.label} (${String(entry.progress[0])}/${String(entry.progress[1])})`
+      : entry.label;
+
   const reportedSeed =
     state.seedResults.find((result) => result.seed === state.traceSeed) ?? state.seedResults[0];
   const usage = reportedSeed?.libraryUsage;
@@ -136,13 +147,11 @@ export function snapshotReport(state: GameState): ReportSnapshot | null {
     seedLines: state.seedResults.map((result) => ({
       seed: result.seed,
       passed: result.passed,
-      note: result.objectives
-        .filter((entry) => !entry.met && !bonusIds.has(entry.id))
-        .map((entry) =>
-          entry.progress
-            ? `${entry.label} (${String(entry.progress[0])}/${String(entry.progress[1])})`
-            : entry.label,
-        )
+      note: [
+        ...result.objectives.filter((entry) => !entry.met && !bonusIds.has(entry.id)),
+        ...(namesBonusSeed ? (result.bonus ?? []).filter((entry) => !entry.met) : []),
+      ]
+        .map(seedNote)
         .join(' · '),
     })),
     objectives,
@@ -153,6 +162,7 @@ export function snapshotReport(state: GameState): ReportSnapshot | null {
     failureSeed: failedSeed?.seed ?? null,
     failureLine: state.failure?.line ?? null,
     passedSeed: passedSeed && failedSeed ? passedSeed.seed : null,
+    bonusSeed,
     commendations: [...state.freshCommendations],
     personalBest: state.personalBest,
     points: passed ? levelPoints(medal, stars) : null,

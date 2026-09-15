@@ -85,6 +85,9 @@ export function ReportSheet({ report, onDismiss, onNext }: ReportSheetProps): Re
             tone="fail"
           />
         )}
+        {report.bonusSeed === null ? null : (
+          <ReportLine label="Bonus" value={`Missed on seed ${String(report.bonusSeed)}`} />
+        )}
 
         <PanelBar sub>Objectives</PanelBar>
         <ul>
