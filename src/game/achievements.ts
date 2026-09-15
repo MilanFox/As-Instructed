@@ -32,6 +32,18 @@ const LAST_SECTOR = 8;
 const ROUTINE_ORDERS = 4;
 const OVER_PAR_FACTOR = 10;
 
+const NUMBER_WORDS: Readonly<Record<number, string>> = {
+  2: 'two',
+  4: 'four',
+  6: 'six',
+  8: 'eight',
+  10: 'ten',
+};
+
+function spelled(value: number): string {
+  return NUMBER_WORDS[value] ?? String(value);
+}
+
 export const ACHIEVEMENTS: readonly Achievement[] = [
   {
     id: 'sector-closed',
@@ -42,25 +54,25 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   {
     id: 'two-sectors',
     title: 'A SECOND SECTOR SIGNED OFF',
-    requirement: `Close every work order in ${String(SECTORS_SECOND)} sectors.`,
+    requirement: `Close every work order in ${spelled(SECTORS_SECOND)} sectors.`,
     note: 'Two sectors clear. The map upstairs has been coloured in to match, in the wrong colour.',
   },
   {
     id: 'four-sectors',
     title: 'FOUR SECTORS BEHIND YOU',
-    requirement: `Close every work order in ${String(SECTORS_MIDWAY)} sectors.`,
+    requirement: `Close every work order in ${spelled(SECTORS_MIDWAY)} sectors.`,
     note: 'Four sectors closed. Somebody upstairs has started a spreadsheet with your name on it.',
   },
   {
     id: 'six-sectors',
     title: 'SIX DOWN, TWO OUTSTANDING',
-    requirement: `Close every work order in ${String(SECTORS_LATE)} sectors.`,
+    requirement: `Close every work order in ${spelled(SECTORS_LATE)} sectors.`,
     note: 'Six sectors closed. The other two were always going to be the difficult ones.',
   },
   {
     id: 'last-sector',
     title: 'THE EIGHTH SECTOR',
-    requirement: `Close a work order in sector ${String(LAST_SECTOR)}.`,
+    requirement: `Close a work order in sector ${spelled(LAST_SECTOR)}.`,
     note: 'Sector eight is the Kessler Contract. There has never been a ninth.',
   },
   {
@@ -121,7 +133,7 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   {
     id: 'in-service',
     title: 'WRITTEN ONCE, USED FOUR TIMES',
-    requirement: `Close ${String(ROUTINE_ORDERS)} different work orders with the same published subroutine doing work in each.`,
+    requirement: `Close ${spelled(ROUTINE_ORDERS)} different work orders with the same published subroutine doing work in each.`,
     note: 'One subroutine, four closed orders. The repository has paid for itself.',
   },
   {
@@ -146,7 +158,7 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   {
     id: 'outside-the-estimate',
     title: 'WELL OUTSIDE THE ESTIMATE',
-    requirement: `Close a work order at ${String(OVER_PAR_FACTOR)} times par.`,
+    requirement: `Close a work order at ${spelled(OVER_PAR_FACTOR)} times par.`,
     note: 'Ten times par, and closed. Closed is the only field anyone upstairs reads.',
     hidden: true,
   },
