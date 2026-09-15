@@ -586,10 +586,10 @@ export class Renderer {
     }
   }
 
-  pulse(kind: 'objective' | 'commend' = 'objective', at?: Vec): void {
+  pulse(kind: 'objective' | 'achievement' = 'objective', at?: Vec): void {
     if (!this.celebrationsEnabled) return;
     const cell = at ?? this.celebrationCell();
-    const color = kind === 'commend' ? palette.accent2 : palette.ok;
+    const color = kind === 'achievement' ? palette.accent2 : palette.ok;
     this.burst(
       'objective',
       cell.x + 0.5,

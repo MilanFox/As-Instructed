@@ -491,7 +491,7 @@ html[data-art='signal'] {
 [data-art='signal'] .score-cell,
 [data-art='signal'] .record,
 [data-art='signal'] .crate,
-[data-art='signal'] .commend {
+[data-art='signal'] .achievement {
   border-radius: 0;
   background: transparent;
 }
@@ -503,7 +503,7 @@ html[data-art='signal'] {
   text-shadow: var(--glow);
 }
 
-[data-art='signal'] .commend__seal {
+[data-art='signal'] .achievement__seal {
   border-radius: 0;
 }
 

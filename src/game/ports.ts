@@ -40,7 +40,7 @@ export interface RendererPort {
   setHighlights(cells: readonly Vec[], met?: boolean): void;
 
   celebrate(kind: CelebrationKind): void;
-  pulse(kind?: 'objective' | 'commend'): void;
+  pulse(kind?: 'objective' | 'achievement'): void;
   setCelebrationsEnabled(enabled: boolean): void;
   skipCelebration(): void;
 

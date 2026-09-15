@@ -211,8 +211,8 @@ export class Conductor {
     this.emit(name, this.engine.now() + LOOKAHEAD + Math.max(0, after), 0, 1, true);
   }
 
-  commend(index = 0, after = 0): void {
-    this.emit('commend', this.engine.now() + LOOKAHEAD + Math.max(0, after), index, 1, true);
+  achievement(index = 0, after = 0): void {
+    this.emit('achievement', this.engine.now() + LOOKAHEAD + Math.max(0, after), index, 1, true);
   }
 
   dispose(): void {

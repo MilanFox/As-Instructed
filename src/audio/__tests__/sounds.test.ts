@@ -166,7 +166,7 @@ describe('the medal figure builds instead of trailing off', () => {
 
 describe('achievements land as one ascending phrase', () => {
   function pitch(seed: number): number {
-    const { buffer, rate } = renderOne('commend', seed);
+    const { buffer, rate } = renderOne('achievement', seed);
     let crossings = 0;
     let counted = 0;
     for (let i = 1; i < buffer.length; i++) {
@@ -194,6 +194,6 @@ describe('achievements land as one ascending phrase', () => {
   it('stays smaller than the medal it is decorating', () => {
     const peak = (name: SoundName, seed = 7): number =>
       analyse(renderOne(name, seed).buffer, 44100).peak;
-    expect(peak('commend', 4)).toBeLessThan(peak('medalBronze'));
+    expect(peak('achievement', 4)).toBeLessThan(peak('medalBronze'));
   });
 });

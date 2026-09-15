@@ -167,7 +167,7 @@ export class CanvasRenderer implements RendererPort {
     this.renderer.celebrate(kind);
   }
 
-  pulse(kind: 'objective' | 'commend' = 'objective'): void {
+  pulse(kind: 'objective' | 'achievement' = 'objective'): void {
     this.renderer.pulse(kind);
   }
 

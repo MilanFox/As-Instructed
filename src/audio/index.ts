@@ -187,8 +187,8 @@ export class GameAudio {
     this.ensureConductor()?.medal(medal, after);
   }
 
-  commend(index = 0, after = 0): void {
-    this.ensureConductor()?.commend(index, after);
+  achievement(index = 0, after = 0): void {
+    this.ensureConductor()?.achievement(index, after);
   }
 
   cue(name: SoundName, seed = 0): void {

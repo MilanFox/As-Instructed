@@ -56,7 +56,7 @@ export type OutcomeSound =
   | 'medalBronze'
   | 'medalSilver'
   | 'medalGold'
-  | 'commend';
+  | 'achievement';
 
 export type UiSound =
   'runStart' | 'compileError' | 'cancel' | 'panelOpen' | 'panelClose' | 'button';
@@ -332,7 +332,7 @@ function renderMedal(engine: AudioEngine, voice: Voice, at: number, shape: Medal
 
 const LADDER: readonly number[] = [293.66, 440, 587.33, 880, 1174.66];
 
-function renderCommend(engine: AudioEngine, voice: Voice, at: number, seed: number): void {
+function renderAchievement(engine: AudioEngine, voice: Voice, at: number, seed: number): void {
   const ctx = engine.ctx;
   const step = Math.max(0, Math.min(LADDER.length - 1, Math.round(seed)));
   const note = LADDER[step] as number;
@@ -586,13 +586,13 @@ export const SOUNDS: Readonly<Record<SoundName, SoundSpec>> = {
     render: (engine, voice, at) => renderMedal(engine, voice, at, GOLD),
   },
 
-  commend: {
+  achievement: {
     bus: 'sfx',
     priority: 5,
     duration: 0.35,
     minIntervalMs: 90,
     gain: 0.44,
-    render: renderCommend,
+    render: renderAchievement,
   },
 
   runStart: {

@@ -544,7 +544,7 @@
   flex: none;
 }
 
-.commend {
+.achievement {
   display: flex;
   gap: var(--space-3);
   align-items: flex-start;
@@ -555,17 +555,17 @@
   background: color-mix(in srgb, var(--gold) 6%, transparent);
 }
 
-.commend__seal {
+.achievement__seal {
   color: var(--gold);
   font-size: 16px;
   line-height: 1.2;
 }
 
-.commend__text {
+.achievement__text {
   min-width: 0;
 }
 
-.commend__title {
+.achievement__title {
   margin: 0;
   color: var(--gold);
   font-family: var(--font-mono);
@@ -573,7 +573,7 @@
   letter-spacing: 0.14em;
 }
 
-.commend__note {
+.achievement__note {
   margin: 3px 0 0;
   color: var(--ink);
   font-size: 12px;
