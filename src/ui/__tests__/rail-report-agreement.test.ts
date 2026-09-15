@@ -218,7 +218,7 @@ describe('one objective, two screens', () => {
     expect(probes?.readout).toBe(rowsOf(Report).find((row) => row.label.endsWith(bonus))?.readout);
   });
 
-  test('a met budget with slack is kinded apart from a progress meter and names its headroom', () => {
+  test('a met budget is kinded apart from a progress meter, and names any headroom', () => {
     const level = campaignOrder().find((each) => each.id === 'w1-03') as LevelDef;
     show(level, reference(level));
 
@@ -230,7 +230,19 @@ describe('one objective, two screens', () => {
       expect(tiles?.readout).toMatch(/^\d+ \/ \d+ tiles$/);
       expect(moves?.kind).toBe('budget');
       expect(moves?.state).toBe('met');
-      expect(moves?.readout).toMatch(/^\d+ \/ \d+ moves · \d+ spare$/);
+      // w1-03 allows one move fewer than it has floor, so a clean drive has no headroom left.
+      expect(moves?.readout).toMatch(/^\d+ \/ \d+ moves$/);
+    }
+
+    const roomy = campaignOrder().find((each) => each.id === 'w2-03') as LevelDef;
+    show(roomy, reference(roomy));
+
+    for (const screen of [rowsOf(OrderCard), rowsOf(Report)]) {
+      const footprint = screen.find((row) => row.label.startsWith('BONUS'));
+
+      expect(footprint?.kind).toBe('budget');
+      expect(footprint?.state).toBe('met');
+      expect(footprint?.readout).toMatch(/^\d+ \/ \d+ tiles · \d+ spare$/);
     }
   });
 });

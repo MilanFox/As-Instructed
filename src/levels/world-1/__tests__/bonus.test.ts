@@ -198,20 +198,25 @@ const rowSerpentine = (sim: Sim, botId: number): void => {
   eastHalf(sim, botId);
 };
 
-const COMBED: Readonly<Record<number, { moves: number; floor: number }>> = {
-  21: { moves: 42, floor: 43 },
-  1: { moves: 40, floor: 41 },
-  2: { moves: 48, floor: 49 },
-  6: { moves: 35, floor: 36 },
-  8: { moves: 35, floor: 36 },
-  14: { moves: 43, floor: 43 },
+const rowSerpentineThatBumps = (sim: Sim, botId: number): void => {
+  rowSerpentine(sim, botId);
+  sim.move(botId, Dir.North);
+};
+
+const SNAKED: Readonly<Record<number, { moves: number; floor: number }>> = {
+  11: { moves: 35, floor: 36 },
+  5: { moves: 40, floor: 41 },
+  7: { moves: 25, floor: 26 },
+  15: { moves: 30, floor: 31 },
+  30: { moves: 45, floor: 46 },
+  88: { moves: 45, floor: 46 },
 };
 
 describe('w1-03 one-move-per-tile', () => {
-  test('the reference combs to match the bay and earns it on every seed', () => {
+  test('the reference snakes both halves and earns it on every seed', () => {
     for (const seed of w1_03.seeds) {
       const run = measured(w1_03, runReference(w1_03, seed, w1_03Solution));
-      const budget = must(COMBED[seed], `seed ${String(seed)}`);
+      const budget = must(SNAKED[seed], `seed ${String(seed)}`);
       expect({
         seed,
         passed: run.passed,
@@ -219,23 +224,33 @@ describe('w1-03 one-move-per-tile', () => {
         moves: run.moves,
         floor: run.floor,
       }).toEqual({ seed, passed: true, star: true, ...budget });
-      expect(run.moves, `seed ${String(seed)}`).toBeLessThanOrEqual(run.floor);
+      expect(run.moves, `seed ${String(seed)}`).toBeLessThanOrEqual(run.floor - 1);
       expect(run.ticks, `seed ${String(seed)}`).toBeLessThanOrEqual(w1_03.par.ticks);
     }
   });
 
-  test('the row serpentine takes gold on the bay the game reports and is refused', () => {
-    const run = scored(w1_03, w1_03.seeds[0] as number, rowSerpentine);
-    expect(run.passed).toBe(true);
-    expect(medalFor(true, run.ticks, w1_03.par.ticks)).toBe('gold');
-    expect({ star: run.met('one-move-per-tile'), moves: run.moves, floor: run.floor }) //
-      .toEqual({ star: false, moves: 44, floor: 43 });
+  test('the row serpentine takes gold and the star on every bay, the rows being odd', () => {
+    for (const seed of w1_03.seeds) {
+      const run = scored(w1_03, seed, rowSerpentine);
+      expect({
+        seed,
+        passed: run.passed,
+        star: run.met('one-move-per-tile'),
+        medal: medalFor(run.passed, run.ticks, w1_03.par.ticks),
+      }).toEqual({ seed, passed: true, star: true, medal: 'gold' });
+    }
   });
 
-  test('the row serpentine only fits the bays with an odd number of rows', () => {
-    const earned = w1_03.seeds.filter((seed) =>
-      scored(w1_03, seed, rowSerpentine).met('one-move-per-tile'),
-    );
-    expect(earned).toEqual([1, 6, 8]);
+  test('one move refused by a wall spends the allowance, so the same route is refused', () => {
+    for (const seed of w1_03.seeds) {
+      const run = scored(w1_03, seed, rowSerpentineThatBumps);
+      expect({
+        seed,
+        passed: run.passed,
+        star: run.met('one-move-per-tile'),
+        moves: run.moves,
+        floor: run.floor,
+      }).toEqual({ seed, passed: true, star: false, moves: run.floor, floor: run.floor });
+    }
   });
 });

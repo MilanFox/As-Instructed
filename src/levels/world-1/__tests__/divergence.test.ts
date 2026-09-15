@@ -109,7 +109,7 @@ describe('w1-03 names a tile rather than a shortfall', () => {
 
   test('one-move-per-tile names the tick and tile the allowance ran out on', () => {
     const filed = 200;
-    const allowed = walkableTiles(w1_03.build(21)).length;
+    const allowed = walkableTiles(w1_03.build(21)).length - 1;
     const { met, divergence } = diverge(w1_03, 21, 'one-move-per-tile', (sim, botId) => {
       for (let step = 0; step < filed; step++) {
         sim.move(botId, step % 2 === 0 ? Dir.East : Dir.West);
@@ -119,7 +119,7 @@ describe('w1-03 names a tile rather than a shortfall', () => {
     expect(met).toBe(false);
     expect(divergence).toEqual({
       where: `tick ${String(allowed)} · ${at({ x: (allowed + 1) % 2 === 1 ? 1 : 2, y: 1 })}`,
-      expected: `${String(allowed)} moves, one per floor tile`,
+      expected: `${String(allowed)} moves, one under the floor count`,
       received: `move ${String(allowed + 1)} of ${String(filed)}`,
     });
   });

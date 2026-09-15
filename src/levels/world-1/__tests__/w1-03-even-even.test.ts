@@ -3,7 +3,7 @@ import type { Dir as DirType, ObjectiveContext, Sim } from '../../../engine/inde
 import { Dir, evaluateObjectives } from '../../../engine/index.ts';
 import { runLevel, runReference } from '../../harness.ts';
 import { blockedMoves, movesIssued, walkableTiles } from '../shared.ts';
-import { bayLayout, w1_03 } from '../w1-03.ts';
+import { BAY_DEPTH, bayLayout, w1_03 } from '../w1-03.ts';
 import { solution as reference } from '../__solutions__/w1-03.ts';
 
 interface Shape {
@@ -24,8 +24,8 @@ const isEvenEven = (it: Shape): boolean => it.columns % 2 === 0 && it.rows % 2 =
 
 const SEEDS = Array.from({ length: 400 }, (_value, index) => index + 1);
 
-/** The first eight even/even bays, plus the only six-column ones inside that range. */
-const SAMPLE = [9, 10, 13, 14, 19, 20, 24, 25, 42, 73];
+/** Every west-half column count the divider can put on the board, at any width. */
+const COLUMN_COUNTS = [2, 3, 4, 5, 6, 7];
 
 const flipEastWest = (dir: DirType): DirType => (dir === Dir.East ? Dir.West : Dir.East);
 const flipNorthSouth = (dir: DirType): DirType => (dir === Dir.North ? Dir.South : Dir.North);
@@ -173,85 +173,55 @@ function coveringWalkExists(columns: number, rows: number, budget: number): bool
 const hamiltonianExists = (columns: number, rows: number): boolean =>
   coveringWalkExists(columns, rows, columns * rows - 1);
 
-describe('w1-03 bays whose west half is even both ways', () => {
+describe('the bay is five rows deep, so no west half is ever even both ways', () => {
   const shapes = SEEDS.map(shape);
-  const evenEven = shapes.filter(isEvenEven);
 
-  test('the generator rolls them, and seed 14 is the one the level grades', () => {
-    expect(evenEven.length).toBeGreaterThan(0);
-    expect(evenEven.length).toBe(109);
-    expect(evenEven.slice(0, 8)).toEqual([
-      { seed: 9, columns: 2, rows: 8, width: 6, height: 8, divider: 3 },
-      { seed: 10, columns: 4, rows: 8, width: 8, height: 8, divider: 5 },
-      { seed: 13, columns: 2, rows: 6, width: 8, height: 6, divider: 3 },
-      { seed: 14, columns: 4, rows: 6, width: 8, height: 6, divider: 5 },
-      { seed: 19, columns: 2, rows: 6, width: 6, height: 6, divider: 3 },
-      { seed: 20, columns: 4, rows: 6, width: 9, height: 6, divider: 5 },
-      { seed: 24, columns: 2, rows: 8, width: 7, height: 8, divider: 3 },
-      { seed: 25, columns: 4, rows: 8, width: 8, height: 8, divider: 5 },
-    ]);
-    expect(shape(42)).toEqual({ seed: 42, columns: 6, rows: 6, width: 9, height: 6, divider: 7 });
-    expect(shape(73)).toEqual({ seed: 73, columns: 6, rows: 8, width: 9, height: 8, divider: 7 });
-    expect(w1_03.seeds.map(shape).filter(isEvenEven)).toEqual([
-      { seed: 14, columns: 4, rows: 6, width: 8, height: 6, divider: 5 },
-    ]);
+  test('the depth never moves, and the width and the partition are what the generator rolls', () => {
+    expect(BAY_DEPTH).toBe(5);
+    expect(BAY_DEPTH % 2).toBe(1);
+    expect(new Set(shapes.map((it) => it.rows))).toEqual(new Set([BAY_DEPTH]));
+    expect([...new Set(shapes.map((it) => it.width))].sort((a, b) => a - b)) //
+      .toEqual([6, 7, 8, 9, 10]);
+    expect([...new Set(shapes.map((it) => it.divider))].sort((a, b) => a - b)) //
+      .toEqual([3, 4, 5, 6, 7, 8]);
   });
 
-  test('every even/even column count and row count the generator can roll turns up', () => {
-    const rolled = new Set(evenEven.map((it) => `${String(it.columns)}x${String(it.rows)}`));
-    expect([...rolled].sort()).toEqual(['2x6', '2x8', '4x6', '4x8', '6x6', '6x8']);
+  test('every column count the partition can leave in the west half turns up', () => {
+    expect([...new Set(shapes.map((it) => it.columns))].sort((a, b) => a - b)) //
+      .toEqual(COLUMN_COUNTS);
+    expect(shapes.filter(isEvenEven)).toEqual([]);
   });
 
-  test('the reference earns the star on them, at every width the half comes in', () => {
-    const scored = SAMPLE.map((seed) => {
-      const run = scoreReference(seed);
-      const it = shape(seed);
-      return {
-        seed,
-        half: `${String(it.columns)}x${String(it.rows)}`,
-        star: run.star,
-        over: run.moves - run.floor,
-      };
-    });
-    expect(scored).toEqual([
-      { seed: 9, half: '2x8', star: true, over: 0 },
-      { seed: 10, half: '4x8', star: true, over: 0 },
-      { seed: 13, half: '2x6', star: true, over: 0 },
-      { seed: 14, half: '4x6', star: true, over: 0 },
-      { seed: 19, half: '2x6', star: true, over: 0 },
-      { seed: 20, half: '4x6', star: true, over: 0 },
-      { seed: 24, half: '2x8', star: true, over: 0 },
-      { seed: 25, half: '4x8', star: true, over: 0 },
-      { seed: 42, half: '6x6', star: true, over: 0 },
-      { seed: 73, half: '6x8', star: true, over: 0 },
-    ]);
+  test('the six graded seeds cover every partition column and every width', () => {
+    const graded = w1_03.seeds.map(shape);
+    expect(graded.map((it) => it.divider).sort((a, b) => a - b)).toEqual([3, 4, 5, 6, 7, 8]);
+    expect(graded.map((it) => it.columns).sort((a, b) => a - b)).toEqual(COLUMN_COUNTS);
+    expect([...new Set(graded.map((it) => it.width))].sort((a, b) => a - b)) //
+      .toEqual([6, 7, 8, 9, 10]);
+    expect(graded.filter((it) => it.columns % 2 === 0)).toHaveLength(3);
+    expect(graded.filter((it) => it.columns % 2 === 1)).toHaveLength(3);
+  });
+
+  test('the first graded seed is a middling bay, not the narrowest half the rules allow', () => {
+    const first = shape(w1_03.seeds[0] as number);
+    expect(first).toEqual({ seed: 11, columns: 4, rows: 5, width: 8, height: 5, divider: 5 });
   });
 });
 
-describe('an even/even west half admits no Hamiltonian path to the doorway', () => {
-  test('exhaustive search finds none, at every even/even size the generator rolls', () => {
-    for (const columns of [2, 4, 6]) {
-      for (const rows of [6, 8]) {
-        expect(hamiltonianExists(columns, rows), `${String(columns)}x${String(rows)}`).toBe(false);
-      }
+describe('a clean route exists in every west half the generator can roll', () => {
+  test('exhaustive search finds a Hamiltonian path at every column count', () => {
+    for (const columns of COLUMN_COUNTS) {
+      expect(hamiltonianExists(columns, BAY_DEPTH), `${String(columns)}x${String(BAY_DEPTH)}`) //
+        .toBe(true);
     }
   }, 60000);
 
-  test('one spare move is enough, at every even/even size the generator rolls', () => {
-    for (const columns of [2, 4, 6]) {
-      for (const rows of [6, 8]) {
-        const size = `${String(columns)}x${String(rows)}`;
-        expect(coveringWalkExists(columns, rows, columns * rows), size).toBe(true);
-      }
-    }
-  }, 60000);
-
-  test('every other parity does have one, so the claim is about even/even alone', () => {
-    for (const columns of [2, 3, 4, 5, 6, 7]) {
-      for (const rows of [5, 6, 7, 8]) {
-        if (columns % 2 === 0 && rows % 2 === 0) continue;
-        expect(hamiltonianExists(columns, rows), `${String(columns)}x${String(rows)}`).toBe(true);
-      }
+  test('an even depth is what would take it away, at half those column counts', () => {
+    for (const columns of COLUMN_COUNTS) {
+      const evenDepth = BAY_DEPTH + 1;
+      const size = `${String(columns)}x${String(evenDepth)}`;
+      expect(hamiltonianExists(columns, evenDepth), size).toBe(columns % 2 === 1);
+      expect(coveringWalkExists(columns, evenDepth, columns * evenDepth), size).toBe(true);
     }
   }, 60000);
 });
@@ -301,11 +271,10 @@ function endsBesideTheDoorway(seed: number, drive: (sim: Sim, botId: number) => 
   return west.size === 0 && at.x === it.divider - 1 && at.y === it.height;
 }
 
-describe('what hint 6 tells the player about the two snakes', () => {
-  test('the row-by-row snake is left beside the doorway only when the rows are odd', () => {
+describe('what the hints tell the player about the two snakes', () => {
+  test('the row-by-row snake is left beside the doorway on every bay, the rows being odd', () => {
     for (const seed of SEEDS) {
-      expect(endsBesideTheDoorway(seed, rowSnake), `seed ${String(seed)}`) //
-        .toBe(shape(seed).rows % 2 === 1);
+      expect(endsBesideTheDoorway(seed, rowSnake), `seed ${String(seed)}`).toBe(true);
     }
   });
 
@@ -318,69 +287,43 @@ describe('what hint 6 tells the player about the two snakes', () => {
 });
 
 describe('the reference earns the star on every bay the generator rolls', () => {
-  test('on the even/even bays, exactly on budget', () => {
-    const budgeted = SAMPLE.map((seed) => {
-      const run = scoreReference(seed);
-      const it = shape(seed);
-      return {
-        seed,
-        half: `${String(it.columns)}x${String(it.rows)}`,
-        passed: run.passed,
-        star: run.star,
-        moves: run.moves,
-        floor: run.floor,
-      };
-    });
-    expect(budgeted).toEqual([
-      { seed: 9, half: '2x8', passed: true, star: true, moves: 41, floor: 41 },
-      { seed: 10, half: '4x8', passed: true, star: true, moves: 57, floor: 57 },
-      { seed: 13, half: '2x6', passed: true, star: true, moves: 43, floor: 43 },
-      { seed: 14, half: '4x6', passed: true, star: true, moves: 43, floor: 43 },
-      { seed: 19, half: '2x6', passed: true, star: true, moves: 31, floor: 31 },
-      { seed: 20, half: '4x6', passed: true, star: true, moves: 49, floor: 49 },
-      { seed: 24, half: '2x8', passed: true, star: true, moves: 49, floor: 49 },
-      { seed: 25, half: '4x8', passed: true, star: true, moves: 57, floor: 57 },
-      { seed: 42, half: '6x6', passed: true, star: true, moves: 49, floor: 49 },
-      { seed: 73, half: '6x8', passed: true, star: true, moves: 65, floor: 65 },
-    ]);
-  });
-
-  test('on the six graded seeds, one of which is the even/even shape', () => {
+  test('on the six graded seeds, one move short of the floor count on each', () => {
     const graded = w1_03.seeds.map((seed) => {
       const run = scoreReference(seed);
       return { seed, passed: run.passed, star: run.star, moves: run.moves, floor: run.floor };
     });
     expect(graded).toEqual([
-      { seed: 21, passed: true, star: true, moves: 42, floor: 43 },
-      { seed: 1, passed: true, star: true, moves: 40, floor: 41 },
-      { seed: 2, passed: true, star: true, moves: 48, floor: 49 },
-      { seed: 6, passed: true, star: true, moves: 35, floor: 36 },
-      { seed: 8, passed: true, star: true, moves: 35, floor: 36 },
-      { seed: 14, passed: true, star: true, moves: 43, floor: 43 },
+      { seed: 11, passed: true, star: true, moves: 35, floor: 36 },
+      { seed: 5, passed: true, star: true, moves: 40, floor: 41 },
+      { seed: 7, passed: true, star: true, moves: 25, floor: 26 },
+      { seed: 15, passed: true, star: true, moves: 30, floor: 31 },
+      { seed: 30, passed: true, star: true, moves: 45, floor: 46 },
+      { seed: 88, passed: true, star: true, moves: 45, floor: 46 },
     ]);
   });
 
-  test('on every bay the generator rolls, and never over budget', () => {
+  test('on every bay the generator rolls, and never with a move to spare', () => {
     const spare = new Set<number>();
+    const floors = new Set<number>();
     for (const seed of SEEDS) {
       const run = scoreReference(seed);
       expect({ seed, passed: run.passed, star: run.star }) //
         .toEqual({ seed, passed: true, star: true });
-      spare.add(run.floor - run.moves);
+      spare.add(run.floor - 1 - run.moves);
+      floors.add(run.floor);
     }
-    expect([...spare].sort()).toEqual([0, 1]);
+    expect([...spare]).toEqual([0]);
+    expect([...floors].sort((a, b) => a - b)).toEqual([26, 31, 36, 41, 46]);
   });
 
   test('it never drives into a wall, so every move it files is a tile it entered', () => {
     for (const seed of SEEDS) expect(scoreReference(seed).blocked, `seed ${String(seed)}`).toBe(0);
   });
 
-  test('it spends the spare move only where a Hamiltonian route does not exist', () => {
+  test('the allowance it grades is one move under the floor count, on every seed', () => {
     for (const seed of SEEDS) {
-      const it = shape(seed);
       const run = scoreReference(seed);
-      expect({ seed, spare: run.floor - run.moves }) //
-        .toEqual({ seed, spare: isEvenEven(it) ? 0 : 1 });
+      expect({ seed, moves: run.moves }).toEqual({ seed, moves: run.floor - 1 });
     }
   });
 });

@@ -119,7 +119,7 @@ describe('w1-03 says what the star counts, so a met star showing slack reads as 
     expect(star.unit).toBe('moves');
   });
 
-  test('it reads out moves against the floor count, on every seed and every run', () => {
+  test('it reads out moves against the allowance, one under the floor, on every run', () => {
     for (const seed of w1_03.seeds) {
       for (const dropped of [0, 1, 2]) {
         const run = shortOf(seed, dropped);
@@ -128,7 +128,7 @@ describe('w1-03 says what the star counts, so a met star showing slack reads as 
         const shown = must(budget, 'a budget');
 
         expect({ seed, dropped, used: shown.used, limit: shown.limit, unit: shown.unit }) //
-          .toEqual({ seed, dropped, used: movesIssued(ctx), limit: floor, unit: 'moves' });
+          .toEqual({ seed, dropped, used: movesIssued(ctx), limit: floor - 1, unit: 'moves' });
       }
     }
   });
@@ -145,7 +145,7 @@ describe('w1-03 says what the star counts, so a met star showing slack reads as 
       const shown = must(budget, 'a budget');
 
       expect({ seed, met: report.met, limit: shown.limit, unit: shown.unit }) //
-        .toEqual({ seed, met: false, limit: floor, unit: 'moves' });
+        .toEqual({ seed, met: false, limit: floor - 1, unit: 'moves' });
       expect(shown.over).toBeGreaterThan(0);
     }
   });

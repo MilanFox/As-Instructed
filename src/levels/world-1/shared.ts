@@ -170,8 +170,9 @@ function moveAfter(ctx: ObjectiveContext, allowed: number): MoveEvent | undefine
   return undefined;
 }
 
-export function oneMovePerFloorTile(label: string): Objective {
-  const budget = (ctx: ObjectiveContext): number => walkableTiles(ctx.initialWorld).length;
+// The id outlives the rule: it is stored in every save that has already earned the star.
+export function fewerMovesThanFloorTiles(label: string): Objective {
+  const budget = (ctx: ObjectiveContext): number => walkableTiles(ctx.initialWorld).length - 1;
   return Objectives.custom('one-move-per-tile', label, (ctx) => movesIssued(ctx) <= budget(ctx), {
     progress: (ctx) => [Math.min(movesIssued(ctx), budget(ctx)), budget(ctx)],
     meter: { kind: 'events', event: 'move' },
@@ -182,7 +183,7 @@ export function oneMovePerFloorTile(label: string): Objective {
       if (over === undefined) return undefined;
       return {
         where: `tick ${String(over.t)} · ${at(over.from)}`,
-        expected: `${String(allowed)} moves, one per floor tile`,
+        expected: `${String(allowed)} moves, one under the floor count`,
         received: `move ${String(allowed + 1)} of ${String(movesIssued(ctx))}`,
       };
     },
