@@ -287,8 +287,8 @@ export const w6_05: LevelDef = {
   hardware: [],
   brief: [
     '**MEMO KD-2622**',
-    '**FROM:** Dep. Coordinator M. Vance',
-    '**CC:** Contractor #4470',
+    '**FROM:** Dep. Coordinator M. Vance\\',
+    '**CC:** Contractor #4470\\',
     '**RE:** Dead band',
     '',
     'The band is designated dead. Traffic on a dead band is, by designation, not traffic. The',

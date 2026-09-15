@@ -307,7 +307,7 @@ export const w5_03: LevelDef = {
   hardware: ['link'],
   brief: [
     '**MEMO KD-2506**',
-    '**FROM:** Dep. Coordinator M. Vance',
+    '**FROM:** Dep. Coordinator M. Vance\\',
     '**RE:** Energisation order',
     '',
     'Substations must be energised in dependency order. Energising a station before its',

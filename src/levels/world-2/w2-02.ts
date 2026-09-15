@@ -45,7 +45,7 @@ export const w2_02: LevelDef = {
   title: 'Capacity',
   hardware: ['inventory'],
   brief: [
-    '**FROM:** Dep. Coordinator M. Vance',
+    '**FROM:** Dep. Coordinator M. Vance\\',
     '**RE:** Hopper allocation, north plot',
     '',
     'The hopper leaves the depot full of seed. It does not open at the other end; Legal have',

@@ -327,7 +327,7 @@ export const w5_05: LevelDef = {
   hardware: [],
   brief: [
     '**MEMO KD-2544**',
-    '**FROM:** Dep. Coordinator M. Vance',
+    '**FROM:** Dep. Coordinator M. Vance\\',
     '**RE:** District 9, reconnection',
     '',
     'District 9 lost its cabling on Tuesday. Stores have issued a drum against the works',

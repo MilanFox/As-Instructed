@@ -191,7 +191,7 @@ export const w5_04: LevelDef = {
   hardware: [],
   brief: [
     '**MEMO KD-2517**',
-    '**FROM:** Dep. Coordinator M. Vance',
+    '**FROM:** Dep. Coordinator M. Vance\\',
     '**RE:** Yard 4 distribution',
     '',
     'Every feeder in Yard 4 has a ceiling. The ceilings are defined in Appendix C. The index',

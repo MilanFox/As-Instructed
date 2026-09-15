@@ -76,7 +76,7 @@ export const w5_02: LevelDef = {
   hardware: ['power'],
   brief: [
     '**MEMO KD-2491**',
-    '**FROM:** Dep. Coordinator M. Vance',
+    '**FROM:** Dep. Coordinator M. Vance\\',
     '**RE:** Feeder run 12, discontinuity',
     '',
     'Feeder run 12 is two hundred segments long and one of them has failed. The test set is',

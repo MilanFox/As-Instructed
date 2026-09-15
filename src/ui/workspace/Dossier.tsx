@@ -1,3 +1,4 @@
+import { InlineMarkdown, Markdown } from '../components/Markdown.tsx';
 import { ObjectiveItem } from './ObjectiveItem.tsx';
 import type { WorkspaceData } from './useWorkspace.ts';
 
@@ -12,6 +13,11 @@ export function Dossier({ workspace }: DossierProps): React.ReactElement | null 
 
   return (
     <>
+      <div className="dossier-section dossier-section--brief">
+        <h2 className="dossier-section__title">Brief</h2>
+        <Markdown source={brief.prose} className="dossier-brief" />
+      </div>
+
       <div className="dossier-section">
         <h2 className="dossier-section__title">What this order grades</h2>
         <ul>
@@ -21,31 +27,30 @@ export function Dossier({ workspace }: DossierProps): React.ReactElement | null 
         </ul>
       </div>
 
-      <div className="dossier-section">
-        <h2 className="dossier-section__title">Brief</h2>
-        <p className="note">{brief.prose}</p>
-      </div>
-
       {brief.facts.length === 0 ? null : (
         <div className="dossier-section">
           <h2 className="dossier-section__title">Facts</h2>
-          <div className="fact-grid">
-            {brief.facts.map((fact) => (
-              <div className="dossier-fact" key={fact.label}>
-                <span className="stat-cell__label">{fact.label}</span>
-                <span className="stat-cell__value">{fact.value}</span>
-              </div>
-            ))}
-          </div>
+          {brief.facts.map((fact) => (
+            <p className="fact-row" key={fact.label}>
+              <span className="fact-row__label">{fact.label}</span>
+              <span className="note">
+                <InlineMarkdown source={fact.value} />
+              </span>
+            </p>
+          ))}
         </div>
       )}
 
       <div className="dossier-section">
-        <h2 className="dossier-section__title">Board</h2>
+        <h2 className="dossier-section__title">What is true of this board</h2>
         {brief.board === null ? (
           <p className="note">One fixed board. Nothing is rolled between seeds.</p>
         ) : (
           <>
+            <p className="note dossier-lead">
+              What the board is, stated before you run anything. Fixed lines hold on every seed.
+              Redrawn lines are rolled again for each seed.
+            </p>
             {brief.board.fixed.map((item) => (
               <p className="board-row" key={item}>
                 <span className="board-tag" data-kind="fixed">

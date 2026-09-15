@@ -6,8 +6,8 @@ import type { WorkspaceData } from './useWorkspace.ts';
 export type DrawerTab = 'program' | 'dossier' | 'manual';
 
 const TABS: readonly { id: DrawerTab; label: string }[] = [
-  { id: 'program', label: 'Program' },
   { id: 'dossier', label: 'Dossier' },
+  { id: 'program', label: 'Program' },
   { id: 'manual', label: 'Manual' },
 ];
 
@@ -65,9 +65,11 @@ export function Drawer({
           </button>
         ))}
         <span className="drawer-tabs__spacer" />
-        <button type="button" className="control" onClick={workspace.resetCode}>
-          Reset code
-        </button>
+        {tab === 'program' ? (
+          <button type="button" className="control" onClick={workspace.resetCode}>
+            Reset code
+          </button>
+        ) : null}
         <button type="button" className="control" onClick={onToggle}>
           Close
         </button>
@@ -102,7 +104,7 @@ export function Drawer({
           data-on={String(tab === 'manual')}
           {...(tab === 'manual' ? {} : { inert: true })}
         >
-          <ApiManual reference={workspace.reference} />
+          <ApiManual reference={workspace.reference} legend={workspace.legend} />
         </div>
       </div>
 

@@ -116,7 +116,7 @@ export const w7_02: LevelDef = {
   costs: { spawn: SPAWN_COST },
   brief: [
     '**MEMO KD-2711**',
-    '**FROM:** Dep. Coordinator M. Vance',
+    '**FROM:** Dep. Coordinator M. Vance\\',
     '**RE:**   Fleet requisition, north apron',
     '',
     'The requisition has been approved at the level Finance considered appropriate this week.',

@@ -480,8 +480,8 @@ export const w8_04: LevelDef = {
   hardware: [],
   brief: [
     '**MEMO KD-2840**',
-    '**FROM:** Dep. Coordinator M. Vance',
-    '**CC:** Contractor #4470',
+    '**FROM:** Dep. Coordinator M. Vance\\',
+    '**CC:** Contractor #4470\\',
     '**RE:** Countersignature',
     '',
     'There is a locker in the workings with a printed form in it and a spare chair caster. The',

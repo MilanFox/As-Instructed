@@ -22,6 +22,8 @@ import type { ApiFunctionSpec, RuntimeFailure } from '../../runtime/index.ts';
 import { PLAYER_API } from '../../runtime/index.ts';
 import { fillPlaceholders, reportFor } from '../screens/review.ts';
 import { CATEGORIES, costLabel, levelCost } from '../reference/api.ts';
+import type { LegendSection } from '../reference/legend.ts';
+import { legendFor } from '../reference/legend.ts';
 import { divergenceCells, divergenceLine } from '../feed/divergence.ts';
 import type { DeskDoc, ReportSnapshot } from '../paper/papers.ts';
 import { usePapers } from '../paper/papers.ts';
@@ -171,6 +173,7 @@ export interface WorkspaceData {
   dismissNotice(id: string): void;
 
   reference: readonly ReferenceEntry[];
+  legend: readonly LegendSection[];
 }
 
 function signatureOf(fn: ApiFunctionSpec): string {
@@ -363,6 +366,8 @@ export function useWorkspace(): WorkspaceData {
     [level, trace],
   );
 
+  const legend = useMemo(() => legendFor(initialWorld), [initialWorld]);
+
   const report = useMemo(() => latestReport(docs, levelId), [docs, levelId]);
   const cause = report?.cause ?? null;
   const cells = useMemo(() => divergenceCells(cause, initialWorld), [cause, initialWorld]);
@@ -526,5 +531,6 @@ export function useWorkspace(): WorkspaceData {
     notices,
     dismissNotice,
     reference,
+    legend,
   };
 }

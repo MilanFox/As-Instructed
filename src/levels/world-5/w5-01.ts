@@ -139,7 +139,7 @@ export const w5_01: LevelDef = {
   hardware: ['probe', 'use'],
   brief: [
     '**MEMO KD-2488**',
-    '**FROM:** Dep. Coordinator M. Vance',
+    '**FROM:** Dep. Coordinator M. Vance\\',
     '**RE:** Feeder line 7, energisation',
     '',
     'Feeder line 7 was laid by two crews working inward from opposite ends. Neither crew',

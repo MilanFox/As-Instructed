@@ -207,7 +207,7 @@ export const w8_03: LevelDef = {
   hardware: [],
   brief: [
     '**MEMO KD-2833**',
-    '**FROM:** Dep. Coordinator M. Vance',
+    '**FROM:** Dep. Coordinator M. Vance\\',
     '**RE:**   Grid restart',
     '',
     'The grid is down. Restarting it is a sequencing matter and not, at this time, an',

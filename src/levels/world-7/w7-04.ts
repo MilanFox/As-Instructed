@@ -214,7 +214,7 @@ export const w7_04: LevelDef = {
   hardware: [],
   costs: { use: 1 },
   brief: [
-    '**FROM:** Dep. Coordinator M. Vance',
+    '**FROM:** Dep. Coordinator M. Vance\\',
     '**RE:** Yard 7 dispatch',
     '',
     'The board has a different number of work items every shift. Some of them are a minute. Some',

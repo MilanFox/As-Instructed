@@ -26,7 +26,7 @@ export const w1_03: LevelDef = {
   title: 'Floor Inspection',
   hardware: [],
   brief: [
-    '**FROM:** Dep. Coordinator M. Vance',
+    '**FROM:** Dep. Coordinator M. Vance\\',
     '**RE:** Quarterly floor inspection, Bay 7',
     '',
     'Bay 7 is inspected by driving a bot across every tile of it. The inspection measures',

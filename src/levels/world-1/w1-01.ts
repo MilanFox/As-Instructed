@@ -40,7 +40,7 @@ export const w1_01: LevelDef = {
   title: 'Cold Start',
   hardware: ['move', 'pos', 'print', 'wait'],
   brief: [
-    '**FROM:** Onboarding, Kessler & Daughters',
+    '**FROM:** Onboarding, Kessler & Daughters\\',
     '**TO:** Contractor #4471',
     '',
     'Welcome aboard. Your bot sits at the west end of Test Hangar 3 and the landing pad is at',

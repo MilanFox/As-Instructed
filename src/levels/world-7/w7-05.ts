@@ -198,7 +198,7 @@ export const w7_05: LevelDef = {
   hardware: [],
   brief: [
     '**MEMO KD-2731**',
-    '**FROM:** Dep. Coordinator M. Vance',
+    '**FROM:** Dep. Coordinator M. Vance\\',
     '**RE:** Conclusion of previous engagement',
     '',
     'The relay sites in the north workings are not on any plan. They were put in by somebody who',
