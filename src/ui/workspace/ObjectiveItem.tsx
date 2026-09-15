@@ -12,6 +12,7 @@ export interface ObjectiveItemProps {
 export function ObjectiveItem({ row }: ObjectiveItemProps): React.ReactElement {
   const over = row.budget !== undefined && row.budget.over > 0 && !row.met;
   const state = over ? 'over' : row.met ? 'met' : row.active ? 'active' : 'open';
+  const cleared = row.cleared === true && state === 'open';
   const progress = row.progress;
   const budget = row.budget;
   const span = progress ? progress[1] : budget ? budget.limit : 0;
@@ -24,8 +25,14 @@ export function ObjectiveItem({ row }: ObjectiveItemProps): React.ReactElement {
       : null;
 
   return (
-    <li className="objective-row" data-state={state}>
-      <span className="objective-row__pip" aria-hidden="true" />
+    <li className="objective-row" data-state={state} data-cleared={cleared ? '' : undefined}>
+      <span className="objective-row__pip" aria-hidden="true">
+        {state === 'met' || cleared ? (
+          <svg className="objective-row__check" viewBox="0 0 12 12">
+            <path d="M1.6 6.3 4.6 9.3 10.4 2.9" />
+          </svg>
+        ) : null}
+      </span>
       <span className="objective-row__main">
         <span className="objective-row__label">
           {row.bonus ? <span className="objective-row__tag">BONUS</span> : null}
@@ -49,7 +56,15 @@ export function ObjectiveItem({ row }: ObjectiveItemProps): React.ReactElement {
         )}
       </span>
       <span className="sr-only">
-        {over ? 'over budget' : row.met ? 'met' : row.active ? 'in progress' : 'not met'}
+        {over
+          ? 'over budget'
+          : row.met
+            ? 'met'
+            : row.active
+              ? 'in progress'
+              : cleared
+                ? 'not met this run, cleared previously'
+                : 'not met'}
       </span>
     </li>
   );

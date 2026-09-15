@@ -229,12 +229,24 @@
 }
 
 .objective-row__pip {
+  display: flex;
   flex: none;
+  align-items: center;
+  justify-content: center;
   width: 15px;
   height: 15px;
   margin-top: 2px;
   border: 2px solid var(--ink-dim);
   background: transparent;
+}
+
+.objective-row__check {
+  width: 11px;
+  height: 11px;
+  fill: none;
+  stroke: #05080c;
+  stroke-width: 2.4;
+  stroke-linecap: square;
 }
 
 .objective-row[data-state='active'] .objective-row__pip {
@@ -250,6 +262,15 @@
 .objective-row[data-state='over'] .objective-row__pip {
   border-color: var(--danger);
   background: var(--danger);
+}
+
+.objective-row[data-cleared] .objective-row__pip {
+  border-color: var(--gold);
+  opacity: 0.55;
+}
+
+.objective-row[data-cleared] .objective-row__check {
+  stroke: var(--gold);
 }
 
 .objective-row__main {
@@ -269,6 +290,10 @@
 
 .objective-row[data-state='met'] .objective-row__label {
   color: var(--gold);
+}
+
+.objective-row[data-cleared] .objective-row__label {
+  color: color-mix(in srgb, var(--gold) 55%, var(--ink-dim));
 }
 
 .objective-row[data-state='over'] .objective-row__label {

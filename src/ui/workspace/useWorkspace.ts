@@ -37,6 +37,7 @@ export interface ObjectiveRow {
   bonus: boolean;
   active: boolean;
   progress?: [number, number];
+  cleared?: boolean;
   meter?: Meter;
   unit?: string;
   budget?: Budget;
@@ -272,6 +273,8 @@ export function useWorkspace(): WorkspaceData {
   const atEnd = !trace || flooredTick >= trace.endTick;
   const active = activeTrack(playback, flooredTick);
 
+  const bankedIds = useMemo(() => new Set(banked), [banked]);
+
   const rows: ObjectiveRow[] = useMemo(() => {
     if (!level) return [];
     const bonusIds = new Set((level.bonus ?? []).map((objective) => objective.id));
@@ -288,6 +291,7 @@ export function useWorkspace(): WorkspaceData {
         met,
         bonus: bonusIds.has(objective.id),
         active: !atEnd && active?.id === objective.id,
+        ...(bankedIds.has(objective.id) ? { cleared: true } : {}),
         ...(objective.meter ? { meter: objective.meter } : {}),
         ...(objective.unit ? { unit: objective.unit } : {}),
       };
@@ -303,7 +307,7 @@ export function useWorkspace(): WorkspaceData {
       if (budget) row.budget = budget;
       return row;
     });
-  }, [level, verdict, playback, atEnd, active, flooredTick, trace]);
+  }, [level, verdict, playback, atEnd, active, flooredTick, trace, bankedIds]);
 
   const objectives = useMemo(() => rows.filter((row) => !row.bonus), [rows]);
   const bonus = useMemo(() => rows.filter((row) => row.bonus), [rows]);
