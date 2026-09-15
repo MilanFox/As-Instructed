@@ -1,14 +1,14 @@
 import type { ReferenceSolution } from '../types.ts';
 
 import { solution as w1_01 } from '../world-1/__solutions__/w1-01.ts';
-import { solution as w1_02 } from '../world-1/__solutions__/w1-02.ts';
+import { solution as w1_02, starSolution as w1_02Star } from '../world-1/__solutions__/w1-02.ts';
 import { solution as w1_03 } from '../world-1/__solutions__/w1-03.ts';
 import { solution as w2_01 } from '../world-2/__solutions__/w2-01.ts';
-import { solution as w2_02 } from '../world-2/__solutions__/w2-02.ts';
+import { solution as w2_02, starSolution as w2_02Star } from '../world-2/__solutions__/w2-02.ts';
 import { solution as w2_03 } from '../world-2/__solutions__/w2-03.ts';
 import { solution as w3_01 } from '../world-3/__solutions__/w3-01.ts';
-import { solution as w3_02 } from '../world-3/__solutions__/w3-02.ts';
-import { solution as w3_03 } from '../world-3/__solutions__/w3-03.ts';
+import { solution as w3_02, starSolution as w3_02Star } from '../world-3/__solutions__/w3-02.ts';
+import { solution as w3_03, starSolution as w3_03Star } from '../world-3/__solutions__/w3-03.ts';
 import { solution as w4_01 } from '../world-4/__solutions__/w4-01.ts';
 import { solution as w4_02 } from '../world-4/__solutions__/w4-02.ts';
 import { solution as w4_03 } from '../world-4/__solutions__/w4-03.ts';
@@ -68,4 +68,11 @@ export const SOLUTIONS: Record<string, ReferenceSolution> = {
   'w8-03': w8_03,
   'w8-04': w8_04,
   'w8-05': w8_05,
+};
+
+export const STARS: Record<string, ReferenceSolution> = {
+  'w1-02': w1_02Star,
+  'w2-02': w2_02Star,
+  'w3-02': w3_02Star,
+  'w3-03': w3_03Star,
 };

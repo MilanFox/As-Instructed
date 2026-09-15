@@ -253,6 +253,13 @@ export const w7_05: LevelDef = {
       value:
         '`look(dir, range)` is free and stops at the first thing it cannot see through. A bot only knows what it has seen.',
     },
+    {
+      label: 'Waiting',
+      value:
+        'A worker waits for every tick it spends in `wait`, and for every tick `sync` moves its ' +
+        'clock forward to meet the fleet. The star wants that total under a tenth of the shift, ' +
+        'where the shift is the final tick times the number of workers. Scout waiting is not counted.',
+    },
   ],
   seeds: [1, 2, 3, 4, 5],
   par: { ticks: 100 },

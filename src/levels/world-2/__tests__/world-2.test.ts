@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import type { Objective, ObjectiveContext, Sim, TileView, Vec } from '../../../engine/index.ts';
+import type { Objective, ObjectiveContext, Sim, Vec } from '../../../engine/index.ts';
 import { Dir, ItemKind, evaluateObjectives, medalFor } from '../../../engine/index.ts';
 import { hardwareUnlockedBy } from '../../index.ts';
 import type { Budget } from '../../../game/budgets.ts';
@@ -10,7 +10,10 @@ import { runLevel, runReference } from '../../harness.ts';
 import type { LevelDef, ReferenceSolution } from '../../types.ts';
 import { WORLD_2_LEVELS, w2_02, w2_03 } from '../index.ts';
 import { solution as w2_01Solution } from '../__solutions__/w2-01.ts';
-import { solution as w2_02Solution } from '../__solutions__/w2-02.ts';
+import {
+  solution as w2_02Solution,
+  starSolution as w2_02StarSolution,
+} from '../__solutions__/w2-02.ts';
 import { solution as w2_03Solution } from '../__solutions__/w2-03.ts';
 import { serpentineHarvest } from '../../__tests__/naive.ts';
 
@@ -21,8 +24,6 @@ const SOLUTIONS: Record<string, ReferenceSolution> = {
 };
 
 const key = (at: Vec): string => `${at.x},${at.y}`;
-
-const PLOT_TILES = 6;
 
 // A player at w2-02 has only the verbs w2-02 has unlocked; a fixture proving the star is
 // reachable has to run on the same hardware.
@@ -185,83 +186,6 @@ function standOnEachCropAsItRipens(sim: Sim, botId: number): void {
   }
 }
 
-function surveyOnFootThenTakeInRipeOrder(sim: Sim, botId: number): void {
-  const ripensIn = new Map<string, number>();
-  const cropAt = new Map<string, Vec>();
-  const bare = new Map<string, Vec>();
-  const mine = new Set<string>();
-  let opened = false;
-
-  const read = (view: TileView): void => {
-    if (!view.inBounds || !view.walkable) return;
-    const at = key(view.at);
-    if (ripensIn.has(at) || bare.has(at) || mine.has(at)) return;
-    if (view.crop === null) {
-      bare.set(at, view.at);
-      return;
-    }
-    ripensIn.set(at, view.sproutsIn + (view.maxGrowth - view.growth));
-    cropAt.set(at, view.at);
-  };
-  const look = (): void => {
-    read(sim.scan(botId));
-    for (const dir of [Dir.North, Dir.East, Dir.South, Dir.West]) read(sim.scan(botId, dir));
-  };
-  const walk = (to: Vec): void => {
-    for (let guard = 0; guard < 12; guard++) {
-      const at = sim.pos(botId);
-      if (at.x === to.x && at.y === to.y) return;
-      if (at.x < to.x) sim.move(botId, Dir.East);
-      else if (at.x > to.x) sim.move(botId, Dir.West);
-      else if (at.y < to.y) sim.move(botId, Dir.South);
-      else sim.move(botId, Dir.North);
-      look();
-    }
-  };
-  const open = (at: string): void => {
-    opened = true;
-    bare.delete(at);
-    mine.add(at);
-  };
-
-  look();
-  for (let guard = 0; guard < 8 && ripensIn.size + bare.size + mine.size < PLOT_TILES; guard++) {
-    const here = key(sim.pos(botId));
-    if (!opened && bare.has(here) && sim.plant(botId)) open(here);
-    if (sim.canMove(botId, Dir.East)) sim.move(botId, Dir.East);
-    else if (sim.canMove(botId, Dir.South)) sim.move(botId, Dir.South);
-    else if (sim.canMove(botId, Dir.West)) sim.move(botId, Dir.West);
-    else break;
-    look();
-  }
-  if (!opened) {
-    const here = sim.pos(botId);
-    const span = (at: Vec): number => Math.abs(at.x - here.x) + Math.abs(at.y - here.y);
-    const opener = [...bare.values()].sort((a, b) => span(a) - span(b))[0];
-    if (opener) {
-      walk(opener);
-      if (sim.plant(botId)) open(key(opener));
-    }
-  }
-
-  for (const [at] of [...ripensIn].sort((a, b) => a[1] - b[1])) {
-    const tile = cropAt.get(at);
-    if (!tile) continue;
-    walk(tile);
-    for (let guard = 0; guard < 80; guard++) {
-      const here = sim.scan(botId);
-      if (here.growth >= here.maxGrowth) break;
-      sim.wait(botId, 1);
-    }
-    sim.harvest(botId);
-    sim.plant(botId);
-  }
-  for (const at of [...bare.values()]) {
-    walk(at);
-    sim.plant(botId);
-  }
-}
-
 function waitLongEnoughOnEverything(sim: Sim, botId: number): void {
   const plot: Vec[] = [
     { x: 1, y: 1 },
@@ -378,7 +302,7 @@ describe('w2-02 bonus — spoilage', () => {
     const spoilage: number[] = [];
     for (const seed of w2_02.seeds) {
       const run = runLevel(w2_02, seed, (sim, botId) =>
-        surveyOnFootThenTakeInRipeOrder(asUnlockedAt('w2-02', sim), botId),
+        w2_02StarSolution.run(asUnlockedAt('w2-02', sim), botId),
       );
       expect(run.verdict.passed, `seed ${String(seed)}`).toBe(true);
       expect(medalFor(true, run.ticks, w2_02.par.ticks), `seed ${String(seed)}`).toBe('gold');

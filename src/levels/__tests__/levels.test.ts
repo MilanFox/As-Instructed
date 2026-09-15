@@ -5,7 +5,7 @@ import { apiUnlockedAt } from '../../runtime/api-spec.ts';
 import { LIBRARY_FIRST_WORLD, requirementsFor } from '../../meta/unlock.ts';
 import { LEVELS, campaignOrder, getLevel, hardwareUnlockedBy, levelsByWorld } from '../index.ts';
 import { runLevel, runReference } from '../harness.ts';
-import { SOLUTIONS } from './solutions.ts';
+import { SOLUTIONS, STARS } from './solutions.ts';
 import type { ReferenceSolution } from '../types.ts';
 import {
   corridorPoll,
@@ -338,6 +338,53 @@ describe('bonus objectives', () => {
 
   test('most of them are within reach of an honest solution', () => {
     expect(earned.size).toBeGreaterThanOrEqual(Math.ceil(withBonus.length * 0.6));
+  });
+
+  test(
+    'every bonus on the site is taken on every seed by one program, as site-starred grades it',
+    { timeout: 120_000 },
+    () => {
+      const unreachable: string[] = [];
+      for (const level of withBonus) {
+        const solution = STARS[level.id] ?? SOLUTIONS[level.id];
+        if (!solution) {
+          unreachable.push(`${level.id}: no fixture`);
+          continue;
+        }
+        for (const seed of level.seeds) {
+          const result = runReference(level, seed, solution);
+          if (!result.verdict.passed) {
+            unreachable.push(`${level.id}/${String(seed)}: the run does not pass`);
+            continue;
+          }
+          const scored = evaluateObjectives(level.bonus ?? [], {
+            world: result.world,
+            initialWorld: result.initialWorld,
+            trace: result.trace,
+          });
+          for (const objective of scored) {
+            if (!objective.met) unreachable.push(`${level.id}/${String(seed)}/${objective.id}`);
+          }
+        }
+      }
+      expect(unreachable).toEqual([]);
+    },
+  );
+
+  test('a star fixture exists only where the reference does not take the star', () => {
+    const redundant = Object.keys(STARS).filter((id) => {
+      const level = getLevel(id) as NonNullable<ReturnType<typeof getLevel>>;
+      const solution = SOLUTIONS[id] as ReferenceSolution;
+      return level.seeds.every((seed) => {
+        const result = runReference(level, seed, solution);
+        return evaluateObjectives(level.bonus ?? [], {
+          world: result.world,
+          initialWorld: result.initialWorld,
+          trace: result.trace,
+        }).every((objective) => objective.met);
+      });
+    });
+    expect(redundant).toEqual([]);
   });
 });
 

@@ -28,6 +28,7 @@ export const solution: ReferenceSolution = {
     const found = new Map<string, Vec>();
     const claimed = new Set<string>();
     const orders = new Map<number, Site>();
+    const told = new Set<number>();
 
     const observe = (id: number): void => {
       const here = sim.pos(id);
@@ -77,6 +78,16 @@ export const solution: ReferenceSolution = {
 
     const nothing = new Set<string>();
 
+    const stepAside = (id: number): void => {
+      for (const dir of ALL_DIRS) {
+        if (!sim.canMove(id, dir)) continue;
+        sim.move(id, dir);
+        observe(id);
+        return;
+      }
+      if (!hands.includes(id)) sim.wait(id, 1);
+    };
+
     const advance = (id: number, to: Vec): void => {
       const from = sim.pos(id);
       if (from.x === to.x && from.y === to.y) return;
@@ -94,7 +105,7 @@ export const solution: ReferenceSolution = {
         observe(id);
         moved++;
       }
-      if (moved === 0) sim.wait(id, 1);
+      if (moved === 0) stepAside(id);
     };
 
     const frontier = (from: Vec, reserved: ReadonlySet<string>): Vec | null => {
@@ -116,7 +127,6 @@ export const solution: ReferenceSolution = {
 
     let lit = 0;
     for (let round = 0; round < 3000 && lit < total; round++) {
-      let posted = false;
       for (const [id, at] of found) {
         if (claimed.has(id)) continue;
         let pick = -1;
@@ -133,15 +143,10 @@ export const solution: ReferenceSolution = {
         claimed.add(id);
         orders.set(pick, { id, at });
         sim.send(boss, pick, at.y * width + at.x);
-        posted = true;
       }
-      if (posted) {
-        sim.sync();
-        for (const hand of hands) {
-          while (sim.recv(hand) !== null) {
-            // Reading is what makes the order this worker's; the position was in the body.
-          }
-        }
+      for (const hand of hands) {
+        // Reading is what makes the order this worker's; the position was in the body.
+        while (sim.recv(hand) !== null) told.add(hand);
       }
 
       const reserved = new Set<string>();
@@ -151,6 +156,11 @@ export const solution: ReferenceSolution = {
         if (order) {
           const at = sim.pos(id);
           if (at.x === order.at.x && at.y === order.at.y) {
+            if (!told.has(id)) {
+              stepAside(id);
+              acted = true;
+              continue;
+            }
             sim.use(id);
             observe(id);
             orders.delete(id);
@@ -189,6 +199,7 @@ export const solution: ReferenceSolution = {
     'const found = new Map();',
     'const claimed = new Set();',
     'const orders = new Map();',
+    'const told = new Set();',
     'const observe = (id) => {',
     '  const here = bot(id).pos();',
     '  seen.add(k(here));',
@@ -231,6 +242,15 @@ export const solution: ReferenceSolution = {
     '  return path.reverse();',
     '};',
     'const nothing = new Set();',
+    'const stepAside = (id) => {',
+    '  for (const d of dirs) {',
+    '    if (!bot(id).canMove(d)) continue;',
+    '    bot(id).move(d);',
+    '    observe(id);',
+    '    return;',
+    '  }',
+    '  if (!hands.includes(id)) bot(id).wait(1);',
+    '};',
     'const advance = (id, to) => {',
     '  const from = bot(id).pos();',
     '  if (from.x === to.x && from.y === to.y) return;',
@@ -245,7 +265,7 @@ export const solution: ReferenceSolution = {
     '    observe(id);',
     '    moved++;',
     '  }',
-    '  if (moved === 0) bot(id).wait(1);',
+    '  if (moved === 0) stepAside(id);',
     '};',
     'const frontier = (from, reserved) => {',
     '  let best = null;',
@@ -260,7 +280,6 @@ export const solution: ReferenceSolution = {
     'for (const id of ids) observe(id);',
     'let lit = 0;',
     'for (let round = 0; round < 3000 && lit < muster.vars.sites; round++) {',
-    '  let posted = false;',
     '  for (const [id, at] of found) {',
     '    if (claimed.has(id)) continue;',
     '    let pick = -1;',
@@ -273,11 +292,9 @@ export const solution: ReferenceSolution = {
     '    claimed.add(id);',
     '    orders.set(pick, { id, at });',
     '    bot(boss).send(pick, at.y * 36 + at.x);',
-    '    posted = true;',
     '  }',
-    '  if (posted) {',
-    '    sync();',
-    '    for (const h of hands) while (bot(h).recv() !== null) {}',
+    '  for (const h of hands) {',
+    '    while (bot(h).recv() !== null) told.add(h);',
     '  }',
     '  const reserved = new Set();',
     '  let acted = false;',
@@ -286,6 +303,11 @@ export const solution: ReferenceSolution = {
     '    if (order) {',
     '      const at = bot(id).pos();',
     '      if (at.x === order.at.x && at.y === order.at.y) {',
+    '        if (!told.has(id)) {',
+    '          stepAside(id);',
+    '          acted = true;',
+    '          continue;',
+    '        }',
     '        bot(id).use();',
     '        observe(id);',
     '        orders.delete(id);',
