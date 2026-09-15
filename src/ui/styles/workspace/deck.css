@@ -25,7 +25,7 @@
   gap: 10px;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 14px;
+  padding: 8px var(--ws-cut);
   background: var(--danger);
   color: #000;
   font-size: 12px;
@@ -57,7 +57,7 @@
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
-  padding: 10px 14px calc(10px + var(--ws-cut) * 0.2);
+  padding: 10px var(--ws-cut) calc(10px + var(--ws-cut) * 0.2);
 }
 
 .transport__group {
