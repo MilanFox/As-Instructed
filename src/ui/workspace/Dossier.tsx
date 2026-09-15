@@ -56,7 +56,9 @@ export function Dossier({ workspace }: DossierProps): React.ReactElement | null 
                 <span className="board-tag" data-kind="fixed">
                   Fixed
                 </span>
-                <span className="note">{item}</span>
+                <span className="note">
+                  <InlineMarkdown source={item} />
+                </span>
               </p>
             ))}
             {brief.board.redrawn.map((item) => (
@@ -64,7 +66,9 @@ export function Dossier({ workspace }: DossierProps): React.ReactElement | null 
                 <span className="board-tag" data-kind="redrawn">
                   Redrawn
                 </span>
-                <span className="note">{item}</span>
+                <span className="note">
+                  <InlineMarkdown source={item} />
+                </span>
               </p>
             ))}
           </>

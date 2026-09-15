@@ -41,7 +41,7 @@ export const w1_03: LevelDef = {
   board: {
     fixed: [
       'Bay 7 is a rectangle of floor inside a solid wall, with nothing in it but the partition',
-      'the bay is **five rows** deep, on every shift',
+      'the bay is five rows deep, on every shift',
       'one partition and one doorway, and the partition reaches the north wall',
       'the doorway is the southernmost row, so both halves join along the bottom',
       'at least two columns of floor either side of the partition',
