@@ -56,7 +56,6 @@
 
 .workspace .transport-deck {
   right: calc(var(--ws-telemetry) + var(--ws-inset) + 22px);
-  bottom: var(--ws-inset);
   left: calc(var(--ws-shift) + var(--ws-inset) + 66px);
 }
 
