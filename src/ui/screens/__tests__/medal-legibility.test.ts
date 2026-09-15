@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type * as ReactModule from 'react';
+import type { Medal as MedalValue } from '../../../game/score.ts';
 import { reactDriver as driver } from '../../__tests__/react-driver.ts';
 
 vi.mock('react', async (importOriginal) => {
@@ -28,7 +29,7 @@ vi.mock('zustand', async () => {
 const { LevelSelect } = await import('../LevelSelect.tsx');
 const { useGame } = await import('../../../game/store.ts');
 const { emptySave } = await import('../../../game/save.ts');
-const { Medal, SILVER_FACTOR, isGraded, medalForLevel } = await import('../../../game/score.ts');
+const { Medal, isGraded } = await import('../../../game/score.ts');
 const { getLevel } = await import('../../../levels/index.ts');
 const { ART_IDS, DIRECTIONS, luminance } = await import('../../../render/theme.ts');
 
@@ -84,59 +85,51 @@ function classes(node: Node | undefined): string[] {
     .filter(Boolean);
 }
 
-function boardWithEveryMedal(): void {
-  const save = emptySave();
-  save.levels['w1-01'] = { completed: true, medal: Medal.Gold, stars: [], attempts: 1 };
-  save.levels['w1-02'] = { completed: true, medal: Medal.Silver, stars: [], attempts: 1 };
-  save.levels['w1-03'] = { completed: true, medal: Medal.Bronze, stars: [], attempts: 1 };
-  useGame.setState({ save, screen: 'levels' });
+function part(row: Node, className: string): Node | undefined {
+  return all([row], (node) => classes(node).includes(className))[0];
 }
 
-function keyRows(tree: Node[]): {
+function orderRows(tree: Node[]): Node[] {
+  const dossier = named(tree, 'Work orders on this site');
+  return dossier ? all([dossier], (node) => classes(node).includes('order-row')) : [];
+}
+
+interface Mark {
+  glyph: string;
+  medal: string;
+  status: string;
   word: string;
-  rule: string;
-  sample: Node | undefined;
-  decorative: boolean;
-}[] {
-  const key = named(tree, 'Medal key');
-  if (!key) return [];
-  return key.children.map((row) => {
-    const sample = all(
-      [row],
-      (node) => classes(node).includes('node') || classes(node).includes('medal'),
-    )[0];
-    const spans = all([row], (node) => node.tag === 'span' && node.children.length > 0);
-    const readable = spans.filter(
-      (span) =>
-        span !== sample &&
-        span.props['aria-hidden'] === undefined &&
-        !all([span], (node) => node === sample).length,
-    );
-    const hidden = all(
-      [row],
-      (node) =>
-        String(node.props['aria-hidden']) === 'true' &&
-        all([node], (each) => each === sample).length > 0,
-    );
-    return {
-      word: readable[0]?.text.trim() ?? '',
-      rule: readable[1]?.text.trim() ?? '',
-      sample,
-      decorative: sample !== undefined && hidden.length > 0,
-    };
-  });
+  marks: string[];
 }
 
-function boardMark(tree: Node[], levelId: string): string[] {
-  const slot = all(tree, (node) => node.tag === 'li' && node.text.includes(levelId))[0];
-  if (!slot) return [];
-  return classes(all([slot], (node) => classes(node).includes('node'))[0]);
+function markFor(tree: Node[], levelId: string): Mark {
+  const row = orderRows(tree).find((each) => part(each, 'order-row__id')?.text.trim() === levelId);
+  if (!row) throw new Error(`${levelId} is not on the dossier`);
+  const medal = part(row, 'order-row__medal');
+  return {
+    glyph: medal?.text.trim() ?? '',
+    medal: String(medal?.props['data-medal'] ?? ''),
+    status: String(row.props['data-status'] ?? ''),
+    word: part(row, 'order-row__status')?.text.trim() ?? '',
+    marks: classes(medal),
+  };
 }
 
-function closedMark(tree: Node[], levelId: string): string[] {
-  const slot = all(tree, (node) => node.tag === 'li' && node.text.includes(levelId))[0];
-  if (!slot) return [];
-  return classes(all([slot], (node) => classes(node).includes('medal'))[0]);
+// The dossier shows the site the player is being sent to next, so a fixture reaches a site by
+// closing everything before it and leaving one order on that site open.
+function dossierOnWorldFour(): void {
+  const save = emptySave();
+  const close = (id: string, medal: MedalValue): void => {
+    save.levels[id] = { completed: true, medal, stars: [], attempts: 1 };
+  };
+  for (const id of ['w1-01', 'w1-02']) close(id, Medal.None);
+  for (const id of ['w1-03', 'w2-01', 'w2-02', 'w2-03', 'w3-01', 'w3-02', 'w3-03']) {
+    close(id, Medal.Gold);
+  }
+  close('w4-01', Medal.Gold);
+  close('w4-02', Medal.Silver);
+  close('w4-03', Medal.Bronze);
+  useGame.setState({ save, screen: 'levels' });
 }
 
 function hueOf(hex: string): number {
@@ -159,123 +152,69 @@ function apart(a: number, b: number): number {
 
 const MEDALS = ['gold', 'silver', 'bronze'] as const;
 
-const MARKS = [...MEDALS, 'closed'] as const;
-
 const UNGRADED = 'w1-01';
+const STILL_OPEN = 'w1-02';
 
 beforeEach(() => {
   useGame.setState({ save: emptySave(), screen: 'levels' });
   driver.reset();
 });
 
-describe('the site map says what the three discs mean', () => {
-  test('there is a key, and it has one row per mark the board draws', () => {
-    const rows = keyRows(render());
-
-    expect(rows.map((row) => row.word)).toEqual([...MARKS]);
-  });
-
-  test('every rung of the ladder is on it, plus the close that is not one, and nothing else', () => {
-    const rows = keyRows(render());
-    const awarded = Object.values(Medal).filter((value) => value !== Medal.None);
-
-    expect([...rows.map((row) => row.word)].sort()).toEqual([...awarded, 'closed'].sort());
-  });
-
-  test('each row says what earns it, in its own words', () => {
-    const rows = keyRows(render());
-
-    expect(rows.every((row) => row.rule.length > 0)).toBe(true);
-    expect(new Set(rows.map((row) => row.rule)).size).toBe(MARKS.length);
-  });
-
-  test('and what it says is what the grader does', () => {
-    const level = getLevel('w1-03');
-    if (!level) throw new Error('no w1-03');
-    const par = level.par.ticks;
-
-    expect(medalForLevel(level, true, par)).toBe(Medal.Gold);
-    expect(medalForLevel(level, true, Math.floor(par * SILVER_FACTOR))).toBe(Medal.Silver);
-    expect(medalForLevel(level, true, par * 10)).toBe(Medal.Bronze);
-
-    const rows = keyRows(render());
-    expect(rows[0]?.rule).toContain('par');
-    expect(rows[1]?.rule).toContain('par');
-    expect(rows[2]?.rule).not.toContain('par');
-  });
-});
-
-describe('the key is drawn in the marks the board is drawn in', () => {
-  test('each sample carries the mark the board gives that medal, and only that one', () => {
-    boardWithEveryMedal();
+describe('the dossier draws a medal as a glyph, not as a hue', () => {
+  test('each rung of the ladder gets its own mark', () => {
+    dossierOnWorldFour();
     const tree = render();
-    const rows = keyRows(tree);
-    const onBoard: Record<string, string[]> = {
-      gold: boardMark(tree, 'w1-01'),
-      silver: boardMark(tree, 'w1-02'),
-      bronze: boardMark(tree, 'w1-03'),
-    };
+    const marks = ['w4-01', 'w4-02', 'w4-03'].map((id) => markFor(tree, id));
 
-    for (const [index, medal] of MEDALS.entries()) {
-      const sample = classes(rows[index]?.sample);
-      const board = onBoard[medal] ?? [];
-      expect(board.length, `${medal} on the board`).toBeGreaterThan(0);
-
-      const shared = sample.filter((each) => each !== 'node' && board.includes(each));
-      expect(shared, `${medal} sample and ${medal} node`).not.toHaveLength(0);
-
-      for (const other of MEDALS.filter((each) => each !== medal)) {
-        expect(shared.some((mark) => (onBoard[other] ?? []).includes(mark))).toBe(false);
-      }
-    }
+    expect(marks.map((mark) => mark.medal)).toEqual([...MEDALS]);
+    for (const mark of marks) expect(mark.glyph).not.toBe('');
+    expect(new Set(marks.map((mark) => mark.glyph)).size).toBe(MEDALS.length);
   });
 
-  test('the samples are decoration; the words carry the meaning', () => {
-    const rows = keyRows(render());
+  test('the glyph is the only thing left when the colour goes', () => {
+    dossierOnWorldFour();
+    const tree = render();
+    const marks = ['w4-01', 'w4-02', 'w4-03'].map((id) => markFor(tree, id));
+    const [gold, silver, bronze] = marks;
+    if (!gold || !silver || !bronze) throw new Error('world 4 is not on the dossier');
 
-    expect(rows).toHaveLength(MARKS.length);
-    for (const row of rows) {
-      expect(row.decorative, `${row.word} sample`).toBe(true);
-      expect(row.word).not.toBe('');
-    }
+    expect(silver.marks).toEqual(gold.marks);
+    expect(bronze.marks).toEqual(gold.marks);
+    expect(new Set(marks.map((mark) => mark.glyph)).size).toBe(MEDALS.length);
   });
 });
 
-describe('the key covers the mark that is not a medal', () => {
+describe('the dossier marks the close that is not a medal', () => {
   test('the fixture is a work order the site really does not grade', () => {
     const level = getLevel(UNGRADED);
 
     expect(level && isGraded(level)).toBe(false);
   });
 
-  test('the ungraded close is on the key, and is keyed as ungraded rather than as a rung', () => {
-    const closed = keyRows(render()).find((row) => row.word === 'closed');
+  test('an ungraded close is not stamped with a rung it never won', () => {
+    const save = emptySave();
+    save.levels[UNGRADED] = { completed: true, medal: Medal.None, stars: [], attempts: 1 };
+    useGame.setState({ save, screen: 'levels' });
+    const mark = markFor(render(), UNGRADED);
 
-    expect(closed?.rule).toBe('not graded');
+    expect(mark.status).toBe('CLOSED');
+    expect(MEDALS).not.toContain(mark.medal);
+    expect(mark.glyph).not.toBe('');
   });
 
-  test('its sample carries the mark the board stamps on an ungraded close', () => {
+  test('and it is marked apart from an ungraded order still open', () => {
     const save = emptySave();
     save.levels[UNGRADED] = { completed: true, medal: Medal.None, stars: [], attempts: 1 };
     useGame.setState({ save, screen: 'levels' });
     const tree = render();
+    const closed = markFor(tree, UNGRADED);
+    const open = markFor(tree, STILL_OPEN);
 
-    const board = closedMark(tree, UNGRADED);
-    const sample = classes(keyRows(tree).find((row) => row.word === 'closed')?.sample);
-
-    expect(board, 'the closed badge on the board').not.toHaveLength(0);
-    expect(sample.filter((mark) => board.includes(mark))).toContain('medal--closed');
-  });
-
-  test('and the word survives greyscale, because the mark is a glyph and not a hue', () => {
-    const save = emptySave();
-    save.levels[UNGRADED] = { completed: true, medal: Medal.None, stars: [], attempts: 1 };
-    useGame.setState({ save, screen: 'levels' });
-    const tree = render();
-    const badge = all(tree, (node) => classes(node).includes('medal--closed'))[0];
-
-    expect(badge?.text.trim()).toBe('✓');
-    expect(MEDALS.some((medal) => classes(badge).includes(`medal--${medal}`))).toBe(false);
+    expect(open.status).toBe('OPEN');
+    expect(closed.status).not.toBe(open.status);
+    expect(closed.word).not.toBe(open.word);
+    expect(closed.word).not.toBe('');
+    expect(open.word).not.toBe('');
   });
 });
 
@@ -309,12 +248,5 @@ describe('the three are distinguishable without colour', () => {
         expect(byHue > 20 || byLight > 0.1, `${id}: ${a} against ${b}`).toBe(true);
       }
     }
-  });
-
-  test('and the words work when neither does', () => {
-    const rows = keyRows(render());
-
-    expect(new Set(rows.map((row) => row.word)).size).toBe(MARKS.length);
-    expect(rows.every((row) => row.word.trim().length > 0)).toBe(true);
   });
 });

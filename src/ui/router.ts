@@ -15,7 +15,7 @@ function levelOf(pathname: string): string | null {
   return ORDER.exec(rest.toLowerCase())?.[1] ?? null;
 }
 
-function pathFor(levelId: string | null): string {
+export function pathFor(levelId: string | null): string {
   return levelId === null ? BASE : `${BASE}order/${levelId}`;
 }
 

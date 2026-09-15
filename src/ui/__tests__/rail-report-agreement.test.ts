@@ -213,8 +213,6 @@ describe('one objective, two screens', () => {
     const bonus = level.bonus?.[0]?.label as string;
     const probes = rowsOf(OrderCard).find((row) => row.label.endsWith(bonus));
     expect(probes?.gauge).toBe(true);
-    expect(probes?.readout).toBe(
-      rowsOf(Report).find((row) => row.label.endsWith(bonus))?.readout,
-    );
+    expect(probes?.readout).toBe(rowsOf(Report).find((row) => row.label.endsWith(bonus))?.readout);
   });
 });

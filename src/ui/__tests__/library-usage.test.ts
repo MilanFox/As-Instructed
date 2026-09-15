@@ -34,7 +34,7 @@ const { emptySave } = await import('../../game/save.ts');
 const { emptyLibrary } = await import('../../meta/save.ts');
 const { STRUCTURE } = await import('../../meta/copy.ts');
 const { Medal } = await import('../../game/score.ts');
-const { buildRows, campaignTally } = await import('../screens/LevelSelect.tsx');
+const { buildCampaign } = await import('../../game/campaign.ts');
 const { reportFor } = await import('../screens/review.ts');
 
 function Results(): unknown {
@@ -281,11 +281,11 @@ describe('reuse pays nothing on any scoreboard', () => {
 
   test('the site map totals are the same with a heavily reused Repository as without', () => {
     closedCampaign();
-    const bare = campaignTally(buildRows(useGame.getState().save));
+    const bare = buildCampaign(useGame.getState().save);
 
     reusedLibrary();
 
-    expect(campaignTally(buildRows(useGame.getState().save))).toEqual(bare);
+    expect(buildCampaign(useGame.getState().save)).toEqual(bare);
   });
 
   test('and so is the performance grade', () => {
