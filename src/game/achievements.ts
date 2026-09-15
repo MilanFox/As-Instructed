@@ -74,6 +74,7 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     title: 'CLOSED ON FIRST DISPATCH',
     requirement: 'Close a work order that runs several layouts on your first run.',
     note: 'It worked on every layout, first time. Survey have asked to see the program. Survey ask everyone.',
+    hidden: true,
   },
   {
     id: 'under-the-estimate',
@@ -172,7 +173,7 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   },
   {
     id: 'resubmitted',
-    title: 'RESUBMITTED WITHOUT AMENDMENT',
+    title: 'THE DEFINITION OF INSANITY',
     requirement: 'Dispatch the same program twice, unaltered.',
     note: 'The same program, sent again unaltered. The outcome was also unaltered.',
     hidden: true,
