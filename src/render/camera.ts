@@ -6,6 +6,10 @@ export const ZOOM_LADDER: readonly number[] = [
 
 export const MAX_FIT_CSS_TILE_PX = 96;
 
+// Below this the strip left over beside an open panel is not worth aiming at, so the
+// camera ignores the inset and keeps using the whole canvas.
+const MIN_FRAME_PX = 160;
+
 export function snapTilePx(raw: number): number {
   const ladder = ZOOM_LADDER;
   let best = ladder[0] as number;
@@ -37,6 +41,13 @@ export interface ViewRange {
   y1: number;
 }
 
+export interface CameraInset {
+  left?: number;
+  top?: number;
+  right?: number;
+  bottom?: number;
+}
+
 export interface CameraOptions {
   fitPadding?: number;
   smoothing?: number;
@@ -61,6 +72,15 @@ export class Camera {
   private targetX = 0.5;
   private targetY = 0.5;
   private targetDeviceTilePx: number = ZOOM_LADDER[13] as number;
+
+  private insetLeft = 0;
+  private insetTop = 0;
+  private insetRight = 0;
+  private insetBottom = 0;
+  private frameX = 0;
+  private frameY = 0;
+  private frameW = 1;
+  private frameH = 1;
 
   private followTarget: { x: number; y: number } | null = null;
   private readonly fitPadding: number;
@@ -91,6 +111,36 @@ export class Camera {
     this.viewWidth = Math.max(1, width);
     this.viewHeight = Math.max(1, height);
     this.dpr = Math.max(0.5, dpr);
+    this.measureFrame();
+  }
+
+  setInset(inset: CameraInset): void {
+    this.insetLeft = Math.max(0, inset.left ?? 0);
+    this.insetTop = Math.max(0, inset.top ?? 0);
+    this.insetRight = Math.max(0, inset.right ?? 0);
+    this.insetBottom = Math.max(0, inset.bottom ?? 0);
+    this.measureFrame();
+    this.clampTarget();
+    this.clampCurrent();
+  }
+
+  private measureFrame(): void {
+    const width = this.viewWidth - this.insetLeft - this.insetRight;
+    const roomy = width >= MIN_FRAME_PX;
+    this.frameX = roomy ? this.insetLeft : 0;
+    this.frameW = roomy ? width : this.viewWidth;
+    const height = this.viewHeight - this.insetTop - this.insetBottom;
+    const tall = height >= MIN_FRAME_PX;
+    this.frameY = tall ? this.insetTop : 0;
+    this.frameH = tall ? height : this.viewHeight;
+  }
+
+  private get frameCentreX(): number {
+    return this.frameX + this.frameW / 2;
+  }
+
+  private get frameCentreY(): number {
+    return this.frameY + this.frameH / 2;
   }
 
   setBounds(bounds: CameraBounds): void {
@@ -101,13 +151,13 @@ export class Camera {
   fit(immediate = true): void {
     this.releaseFocus();
     const padded = 1 - this.fitPadding * 2;
-    const rawX = (this.viewWidth * padded * this.dpr) / this.cols;
-    const rawY = (this.viewHeight * padded * this.dpr) / this.rows;
+    const rawX = (this.frameW * padded * this.dpr) / this.cols;
+    const rawY = (this.frameH * padded * this.dpr) / this.rows;
     const cap = MAX_FIT_CSS_TILE_PX * this.dpr;
     let snapped = snapTilePx(Math.min(cap, Math.max(rawX < rawY ? rawX : rawY, 1)));
 
-    const maxW = this.viewWidth * this.dpr;
-    const maxH = this.viewHeight * this.dpr;
+    const maxW = this.frameW * this.dpr;
+    const maxH = this.frameH * this.dpr;
     for (let i = ladderIndex(snapped) + 1; i < ZOOM_LADDER.length; i++) {
       const rung = ZOOM_LADDER[i] as number;
       if (rung > cap) break;
@@ -140,8 +190,8 @@ export class Camera {
     this.targetDeviceTilePx = snapTilePx(deviceTilePx);
     if (before) {
       const tile = this.targetDeviceTilePx / this.dpr;
-      this.targetX = before.x - (anchorX! - this.viewWidth / 2) / tile;
-      this.targetY = before.y - (anchorY! - this.viewHeight / 2) / tile;
+      this.targetX = before.x - (anchorX! - this.frameCentreX) / tile;
+      this.targetY = before.y - (anchorY! - this.frameCentreY) / tile;
     }
     this.followTarget = null;
     this.releaseFocus();
@@ -237,11 +287,11 @@ export class Camera {
   }
 
   originX(): number {
-    return this.viewWidth / 2 - this.x * this.tilePx + this.kickX;
+    return this.frameCentreX - this.x * this.tilePx + this.kickX;
   }
 
   originY(): number {
-    return this.viewHeight / 2 - this.y * this.tilePx + this.kickY;
+    return this.frameCentreY - this.y * this.tilePx + this.kickY;
   }
 
   worldToScreen(tileX: number, tileY: number, out: { x: number; y: number }): void {
@@ -252,8 +302,8 @@ export class Camera {
   screenToWorld(cssX: number, cssY: number): { x: number; y: number } {
     const tile = this.tilePx;
     return {
-      x: (cssX - this.viewWidth / 2) / tile + this.x,
-      y: (cssY - this.viewHeight / 2) / tile + this.y,
+      x: (cssX - this.frameCentreX) / tile + this.x,
+      y: (cssY - this.frameCentreY) / tile + this.y,
     };
   }
 
@@ -288,23 +338,21 @@ export class Camera {
     this.y = c.y;
   }
 
+  // Either edge of the board may be drawn up to the matching edge of the frame, whether or
+  // not the board is larger than the frame: that is the whole travel the player gets.
   private clampCentre(x: number, y: number, tilePx: number): { x: number; y: number } {
-    const tile = tilePx;
-    const halfW = this.viewWidth / 2 / tile;
-    const halfH = this.viewHeight / 2 / tile;
+    const halfW = this.frameW / 2 / tilePx;
+    const halfH = this.frameH / 2 / tilePx;
     const slack = this.focusSlack;
-    const cx =
-      this.cols <= halfW * 2
-        ? clampAround(x, this.cols / 2, slack)
-        : Math.min(Math.max(x, halfW - slack), this.cols - halfW + slack);
-    const cy =
-      this.rows <= halfH * 2
-        ? clampAround(y, this.rows / 2, slack)
-        : Math.min(Math.max(y, halfH - slack), this.rows - halfH + slack);
-    return { x: cx, y: cy };
+    return {
+      x: clampBetween(x, halfW, this.cols - halfW, slack),
+      y: clampBetween(y, halfH, this.rows - halfH, slack),
+    };
   }
 }
 
-function clampAround(value: number, centre: number, slack: number): number {
-  return Math.min(Math.max(value, centre - slack), centre + slack);
+function clampBetween(value: number, a: number, b: number, slack: number): number {
+  const low = Math.min(a, b) - slack;
+  const high = Math.max(a, b) + slack;
+  return Math.min(Math.max(value, low), high);
 }

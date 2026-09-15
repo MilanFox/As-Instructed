@@ -39,23 +39,3 @@
   inset: 0;
   z-index: 0;
 }
-
-.workspace__scrim {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  background: #000;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--ws-slide);
-}
-
-.workspace[data-drawer='open'] .workspace__scrim {
-  opacity: 0.28;
-  pointer-events: auto;
-}
-
-.workspace[data-watch='true'] .workspace__scrim {
-  opacity: 0;
-  pointer-events: none;
-}

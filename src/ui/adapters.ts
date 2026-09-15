@@ -8,7 +8,7 @@ import {
   importsLibrary,
 } from '../runtime/index.ts';
 import { Renderer } from '../render/index.ts';
-import type { ArtId, TileReadout } from '../render/index.ts';
+import type { ArtId, CameraInset, TileReadout } from '../render/index.ts';
 import type { Trace, Vec, World } from '../engine/index.ts';
 import { LIBRARY_FAILURE, prepareLibrary, useLibrary } from '../meta/index.ts';
 import type { CelebrationKind, RendererPort, RunSubmission, RunnerPort } from '../game/ports.ts';
@@ -192,6 +192,10 @@ export class CanvasRenderer implements RendererPort {
 
   fit(): void {
     this.renderer.fit();
+  }
+
+  setViewInset(inset: CameraInset): void {
+    this.renderer.setViewInset(inset);
   }
 
   zoomBy(steps: number): void {

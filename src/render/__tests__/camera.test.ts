@@ -96,13 +96,35 @@ describe('fit', () => {
 });
 
 describe('clamping', () => {
-  it('centres an axis whose content is smaller than the viewport', () => {
+  it('lets an axis smaller than the viewport pan until the grid edge is flush', () => {
     const cam = camera(960, 200, 1, 8, 3);
     cam.setZoom(48);
     cam.panBy(5000, 5000);
     cam.settle();
-    expect(cam.x).toBeCloseTo(4);
-    expect(cam.y).toBeCloseTo(1.5);
+    expect(cam.originX() + 8 * cam.tilePx).toBeCloseTo(960);
+    expect(cam.originY() + 3 * cam.tilePx).toBeCloseTo(200);
+    cam.panBy(-5000, -5000);
+    cam.settle();
+    expect(cam.originX()).toBeCloseTo(0);
+    expect(cam.originY()).toBeCloseTo(0);
+  });
+
+  it('never pans a grid smaller than the viewport off it', () => {
+    const cam = camera(960, 200, 1, 8, 3);
+    cam.setZoom(48);
+    for (const [dx, dy] of [
+      [4000, 0],
+      [0, 4000],
+      [-4000, -4000],
+      [300, -120],
+    ] as const) {
+      cam.panBy(dx, dy);
+      cam.settle();
+      expect(cam.originX()).toBeGreaterThanOrEqual(-0.001);
+      expect(cam.originX() + 8 * cam.tilePx).toBeLessThanOrEqual(960 + 0.001);
+      expect(cam.originY()).toBeGreaterThanOrEqual(-0.001);
+      expect(cam.originY() + 3 * cam.tilePx).toBeLessThanOrEqual(200 + 0.001);
+    }
   });
 
   it('never lets the grid edge come inside the viewport when zoomed in', () => {
@@ -116,6 +138,45 @@ describe('clamping', () => {
     cam.settle();
     expect(cam.originX() + 40 * cam.tilePx).toBeGreaterThanOrEqual(480 - 0.001);
     expect(cam.originY() + 40 * cam.tilePx).toBeGreaterThanOrEqual(320 - 0.001);
+  });
+});
+
+describe('a panel over the canvas', () => {
+  it('fits and centres the grid in what is left of the canvas', () => {
+    const cam = camera(1280, 640, 1, 12, 9);
+    cam.setInset({ left: 640 });
+    cam.fit(true);
+    expect(cam.originX()).toBeGreaterThanOrEqual(640 - 0.001);
+    expect(cam.originX() + 12 * cam.tilePx).toBeLessThanOrEqual(1280 + 0.001);
+    expect(cam.originX() - 640).toBeCloseTo(1280 - (cam.originX() + 12 * cam.tilePx), 5);
+  });
+
+  it('keeps the grid out from under the panel while panning', () => {
+    const cam = camera(1280, 640, 1, 12, 9);
+    cam.setInset({ left: 640 });
+    cam.fit(true);
+    cam.panBy(5000, 0);
+    cam.settle();
+    expect(cam.originX()).toBeGreaterThanOrEqual(640 - 0.001);
+  });
+
+  it('ignores an inset that would leave no room to look at', () => {
+    const cam = camera(700, 640, 1, 12, 9);
+    cam.setInset({ left: 700 });
+    cam.fit(true);
+    expect(cam.originX()).toBeCloseTo(350 - (12 * cam.tilePx) / 2, 5);
+  });
+
+  it('keeps a screen point on the same tile it reads back', () => {
+    const cam = camera(1280, 640, 1, 20, 20);
+    cam.setInset({ left: 500 });
+    cam.setZoom(32);
+    cam.settle();
+    const out = { x: 0, y: 0 };
+    cam.worldToScreen(9.5, 8.25, out);
+    const back = cam.screenToWorld(out.x, out.y);
+    expect(back.x).toBeCloseTo(9.5);
+    expect(back.y).toBeCloseTo(8.25);
   });
 });
 
@@ -141,6 +202,7 @@ describe('projection', () => {
   it('pins the anchor point while zooming', () => {
     const cam = camera(800, 600, 1, 30, 30);
     cam.setZoom(24);
+    cam.setCenter(15, 15, true);
     cam.settle();
     const before = cam.screenToWorld(200, 150);
     cam.zoomBy(2, 200, 150);

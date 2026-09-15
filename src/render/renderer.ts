@@ -11,7 +11,7 @@ import {
 } from '../engine/index.ts';
 import type { Bot, GroundStack, Machine, Trace, TraceEvent, Vec, World } from '../engine/index.ts';
 import { Camera } from './camera.ts';
-import type { ViewRange } from './camera.ts';
+import type { CameraInset, ViewRange } from './camera.ts';
 import { ParticleSystem, FX_LAYER_OVER, FX_LAYER_UNDER } from './fx.ts';
 import type { FxName, FxOptions } from './fx.ts';
 import {
@@ -502,6 +502,13 @@ export class Renderer {
     this.cameraHeld = false;
     this.leaning = false;
     this.camera.fit(true);
+  }
+
+  // The canvas keeps the whole window; a panel over it only takes away the part of the
+  // canvas the board may aim at.
+  setViewInset(inset: CameraInset): void {
+    this.camera.setInset(inset);
+    if (!this.cameraHeld) this.camera.fit(false);
   }
 
   readoutAt(cssX: number, cssY: number): TileReadout | null {

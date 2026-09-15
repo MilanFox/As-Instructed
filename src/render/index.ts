@@ -15,7 +15,7 @@ export {
   snapTilePx,
   ladderIndex,
 } from './camera.ts';
-export type { CameraOptions, CameraBounds, ViewRange } from './camera.ts';
+export type { CameraInset, CameraOptions, CameraBounds, ViewRange } from './camera.ts';
 
 export {
   TileSet,

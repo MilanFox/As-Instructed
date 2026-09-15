@@ -24,8 +24,7 @@
 /* The slam has to land before the eye does, so the close is quicker than the open. */
 .workspace[data-drawer='shut'] .drawer,
 .workspace[data-drawer='shut'] .transport-deck,
-.workspace[data-drawer='shut'] .work-order,
-.workspace[data-drawer='shut'] .workspace__scrim {
+.workspace[data-drawer='shut'] .work-order {
   transition-duration: var(--ws-slam);
 }
 

@@ -18,9 +18,14 @@ const VIEW: BoardView = { originX: 0, originY: 0, tilePx: 0, cols: 0, rows: 0 };
 export interface FeedCanvasProps {
   onReadout?: (line: string | null) => void;
   onView?: (view: BoardView) => void;
+  insetLeft?: number;
 }
 
-export function FeedCanvas({ onReadout, onView }: FeedCanvasProps): React.ReactElement {
+export function FeedCanvas({
+  onReadout,
+  onView,
+  insetLeft = 0,
+}: FeedCanvasProps): React.ReactElement {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const pointer = useRef<{ x: number; y: number } | null>(null);
 
@@ -88,6 +93,10 @@ export function FeedCanvas({ onReadout, onView }: FeedCanvasProps): React.ReactE
   useEffect(() => {
     if (level) renderer().setWorld(level.world);
   }, [renderer, level]);
+
+  useEffect(() => {
+    (renderer() as FeedRenderer).setViewInset?.({ left: insetLeft });
+  }, [renderer, insetLeft]);
 
   useEffect(() => {
     (renderer() as FeedRenderer).setPreview?.(world);

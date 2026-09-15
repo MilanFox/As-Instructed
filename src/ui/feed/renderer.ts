@@ -1,5 +1,5 @@
 import type { Vec, World } from '../../engine/index.ts';
-import type { ArtId, TileReadout } from '../../render/index.ts';
+import type { ArtId, CameraInset, TileReadout } from '../../render/index.ts';
 import type { BoardView } from '../adapters.ts';
 
 export interface FeedRenderer {
@@ -8,6 +8,7 @@ export interface FeedRenderer {
   readoutAt?(cssX: number, cssY: number): TileReadout | null;
   setHover?(cell: Vec | null): void;
   fit?(): void;
+  setViewInset?(inset: CameraInset): void;
   zoomBy?(steps: number): void;
   deviceTilePx?(): number;
   setFollow?(botId: number | null): void;

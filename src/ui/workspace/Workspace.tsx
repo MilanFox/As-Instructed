@@ -25,6 +25,11 @@ import '../styles/workspace/report.css';
 import '../styles/workspace/banner.css';
 import '../styles/workspace/reflow.css';
 
+function drawerWidth(): number {
+  const drawer = document.getElementById('workspace-drawer');
+  return drawer ? drawer.getBoundingClientRect().width : 0;
+}
+
 function useMedia(query: string): boolean {
   const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
   useEffect(() => {
@@ -58,17 +63,26 @@ export function Workspace(): React.ReactElement {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [problems, setProblems] = useState(0);
   const [readout, setReadout] = useState<string | null>(null);
+  const [mapInset, setMapInset] = useState(0);
 
   const handleRef = useRef<HTMLButtonElement | null>(null);
+
+  // The drawer covers the left of the canvas, so the board aims at what is left of it.
+  useEffect(() => {
+    const measure = (): void => {
+      setMapInset(open ? drawerWidth() : 0);
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => {
+      window.removeEventListener('resize', measure);
+    };
+  }, [open, compact]);
 
   const openDrawer = useCallback((): void => {
     setOpen(true);
     setTelemetryOpen(false);
     setOrderOpen(false);
-  }, []);
-
-  const close = useCallback((): void => {
-    setOpen(false);
   }, []);
 
   const toggle = useCallback((): void => {
@@ -181,9 +195,8 @@ export function Workspace(): React.ReactElement {
       {/* Renderer is one canvas for the whole app (src/ui/adapters.ts), so the feed is
           hidden rather than unmounted and stays outside every boundary. */}
       <div className="workspace__map">
-        <FeedCanvas onReadout={setReadout} />
+        <FeedCanvas onReadout={setReadout} insetLeft={mapInset} />
       </div>
-      <div className="workspace__scrim" aria-hidden="true" onClick={close} />
 
       <PanelBoundary label="The work order">
         <WorkOrderCard
