@@ -22,6 +22,44 @@
   clip-path: var(--ws-clip, none);
 }
 
+/* The HUD is one frame: every surface hangs off --ws-inset rather than its own viewport edge,
+   and the right column stacks the telemetry over the postings. The deck and the postings are
+   anchored from here because their own sheets pin them to the edge, and a postings panel that
+   no longer stands over the drawer no longer has to dodge it. */
+.hud-right {
+  position: fixed;
+  top: var(--ws-inset);
+  right: var(--ws-inset);
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: var(--ws-telemetry);
+  max-height: calc(100vh - var(--ws-inset) * 2);
+  transition: transform var(--ws-slide);
+}
+
+.hud-right > .telemetry,
+.hud-right > .postings {
+  position: static;
+  width: auto;
+  min-height: 0;
+}
+
+.workspace[data-sheet='open'] .hud-right {
+  transform: translateX(calc(100% + var(--ws-inset) + 14px));
+}
+
+.workspace[data-drawer='open'] .hud-right > .postings {
+  transform: none;
+}
+
+.workspace .transport-deck {
+  right: calc(var(--ws-telemetry) + var(--ws-inset) + 22px);
+  bottom: var(--ws-inset);
+  left: calc(var(--ws-shift) + var(--ws-inset) + 66px);
+}
+
 .panel-bar {
   display: flex;
   flex: none;

@@ -121,7 +121,7 @@ export function TelemetryPanel({
         )}
 
         <div className="telemetry__foot">
-          <span className="kicker">#4471 · K&amp;D · feed +41 min</span>
+          <span className="kicker">#4471 · K&amp;D · site feed</span>
         </div>
       </>
     </OverlayPanel>

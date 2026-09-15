@@ -17,20 +17,21 @@
   }
 
   .work-order {
-    max-height: calc(100vh - 300px);
+    max-height: calc(100vh - var(--ws-inset) * 2 - 300px);
   }
 }
 
 @media (width <= 900px) {
   .workspace {
-    --ws-telemetry: min(400px, 100vw);
+    --ws-telemetry: min(400px, calc(100vw - var(--ws-inset) * 2));
     --ws-drawer: 100vw;
     --ws-cut: 16px;
+    --ws-inset: 12px;
   }
 
   .work-order {
-    right: -2px;
-    left: -2px;
+    right: var(--ws-inset);
+    left: var(--ws-inset);
     width: auto;
     max-height: min(42vh, calc(50vh - 108px));
     transform: none;
@@ -43,10 +44,18 @@
     display: none;
   }
 
-  .telemetry {
-    top: 52px;
-    max-height: calc(100vh - 110px);
-    transform: translateX(calc(100% + 12px));
+  /* Too narrow for a column: the two surfaces take the screen on their own again. */
+  .hud-right {
+    display: contents;
+  }
+
+  .hud-right > .telemetry {
+    position: fixed;
+    top: calc(var(--ws-inset) + 54px);
+    right: var(--ws-inset);
+    width: var(--ws-telemetry);
+    max-height: calc(100vh - var(--ws-inset) - 110px);
+    transform: translateX(calc(100% + var(--ws-inset) + 12px));
     transition: transform var(--ws-slide);
   }
 
@@ -54,13 +63,13 @@
     transform: translateX(0);
   }
 
-  .transport-deck {
-    right: -2px;
-    left: -2px;
+  .workspace .transport-deck {
+    right: var(--ws-inset);
+    left: var(--ws-inset);
   }
 
   .workspace[data-drawer='open'] .transport-deck {
-    transform: translateY(calc(100% + 16px));
+    transform: translateY(calc(100% + var(--ws-inset) + 16px));
   }
 
   .report-sheet {
@@ -71,19 +80,25 @@
     transform: none;
   }
 
-  .postings {
-    right: -2px;
-    left: -2px;
+  .hud-right > .postings {
+    position: fixed;
+    top: var(--ws-inset);
+    right: var(--ws-inset);
+    left: var(--ws-inset);
     width: auto;
   }
 
   .workspace[data-drawer='open'] .work-order,
   .workspace[data-drawer='open'] .telemetry {
-    transform: translateX(calc(100% + 12px));
+    transform: translateX(calc(100% + var(--ws-inset) + 12px));
   }
 
   .workspace[data-drawer='open'] .work-order {
-    transform: translateY(calc(-100% - 12px));
+    transform: translateY(calc(-100% - var(--ws-inset) - 12px));
+  }
+
+  .workspace[data-drawer='open'] .hud-right > .postings {
+    transform: translateY(calc(-100% - var(--ws-inset) - 12px));
   }
 
   .workspace[data-drawer='open'] {
@@ -104,7 +119,7 @@
 
 @media (width <= 600px) {
   .workspace {
-    --ws-telemetry: 100vw;
+    --ws-telemetry: calc(100vw - var(--ws-inset) * 2);
     --ws-cut: 12px;
     font-size: 12px;
   }

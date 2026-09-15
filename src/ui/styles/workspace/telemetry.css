@@ -1,21 +1,13 @@
-/* ---- telemetry: paperwork and vitals, top-right, bleeding off both edges ---- */
+/* ---- telemetry: vitals and crew, top of the right column ---- */
 
 .telemetry {
   --ws-clip: polygon(0 0, 100% 0, 100% 100%, var(--ws-cut) 100%, 0 calc(100% - var(--ws-cut)));
 
-  top: -2px;
-  right: -2px;
-  width: var(--ws-telemetry);
   max-height: min(46vh, calc(100vh - 300px));
 }
 
 .crew-list {
   min-height: 0;
-}
-
-.workspace[data-sheet='open'] .telemetry {
-  transform: translateX(calc(100% + 14px));
-  transition: transform var(--ws-slide);
 }
 
 .vitals {

@@ -41,7 +41,7 @@ export function WorkOrderCard({
               className="control control--tight"
               onClick={() => workspace.goto('levels')}
             >
-              Orders
+              Site map
             </button>
             {compact ? (
               <>

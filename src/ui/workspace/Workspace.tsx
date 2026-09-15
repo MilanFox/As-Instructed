@@ -56,7 +56,7 @@ export function Workspace(): React.ReactElement {
   const [open, setOpen] = useState(
     () => !window.matchMedia(COMPACT_QUERY).matches && workspace.trace === null,
   );
-  const [tab, setTab] = useState<DrawerTab>('program');
+  const [tab, setTab] = useState<DrawerTab>('dossier');
   const [orderOpen, setOrderOpen] = useState(false);
   const [telemetryOpen, setTelemetryOpen] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
@@ -210,20 +210,22 @@ export function Workspace(): React.ReactElement {
         />
       </PanelBoundary>
 
-      <PanelBoundary label="Telemetry">
-        <TelemetryPanel
-          workspace={workspace}
-          compact={compact}
-          open={!compact || telemetryOpen}
-          onClose={() => setTelemetryOpen(false)}
-          onReport={() => setSheetOpen(true)}
-          reportHidden={!sheetOpen}
-        />
-      </PanelBoundary>
+      <div className="hud-right">
+        <PanelBoundary label="Telemetry">
+          <TelemetryPanel
+            workspace={workspace}
+            compact={compact}
+            open={!compact || telemetryOpen}
+            onClose={() => setTelemetryOpen(false)}
+            onReport={() => setSheetOpen(true)}
+            reportHidden={!sheetOpen}
+          />
+        </PanelBoundary>
 
-      <PanelBoundary label="The postings">
-        <Postings workspace={workspace} onManual={() => openTo('manual')} />
-      </PanelBoundary>
+        <PanelBoundary label="The postings">
+          <Postings workspace={workspace} onManual={() => openTo('manual')} />
+        </PanelBoundary>
+      </div>
 
       <PanelBoundary label="The transport deck">
         <TransportDeck
@@ -235,7 +237,7 @@ export function Workspace(): React.ReactElement {
         />
       </PanelBoundary>
 
-      <PanelBoundary label="The program drawer">
+      <PanelBoundary label="The workbench">
         <Drawer
           workspace={workspace}
           open={open}
@@ -254,10 +256,10 @@ export function Workspace(): React.ReactElement {
         ref={handleRef}
         aria-expanded={open}
         aria-controls="workspace-drawer"
-        aria-label="Program drawer"
+        aria-label="Workbench drawer"
         onClick={toggle}
       >
-        <span className="drawer-handle__text">Program</span>
+        <span className="drawer-handle__text">Workbench</span>
       </button>
 
       {report ? (

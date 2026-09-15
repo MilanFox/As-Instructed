@@ -1,4 +1,4 @@
-/* ---- work order: top-left, bleeding off both edges ---- */
+/* ---- work order: top-left corner of the HUD frame ---- */
 
 .work-order {
   --ws-clip: polygon(
@@ -9,10 +9,10 @@
     0 100%
   );
 
-  top: -2px;
-  left: -2px;
+  top: var(--ws-inset);
+  left: var(--ws-inset);
   width: var(--ws-order);
-  max-height: calc(100vh - 330px);
+  max-height: calc(100vh - var(--ws-inset) * 2 - 330px);
   transition: transform var(--ws-slide);
 }
 

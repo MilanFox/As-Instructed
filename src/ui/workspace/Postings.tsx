@@ -13,7 +13,7 @@ export function Postings({ workspace, onManual }: PostingsProps): React.ReactEle
   return (
     <div className="postings">
       {requisition ? (
-        <OverlayPanel className="posting" label="Requisition">
+        <OverlayPanel className="posting" label="New commands">
           <PanelBar
             tools={
               <>
@@ -24,13 +24,14 @@ export function Postings({ workspace, onManual }: PostingsProps): React.ReactEle
                   type="button"
                   className="control control--tight"
                   onClick={workspace.signRequisition}
+                  aria-label="Dismiss new commands"
                 >
-                  Sign
+                  Dismiss
                 </button>
               </>
             }
           >
-            Requisition
+            New commands
           </PanelBar>
           <div className="chip-row">
             {requisition.hardware.map((name) => (
