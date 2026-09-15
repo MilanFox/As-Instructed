@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import type { PrintEvent, Trace, TraceEvent, Verdict } from '../engine/index.ts';
-import { Medal, usesFuel } from '../engine/index.ts';
+import type { EventOrigin, PrintEvent, Trace, TraceEvent, Verdict } from '../engine/index.ts';
+import { Medal, eventIndexAt, usesFuel } from '../engine/index.ts';
 import type { PerSeedResult, RuntimeFailure } from '../runtime/protocol.ts';
 import { WORKER_TIMEOUT_MS } from '../runtime/protocol.ts';
 import type { LevelDef } from '../levels/index.ts';
@@ -45,7 +45,17 @@ export const SPEEDS: readonly number[] = [0.25, 0.5, 1, 2, 4, 8, 16, 32, 64, Inf
 
 export const BASE_TICKS_PER_SECOND = 4;
 
+// The 5000ms worker default is not enough to record an attributed trace on the heaviest levels.
+export const DEBUG_TIMEOUT_MS = 20_000;
+
 const UI_WATCHDOG_MS = WORKER_TIMEOUT_MS + 2000;
+
+const DEBUG_WATCHDOG_MS = DEBUG_TIMEOUT_MS + 2000;
+
+export const SOURCE_NAMES: Readonly<Record<EventOrigin['file'], string>> = {
+  program: 'program',
+  lib: 'lib.ts',
+};
 
 // Every keystroke resets the loaded run, so the replacement is only worth running once the
 // typing stops.
@@ -60,7 +70,7 @@ export interface GameState {
 
   runState: RunState;
   runToken: number;
-  runMode: 'dispatch' | 'preview' | null;
+  runMode: 'dispatch' | 'preview' | 'debug' | null;
   previewState: RunState;
   trace: Trace | null;
   verdict: Verdict | null;
@@ -82,6 +92,8 @@ export interface GameState {
   endTick: number;
   playing: boolean;
   speed: number;
+  eventCursor: number | null;
+  debugNote: string | null;
 
   console: ConsoleLine[];
   consoleFilter: 'all' | 'print' | 'system';
@@ -110,6 +122,7 @@ export interface GameState {
   run(): void;
   cancel(): void;
   preview(): void;
+  debugRun(): void;
   resetPreview(): void;
   dismissResults(): void;
   advanceToNextLevel(): void;
@@ -120,6 +133,8 @@ export interface GameState {
 
   seek(tick: number): void;
   step(delta: number): void;
+  stepEvent(delta: number): void;
+  seekToLine(file: EventOrigin['file'], line: number): void;
   play(): void;
   pause(): void;
   togglePlay(): void;
@@ -172,6 +187,58 @@ export function surveyTransition(current: SurveyView, seed: number | null): Surv
     current.heldRun ??
     (current.trace ? { trace: current.trace, tick: current.tick, endTick: current.endTick } : null);
   return { surveySeed: seed, heldRun: held, trace: null, tick: 0, endTick: 0 };
+}
+
+// Only a graded dispatch is worth holding aside. A single-seed run belongs to the one seed it
+// ran, so drawing a different seed drops it rather than handing it back later as "the run".
+export function holdableRun(view: SurveyView, runMode: GameState['runMode']): SurveyView {
+  if (view.heldRun !== null || runMode === 'dispatch') return view;
+  return { ...view, trace: null, tick: 0, endTick: 0 };
+}
+
+// The first index past every event that has already happened at `tick`. The board at tick T
+// shows the outcome of every event with t <= T, so all of those are behind the cursor.
+function eventsThrough(trace: Trace, tick: number): number {
+  let after = eventIndexAt(trace, tick);
+  while (after < trace.events.length && (trace.events[after] as TraceEvent).t <= tick) after += 1;
+  return after;
+}
+
+// Several events can share a tick, so which one is being looked at is not derivable from the
+// tick. The held index is believed only while it still names an event at `tick` — a scrub or a
+// frame of playback moves the tick out from under it and the cursor re-derives from the board.
+export function stepEventCursor(
+  trace: Trace,
+  tick: number,
+  held: number | null,
+  delta: number,
+): number | null {
+  const events = trace.events;
+  if (events.length === 0) return null;
+
+  const anchored =
+    held !== null && held >= 0 && held < events.length && events[held]?.t === tick ? held : null;
+  const index = (anchored ?? eventsThrough(trace, tick) - 1) + delta;
+  return index >= 0 && index < events.length ? index : null;
+}
+
+export function resolveEventCursor(trace: Trace, tick: number, held: number | null): number | null {
+  return stepEventCursor(trace, tick, held, 0);
+}
+
+export function firstEventFromLine(
+  trace: Trace,
+  file: EventOrigin['file'],
+  line: number,
+): number | null {
+  for (const [index, event] of trace.events.entries()) {
+    if (event.origin?.file === file && event.origin.line === line) return index;
+  }
+  return null;
+}
+
+export function traceIsAttributed(trace: Trace): boolean {
+  return trace.events.some((event) => event.origin !== undefined);
 }
 
 let lineId = 0;
@@ -379,6 +446,145 @@ export const useGame = create<GameState>((set, get) => {
     }, PRIME_IDLE_MS);
   }
 
+  // The seed a single-seed run runs: the one being surveyed, or the order's own first.
+  function chosenSeed(): number | null {
+    const state = get();
+    const level = state.currentLevelId ? getLevel(state.currentLevelId) : undefined;
+    if (!level) return null;
+    return state.surveySeed ?? (level.seeds[0] as number);
+  }
+
+  // The preview, the survey's Dispatch and the debug run are one mechanism: run a single seed,
+  // show the trace, grade nothing, write nothing. `debug` only asks for attribution on top.
+  //
+  // Nothing here reaches recordResult or persist, and showResults stays false, so no medal,
+  // star, attempt, best or close-out can come of it. A verdict from one seed is not a verdict:
+  // the medal folds worst-seed per objective across the whole schedule.
+  function oneSeedRun(seed: number, debug: boolean): void {
+    const word = debug ? 'debug' : 'single-seed';
+    if (get().runState === 'running') return;
+    if (get().previewState === 'running') {
+      cancelPreview();
+      pushLines([{ t: 0, kind: 'system', text: `${word} run cancelled` }]);
+      return;
+    }
+    const state = get();
+    const level = state.currentLevelId ? getLevel(state.currentLevelId) : undefined;
+    if (!level) return;
+
+    const seeds = [seed];
+    const token = state.runToken + 1;
+    cancelPrime();
+    state.pause();
+    set({
+      runToken: token,
+      previewState: 'running',
+      runMode: debug ? 'debug' : 'preview',
+      failure: null,
+      verdict: null,
+      seedResults: [],
+      traceSeed: null,
+      failedSeed: null,
+      showResults: false,
+      eventCursor: null,
+      debugNote: null,
+    });
+    pushLines([
+      { t: 0, kind: 'system', text: `${word} run ${level.id} — seed ${String(seed)}, ungraded` },
+    ]);
+
+    clearWatchdog();
+    watchdog = setTimeout(
+      () => {
+        finishPreview(token, {
+          failure: {
+            kind: 'timeout',
+            message:
+              'Your program did not halt. We stopped it. We would like this noted on the record.',
+          },
+        });
+        pushLines([
+          { t: 0, kind: 'error', text: 'HALT notice filed. The host did not answer in time.' },
+        ]);
+      },
+      debug ? DEBUG_WATCHDOG_MS : UI_WATCHDOG_MS,
+    );
+
+    state
+      .runner()
+      .run({
+        code: state.code,
+        levelId: level.id,
+        seeds,
+        ...(debug ? { debug: true, timeoutMs: DEBUG_TIMEOUT_MS } : {}),
+      })
+      .then((response) => {
+        if (get().runToken !== token) return;
+        if (!response.ok) {
+          if (response.error.kind === 'cancelled') {
+            finishPreview(token, {});
+            return;
+          }
+          finishPreview(token, { failure: response.error });
+          pushLines([{ t: 0, kind: 'error', text: response.error.message }]);
+          return;
+        }
+
+        const { trace, verdict, results, traceSeed, failedSeed } = response;
+        const cap = get().save.settings.consoleCap;
+        const prints = trace.events.filter((event): event is PrintEvent => event.kind === 'print');
+        const shown = prints.slice(0, cap);
+        const notices = trace.events.flatMap((event) => {
+          const text = actionNotice(event);
+          return text ? [{ t: event.t, kind: 'notice' as const, text }] : [];
+        });
+        pushLines(
+          [
+            ...shown.map((event) => ({
+              t: event.t,
+              kind: 'print' as const,
+              text: event.text,
+              ...(event.line !== undefined ? { line: event.line } : {}),
+            })),
+            ...notices,
+          ].sort((a, b) => a.t - b.t),
+        );
+        pushLines([
+          {
+            t: trace.endTick,
+            kind: verdict.passed ? 'success' : 'error',
+            text: `${word} run complete — ${verdict.stats.ticks} ticks on seed ${String(seed)}, ungraded`,
+          },
+        ]);
+
+        get().renderer().setTrace(trace);
+        get().renderer().seek(0);
+        set({
+          trace,
+          verdict,
+          seedResults: results,
+          traceSeed,
+          failedSeed: failedSeed ?? null,
+          suppressed: Math.max(0, prints.length - shown.length),
+          tick: 0,
+          endTick: trace.endTick,
+          eventCursor: null,
+          debugNote: null,
+          showResults: false,
+        });
+        finishPreview(token, {});
+        // A debug run is for stepping, so it stops on the first frame instead of playing away
+        // from the line the player came to read.
+        if (!debug) get().play();
+      })
+      .catch((error: unknown) => {
+        if (get().runToken !== token) return;
+        const message = error instanceof Error ? error.message : String(error);
+        finishPreview(token, { failure: { kind: 'runtime', message } });
+        pushLines([{ t: 0, kind: 'error', text: message }]);
+      });
+  }
+
   function primeTrace(levelId: string, code: string): void {
     const level = getLevel(levelId);
     if (!level) return;
@@ -435,6 +641,8 @@ export const useGame = create<GameState>((set, get) => {
     endTick: 0,
     playing: false,
     speed: save.settings.speed,
+    eventCursor: null,
+    debugNote: null,
 
     console: [],
     consoleFilter: 'all',
@@ -517,6 +725,8 @@ export const useGame = create<GameState>((set, get) => {
         heldRun: null,
         tick: 0,
         endTick: 0,
+        eventCursor: null,
+        debugNote: null,
         console: [],
         suppressed: 0,
         brief: 'brief',
@@ -573,10 +783,10 @@ export const useGame = create<GameState>((set, get) => {
 
       cancelPrime();
       state.pause();
-      const next = surveyTransition(state, seed);
+      const next = surveyTransition(seed === null ? state : holdableRun(state, state.runMode), seed);
       state.renderer().setTrace(next.trace);
       if (next.trace) state.renderer().seek(next.tick);
-      set(next);
+      set({ ...next, eventCursor: null, debugNote: null });
     },
 
     setPanel(panel) {
@@ -602,7 +812,13 @@ export const useGame = create<GameState>((set, get) => {
         get().cancel();
         return;
       }
-      get().showSeed(null);
+      // Dispatch while a seed is on the board runs that seed. It cannot grade: a medal folds
+      // worst-seed per objective across the whole schedule, so one seed decides nothing.
+      const surveyed = get().surveySeed;
+      if (surveyed !== null) {
+        oneSeedRun(surveyed, false);
+        return;
+      }
       const state = get();
       const level = state.currentLevelId ? getLevel(state.currentLevelId) : undefined;
       if (!level) return;
@@ -624,6 +840,8 @@ export const useGame = create<GameState>((set, get) => {
         showResults: false,
         freshCommendations: [],
         personalBest: null,
+        eventCursor: null,
+        debugNote: null,
         console: [],
         suppressed: 0,
       });
@@ -727,6 +945,8 @@ export const useGame = create<GameState>((set, get) => {
           suppressed: Math.max(0, prints.length - shown.length),
           tick: trace.endTick,
           endTick: trace.endTick,
+          eventCursor: null,
+          debugNote: null,
           showResults: true,
           resultId: get().resultId + 1,
           ...(verdict.passed ? {} : { failureCursor: get().failureCursor + 1 }),
@@ -877,114 +1097,13 @@ export const useGame = create<GameState>((set, get) => {
     },
 
     preview() {
-      if (get().runState === 'running') return;
-      if (get().previewState === 'running') {
-        cancelPreview();
-        pushLines([{ t: 0, kind: 'system', text: 'preview cancelled' }]);
-        return;
-      }
-      get().showSeed(null);
-      const state = get();
-      const level = state.currentLevelId ? getLevel(state.currentLevelId) : undefined;
-      if (!level) return;
+      const seed = chosenSeed();
+      if (seed !== null) oneSeedRun(seed, false);
+    },
 
-      const seeds = [level.seeds[0] as number];
-      const token = state.runToken + 1;
-      cancelPrime();
-      state.pause();
-      set({
-        runToken: token,
-        previewState: 'running',
-        runMode: 'preview',
-        failure: null,
-        verdict: null,
-        seedResults: [],
-        traceSeed: null,
-        failedSeed: null,
-        showResults: false,
-      });
-      pushLines([{ t: 0, kind: 'system', text: `preview ${level.id} — seed ${seeds[0]}` }]);
-
-      clearWatchdog();
-      watchdog = setTimeout(() => {
-        finishPreview(token, {
-          failure: {
-            kind: 'timeout',
-            message:
-              'Your program did not halt. We stopped it. We would like this noted on the record.',
-          },
-        });
-        pushLines([
-          { t: 0, kind: 'error', text: 'HALT notice filed. The host did not answer in time.' },
-        ]);
-      }, UI_WATCHDOG_MS);
-
-      state
-        .runner()
-        .run({ code: state.code, levelId: level.id, seeds })
-        .then((response) => {
-          if (get().runToken !== token) return;
-          if (!response.ok) {
-            if (response.error.kind === 'cancelled') {
-              finishPreview(token, {});
-              return;
-            }
-            finishPreview(token, { failure: response.error });
-            pushLines([{ t: 0, kind: 'error', text: response.error.message }]);
-            return;
-          }
-
-          const { trace, verdict, results, traceSeed, failedSeed } = response;
-          const cap = get().save.settings.consoleCap;
-          const prints = trace.events.filter(
-            (event): event is PrintEvent => event.kind === 'print',
-          );
-          const shown = prints.slice(0, cap);
-          const notices = trace.events.flatMap((event) => {
-            const text = actionNotice(event);
-            return text ? [{ t: event.t, kind: 'notice' as const, text }] : [];
-          });
-          pushLines(
-            [
-              ...shown.map((event) => ({
-                t: event.t,
-                kind: 'print' as const,
-                text: event.text,
-                ...(event.line !== undefined ? { line: event.line } : {}),
-              })),
-              ...notices,
-            ].sort((a, b) => a.t - b.t),
-          );
-          pushLines([
-            {
-              t: trace.endTick,
-              kind: verdict.passed ? 'success' : 'error',
-              text: `preview complete — ${verdict.stats.ticks} ticks`,
-            },
-          ]);
-
-          get().renderer().setTrace(trace);
-          get().renderer().seek(0);
-          set({
-            trace,
-            verdict,
-            seedResults: results,
-            traceSeed,
-            failedSeed: failedSeed ?? null,
-            suppressed: Math.max(0, prints.length - shown.length),
-            tick: 0,
-            endTick: trace.endTick,
-            showResults: false,
-          });
-          finishPreview(token, {});
-          get().play();
-        })
-        .catch((error: unknown) => {
-          if (get().runToken !== token) return;
-          const message = error instanceof Error ? error.message : String(error);
-          finishPreview(token, { failure: { kind: 'runtime', message } });
-          pushLines([{ t: 0, kind: 'error', text: message }]);
-        });
+    debugRun() {
+      const seed = chosenSeed();
+      if (seed !== null) oneSeedRun(seed, true);
     },
 
     resetPreview() {
@@ -1005,6 +1124,8 @@ export const useGame = create<GameState>((set, get) => {
         heldRun: null,
         tick: 0,
         endTick: 0,
+        eventCursor: null,
+        debugNote: null,
         runMode: null,
         showResults: false,
         failure: null,
@@ -1050,15 +1171,52 @@ export const useGame = create<GameState>((set, get) => {
       set({ freshCommendations: [...get().freshCommendations, id] });
     },
 
+    // Every cursor move lands here, including the renderer's and the conductor's, so the event
+    // cursor is dropped on the way through and re-derived from the tick by whoever reads it.
     seek(tick) {
       const clamped = Math.max(0, Math.min(get().endTick, tick));
-      set({ tick: clamped });
+      set({ tick: clamped, eventCursor: null, debugNote: null });
       get().renderer().seek(clamped);
     },
 
     step(delta) {
       get().pause();
       get().seek(Math.round(get().tick) + delta);
+    },
+
+    stepEvent(delta) {
+      const state = get();
+      const trace = state.trace;
+      if (!trace) return;
+      state.pause();
+      const index = stepEventCursor(trace, state.tick, state.eventCursor, delta);
+      if (index === null) {
+        set({ debugNote: delta < 0 ? 'No earlier event.' : 'No later event.' });
+        return;
+      }
+      get().seek((trace.events[index] as TraceEvent).t);
+      set({ eventCursor: index });
+    },
+
+    seekToLine(file, line) {
+      const trace = get().trace;
+      if (!trace) {
+        set({ debugNote: 'No run to step through.' });
+        return;
+      }
+      const index = firstEventFromLine(trace, file, line);
+      if (index === null) {
+        const where = `${SOURCE_NAMES[file]} line ${String(line)}`;
+        set({
+          debugNote: traceIsAttributed(trace)
+            ? `No event came from ${where}.`
+            : 'This run recorded no lines. Dispatch a debug run.',
+        });
+        return;
+      }
+      get().pause();
+      get().seek((trace.events[index] as TraceEvent).t);
+      set({ eventCursor: index });
     },
 
     play() {
@@ -1068,7 +1226,7 @@ export const useGame = create<GameState>((set, get) => {
         return;
       }
       if (get().tick >= get().endTick) get().seek(0);
-      set({ playing: true });
+      set({ playing: true, eventCursor: null, debugNote: null });
       get()
         .renderer()
         .play(get().speed * BASE_TICKS_PER_SECOND);

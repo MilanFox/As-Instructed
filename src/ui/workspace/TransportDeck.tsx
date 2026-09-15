@@ -1,8 +1,10 @@
 import { useMemo } from 'react';
 
 import { SPEEDS } from '../../game/store.ts';
+import { openOverlay, useOverlay } from '../hooks/useOverlay.ts';
 import { OverlayPanel, PanelBar } from './OverlayPanel.tsx';
 import type { WorkspaceData } from './useWorkspace.ts';
+import { describeDebug } from './useWorkspace.ts';
 
 const FILTERS = ['all', 'print', 'system'] as const;
 
@@ -40,6 +42,15 @@ export function TransportDeck({
   const at = Math.min(end, Math.floor(workspace.tick));
   const fault = faultOf(workspace);
 
+  const overlay = useOverlay().open;
+  const surveyed = workspace.surveySeed;
+  const surveyBusy = surveyed !== null && workspace.previewState === 'running';
+  const debugging = workspace.previewState === 'running' && workspace.runMode === 'debug';
+  const noTrace = workspace.trace === null;
+  // The subroutines file is a flap of its own, so an event attributed to it names a line the
+  // player cannot see until they open it.
+  const shutLib = workspace.debug.origin?.file === 'lib' && overlay !== 'library';
+
   const rung = useMemo(() => {
     const found = SPEEDS.indexOf(workspace.speed);
     return found < 0 ? SPEEDS.indexOf(1) : found;
@@ -67,13 +78,42 @@ export function TransportDeck({
         </p>
       )}
 
+      <p className="debug-strip">
+        {workspace.ungraded === null ? null : (
+          <span className="debug-strip__grade">{workspace.ungraded}</span>
+        )}
+        <span className="debug-strip__text">{describeDebug(workspace.debug)}</span>
+        {shutLib ? (
+          <button
+            type="button"
+            className="control control--tight"
+            onClick={() => openOverlay('library')}
+          >
+            Open lib.ts
+          </button>
+        ) : null}
+      </p>
+
       <div className="transport">
         <button
           type="button"
-          className={running ? 'control control--stop' : 'control control--go'}
+          className={running || surveyBusy ? 'control control--stop' : 'control control--go'}
           onClick={running ? workspace.cancel : workspace.run}
         >
-          {running ? 'Cancel' : 'Dispatch'}
+          {running || surveyBusy
+            ? 'Cancel'
+            : surveyed === null
+              ? 'Dispatch'
+              : `Dispatch seed ${String(surveyed)}`}
+        </button>
+
+        <button
+          type="button"
+          className="control control--tight"
+          onClick={workspace.debugRun}
+          disabled={running}
+        >
+          {debugging ? 'Cancel debug' : 'Debug run'}
         </button>
 
         <span className="transport__group">
@@ -100,6 +140,27 @@ export function TransportDeck({
             aria-label="Forward one tick"
           >
             +1
+          </button>
+        </span>
+
+        <span className="transport__group">
+          <button
+            type="button"
+            className="control control--tight"
+            onClick={() => workspace.stepEvent(-1)}
+            disabled={noTrace}
+            aria-label="Back one event"
+          >
+            «
+          </button>
+          <button
+            type="button"
+            className="control control--tight"
+            onClick={() => workspace.stepEvent(1)}
+            disabled={noTrace}
+            aria-label="Forward one event"
+          >
+            »
           </button>
         </span>
 

@@ -15,6 +15,8 @@ export interface RunSubmission {
   code: string;
   levelId: string;
   seeds: number[];
+  debug?: boolean;
+  timeoutMs?: number;
 }
 
 export interface RunnerPort {

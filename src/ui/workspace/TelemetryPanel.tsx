@@ -2,11 +2,12 @@ import { OverlayPanel, PanelBar } from './OverlayPanel.tsx';
 import type { WorkspaceData } from './useWorkspace.ts';
 
 function stateOf(workspace: WorkspaceData): { word: string; tone: string } {
+  const single = workspace.runMode === 'debug' ? 'debug' : 'preview';
   if (workspace.runState === 'running') return { word: 'running', tone: 'live' };
-  if (workspace.previewState === 'running') return { word: 'preview', tone: 'live' };
+  if (workspace.previewState === 'running') return { word: single, tone: 'live' };
   if (workspace.grade?.passed === true) return { word: 'pass', tone: 'pass' };
   if (workspace.grade) return { word: 'fail', tone: 'fail' };
-  if (workspace.trace) return { word: 'preview', tone: 'idle' };
+  if (workspace.trace) return { word: single, tone: 'idle' };
   return { word: 'idle', tone: 'idle' };
 }
 

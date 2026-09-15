@@ -65,6 +65,8 @@ export class RuntimeRunner implements RunnerPort {
       levelId: submission.levelId,
       seeds: submission.seeds,
       ...(library.request ? { library: library.request } : {}),
+      ...(submission.debug === true ? { debug: true } : {}),
+      ...(submission.timeoutMs === undefined ? {} : { timeoutMs: submission.timeoutMs }),
     });
   }
 

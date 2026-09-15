@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 
-import type { Trace, Vec, Verdict, World } from '../../engine/index.ts';
+import type { EventOrigin, Trace, Vec, Verdict, World } from '../../engine/index.ts';
 import { replayTo } from '../../engine/index.ts';
 import type { Budget, Meter } from '../../game/budgets.ts';
 import { budgetFor } from '../../game/budgets.ts';
@@ -8,8 +8,11 @@ import { activeTrack, metAt, playbackFor, progressAt } from '../../game/playback
 import { REVIEW_TIERS, isGraded } from '../../game/score.ts';
 import type { ConsoleLine, GameState } from '../../game/store.ts';
 import {
+  SOURCE_NAMES,
   currentLevel,
   levelUsesFuel,
+  resolveEventCursor,
+  traceIsAttributed,
   unlockedHardware,
   useGame,
   visibleConsole,
@@ -90,6 +93,36 @@ export interface BriefData {
   seeds: readonly number[];
 }
 
+export interface DebugView {
+  index: number | null;
+  total: number;
+  kind: string | null;
+  origin: EventOrigin | null;
+  attributed: boolean;
+  note: string | null;
+}
+
+// Why there is no line is three different facts, and the player is told which one it is: the
+// run recorded none, the call was coalesced into one event, or the engine raised it itself.
+function lineOf(debug: DebugView): string {
+  if (debug.origin) {
+    return `${SOURCE_NAMES[debug.origin.file]} line ${String(debug.origin.line)}`;
+  }
+  if (!debug.attributed) return 'no lines recorded — this run was not a debug run';
+  if (debug.kind === 'sense') return 'no single line — these sense calls are coalesced';
+  return 'no line — the engine raised this, not an API call';
+}
+
+// Counted in words, because the tick readout beside it is a padded 000/000 fraction and two
+// cursors in one format read as one.
+export function describeDebug(debug: DebugView): string {
+  if (debug.note !== null) return debug.note;
+  if (debug.total === 0) return 'no events recorded';
+  if (debug.index === null) return `before the first of ${String(debug.total)} events`;
+  const at = `event ${String(debug.index + 1)} of ${String(debug.total)} · ${debug.kind ?? '—'}`;
+  return `${at} · ${lineOf(debug)}`;
+}
+
 export interface ReferenceEntry {
   name: string;
   signature: string;
@@ -124,6 +157,8 @@ export interface WorkspaceData {
   runState: GameState['runState'];
   previewState: GameState['runState'];
   runMode: GameState['runMode'];
+  traceSeed: number | null;
+  ungraded: string | null;
   trace: Trace | null;
   grade: Verdict | null;
   failure: RuntimeFailure | null;
@@ -137,8 +172,11 @@ export interface WorkspaceData {
   run(): void;
   cancel(): void;
   preview(): void;
+  debugRun(): void;
   seek(tick: number): void;
   step(delta: number): void;
+  stepEvent(delta: number): void;
+  debug: DebugView;
   play(): void;
   pause(): void;
   togglePlay(): void;
@@ -239,9 +277,19 @@ export function useWorkspace(): WorkspaceData {
   const trace = useGame((state) => state.trace);
   const verdict = useGame((state) => state.verdict);
   const failure = useGame((state) => state.failure);
+  const traceSeed = useGame((state) => state.traceSeed);
 
   // A preview writes a verdict of its own, so only a dispatched run has graded anything.
   const grade = runMode === 'dispatch' ? verdict : null;
+
+  // What is on the board is a medal or it is not, and the player is told which without having
+  // to work it out from which button they pressed.
+  const ungraded =
+    trace === null || runMode === 'dispatch' || runMode === null
+      ? null
+      : traceSeed === null
+        ? 'one seed · ungraded'
+        : `seed ${String(traceSeed)} · ungraded`;
 
   const tick = useGame((state) => state.tick);
   const endTick = useGame((state) => state.endTick);
@@ -251,8 +299,12 @@ export function useWorkspace(): WorkspaceData {
   const run = useGame((state) => state.run);
   const cancel = useGame((state) => state.cancel);
   const preview = useGame((state) => state.preview);
+  const debugRun = useGame((state) => state.debugRun);
   const seek = useGame((state) => state.seek);
   const step = useGame((state) => state.step);
+  const stepEvent = useGame((state) => state.stepEvent);
+  const eventCursor = useGame((state) => state.eventCursor);
+  const debugNote = useGame((state) => state.debugNote);
   const play = useGame((state) => state.play);
   const pause = useGame((state) => state.pause);
   const togglePlay = useGame((state) => state.togglePlay);
@@ -347,6 +399,21 @@ export function useWorkspace(): WorkspaceData {
     if (trace) return replayTo(trace, flooredTick);
     return level ? level.build(surveySeed ?? (level.seeds[0] as number)) : null;
   }, [level, trace, flooredTick, surveySeed]);
+
+  const attributed = useMemo(() => (trace ? traceIsAttributed(trace) : false), [trace]);
+
+  const debug = useMemo<DebugView>(() => {
+    const index = trace ? resolveEventCursor(trace, tick, eventCursor) : null;
+    const event = index === null ? undefined : trace?.events[index];
+    return {
+      index,
+      total: trace?.events.length ?? 0,
+      kind: event?.kind ?? null,
+      origin: event?.origin ?? null,
+      attributed,
+      note: debugNote,
+    };
+  }, [trace, tick, eventCursor, attributed, debugNote]);
 
   const showFuel = useMemo(() => (level ? levelUsesFuel(level) : false), [level]);
   const fuel = useMemo<FuelRow | null>(() => {
@@ -521,6 +588,8 @@ export function useWorkspace(): WorkspaceData {
     runState,
     previewState,
     runMode,
+    traceSeed,
+    ungraded,
     trace,
     grade,
     failure,
@@ -532,8 +601,11 @@ export function useWorkspace(): WorkspaceData {
     run,
     cancel,
     preview,
+    debugRun,
     seek,
     step,
+    stepEvent,
+    debug,
     play,
     pause,
     togglePlay,

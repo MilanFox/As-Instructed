@@ -1,13 +1,48 @@
 import Editor, { type OnMount } from '@monaco-editor/react';
 import { useEffect, useMemo, useRef } from 'react';
 
-import { currentLevel, useGame } from '../../game/store.ts';
-import { PLAYER_FILE_PATH } from '../../runtime/index.ts';
+import type { EventOrigin } from '../../engine/index.ts';
+import { currentLevel, resolveEventCursor, useGame } from '../../game/store.ts';
+import { LIB_FILE_PATH, PLAYER_FILE_PATH } from '../../runtime/index.ts';
 import { THEME, monaco, setupMonaco } from '../monaco-setup.ts';
 
 const RUNTIME_MARKER_OWNER = 'bootstrap-runtime';
 
+const STEP_DECORATION = {
+  isWholeLine: true,
+  className: 'debug-step-line',
+  linesDecorationsClassName: 'debug-step-gutter',
+} as const;
+
+const FILE_PATHS: Readonly<Record<EventOrigin['file'], string>> = {
+  program: PLAYER_FILE_PATH,
+  lib: LIB_FILE_PATH,
+};
+
 type StandaloneEditor = monaco.editor.IStandaloneCodeEditor;
+
+// The lib file is shown by an editor this component does not own, and the program file by one
+// that comes and goes, so the decoration is put on the documents rather than on either editor.
+function markOrigin(origin: EventOrigin | null, previous: Map<string, string[]>): void {
+  for (const path of Object.values(FILE_PATHS)) {
+    const model = monaco.editor.getModel(monaco.Uri.parse(path));
+    if (!model) continue;
+    const wanted =
+      origin && FILE_PATHS[origin.file] === path
+        ? [Math.max(1, Math.min(model.getLineCount(), origin.line))]
+        : [];
+    previous.set(
+      path,
+      model.deltaDecorations(
+        previous.get(path) ?? [],
+        wanted.map((line) => ({
+          range: new monaco.Range(line, 1, line, model.getLineMaxColumn(line)),
+          options: STEP_DECORATION,
+        })),
+      ),
+    );
+  }
+}
 
 export interface MonacoBodyProps {
   fontSize: number;
@@ -26,10 +61,17 @@ export function MonacoBody({
   const failure = useGame((state) => state.failure);
   const runner = useGame((state) => state.runner);
   const run = useGame((state) => state.run);
+  const trace = useGame((state) => state.trace);
+  const tick = useGame((state) => state.tick);
+  const eventCursor = useGame((state) => state.eventCursor);
+  const seekToLine = useGame((state) => state.seekToLine);
 
   const editorRef = useRef<StandaloneEditor | null>(null);
   const runRef = useRef(run);
   runRef.current = run;
+  const seekToLineRef = useRef(seekToLine);
+  seekToLineRef.current = seekToLine;
+  const markedRef = useRef(new Map<string, string[]>());
 
   useEffect(() => {
     setupMonaco();
@@ -61,6 +103,15 @@ export function MonacoBody({
     ]);
     editor?.revealLineInCenterIfOutsideViewport(line);
   }, [failure]);
+
+  useEffect(() => {
+    const index = trace ? resolveEventCursor(trace, tick, eventCursor) : null;
+    const origin = (index === null ? undefined : trace?.events[index]?.origin) ?? null;
+    markOrigin(origin, markedRef.current);
+    if (origin?.file === 'program') {
+      editorRef.current?.revealLineInCenterIfOutsideViewport(origin.line);
+    }
+  }, [trace, tick, eventCursor]);
 
   const options = useMemo(
     () => ({
@@ -99,6 +150,16 @@ export function MonacoBody({
     const model = editor.getModel();
     if (model && model.getValue() !== code) model.setValue(code);
     editor.addCommand(api.KeyMod.CtrlCmd | api.KeyCode.Enter, () => runRef.current());
+    editor.addAction({
+      id: 'bootstrap.goToFirstEventFromLine',
+      label: 'Go to the first event from this line',
+      contextMenuGroupId: 'navigation',
+      keybindings: [api.KeyMod.Alt | api.KeyCode.KeyE],
+      run: (target) => {
+        const line = target.getPosition()?.lineNumber;
+        if (line !== undefined) seekToLineRef.current('program', line);
+      },
+    });
     editor.focus();
   };
 

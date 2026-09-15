@@ -1047,16 +1047,84 @@ describe('the seed survey', () => {
     expect(useGame.getState().surveySeed).toBe(7);
   });
 
-  it('is left behind by a new dispatch', async () => {
+  it('runs the seed it is showing when dispatched, and stays on it', async () => {
+    reset();
+    const runner = new ScriptedRunner();
+    useGame.getState().attachRunner(runner);
+    pickUp('w1-02');
+    useGame.getState().unlockSeeds();
+    useGame.getState().showSeed(7);
+    runner.requests.length = 0;
+
+    useGame.getState().run();
+
+    expect(runner.requests[0]?.seeds).toEqual([7]);
+    expect(useGame.getState().surveySeed).toBe(7);
+    expect(useGame.getState().runState).toBe('idle');
+    expect(useGame.getState().previewState).toBe('running');
+    await Promise.resolve();
+  });
+
+  it('grades nothing it ran on one seed', async () => {
     reset();
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
     pickUp('w1-02');
     useGame.getState().unlockSeeds();
     useGame.getState().showSeed(7);
+    useGame.getState().setCode('move(Dir.East);');
+    const before = useGame.getState().save;
+
+    useGame.getState().run();
+    await vi.waitFor(() => {
+      expect(useGame.getState().previewState).toBe('idle');
+    });
+
+    const state = useGame.getState();
+    expect(state.trace).not.toBeNull();
+    expect(state.traceSeed).toBe(7);
+    expect(state.runMode).toBe('preview');
+    expect(state.showResults).toBe(false);
+    expect(state.save.stats.runs).toBe(before.stats.runs);
+    expect(state.save.levels['w1-02']?.attempts ?? 0).toBe(before.levels['w1-02']?.attempts ?? 0);
+  });
+
+  it('hands the graded run back untouched when the survey closes', async () => {
+    reset();
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+    pickUp('w1-02');
+    useGame.getState().unlockSeeds();
     await runOnce('move(Dir.East);');
-    expect(useGame.getState().surveySeed).toBeNull();
-    expect(useGame.getState().heldRun).toBeNull();
+    const dispatched = useGame.getState().trace;
+
+    useGame.getState().showSeed(7);
+    useGame.getState().run();
+    await vi.waitFor(() => {
+      expect(useGame.getState().previewState).toBe('idle');
+    });
+    expect(useGame.getState().trace).not.toBe(dispatched);
+
+    useGame.getState().showSeed(null);
+    expect(useGame.getState().trace).toBe(dispatched);
+  });
+
+  it('drops a one-seed run rather than handing it back as the run for another seed', async () => {
+    reset();
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+    pickUp('w1-02');
+    useGame.getState().unlockSeeds();
+    useGame.getState().showSeed(7);
+    useGame.getState().run();
+    await vi.waitFor(() => {
+      expect(useGame.getState().previewState).toBe('idle');
+    });
     expect(useGame.getState().trace).not.toBeNull();
+
+    const other = getLevel('w1-02')?.seeds.find((seed) => seed !== 7) as number;
+    useGame.getState().showSeed(other);
+
+    expect(useGame.getState().heldRun).toBeNull();
+    useGame.getState().showSeed(null);
+    expect(useGame.getState().trace).toBeNull();
   });
 
   it('is released by a gold run that leaves no bonus open', async () => {
