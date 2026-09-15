@@ -7,13 +7,13 @@ export interface ClosedBannerProps {
 }
 
 export function ClosedBanner({ workspace }: ClosedBannerProps): React.ReactElement {
-  const fileRef = useRef<HTMLButtonElement | null>(null);
+  const acknowledgeRef = useRef<HTMLButtonElement | null>(null);
   const report = workspace.report;
   const id = (report?.levelId ?? workspace.level?.id ?? '').toUpperCase();
   const medal = report?.medal && report.medal !== 'none' ? report.medal : null;
 
   useEffect(() => {
-    fileRef.current?.focus();
+    acknowledgeRef.current?.focus();
   }, []);
 
   return (
@@ -23,7 +23,7 @@ export function ClosedBanner({ workspace }: ClosedBannerProps): React.ReactEleme
         <span className="closed-banner__word">
           Closed
           <span className="closed-banner__sub">
-            {report?.headline ?? 'Every objective met. The order is yours to file.'}
+            {report?.headline ?? 'Every objective met. Nothing further is expected.'}
           </span>
         </span>
         {medal ? (
@@ -33,11 +33,11 @@ export function ClosedBanner({ workspace }: ClosedBannerProps): React.ReactEleme
         ) : null}
         <button
           type="button"
-          className="closed-banner__file"
-          ref={fileRef}
+          className="closed-banner__acknowledge"
+          ref={acknowledgeRef}
           onClick={workspace.closeOut}
         >
-          File it
+          Acknowledge
         </button>
       </div>
     </section>

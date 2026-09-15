@@ -87,7 +87,7 @@
   text-transform: uppercase;
 }
 
-.closed-banner__file {
+.closed-banner__acknowledge {
   flex: none;
   padding: 18px 26px;
   border: 0;
@@ -102,6 +102,6 @@
   clip-path: polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
 }
 
-.closed-banner__file:hover {
+.closed-banner__acknowledge:hover {
   background: #fff;
 }
