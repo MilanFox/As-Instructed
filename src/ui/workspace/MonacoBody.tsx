@@ -106,6 +106,9 @@ export function MonacoBody({
     <Editor
       key={level?.id ?? 'none'}
       path={PLAYER_FILE_PATH}
+      // Disposing the model restarts its version at 1, and the typescript worker reuses the
+      // program it already emitted for that version — the previous order's source.
+      keepCurrentModel
       defaultLanguage="typescript"
       language="typescript"
       theme={THEME}
