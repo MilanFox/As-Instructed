@@ -214,11 +214,17 @@ function paintSheet(ctx: CanvasRenderingContext2D, t: number): void {
     }
   };
 
+  const ground = alpha(INK, 0.09);
+
   if (flat) fill(STAMP_FLOOR, alpha(INK, 0.1));
-  else dots(STAMP_FLOOR, alpha(INK, 0.2), Math.max(1, p >> 2));
+  else {
+    fill(STAMP_FLOOR, ground);
+    dots(STAMP_FLOOR, alpha(INK, 0.2), Math.max(1, p >> 2));
+  }
 
   if (flat) fill(STAMP_REGOLITH, alpha(INK, 0.16));
   else {
+    fill(STAMP_REGOLITH, ground);
     dots(STAMP_REGOLITH, alpha(INK, 0.22), Math.max(1, p >> 2));
     const grit = alpha(INK, 0.34);
     for (let y = 0, j = 0; y < t; y += p, j++) {
@@ -230,6 +236,7 @@ function paintSheet(ctx: CanvasRenderingContext2D, t: number): void {
 
   if (flat) fill(STAMP_SOIL, alpha(INK, 0.2));
   else {
+    fill(STAMP_SOIL, ground);
     const dash = alpha(INK, 0.26);
     for (let y = 0, j = 0; y < t; y += p, j++) {
       const offset = (j % 2) * p * 1.5;
@@ -264,6 +271,7 @@ function paintSheet(ctx: CanvasRenderingContext2D, t: number): void {
 
   if (flat) fill(STAMP_RUBBLE, alpha(INK, 0.18));
   else {
+    fill(STAMP_RUBBLE, ground);
     const chip = alpha(INK, 0.32);
     for (let y = 0, j = 0; y < t; y += p, j++) {
       if (j % 3 === 2) continue;
@@ -294,6 +302,7 @@ function paintSheet(ctx: CanvasRenderingContext2D, t: number): void {
 
   if (flat) fill(STAMP_PAD, alpha(WARM, 0.5));
   else {
+    fill(STAMP_PAD, ground);
     const ring = alpha(WARM, 0.62);
     const core = alpha(WARM, 0.14);
     const inset = Math.round(t * 0.28);
@@ -318,6 +327,7 @@ function paintSheet(ctx: CanvasRenderingContext2D, t: number): void {
 
   if (flat) fill(STAMP_DEPOT, alpha(INK, 0.3));
   else {
+    fill(STAMP_DEPOT, ground);
     dots(STAMP_DEPOT, alpha(INK, 0.16), 1);
     const inset = Math.round(t * 0.18);
     const lw = Math.max(1, Math.round(t / 16));
@@ -336,6 +346,7 @@ function paintSheet(ctx: CanvasRenderingContext2D, t: number): void {
 
   if (flat) fill(STAMP_CABLE, alpha(WARM, 0.3));
   else {
+    fill(STAMP_CABLE, ground);
     dots(STAMP_CABLE, alpha(INK, 0.12), 1);
     const lw = Math.max(1, Math.round(t / 12));
     const cy = Math.round(t / 2 - lw / 2);
@@ -350,6 +361,7 @@ function paintSheet(ctx: CanvasRenderingContext2D, t: number): void {
       fill(index, alpha(INK, 0.22));
       continue;
     }
+    fill(index, ground);
     dots(index, alpha(INK, 0.12), 1);
     const s = t * 0.16;
     const style = alpha(HOT, 0.6);
