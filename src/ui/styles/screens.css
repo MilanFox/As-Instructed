@@ -249,24 +249,21 @@
   z-index: 4;
   display: flex;
   gap: var(--space-4);
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
   margin: 0;
   pointer-events: none;
 }
 
-.survey__title .game-mark {
+.survey__title .game-wordmark {
   flex: none;
 }
 
-.survey__title-text {
-  margin-right: -0.32em;
-  color: var(--ink);
-  font-family: var(--font-mono);
-  font-size: 23px;
-  font-weight: 600;
-  letter-spacing: 0.32em;
-  white-space: nowrap;
+/* The plate's underside sits 9.375% up from the foot of the mark's box, so dropping the mark by
+   that much puts the ground the robot walks on and the type's baseline on one line. */
+.survey__title .game-mark {
+  flex: none;
+  margin-bottom: -5.25px;
 }
 
 /* ---- site pins: the hit areas and name plates that sit over the plan ---- */

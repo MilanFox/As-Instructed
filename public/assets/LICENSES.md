@@ -59,6 +59,16 @@ Verbatim from both licence files:
 
 > This Font Software is licensed under the SIL Open Font License, Version 1.1.
 
+### Derivative work
+
+The `AS INSTRUCTED` wordmark in `src/ui/components/GameMark.tsx` is outlined vector paths drawn
+from **Saira Condensed Black** — `Copyright 2016 The Saira Project Authors`
+(<https://github.com/CatharsisFonts/Saira>), SIL OFL 1.1. OFL permits derivatives; the paths are
+not the font, no font file ships, and the Reserved Font Name is not reused.
+
+The robot mark beside it is our own vector work, redrawn by hand from an image-model reference
+commissioned for this project. No raster is embedded and nothing is traced automatically.
+
 OFL 1.1 permits bundling and self-hosting. The two conditions that matter to us:
 the fonts are not sold on their own, and if we ever *modify* them we must not ship
 the modified version under the Reserved Font Name ("Inter" / "JetBrains Mono").

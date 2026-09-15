@@ -6,7 +6,7 @@ import { exportSave } from '../../game/save.ts';
 import { currentLevel, useGame } from '../../game/store.ts';
 import { pathFor } from '../router.ts';
 import { IconMap } from '../components/Icons.tsx';
-import { GAME_TITLE, GameMark } from '../components/GameMark.tsx';
+import { GAME_TITLE, GameMark, GameWordmark } from '../components/GameMark.tsx';
 import { Interlock } from './LockedLevel.tsx';
 import '../styles/screens.css';
 
@@ -740,8 +740,9 @@ export function LevelSelect(): JSX.Element {
           className="survey__title"
           style={{ left: `${String(box.aside)}px`, right: `${String(box.w - box.flank)}px` }}
         >
-          <GameMark size={46} />
-          <span className="survey__title-text">{GAME_TITLE}</span>
+          <span className="sr-only">{GAME_TITLE}</span>
+          <GameWordmark height={46} />
+          <GameMark size={56} />
         </h1>
       ) : null}
 
