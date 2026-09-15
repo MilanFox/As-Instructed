@@ -102,7 +102,9 @@ export const w2_02: LevelDef = {
     {
       label: 'Spoilage',
       value:
-        'One against the sheet for every tick a ripe crop stands in the ground with nobody on it.',
+        'One against the sheet for every tick between a crop coming ready and the swing that takes ' +
+        'it. Standing on the tile does not stop the count; only the harvest does. Only the crops ' +
+        'that were in the ground at the start of the shift are counted.',
     },
     { label: 'At `maxGrowth`', value: 'Growth stops. The docking does not.' },
   ],
@@ -147,7 +149,7 @@ export const w2_02: LevelDef = {
     'One pass cannot finish the plot. The crops do not all come ready at the same time.',
     'Growth climbs by one per tick, so a tile says exactly how long it needs. The clock runs whether the bot drives or stands still.',
     'A tile reading 0 growth is not always freshly planted. Some crops on this ladder have not started yet, and sproutsIn says how many ticks until they do.',
-    'Waiting on a tile until it comes ready costs no spoilage. Driving laps costs the same ticks and arrives late.',
+    'Waiting on a tile until it comes ready and harvesting it then costs no spoilage. Once a crop is ready the count runs whether the bot stands on it or not, so driving a lap first arrives late and pays for it.',
   ],
   docs: ['inventory', 'harvest', 'plant', 'wait'],
 };
