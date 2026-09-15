@@ -85,7 +85,7 @@ function metaNumber(tile: Tile | undefined, key: string): number {
 
 function receivePacket(sim: Sim, botId: number): string | null {
   const antenna = antennaFor(sim, botId);
-  void sim.probe(botId, antenna?.id);
+  sim.recordSense(botId, 'receive', antenna !== undefined, antenna?.id);
   if (!antenna) return null;
 
   const tile = tileAt(sim.world, antenna.at);
@@ -104,7 +104,7 @@ function receivePacket(sim: Sim, botId: number): string | null {
 
 function bufferedPackets(sim: Sim, botId: number): number {
   const antenna = antennaFor(sim, botId);
-  void sim.probe(botId, antenna?.id);
+  sim.recordSense(botId, 'buffered', antenna !== undefined, antenna?.id);
   if (!antenna) return 0;
 
   const tile = tileAt(sim.world, antenna.at);

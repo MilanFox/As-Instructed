@@ -272,6 +272,11 @@ export class Sim {
     };
   }
 
+  recordSense(botId: number, name: string, ok: boolean, detail?: string): void {
+    const bot = this.requireBot(botId);
+    this.sense(bot, name, ok, detail);
+  }
+
   move(botId: number, dir: Dir): boolean {
     const bot = this.requireActiveBot(botId);
     const t = bot.clock;

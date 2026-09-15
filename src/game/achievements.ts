@@ -16,6 +16,7 @@ const SENSING_COMMANDS: readonly string[] = [
   'inventory',
   'readMark',
   'receive',
+  'buffered',
 ];
 
 const SENSE_BUDGET_ID = /^within-\d+-([A-Za-z]+)$/;

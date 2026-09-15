@@ -2,15 +2,19 @@ import { describe, expect, test } from 'vitest';
 import type { World } from '../../engine/index.ts';
 import {
   IllegalActionError,
+  Objectives,
   Sim,
   addBot,
   addMachine,
+  cloneWorld,
   createWorld,
+  evaluateObjectives,
   senseTotals,
   setTile,
   tileAt,
   vec,
 } from '../../engine/index.ts';
+import { isSenseBudget } from '../../game/achievements.ts';
 import { PLAYER_API } from '../api-spec.ts';
 import { assertApiComplete, buildPlayerScope, implementedApiNames } from '../api-bindings.ts';
 
@@ -131,18 +135,61 @@ describe('buffered', () => {
     expect(tileAt(sim.world, ANTENNA)?.meta?.['rxNext']).toBeUndefined();
   });
 
-  test('a band read is two probes against a sensing budget', () => {
+  test('a band read is one probe plus one call under its own name', () => {
     const { sim } = listeningPost(['alpha', 'beta']);
     const { buffered, receive } = api(sim, ['buffered', 'receive']);
     buffered?.();
     receive?.();
-    expect(senseTotals(sim.finish())['probe']).toBe(4);
+    expect(senseTotals(sim.finish())).toMatchObject({ probe: 2, buffered: 1, receive: 1 });
   });
 
   test('the charge is the same with the bot standing on the post', () => {
     const { sim } = listeningPost(['alpha']);
     expect(api(sim, ['buffered']).buffered?.()).toBe(1);
-    expect(senseTotals(sim.finish())['probe']).toBe(2);
+    expect(senseTotals(sim.finish())).toMatchObject({ probe: 1, buffered: 1 });
+  });
+
+  test('a band read with no antenna to find still counts once', () => {
+    const world = createWorld({ w: 4, h: 4, seed: 1 });
+    addBot(world, { at: vec(1, 1) });
+    const sim = new Sim(world);
+    expect(api(sim, ['receive']).receive?.()).toBeNull();
+    expect(senseTotals(sim.finish())).toMatchObject({ probe: 1, receive: 1 });
+  });
+});
+
+describe('a band read is budgetable', () => {
+  const withinTwoReceives = Objectives.withinSenses('receive', 2);
+
+  function grade(reads: number): ReturnType<typeof evaluateObjectives>[number] {
+    const { sim, world } = listeningPost(['alpha', 'beta', 'gamma', 'delta']);
+    const initialWorld = cloneWorld(world);
+    const { receive } = api(sim, ['receive']);
+    for (let i = 0; i < reads; i += 1) receive?.();
+    const trace = sim.finish();
+    const report = evaluateObjectives([withinTwoReceives], {
+      world: sim.world,
+      trace,
+      initialWorld,
+    });
+    return report[0] as ReturnType<typeof evaluateObjectives>[number];
+  }
+
+  test('the objective id is the one isSenseBudget recognises', () => {
+    expect(withinTwoReceives.id).toBe('within-2-receive');
+    expect(isSenseBudget(withinTwoReceives.id)).toBe(true);
+  });
+
+  test('a run inside the allowance meets it, and its meter reads the band reads', () => {
+    const met = grade(2);
+    expect(met.met).toBe(true);
+    expect(met.progress).toEqual([2, 2]);
+  });
+
+  test('a run over the allowance fails and names what it spent', () => {
+    const missed = grade(3);
+    expect(missed.met).toBe(false);
+    expect(missed.divergence?.received).toBe('3 calls');
   });
 });
 
