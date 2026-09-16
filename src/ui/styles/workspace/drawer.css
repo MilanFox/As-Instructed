@@ -1,6 +1,6 @@
-/* ---- drawer: the editor and everything there is to read ---- */
+/* ---- flyout: one panel off the left edge, showing whichever face was asked for ---- */
 
-.drawer {
+.flyout {
   position: fixed;
   top: 0;
   bottom: 0;
@@ -8,7 +8,7 @@
   z-index: 6;
   display: flex;
   flex-direction: column;
-  width: var(--ws-drawer);
+  width: var(--ws-flyout);
   min-height: 0;
   border-right: 2px solid var(--ws-edge);
   background: var(--ws-fill);
@@ -17,32 +17,49 @@
   transition: transform var(--ws-slide);
 }
 
-.workspace[data-drawer='open'] .drawer {
+.workspace[data-flyout='open'] .flyout {
   transform: translateX(0);
 }
 
-/* Both flyouts are the same width, so either one's edge is the thing you grab. It sits over
-   the drawer's own border so the edge itself is what the pointer lands on. */
+/* The faces stand in the same box and never move, so asking for the other one swaps what is
+   on the panel rather than sliding a second panel in over it. */
+.flyout[data-on='false'] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* One edge for both faces: a strip pinned to the viewport at whatever width the flyout is
+   at, rather than a child of either one, so neither face's own content can cover it. */
 .flyout-grip {
-  position: absolute;
+  position: fixed;
   top: 0;
-  right: -6px;
   bottom: 0;
-  z-index: 1;
+  left: -6px;
+  z-index: 6;
   width: 12px;
   padding: 0;
   border: 0;
   background: none;
   cursor: col-resize;
   touch-action: none;
+  transform: translateX(var(--ws-handle-x));
+  transition:
+    transform var(--ws-slide),
+    opacity var(--ws-slide);
 }
 
-/* Both flaps ride out on this same edge, bottom-anchored; the mark sits clear above them. */
+.workspace[data-flyout='shut'] .flyout-grip {
+  opacity: 0;
+}
+
+/* Outboard of the panel's own border, which is the same colour it is, so the mark reads at
+   rest rather than only on hover. Both flaps ride out on this edge bottom-anchored and the
+   mark sits clear above them — until a viewport too short to hold both, where it stops. */
 .flyout-grip::after {
   content: '';
   position: absolute;
-  right: 4px;
-  bottom: 474px;
+  right: 2px;
+  bottom: min(474px, calc(100vh - 96px));
   width: 4px;
   height: 72px;
   background: var(--ws-edge);
@@ -60,13 +77,14 @@
 }
 
 /* The slam has to land before the eye does, so the close is quicker than the open. */
-.workspace[data-drawer='shut'] .drawer,
-.workspace[data-drawer='shut'] .transport-deck,
-.workspace[data-drawer='shut'] .work-order {
+.workspace[data-flyout='shut'] .flyout,
+.workspace[data-flyout='shut'] .flyout-grip,
+.workspace[data-flyout='shut'] .transport-deck,
+.workspace[data-flyout='shut'] .work-order {
   transition-duration: var(--ws-slam);
 }
 
-/* Level with the drawer's own tab bar, clear of the drawer's 12px shadow. Below the drawer
+/* Level with the drawer's own tab bar, clear of the flyout's 12px shadow. Below the flyout
    and both flaps in the stack, so it is never the thing on top of an open panel. */
 .drawer-escape {
   position: fixed;
@@ -83,7 +101,7 @@
   z-index: 7;
   display: grid;
   place-items: center;
-  transform: translateX(max(var(--ws-handle-x), var(--ws-lib-x)));
+  transform: translateX(var(--ws-handle-x));
   transition: transform var(--ws-slide);
   width: 46px;
   height: 178px;
@@ -101,7 +119,7 @@
   filter: drop-shadow(8px 8px 0 rgb(0 0 0 / 78%));
 }
 
-.workspace[data-drawer='shut'] .drawer-handle {
+.workspace[data-flyout='shut'] .drawer-handle {
   transition-duration: var(--ws-slam);
 }
 
@@ -288,7 +306,7 @@
 }
 
 /* Two separate asks, not one segmented control: they need a gap between them and room to
-   drop onto their own lines when the drawer narrows. */
+   drop onto their own lines when the flyout narrows. */
 .field-note-asks {
   display: flex;
   margin-top: 10px;

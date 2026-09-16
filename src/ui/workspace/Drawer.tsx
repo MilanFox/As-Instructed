@@ -2,7 +2,6 @@ import { ApiManual } from './ApiManual.tsx';
 import { CodeEditor } from './CodeEditor.tsx';
 import { Dossier } from './Dossier.tsx';
 import type { WorkspaceData } from './useWorkspace.ts';
-import { WidthGrip } from './WidthGrip.tsx';
 
 export type DrawerTab = 'program' | 'dossier' | 'manual';
 
@@ -14,30 +13,24 @@ const TABS: readonly { id: DrawerTab; label: string }[] = [
 
 export interface DrawerProps {
   workspace: WorkspaceData;
-  open: boolean;
+  on: boolean;
   tab: DrawerTab;
   onTab: (tab: DrawerTab) => void;
   onToggle: () => void;
   onRun: () => void;
   onProblems: (count: number) => void;
   problems: number;
-  width: number;
-  onWidth: (width: number) => void;
-  resizable: boolean;
 }
 
 export function Drawer({
   workspace,
-  open,
+  on,
   tab,
   onTab,
   onToggle,
   onRun,
   onProblems,
   problems,
-  width,
-  onWidth,
-  resizable,
 }: DrawerProps): React.ReactElement {
   const running = workspace.runState === 'running';
   const last = workspace.console.at(-1);
@@ -54,15 +47,13 @@ export function Drawer({
   };
 
   return (
-    <div className="drawer" id="workspace-drawer" {...(open ? {} : { inert: true })}>
-      {resizable ? (
-        <WidthGrip
-          label="Workbench width"
-          controls="workspace-drawer"
-          width={width}
-          onWidth={onWidth}
-        />
-      ) : null}
+    <section
+      className="flyout drawer"
+      id="workspace-drawer"
+      aria-label="Workbench"
+      data-on={String(on)}
+      {...(on ? {} : { inert: true })}
+    >
       <div className="drawer-tabs" role="tablist" aria-label="Drawer pages" onKeyDown={onTabKey}>
         {TABS.map((entry) => (
           <button
@@ -140,6 +131,6 @@ export function Drawer({
           {last ? last.text : 'nothing on the wire'}
         </span>
       </div>
-    </div>
+    </section>
   );
 }

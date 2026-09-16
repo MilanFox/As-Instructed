@@ -62,3 +62,58 @@ describe('the screen wires both directions', () => {
     });
   }
 });
+
+const DRAWER = readFileSync(new URL('../../workspace/Drawer.tsx', import.meta.url), 'utf8');
+const SUBROUTINES = readFileSync(
+  new URL('../../workspace/Subroutines.tsx', import.meta.url),
+  'utf8',
+);
+
+const countOf = (source: string, pattern: RegExp): number => (source.match(pattern) ?? []).length;
+
+describe('one surface, and the face on it is whichever flap was pressed', () => {
+  test('both faces are the same panel', () => {
+    expect(['the workbench face', /className="flyout drawer"/.test(DRAWER)]).toEqual([
+      'the workbench face',
+      true,
+    ]);
+    expect(['the lib.ts face', /className="flyout library-face"/.test(SUBROUTINES)]).toEqual([
+      'the lib.ts face',
+      true,
+    ]);
+  });
+
+  test('the screen carries one open state, not one per face', () => {
+    expect(['data-flyout', /data-flyout=\{flyoutOpen \? 'open' : 'shut'\}/.test(WORKSPACE)]).toEqual(
+      ['data-flyout', true],
+    );
+    expect(['stale attributes', /data-drawer=|data-library=/.test(WORKSPACE)]).toEqual([
+      'stale attributes',
+      false,
+    ]);
+  });
+
+  test('the open state is either face being up, so neither can be missed', () => {
+    expect([
+      'flyoutOpen',
+      /const flyoutOpen = open \|\| libraryOpen \|\| referenceRequested;/.test(WORKSPACE),
+    ]).toEqual(['flyoutOpen', true]);
+  });
+
+  // The deck used to fold for the workbench alone, which is how lib.ts came to sit on the
+  // scrubber. It folds on the flyout now, whichever face is on it.
+  test('the deck folds on the flyout rather than on the workbench', () => {
+    expect(['crowded', /const crowded = flyoutOpen &&/.test(WORKSPACE)]).toEqual(['crowded', true]);
+  });
+
+  test('there is one grip, and it belongs to neither face', () => {
+    expect(['<WidthGrip> in Workspace.tsx', countOf(WORKSPACE, /<WidthGrip\b/g)]).toEqual([
+      '<WidthGrip> in Workspace.tsx',
+      1,
+    ]);
+    expect([
+      'a grip inside a face',
+      /WidthGrip/.test(DRAWER) || /WidthGrip/.test(SUBROUTINES),
+    ]).toEqual(['a grip inside a face', false]);
+  });
+});

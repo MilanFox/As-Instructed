@@ -1,17 +1,6 @@
 /* ---- shared subroutines: ~/lib.ts, a second file rather than a page of the workbench ---- */
 
-/* One width, two surfaces: resizing either one is resizing the same edge. Below the compact
-   query reflow.css gives lib.ts its own value again, where the drawer takes the whole screen. */
-.workspace {
-  --ws-lib: var(--ws-drawer);
-  --ws-lib-x: 0px;
-}
-
-.workspace[data-library='open'] {
-  --ws-lib-x: var(--ws-lib);
-}
-
-/* The flap rides out on whichever surface is further open, so it is never buried by one. */
+/* The flap rides out on the flyout's edge, the same one the workbench flap rides. */
 .library-handle {
   position: fixed;
   bottom: 322px;
@@ -19,7 +8,7 @@
   z-index: 7;
   display: grid;
   place-items: center;
-  transform: translateX(max(var(--ws-handle-x), var(--ws-lib-x)));
+  transform: translateX(var(--ws-handle-x));
   transition: transform var(--ws-slide);
   width: 46px;
   height: 128px;
@@ -37,7 +26,7 @@
   filter: drop-shadow(8px 8px 0 rgb(0 0 0 / 78%));
 }
 
-.workspace[data-library='shut'] .library-handle {
+.workspace[data-flyout='shut'] .library-handle {
   transition-duration: var(--ws-slam);
 }
 
@@ -51,60 +40,32 @@
   writing-mode: vertical-rl;
 }
 
-.library-flyout {
-  --ws-clip: polygon(
-    0 0,
-    100% 0,
-    100% calc(100% - var(--ws-cut)),
-    calc(100% - var(--ws-cut)) 100%,
-    0 100%
-  );
-
-  top: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 9;
-  width: var(--ws-lib);
-  transform: translateX(-100%);
-  transition: transform var(--ws-slide);
-}
-
-.library-flyout[data-open='true'] {
-  transform: translateX(0);
-}
-
-/* The panel clips its own children, so this grip is pulled inside the frame rather than
-   straddling it the way the drawer's does. */
-.library-flyout .flyout-grip {
-  right: 0;
-}
-
-.library-flyout .lib {
+.library-face .lib {
   flex: 1 1 auto;
   min-height: 0;
   background: transparent;
 }
 
-.library-flyout .lib__tabs {
+.library-face .lib__tabs {
   flex-wrap: wrap;
   gap: 2px;
   border-bottom: 2px solid var(--ws-edge);
   background: #000;
 }
 
-.library-flyout .lib__tab {
+.library-face .lib__tab {
   background: transparent;
   font-family: var(--font-prose);
   font-weight: 800;
   letter-spacing: 0.16em;
 }
 
-.library-flyout .lib__tab[aria-selected='true'] {
+.library-face .lib__tab[aria-selected='true'] {
   background: var(--ws-edge);
   color: #000;
   box-shadow: none;
 }
 
-.library-flyout .lib__body {
+.library-face .lib__body {
   background: var(--ws-fill);
 }

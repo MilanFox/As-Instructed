@@ -12,11 +12,13 @@ const NUDGE: Readonly<Record<string, number>> = {
 export function WidthGrip({
   label,
   controls,
+  open,
   width,
   onWidth,
 }: {
   label: string;
   controls: string;
+  open: boolean;
   width: number;
   onWidth: (width: number) => void;
 }): React.ReactElement {
@@ -70,6 +72,7 @@ export function WidthGrip({
       aria-controls={controls}
       tabIndex={0}
       data-dragging={String(dragging)}
+      {...(open ? {} : { inert: true })}
       onKeyDown={onKeyDown}
       onPointerDown={(event) => {
         event.preventDefault();

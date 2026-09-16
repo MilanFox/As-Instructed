@@ -310,7 +310,7 @@ describe('Monaco keeps a box it can lay out into', () => {
   });
 
   const CHAIN = [
-    ['.drawer', 'min-height'],
+    ['.flyout', 'min-height'],
     ['.drawer__stack', 'min-height'],
     ['.drawer-page', 'min-height'],
   ] as const;
@@ -324,13 +324,13 @@ describe('Monaco keeps a box it can lay out into', () => {
     });
   }
 
-  test('the drawer is pinned top and bottom, so its height is definite', () => {
-    expect(['drawer position', declared('.drawer', 'position')]).toEqual([
-      'drawer position',
+  test('the flyout is pinned top and bottom, so its height is definite', () => {
+    expect(['flyout position', declared('.flyout', 'position')]).toEqual([
+      'flyout position',
       'fixed',
     ]);
-    expect(['drawer top', declared('.drawer', 'top')]).toEqual(['drawer top', '0']);
-    expect(['drawer bottom', declared('.drawer', 'bottom')]).toEqual(['drawer bottom', '0']);
+    expect(['flyout top', declared('.flyout', 'top')]).toEqual(['flyout top', '0']);
+    expect(['flyout bottom', declared('.flyout', 'bottom')]).toEqual(['flyout bottom', '0']);
   });
 
   test('the page fills the stack, so the editor inherits a definite height', () => {
@@ -343,16 +343,16 @@ describe('Monaco keeps a box it can lay out into', () => {
   });
 });
 
-const NEVER_UNBOXED = ['.drawer', '.drawer__stack', '.drawer-page'] as const;
+const NEVER_UNBOXED = ['.flyout', '.drawer__stack', '.drawer-page'] as const;
 
 const UNBOXING = [
   ['display: none', /(?:^|;)\s*display:\s*none/],
   ['visibility: hidden', /(?:^|;)\s*visibility:\s*hidden/],
 ] as const;
 
-describe('a shut drawer is moved, not taken out of the layout', () => {
+describe('a shut flyout is moved, not taken out of the layout', () => {
   for (const [name, pattern] of UNBOXING) {
-    test(`no rule sets ${name} on the drawer, its stack or any of its pages`, () => {
+    test(`no rule sets ${name} on the flyout, its stack or any of its pages`, () => {
       const offenders = RULES.filter((rule) => {
         const touches = NEVER_UNBOXED.some((base) =>
           new RegExp(`${base.replace('.', '\\.')}(?:--[\\w-]+)?(?:\\[[^\\]]*\\])?$`).test(
@@ -369,15 +369,28 @@ describe('a shut drawer is moved, not taken out of the layout', () => {
     });
   }
 
-  test('the shut drawer is only slid off the edge', () => {
-    expect(['drawer transform', declared('.drawer', 'transform')]).toEqual([
-      'drawer transform',
+  test('the shut flyout is only slid off the edge', () => {
+    expect(['flyout transform', declared('.flyout', 'transform')]).toEqual([
+      'flyout transform',
       'translateX(-100%)',
     ]);
     expect([
-      'open drawer transform',
-      declared(".workspace[data-drawer='open'] .drawer", 'transform'),
-    ]).toEqual(['open drawer transform', 'translateX(0)']);
+      'open flyout transform',
+      declared(".workspace[data-flyout='open'] .flyout", 'transform'),
+    ]).toEqual(['open flyout transform', 'translateX(0)']);
+  });
+
+  // The face that is not showing keeps its box, so the editor on it never has to lay out
+  // again — and swapping faces cannot slide anything, because neither face ever moves.
+  test('the face that is not showing is faded in place, not moved', () => {
+    expect(['idle face opacity', declared(".flyout[data-on='false']", 'opacity')]).toEqual([
+      'idle face opacity',
+      '0',
+    ]);
+    expect(['idle face transform', declared(".flyout[data-on='false']", 'transform')]).toEqual([
+      'idle face transform',
+      null,
+    ]);
   });
 
   test('a page that is not the one on top is faded, not removed', () => {

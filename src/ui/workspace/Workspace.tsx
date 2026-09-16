@@ -20,6 +20,7 @@ import { TelemetryPanel } from './TelemetryPanel.tsx';
 import { TransportDeck } from './TransportDeck.tsx';
 import { useFeedZoom } from './useFeedZoom.ts';
 import { useWorkspace } from './useWorkspace.ts';
+import { WidthGrip } from './WidthGrip.tsx';
 import { WorkOrderCard } from './WorkOrderCard.tsx';
 
 import '../styles/workspace/workspace.css';
@@ -76,7 +77,17 @@ export function Workspace(): React.ReactElement {
 
   const handleRef = useRef<HTMLButtonElement | null>(null);
 
-  // The flyouts draw over the board rather than push it aside, but their measured width is
+  // One flyout showing one of two faces. Everything that has to stand clear of it — the deck,
+  // the flaps, the grip — reads this rather than asking which face is up. The manual counts
+  // as open from the moment it is asked for, so arriving from lib.ts swaps the face instead
+  // of shutting the panel for the frame before the workbench catches up.
+  const overlayOpen = useOverlay().open;
+  const libraryOpen = overlayOpen === 'library';
+  const referenceRequested = overlayOpen === 'docs';
+  const flyoutOpen = open || libraryOpen || referenceRequested;
+  const workbenchOn = flyoutOpen && !libraryOpen;
+
+  // The flyout draws over the board rather than pushes it aside, but its measured width is
   // still what the deck folds on and what the Site map button is parked beside.
   useEffect(() => {
     const measure = (): void => {
@@ -99,7 +110,7 @@ export function Workspace(): React.ReactElement {
       window.removeEventListener('resize', measure);
     };
   }, []);
-  const crowded = open && !compact && measured > 0 && deckIsCrowded(measured, viewport);
+  const crowded = flyoutOpen && !compact && measured > 0 && deckIsCrowded(measured, viewport);
 
   // A stored width outlives the viewport it was chosen on, so it is pulled back inside the
   // one in front of us rather than left to overhang it.
@@ -181,17 +192,17 @@ export function Workspace(): React.ReactElement {
     if (fresh) setSheetOpen(true);
   }, [fresh]);
 
+  // Keyed on the same flag that makes the face inert, so focus is taken back in the commit
+  // that takes the face away rather than a render later, with nowhere left to take it from.
   useEffect(() => {
-    if (open) return;
+    if (workbenchOn) return;
     const active = document.activeElement;
     const drawer = document.getElementById('workspace-drawer');
     if (active && drawer?.contains(active)) handleRef.current?.focus();
-  }, [open]);
+  }, [workbenchOn]);
 
   // The shortcut store drives the drawer, and shutting the drawer by any route drives the
   // store back. The ref tells an incoming request apart from our own echo of it.
-  const overlayOpen = useOverlay().open;
-  const referenceRequested = overlayOpen === 'docs';
   const requestHandled = useRef(referenceRequested);
 
   useEffect(() => {
@@ -207,7 +218,6 @@ export function Workspace(): React.ReactElement {
     }
   }, [referenceRequested, open, tab, openTo]);
 
-  const libraryOpen = overlayOpen === 'library';
   useEffect(() => {
     if (libraryOpen) setOpen(false);
   }, [libraryOpen]);
@@ -242,15 +252,14 @@ export function Workspace(): React.ReactElement {
   return (
     <div
       className="workspace"
-      data-drawer={open ? 'open' : 'shut'}
-      data-library={libraryOpen ? 'open' : 'shut'}
+      data-flyout={flyoutOpen ? 'open' : 'shut'}
       data-watch={String(watching)}
       data-sheet={report ? 'open' : 'shut'}
       data-deck={crowded ? 'folded' : 'shown'}
       style={
         width === null
           ? undefined
-          : ({ '--ws-drawer-user': `${String(width)}px` } as React.CSSProperties)
+          : ({ '--ws-flyout-user': `${String(width)}px` } as React.CSSProperties)
       }
     >
       {/* Renderer is one canvas for the whole app (src/ui/adapters.ts), so the feed is
@@ -301,21 +310,34 @@ export function Workspace(): React.ReactElement {
       <PanelBoundary label="The workbench">
         <Drawer
           workspace={workspace}
-          open={open}
+          on={workbenchOn}
           tab={tab}
           onTab={setTab}
           onToggle={toggle}
           onRun={dispatch}
           onProblems={setProblems}
           problems={problems}
-          width={width ?? measured}
-          onWidth={resize}
-          resizable={!compact}
         />
       </PanelBoundary>
 
-      {/* The drawer stands over the work order card and takes its Site map button with it.
-          Same action, parked in the strip of board the drawer leaves — and once that strip is
+      <PanelBoundary label="Shared Subroutines">
+        <Subroutines />
+      </PanelBoundary>
+
+      {/* One grip for one edge, parked on the viewport rather than inside either face, so the
+          same strip is the grab whichever face the flyout is showing. */}
+      {compact ? null : (
+        <WidthGrip
+          label={libraryOpen ? 'lib.ts width' : 'Workbench width'}
+          controls={libraryOpen ? 'workspace-library' : 'workspace-drawer'}
+          open={flyoutOpen}
+          width={width ?? measured}
+          onWidth={resize}
+        />
+      )}
+
+      {/* The flyout stands over the work order card and takes its Site map button with it.
+          Same action, parked in the strip of board the flyout leaves — and once that strip is
           down to the telemetry column there is no room for it, the same as at compact. */}
       {open && !compact && !crowded && !libraryOpen ? (
         <button
@@ -332,17 +354,13 @@ export function Workspace(): React.ReactElement {
         type="button"
         className="drawer-handle"
         ref={handleRef}
-        aria-expanded={open}
+        aria-expanded={open && !libraryOpen}
         aria-controls="workspace-drawer"
         aria-label="Workbench drawer"
         onClick={toggle}
       >
         <span className="drawer-handle__text">Workbench</span>
       </button>
-
-      <PanelBoundary label="Shared Subroutines">
-        <Subroutines width={width ?? measured} onWidth={resize} resizable={!compact} />
-      </PanelBoundary>
 
       {report ? (
         <PanelBoundary label="The run report">

@@ -159,7 +159,7 @@
     transform var(--ws-slide);
 }
 
-.workspace[data-drawer='open'] .postings {
+.workspace[data-flyout='open'] .postings {
   transform: translateY(calc(-100% - 24px));
 }
 

@@ -2,8 +2,7 @@ import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 
 import { REPOSITORY_NAME, useLibrary } from '../../meta/index.ts';
 import { closeOverlay, toggleOverlay, useOverlay } from '../hooks/useOverlay.ts';
-import { OverlayPanel, PanelBar } from './OverlayPanel.tsx';
-import { WidthGrip } from './WidthGrip.tsx';
+import { PanelBar } from './OverlayPanel.tsx';
 
 const TITLE = `${REPOSITORY_NAME} · ~/lib.ts`;
 
@@ -12,17 +11,7 @@ const SubroutinesFile = lazy(async () => {
   return { default: module.SubroutinesFile };
 });
 
-export interface SubroutinesProps {
-  width: number;
-  onWidth: (width: number) => void;
-  resizable: boolean;
-}
-
-export function Subroutines({
-  width,
-  onWidth,
-  resizable,
-}: SubroutinesProps): React.ReactElement | null {
+export function Subroutines(): React.ReactElement | null {
   const unlocked = useLibrary((state) => state.save.unlocked);
   const published = useLibrary((state) => state.save.published.length);
   const open = useOverlay().open === 'library';
@@ -61,21 +50,13 @@ export function Subroutines({
         </span>
       </button>
 
-      <OverlayPanel
-        className="library-flyout"
+      <section
+        className="flyout library-face"
         id="workspace-library"
-        label={TITLE}
-        open={open}
-        inert={!open}
+        aria-label={TITLE}
+        data-on={String(open)}
+        {...(open ? {} : { inert: true })}
       >
-        {resizable ? (
-          <WidthGrip
-            label="lib.ts width"
-            controls="workspace-library"
-            width={width}
-            onWidth={onWidth}
-          />
-        ) : null}
         <PanelBar
           tools={
             <button type="button" className="control control--tight" onClick={closeOverlay}>
@@ -91,7 +72,7 @@ export function Subroutines({
             <SubroutinesFile />
           </Suspense>
         ) : null}
-      </OverlayPanel>
+      </section>
     </>
   );
 }
