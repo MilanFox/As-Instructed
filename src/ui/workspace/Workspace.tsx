@@ -13,6 +13,7 @@ import {
   storedDrawerWidth,
 } from './drawerSize.ts';
 import { FeedCanvas } from './FeedCanvas.tsx';
+import { flyoutOpensOnArrival, rememberFlyoutOpen } from './flyoutMemory.ts';
 import { Postings } from './Postings.tsx';
 import { ReportSheet } from './ReportSheet.tsx';
 import { Subroutines } from './Subroutines.tsx';
@@ -60,10 +61,13 @@ export function Workspace(): React.ReactElement {
   const zoom = useFeedZoom();
   const compact = useMedia(COMPACT_QUERY);
 
-  // Arriving with nothing to watch means the job is to write; arriving with a trace
-  // means the job is to look at it.
-  const [open, setOpen] = useState(
-    () => !window.matchMedia(COMPACT_QUERY).matches && workspace.trace === null,
+  const levelId = workspace.level?.id ?? null;
+  const [open, setOpen] = useState(() =>
+    flyoutOpensOnArrival(
+      levelId,
+      workspace.trace !== null,
+      window.matchMedia(COMPACT_QUERY).matches,
+    ),
   );
   const [tab, setTab] = useState<DrawerTab>('dossier');
   const [orderOpen, setOrderOpen] = useState(false);
@@ -136,7 +140,8 @@ export function Workspace(): React.ReactElement {
     setTelemetryOpen(false);
     setOrderOpen(false);
     closeLibrary();
-  }, []);
+    rememberFlyoutOpen(levelId, true);
+  }, [levelId]);
 
   const toggle = useCallback((): void => {
     setOpen((was) => {
@@ -145,9 +150,10 @@ export function Workspace(): React.ReactElement {
         setOrderOpen(false);
         closeLibrary();
       }
+      rememberFlyoutOpen(levelId, !was);
       return !was;
     });
-  }, []);
+  }, [levelId]);
 
   const openTo = useCallback(
     (next: DrawerTab): void => {
@@ -222,6 +228,15 @@ export function Workspace(): React.ReactElement {
     if (libraryOpen) setOpen(false);
   }, [libraryOpen]);
 
+  // The screen outlives the level, so the next one gets the arrival rule applied to it rather
+  // than inheriting wherever the last one left the flyout.
+  const arrivedAt = useRef(levelId);
+  useEffect(() => {
+    if (arrivedAt.current === levelId) return;
+    arrivedAt.current = levelId;
+    setOpen(flyoutOpensOnArrival(levelId, workspace.trace !== null, compact));
+  }, [levelId, workspace.trace, compact]);
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape') return;
@@ -231,7 +246,10 @@ export function Workspace(): React.ReactElement {
         return;
       }
       setOpen((was) => {
-        if (was) handleRef.current?.focus();
+        if (was) {
+          handleRef.current?.focus();
+          rememberFlyoutOpen(levelId, false);
+        }
         return false;
       });
     };
@@ -239,7 +257,7 @@ export function Workspace(): React.ReactElement {
     return () => {
       window.removeEventListener('keydown', onKey);
     };
-  }, []);
+  }, [levelId]);
 
   const dismissSheet = useCallback((): void => {
     setSheetOpen(false);
