@@ -210,7 +210,7 @@ export const w4_03: LevelDef = {
     'Eleven months. Not malfunctioning. Facilities have classified it',
     'as existing infrastructure, which requires no decision.',
     '',
-    'The hoist bills from the first collection point on; survey time',
+    'The lift bills from the first collection point on; survey time',
     'has no line item.',
     '```',
     '',

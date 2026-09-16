@@ -99,10 +99,12 @@ export const w4_01: LevelDef = {
     'The tunnels are not lit, not surveyed, and not, strictly, ours.',
     'The Charter grants us surface rights. Legal advise that "surface"',
     'is defined in Appendix C.',
+    '',
+    'The lamp is metered by the reading, and Procurement have already',
+    'booked the saving from the lower count.',
     '```',
     '',
-    'One tunnel. It bends, does not fork, and ends on a marked pad. Drive the bot there',
-    'on a metered lamp, without a wasted step. Both allowances are below.',
+    'Drive RIG-04 down the tunnel and park it on the pad.',
   ].join('\n'),
   board: {
     fixed: [
