@@ -23,6 +23,7 @@ import {
   endedOn,
   firstVisitOrder,
   standingKeys,
+  standingTiles,
   tilesWithTerrain,
 } from './objectives.ts';
 
@@ -127,8 +128,7 @@ function permutations(items: readonly Vec[]): Vec[][] {
   return out;
 }
 
-function tourCost(world: World, start: Vec, order: readonly Vec[], lift: Vec): number {
-  const stops = [start, ...order, lift];
+function routeCost(world: World, stops: readonly Vec[]): number {
   let total = 0;
   for (let n = 1; n < stops.length; n++) {
     const leg = distancesFrom(world, stops[n - 1] as Vec).get(keyOf(stops[n] as Vec));
@@ -138,14 +138,27 @@ function tourCost(world: World, start: Vec, order: readonly Vec[], lift: Vec): n
   return total;
 }
 
-function tookBestOrder(ctx: ObjectiveContext): boolean {
-  const { points, lift, start } = landmarks(ctx.initialWorld);
-  if (points.length !== 3 || lift === undefined || start === undefined) return false;
-  const order = firstVisitOrder(ctx, points);
-  if (order.length !== 3) return false;
-  const costs = permutations(points).map((perm) => tourCost(ctx.initialWorld, start, perm, lift));
-  const best = Math.min(...costs);
-  return tourCost(ctx.initialWorld, start, order, lift) === best;
+function shortestHaul(world: World): number {
+  const { points, lift } = landmarks(world);
+  if (points.length !== 3 || lift === undefined) return Infinity;
+  return Math.min(...permutations(points).map((perm) => routeCost(world, [...perm, lift])));
+}
+
+function haulSteps(ctx: ObjectiveContext): number | undefined {
+  const pads = new Set(tilesWithTerrain(ctx.initialWorld, Terrain.Pad).map(keyOf));
+  const stood = standingTiles(ctx);
+  const first = stood.findIndex((tile) => pads.has(keyOf(tile)));
+  if (first === -1) return undefined;
+  return stood.length - 1 - first;
+}
+
+function haulComplete(ctx: ObjectiveContext): boolean {
+  return visitedCount(ctx) === 3 && botEndsOn(ctx, Terrain.Depot);
+}
+
+function tookShortestHaul(ctx: ObjectiveContext): boolean {
+  if (!haulComplete(ctx)) return false;
+  return haulSteps(ctx) === shortestHaul(ctx.initialWorld);
 }
 
 function visitedCount(ctx: ObjectiveContext): number {
@@ -163,25 +176,21 @@ function missedPoint(ctx: ObjectiveContext): Divergence | undefined {
   return { where: at(missed), expected: 'stood on', received: 'never reached' };
 }
 
-function orderTaken(ctx: ObjectiveContext): Divergence | undefined {
-  const { points, lift, start } = landmarks(ctx.initialWorld);
-  if (points.length !== 3 || lift === undefined || start === undefined) return undefined;
-  const order = firstVisitOrder(ctx, points);
-  if (order.length !== points.length) {
+function haulTaken(ctx: ObjectiveContext): Divergence | undefined {
+  const { points, lift } = landmarks(ctx.initialWorld);
+  if (points.length !== 3 || lift === undefined) return undefined;
+  if (!haulComplete(ctx)) {
     return {
-      where: 'the collection points',
-      expected: `all ${String(points.length)}, in some order`,
-      received: `${String(order.length)} of ${String(points.length)}`,
+      where: 'the haul',
+      expected: `all ${String(points.length)} points, then the lift`,
+      received: `${String(visitedCount(ctx))} of ${String(points.length)} points`,
     };
   }
-  const best = Math.min(
-    ...permutations(points).map((perm) => tourCost(ctx.initialWorld, start, perm, lift)),
-  );
-  const took = tourCost(ctx.initialWorld, start, order, lift);
+  const took = haulSteps(ctx);
   return {
-    where: clipValue(order.map(at).join(' → ')),
-    expected: `${String(best)} steps`,
-    received: Number.isFinite(took) ? `${String(took)} steps` : 'no route',
+    where: clipValue(firstVisitOrder(ctx, points).map(at).join(' → ')),
+    expected: `${String(shortestHaul(ctx.initialWorld))} steps`,
+    received: took === undefined ? 'never begun' : `${String(took)} steps`,
   };
 }
 
@@ -197,20 +206,20 @@ export const w4_03: LevelDef = {
     'FROM: Dep. Coordinator M. Vance',
     'RE:   Unlogged unit',
     '',
-    'Telemetry has found a bot at depth running a program with no',
-    'deployment record. It has been running for eleven months. It is',
-    'not malfunctioning.',
+    'A bot at depth is running a program with no deployment record.',
+    'Eleven months. Not malfunctioning. Facilities have classified it',
+    'as existing infrastructure, which requires no decision.',
     '',
-    'Facilities have classified it as "existing infrastructure" so that',
-    'it does not require a decision.',
+    'The hoist bills from the first collection point on; survey time',
+    'has no line item.',
     '```',
     '',
-    'Stand on all three collection points, then end the run on the lift.',
+    'Stand on all three collection points, then end on the lift.',
   ].join('\n'),
   board: {
     fixed: [
       'the map is 30 tiles square',
-      'tunnels are one tile wide, and a tile with an even `x` and an even `y` is always rock',
+      'tunnels are one tile wide',
       'the cave is carved throughout — every tunnel is reachable from every other, and nothing is sealed off',
       'three collection points and one lift, each at the blind end of a side passage',
       'RIG-04 starts at a blind end too, and the lift is the one furthest from it',
@@ -231,19 +240,14 @@ export const w4_03: LevelDef = {
       value: 'Each of the four is at the end of a short side passage off the main tunnels.',
     },
     {
-      label: 'The order',
+      label: 'The haul',
       value:
-        'For the star: counted from the **first** time the bot stands on each point. A survey that walks into a side chamber has already spent that point — read the chamber off a ray down the passage instead.',
+        'For the star: the steps from the **first** time RIG-04 stands on a collection point to the end of the run on the lift. Everything before that first step onto a point is free.',
     },
     {
       label: 'The clock',
       value:
         'It pays for one look around and one good circuit. It does not pay for three separate trips.',
-    },
-    {
-      label: 'The Repository',
-      value:
-        'Nothing here needs it. But the two halves you write get names later: `survey` and `pathTo`.',
     },
   ],
   seeds: [1, 2, 3, 4],
@@ -266,10 +270,10 @@ export const w4_03: LevelDef = {
   ],
   bonus: [
     Objectives.custom(
-      'best-order',
-      'Take the collection points in the best order',
-      (ctx) => tookBestOrder(ctx),
-      { divergence: orderTaken },
+      'shortest-haul',
+      'Go from the first collection point to the lift in the fewest steps the cave allows',
+      (ctx) => tookShortestHaul(ctx),
+      { divergence: haulTaken },
     ),
   ],
   starter: [
@@ -289,7 +293,7 @@ export const w4_03: LevelDef = {
     'You are being asked to do two different things. Doing them at the same time is what is expensive.',
     'The first thing produces no movement towards any collection point and that is fine. It produces a description of the cave.',
     'Once the cave is written down, the bot no longer has to be anywhere for you to work out how far apart two tiles are.',
-    'There are six ways to order three stops. Six is a small enough number to simply try all of them.',
+    'There are six ways to order three stops. Six is a small enough number to simply try all of them, and the cheapest one is the answer.',
     'A route is a list of tiles chosen before the bot moves. Walking one tells you where the bot ends up without the bot having to be asked, as long as the program keeps the last tile it sent it to.',
   ],
   docs: ['look', 'coordinates', 'memory'],

@@ -80,8 +80,6 @@ export const solution: ReferenceSolution = {
       }
     };
 
-    const start = key(standing.x, standing.y);
-
     for (;;) {
       senseHere();
       const here = standing;
@@ -106,7 +104,7 @@ export const solution: ReferenceSolution = {
     let best = orders[0] as Key[];
     let bestCost = Number.POSITIVE_INFINITY;
     for (const order of orders) {
-      const stops = [start, ...order, lift];
+      const stops = [...order, lift];
       let cost = 0;
       for (let n = 1; n < stops.length; n++) cost += distance(stops[n - 1] as Key, stops[n] as Key);
       if (cost < bestCost) {
@@ -172,7 +170,6 @@ export const solution: ReferenceSolution = {
     '    standing = to;',
     '  }',
     '};',
-    'const start = key(standing.x, standing.y);',
     'for (;;) {',
     '  senseHere();',
     '  const route = routeTo(key(standing.x, standing.y), unfinished);',
@@ -188,7 +185,7 @@ export const solution: ReferenceSolution = {
     'let best = orders[0];',
     'let bestCost = Infinity;',
     'for (const order of orders) {',
-    '  const stops = [start, ...order, lift];',
+    '  const stops = [...order, lift];',
     '  let cost = 0;',
     '  for (let n = 1; n < stops.length; n++) cost += distance(stops[n - 1], stops[n]);',
     '  if (cost < bestCost) { bestCost = cost; best = order; }',

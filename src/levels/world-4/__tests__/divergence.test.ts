@@ -50,14 +50,13 @@ function walkTo(sim: Sim, botId: number, to: Vec): void {
   }
 }
 
-describe('w4-03 prices the order the run took against the best one', () => {
+describe('w4-03 prices the haul the run took against the shortest one', () => {
   const seed = 1;
 
-  function worstOrder(level: LevelDef): { order: Vec[]; lift: Vec } {
+  function orderBy(level: LevelDef, pick: 'best' | 'worst'): { order: Vec[]; lift: Vec } {
     const world = level.build(seed);
     const points = tilesWithTerrain(world, Terrain.Pad);
     const lift = must(tilesWithTerrain(world, Terrain.Depot)[0], 'the lift');
-    const start = must(world.bots[0], 'the bot').at;
     const perms: Vec[][] = [];
     for (const a of points) {
       for (const b of points) {
@@ -68,23 +67,29 @@ describe('w4-03 prices the order the run took against the best one', () => {
       }
     }
     const cost = (order: readonly Vec[]): number => {
-      const stops = [start, ...order, lift];
+      const stops = [...order, lift];
       let total = 0;
       for (let n = 1; n < stops.length; n++) {
         total += pathBetween(world, stops[n - 1] as Vec, stops[n] as Vec)?.length ?? 0;
       }
       return total;
     };
-    const order = perms.reduce((a, b) => (cost(b) > cost(a) ? b : a));
+    const order = perms.reduce((a, b) =>
+      pick === 'worst' ? (cost(b) > cost(a) ? b : a) : cost(b) < cost(a) ? b : a,
+    );
     return { order, lift };
   }
 
-  test('the worst of the six orders is told what it cost and what the best costs', () => {
-    const { order, lift } = worstOrder(w4_03);
-    const { met, divergence } = diverge(w4_03, seed, 'best-order', (sim, botId) => {
+  function haul(order: readonly Vec[], lift: Vec) {
+    return (sim: Sim, botId: number): void => {
       for (const point of order) walkTo(sim, botId, point);
       walkTo(sim, botId, lift);
-    });
+    };
+  }
+
+  test('the worst of the six orders is told what it cost and what the shortest costs', () => {
+    const { order, lift } = orderBy(w4_03, 'worst');
+    const { met, divergence } = diverge(w4_03, seed, 'shortest-haul', haul(order, lift));
 
     expect(met).toBe(false);
     const shown = must(divergence, 'a divergence');
@@ -96,23 +101,48 @@ describe('w4-03 prices the order the run took against the best one', () => {
     );
   });
 
-  test('it never names the best order, only what the best order costs', () => {
-    const { order, lift } = worstOrder(w4_03);
-    const { divergence } = diverge(w4_03, seed, 'best-order', (sim, botId) => {
-      for (const point of order) walkTo(sim, botId, point);
+  test('the shortest order walked the short way earns it, and the steps agree', () => {
+    const { order, lift } = orderBy(w4_03, 'best');
+    const { met, divergence } = diverge(w4_03, seed, 'shortest-haul', haul(order, lift));
+
+    expect(met).toBe(true);
+    const shown = must(divergence, 'a divergence');
+    expect(shown.received).toBe(shown.expected);
+  });
+
+  test('the shortest order with a step out and back is refused', () => {
+    const { order, lift } = orderBy(w4_03, 'best');
+    const { met } = diverge(w4_03, seed, 'shortest-haul', (sim, botId) => {
+      const [first, ...rest] = order;
+      const at = must(first, 'a point');
+      walkTo(sim, botId, at);
+      const detour = must(
+        ALL_DIRS.find((dir) => sim.look(botId, dir, 1)[0]?.walkable === true),
+        'an open neighbour',
+      );
+      sim.move(botId, detour);
+      walkTo(sim, botId, at);
+      for (const point of rest) walkTo(sim, botId, point);
       walkTo(sim, botId, lift);
     });
+
+    expect(met).toBe(false);
+  });
+
+  test('it never names the shortest order, only what the shortest haul costs', () => {
+    const { order, lift } = orderBy(w4_03, 'worst');
+    const { divergence } = diverge(w4_03, seed, 'shortest-haul', haul(order, lift));
     const shown = must(divergence, 'a divergence');
     expect(`${shown.expected} ${shown.received}`).not.toMatch(/\(/);
   });
 
   test('a run that never reached all three is told how many it did reach', () => {
-    const { met, divergence } = diverge(w4_03, seed, 'best-order', () => undefined);
+    const { met, divergence } = diverge(w4_03, seed, 'shortest-haul', () => undefined);
     expect(met).toBe(false);
     expect(divergence).toEqual({
-      where: 'the collection points',
-      expected: 'all 3, in some order',
-      received: '0 of 3',
+      where: 'the haul',
+      expected: 'all 3 points, then the lift',
+      received: '0 of 3 points',
     });
   });
 
