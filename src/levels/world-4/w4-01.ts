@@ -10,20 +10,40 @@ import {
   tileAt,
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
+import type { Cell } from './caves.ts';
 import { carveTunnel, cellTile, paintCave, walkableNeighbours } from './caves.ts';
 import { botEndsOn, endedOn } from './objectives.ts';
 
 const CELLS = 11;
 const SIZE = 2 * CELLS + 1;
+const RUNS = 19;
+const LAMP = 3 * RUNS + 12;
+const STAR = 4 + 2 * (RUNS - 1);
+const STEP_SLACK = 3;
 
 function tunnelCells(rng: Rng): number {
   return rng.int(16, 30);
 }
 
+function cellRuns(path: Cell[]): number {
+  let runs = 0;
+  let heading: string | undefined;
+  for (let n = 1; n < path.length; n++) {
+    const previous = path[n - 1] as Cell;
+    const current = path[n] as Cell;
+    const along = `${String(current.i - previous.i)},${String(current.j - previous.j)}`;
+    if (along !== heading) runs++;
+    heading = along;
+  }
+  return runs;
+}
+
 function build(seed: number): World {
   const world = createWorld({ w: SIZE, h: SIZE, seed, fill: Terrain.Rock });
   const rng = world.rng;
-  const { grid, path } = carveTunnel(rng, CELLS, CELLS, tunnelCells(rng));
+  let drawn = carveTunnel(rng, CELLS, CELLS, tunnelCells(rng));
+  while (cellRuns(drawn.path) !== RUNS) drawn = carveTunnel(rng, CELLS, CELLS, tunnelCells(rng));
+  const { grid, path } = drawn;
   paintCave(world, grid);
 
   const head = path[0] ?? { i: 0, j: 0 };
@@ -32,12 +52,6 @@ function build(seed: number): World {
   addBot(world, { at: cellTile(head.i, head.j), name: 'RIG-04' });
   return world;
 }
-
-const PER_RUN = 3;
-const SPARE = 12;
-const AT_THE_DEAD_END = 4;
-const PER_BEND = 2;
-const STEP_SLACK = 3;
 
 function tunnelShape(world: World): { runs: number; steps: number } {
   const bot = world.bots[0];
@@ -60,12 +74,6 @@ function tunnelShape(world: World): { runs: number; steps: number } {
     at = onward;
   }
 }
-
-const allowance = (ctx: ObjectiveContext): number =>
-  PER_RUN * tunnelShape(ctx.initialWorld).runs + SPARE;
-
-const tightAllowance = (ctx: ObjectiveContext): number =>
-  AT_THE_DEAD_END + PER_BEND * Math.max(tunnelShape(ctx.initialWorld).runs - 1, 0);
 
 const stepAllowance = (ctx: ObjectiveContext): number =>
   tunnelShape(ctx.initialWorld).steps + STEP_SLACK;
@@ -101,13 +109,15 @@ export const w4_01: LevelDef = {
       'the map is 23 tiles square, and rock everywhere the tunnel is not',
       'one tunnel and nothing else — every floor tile belongs to it',
       'the tunnel is one tile wide and never runs alongside itself, so no tile on it has more than two openings',
+      `it runs straight ${String(RUNS)} times, so it bends ${String(RUNS - 1)} times, every shift`,
+      `both allowances are the same every shift — ${String(LAMP)} readings, ${String(STAR)} for the star`,
       'a tile with an even `x` and an even `y` is always rock',
       'RIG-04 starts at one end of the tunnel and the pad is at the other',
     ],
     redrawn: [
       'the shape of the tunnel, bend for bend',
-      'its length — 31 to 59 tiles of floor',
-      `both allowances with it — ${String(PER_RUN)} readings per straight run plus ${String(SPARE)}, and one step per tile between RIG-04 and the pad, plus ${String(STEP_SLACK)}`,
+      'its length — 41 to 59 tiles of floor',
+      `the step allowance with it — one step per tile between RIG-04 and the pad, plus ${String(STEP_SLACK)}`,
       'where in the rock it is carved',
       'which end of it RIG-04 starts from',
     ],
@@ -132,7 +142,7 @@ export const w4_01: LevelDef = {
     { label: 'The pad', value: 'The only tile in the tunnel that is not plain floor.' },
     {
       label: 'The lamp',
-      value: `The shift allows ${String(PER_RUN)} readings for every straight run of the tunnel, plus ${String(SPARE)}. One ray reports a whole run; feeling along the tunnel a tile at a time does not fit.`,
+      value: `${String(LAMP)} readings for the shift.`,
     },
     {
       label: 'The steps',
@@ -140,11 +150,11 @@ export const w4_01: LevelDef = {
     },
     {
       label: 'The star',
-      value: `${String(AT_THE_DEAD_END)} readings, plus ${String(PER_BEND)} for every bend. The dead end can cost four rays before one of them opens; after that, the ray that carried you in already reported the rock ahead, so a bend has two candidates left and costs at most two.`,
+      value: `${String(STAR)} readings for the shift.`,
     },
   ],
   seeds: [1, 2, 46],
-  par: { ticks: 52 },
+  par: { ticks: 58 },
   build,
   objectives: [
     Objectives.custom(
@@ -159,15 +169,18 @@ export const w4_01: LevelDef = {
     ),
     Objectives.custom(
       'reading-allowance',
-      'Stay inside the reading allowance',
-      (ctx) => readingsTaken(ctx) <= allowance(ctx),
+      `Reach the pad in ${String(LAMP)} readings`,
+      (ctx) => botEndsOn(ctx, Terrain.Pad) && readingsTaken(ctx) <= LAMP,
       {
-        progress: (ctx) => [Math.min(readingsTaken(ctx), allowance(ctx)), allowance(ctx)],
-        divergence: (ctx) => ({
-          where: 'readings this shift',
-          expected: `${String(allowance(ctx))} at most`,
-          received: `${String(readingsTaken(ctx))} taken`,
-        }),
+        progress: (ctx) => [Math.min(readingsTaken(ctx), LAMP), LAMP],
+        divergence: (ctx) =>
+          botEndsOn(ctx, Terrain.Pad)
+            ? {
+                where: 'readings this shift',
+                expected: `${String(LAMP)} at most`,
+                received: `${String(readingsTaken(ctx))} taken`,
+              }
+            : endedOn(ctx, Terrain.Pad),
       },
     ),
     Objectives.custom(
@@ -189,15 +202,15 @@ export const w4_01: LevelDef = {
   bonus: [
     Objectives.custom(
       'tight-reading-bound',
-      'Reach the pad on 4 readings, plus 2 for each bend',
-      (ctx) => botEndsOn(ctx, Terrain.Pad) && readingsTaken(ctx) <= tightAllowance(ctx),
+      `Reach the pad in ${String(STAR)} readings`,
+      (ctx) => botEndsOn(ctx, Terrain.Pad) && readingsTaken(ctx) <= STAR,
       {
-        progress: (ctx) => [Math.min(readingsTaken(ctx), tightAllowance(ctx)), tightAllowance(ctx)],
+        progress: (ctx) => [Math.min(readingsTaken(ctx), STAR), STAR],
         divergence: (ctx) =>
           botEndsOn(ctx, Terrain.Pad)
             ? {
                 where: 'readings this shift',
-                expected: `${String(tightAllowance(ctx))} at most`,
+                expected: `${String(STAR)} at most`,
                 received: `${String(readingsTaken(ctx))} taken`,
               }
             : endedOn(ctx, Terrain.Pad),
