@@ -163,6 +163,12 @@ export function mountLibrary(runner: RuntimeRunner): () => void {
     const rewritten = state.save.source !== previous.save.source;
     if (rewritten) void installTypes();
 
+    // Every run links the live editor source, not the committed one, so an edit to lib.ts
+    // stales the board exactly as an edit to the order's own code does.
+    if (state.source !== previous.source && useGame.getState().trace !== null) {
+      useGame.getState().resetPreview();
+    }
+
     if (rewritten || state.save.published.length !== previous.save.published.length) {
       if (!useLibrary.getState().structure().flat) useGame.getState().award('built-on-it');
     }
