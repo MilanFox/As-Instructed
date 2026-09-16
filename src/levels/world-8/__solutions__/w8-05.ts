@@ -520,22 +520,6 @@ export const solution: ReferenceSolution = {
       if (!shifted) break;
     }
 
-    let heldId = '';
-    let heldFor = -1;
-    for (const station of stations) {
-      const start = thrown.get(station.id);
-      if (start === undefined) continue;
-      let fed = -1;
-      for (const dep of station.deps) {
-        const at = thrown.get(dep);
-        if (at !== undefined && at + 1 > fed) fed = at + 1;
-      }
-      if (fed < 0 || start - fed <= heldFor) continue;
-      heldFor = start - fed;
-      heldId = station.id;
-    }
-    if (heldId !== '') sim.print(anyBot, `held ${heldId} ${String(heldFor)}`);
-
     const poweredAt = gateFeeder === undefined ? undefined : thrown.get(gateFeeder);
     if (gateAt !== null && gateFeeder !== undefined && poweredAt !== undefined) {
       sim.print(anyBot, `gate ${gateFeeder} ${String(gateAt - poweredAt)}`);
@@ -1045,22 +1029,6 @@ export const solution: ReferenceSolution = {
     '  }',
     '  if (!shifted) break;',
     '}',
-    '',
-    "let heldId = '';",
-    'let heldFor = -1;',
-    'for (const s of subs) {',
-    '  const start = thrown.get(s.id);',
-    '  if (start === undefined) continue;',
-    '  let fed = -1;',
-    '  for (const dep of s.deps) {',
-    '    const at = thrown.get(dep);',
-    '    if (at !== undefined && at + 1 > fed) fed = at + 1;',
-    '  }',
-    '  if (fed < 0 || start - fed <= heldFor) continue;',
-    '  heldFor = start - fed;',
-    '  heldId = s.id;',
-    '}',
-    "if (heldId !== '') print(`held ${heldId} ${heldFor}`);",
     '',
     '// How long the gate stood powered and shut: the walk east, priced against the grid’s clock.',
     'const poweredAt = gateFeeder ? thrown.get(gateFeeder) : undefined;',

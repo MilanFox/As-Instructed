@@ -2,7 +2,6 @@ import { describe, expect, test } from 'vitest';
 import type { Objective, ObjectiveContext, Sim, Trace, Vec } from '../../../engine/index.ts';
 import {
   DIVERGENCE_VALUE_CHARS,
-  Dir,
   FED_BY,
   ItemKind,
   NOTHING,
@@ -15,7 +14,7 @@ import {
   tileAt,
 } from '../../../engine/index.ts';
 import { must } from '../../../engine/__tests__/helpers.ts';
-import { fieldSweep, literalPlanFollower } from '../../__tests__/naive.ts';
+import { fieldSweep, frontierScavenger, literalPlanFollower } from '../../__tests__/naive.ts';
 import { runLevel } from '../../harness.ts';
 import type { LevelDef } from '../../types.ts';
 import { key, pathOn, point } from '../shared.ts';
@@ -268,29 +267,26 @@ describe('w8-04 says whether the run reached the locker, and never says where it
     }
   });
 
-  test('bot-intact reads the tick, the tile and the reason off the die event', () => {
-    const initialWorld = w8_04.build(1);
-    const world = cloneWorld(initialWorld);
-    const bot = must(world.bots[0], 'the bot');
-    bot.alive = false;
-    const at = { x: 9, y: 4 };
-    const objective = objectiveIn(w8_04, 'bot-intact');
-    const ctx: ObjectiveContext = {
-      world,
-      initialWorld,
-      trace: {
-        initialWorld,
-        events: [{ kind: 'die', t: 88, dt: 0, botId: bot.id, at, reason: 'out of fuel' }],
-        keyframes: [],
-        endTick: 88,
-      },
-    };
+  test('walk-the-plan names the tick and the tile of the first step off the route', () => {
+    const { met, divergence } = report(w8_04, 5, 'walk-the-plan', (sim, botId) => {
+      frontierScavenger.run(sim, botId);
+    });
 
-    expect(objective.evaluate(ctx)).toBe(false);
-    expect(objective.divergence?.(ctx)).toEqual({
-      where: `tick 88 · ${point(at)}`,
-      expected: 'the bot still running',
-      received: 'out of fuel',
+    expect(met).toBe(false);
+    const shown = must(divergence, 'a divergence');
+    expect(shown.where).toMatch(/^tick \d+ · \(\d+, \d+\)$/);
+    expect(shown.expected).toBe('a tile the filed route covers');
+    expect(shown.received).toMatch(/^\d+ tiles in the old workings$/);
+  });
+
+  test('walk-the-plan tells a run that strayed nowhere but stopped short', () => {
+    const { met, divergence } = report(w8_04, 5, 'walk-the-plan', () => undefined);
+
+    expect(met).toBe(false);
+    expect(divergence).toEqual({
+      where: 'the far end of the filed route',
+      expected: 'the bot standing on it',
+      received: 'the run stopped short',
     });
   });
 });
@@ -386,31 +382,27 @@ describe('w8-05 reports the finale without driving the finale', () => {
     expect(shift.expected).toMatch(/^tick \d+$/);
   });
 
-  test('name-the-hold says the note is missing, and never which station it wanted', () => {
+  test('nine-turns names the gate and the turns that moved nothing', () => {
     const airlock = must(machineById(w8_05.build(seed), 'airlock'), 'the airlock');
-    const { met, divergence } = report(w8_05, seed, 'name-the-hold', (sim, botId) => {
+    const { met, divergence } = report(w8_05, seed, 'nine-turns', (sim, botId) => {
       walkTo(sim, botId, airlock.at);
-      sim.move(botId, Dir.East);
-    });
-
-    expect(met).toBe(false);
-    expect(divergence).toEqual({
-      where: 'the hand-over note',
-      expected: 'a line naming the substation that stood',
-      received: NOTHING,
-    });
-  });
-
-  test('a note naming a station nothing started is told that, in the run’s own terms', () => {
-    const { met, divergence } = report(w8_05, seed, 'name-the-hold', (sim, botId) => {
-      sim.print(botId, 'held sub-3 40');
+      for (let turn = 0; turn < 4; turn++) sim.use(botId);
     });
 
     expect(met).toBe(false);
     const shown = must(divergence, 'a divergence');
-    expect(shown.where).toBe('sub-3');
-    expect(shown.expected).toBe('a station this run started after its feeders');
-    expect(shown.received).toBe('this run never started it');
+    expect(shown.where).toBe(`airlock at ${point(airlock.at)}`);
+    expect(shown.expected).toMatch(/^every turn with sub-\d+ on$/);
+    expect(shown.received).toBe('4 of 4 at a dark gate');
+  });
+
+  test('a gate nobody reached for is told that, and not a figure it missed', () => {
+    const { met, divergence } = report(w8_05, seed, 'nine-turns', idle);
+
+    expect(met).toBe(false);
+    const shown = must(divergence, 'a divergence');
+    expect(shown.expected).toBe('9 turns of the handle');
+    expect(shown.received).toBe('nobody turned it');
   });
 
   test('a gate opened before its substation was thrown has no interval to file', () => {
@@ -441,15 +433,15 @@ describe('w8-05 reports the finale without driving the finale', () => {
     });
   });
 
-  test('a note naming no station at all is told that instead', () => {
-    const { met, divergence } = report(w8_05, seed, 'name-the-hold', (sim, botId) => {
-      sim.print(botId, 'held sub-99 40');
+  test('a gate note under the wrong substation is told which one it wanted', () => {
+    const { met, divergence } = report(w8_05, seed, 'mind-the-gate', (sim, botId) => {
+      sim.print(botId, 'gate sub-99 40');
     });
 
     expect(met).toBe(false);
     const shown = must(divergence, 'a divergence');
     expect(shown.where).toBe('sub-99');
-    expect(shown.received).toBe('nothing on the site answers to that');
+    expect(shown.expected).toBe('the substation the airlock draws from');
   });
 });
 

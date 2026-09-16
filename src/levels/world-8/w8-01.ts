@@ -18,7 +18,7 @@ import {
   vec,
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
-import { localRng, point } from './shared.ts';
+import { dropLog, localRng, point } from './shared.ts';
 
 const FIELD_W = 14;
 const FIELD_H = 10;
@@ -147,9 +147,39 @@ function harvestMiss(ctx: ObjectiveContext): Divergence {
 const PAR_TICKS = 165;
 const SHIFT_TICKS = 215;
 const SURVEY_BUDGET = 16;
-const TIGHT_SURVEY = FIELD_H;
 
 const AUDIT_KEYWORD = 'row';
+
+const hopper = (world: World): number => Math.max(1, world.bots[0]?.capacity ?? 1);
+
+const loadsAllowed = (world: World): number => Math.ceil(ripeAtStart(world) / hopper(world));
+
+const loadsFiled = (ctx: ObjectiveContext): number => {
+  const silo = siloTile(ctx.initialWorld);
+  return dropLog(ctx).filter(
+    (load) => load.item === ItemKind.Crop && load.at.x === silo.x && load.at.y === silo.y,
+  ).length;
+};
+
+const haulTight = (ctx: ObjectiveContext): boolean =>
+  delivered(ctx) >= ripeAtStart(ctx.initialWorld) &&
+  loadsFiled(ctx) <= loadsAllowed(ctx.initialWorld);
+
+function haulLoose(ctx: ObjectiveContext): Divergence {
+  const wanted = ripeAtStart(ctx.initialWorld);
+  if (delivered(ctx) < wanted) {
+    return {
+      where: `the silo at ${point(siloTile(ctx.initialWorld))}`,
+      expected: `${String(wanted)} crops`,
+      received: `${String(delivered(ctx))} crops`,
+    };
+  }
+  return {
+    where: 'the haulage log',
+    expected: `${String(loadsAllowed(ctx.initialWorld))} loads`,
+    received: `${String(loadsFiled(ctx))} loads`,
+  };
+}
 
 function ripePerRow(world: World): number[] {
   const rows = new Array<number>(world.h).fill(0);
@@ -241,11 +271,11 @@ export const w8_01: LevelDef = {
   brief: [
     '**FROM:** Dep. Coordinator M. Vance',
     '',
-    'The field is ripe and the work order is one you have run a dozen times. Finance have',
-    'since attached a second budget to it. Time was already costed. Sensor readings are now',
-    'costed too. Both budgets are hard, and missing either one is a fail.',
+    'The field is ripe and the work order is one you have run a dozen times. Finance',
+    'have since attached a second budget, and an auditor who wants the row tally as',
+    'the shift opened and a haulage log free of half-empty trips.',
     '',
-    'Harvest every crop that was ripe when the shift started. Leave all of it on the silo tile.',
+    'Nobody upstairs will say why. Bring the ripe crop in.',
   ].join('\n'),
   facts: [
     {
@@ -256,17 +286,26 @@ export const w8_01: LevelDef = {
       label: 'The silo',
       value: '`probe("silo")` reports it from anywhere, for nothing. The bot starts on it.',
     },
-    { label: 'One beam', value: 'Every `look()` is one beam, however far it reaches.' },
     {
-      label: '`scan()`',
-      value:
-        'Reads the tile under the bot and the four beside it. Free, and off the beam budget — but only those five, so the price is the walk.',
+      label: 'Readings',
+      value: `Both instruments are metered, separately and hard: ${String(SURVEY_BUDGET)} \`look()\` and ${String(SURVEY_BUDGET)} \`scan()\` for the shift. One call is one reading, however far it reaches.`,
     },
+    {
+      label: 'What each reads',
+      value:
+        'A `look()` returns a whole line to the edge of the site. A `scan()` returns the tile under the bot, or one tile beside it.',
+    },
+    { label: 'The shift', value: `${String(SHIFT_TICKS)} ticks, hard. Reading costs no ticks.` },
     { label: 'Ripe', value: 'A crop still green at the start does not count and does not travel.' },
     {
       label: 'The bot',
       value:
         'Carries a fixed number of crops. The number changes between shifts, and nothing on the bot reports it — a harvest into full arms comes back empty and still costs its ticks.',
+    },
+    {
+      label: 'A load',
+      value:
+        'One `drop()` on the silo tile. The fewest loads a shift can take is its ripe count divided by what the arms hold, rounded up.',
     },
     {
       label: 'Audit note',
@@ -295,33 +334,48 @@ export const w8_01: LevelDef = {
       label: `Close the shift within ${String(SHIFT_TICKS)} ticks`,
     }),
     Objectives.withinSenses('look', SURVEY_BUDGET, {
-      label: `Survey the field on at most ${String(SURVEY_BUDGET)} beams`,
+      label: `Call look at most ${String(SURVEY_BUDGET)} times`,
+    }),
+    Objectives.withinSenses('scan', SURVEY_BUDGET, {
+      label: `Call scan at most ${String(SURVEY_BUDGET)} times`,
     }),
   ],
   bonus: [
     Objectives.custom('name-the-row', 'Name the row that held the most ripe crop', auditFiled, {
       divergence: misreadAudit,
     }),
-    Objectives.withinSenses('look', TIGHT_SURVEY, {
-      label: `Survey the field on ${String(TIGHT_SURVEY)} beams — one a row`,
-    }),
+    Objectives.custom(
+      'fewest-loads',
+      'Take the crop off the field in the fewest loads the arms allow',
+      haulTight,
+      {
+        progress: (ctx) => {
+          const allowed = loadsAllowed(ctx.initialWorld);
+          return [Math.min(loadsFiled(ctx), allowed), allowed];
+        },
+        divergence: haulLoose,
+        meter: { kind: 'events', event: 'drop' },
+        unit: 'loads',
+      },
+    ),
   ],
   starter: [
     "// import { pathTo } from 'lib';",
     '// The field is 14 by 10. probe("silo") reports the drop point.',
-    '// 215 ticks and 16 beams. Both are hard.',
+    '// 215 ticks, 16 looks, 16 scans. Finance costed all three.',
     '',
     'const silo = probe("silo").at;',
     'print(silo.x + "," + silo.y);',
     '',
   ].join('\n'),
   hints: [
-    'Looking costs no ticks. It is only rationed. Find out what is on the field before you decide where to walk.',
-    'The bot does not have to stand on a tile to know what grows there. One pass along the edge can report every row.',
+    'Reading costs no ticks. It is only rationed. Find out what is on the field before you decide where to walk.',
+    'The bot does not have to stand on a tile to know what grows there. One pass along the edge can report every row, and a line costs the same as a single tile.',
     'A green crop is two ticks and nothing to show for it. Check how ripe a crop is, not just that it is there.',
     'The bot carries a fixed number of crops. Decide which ones travel together before you set off.',
+    'A harvest into full arms comes back with nothing, and that is the only thing on site that will tell you how much the arms hold.',
     'Nothing on the field changes except what you harvest. Keep what a beam told you, and never spend a second beam on the same row.',
     'The field will not still say which row was heaviest once you have worked it. Anything you mean to report about how the shift opened has to be counted while the survey is still fresh.',
   ],
-  docs: ['look', 'harvest', 'probe'],
+  docs: ['look', 'scan', 'harvest', 'drop', 'probe'],
 };

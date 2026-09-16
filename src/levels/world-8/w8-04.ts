@@ -1,11 +1,4 @@
-import type {
-  DieEvent,
-  Divergence,
-  ObjectiveContext,
-  Rng,
-  Vec,
-  World,
-} from '../../engine/index.ts';
+import type { Divergence, ObjectiveContext, Rng, Vec, World } from '../../engine/index.ts';
 import {
   ALL_DIRS,
   Dir,
@@ -460,15 +453,55 @@ function formStanding(ctx: ObjectiveContext): string {
     : 'still in the locker; nobody reached it';
 }
 
-function died(ctx: ObjectiveContext): Divergence {
-  const death = ctx.trace.events.find((event): event is DieEvent => event.kind === 'die');
-  if (death === undefined) {
-    return { where: 'end of run', expected: 'a bot on the site', received: NOTHING };
+function filedTiles(seed: number): Set<string> {
+  const survey = surveyFor(seed);
+  const filed = new Set<string>([key(LIFT)]);
+  for (const leg of survey.legs) for (const at of legTiles(leg)) filed.add(key(at));
+  for (const collapse of survey.collapsed) {
+    const leg = survey.legs[collapse.leg] as Leg;
+    for (const at of bypassPath(leg, collapse.side)) filed.add(key(at));
+  }
+  return filed;
+}
+
+interface Stray {
+  at: Vec;
+  t: number;
+}
+
+function strayTiles(ctx: ObjectiveContext): Stray[] {
+  const filed = filedTiles(ctx.initialWorld.vars.seed ?? 1);
+  const seen = new Set<string>();
+  const out: Stray[] = [];
+  for (const event of ctx.trace.events) {
+    if (event.kind !== 'move' || !event.ok) continue;
+    const at = key(event.to);
+    if (filed.has(at) || seen.has(at)) continue;
+    seen.add(at);
+    out.push({ at: event.to, t: event.t });
+  }
+  return out;
+}
+
+function walkedTheRoute(ctx: ObjectiveContext): boolean {
+  const locker = surveyFor(ctx.initialWorld.vars.seed ?? 1).locker;
+  return tilesEntered(ctx).has(key(locker)) && strayTiles(ctx).length === 0;
+}
+
+function strayed(ctx: ObjectiveContext): Divergence {
+  const stray = strayTiles(ctx);
+  const first = stray[0];
+  if (first === undefined) {
+    return {
+      where: 'the far end of the filed route',
+      expected: 'the bot standing on it',
+      received: 'the run stopped short',
+    };
   }
   return {
-    where: `tick ${String(death.t)} · ${point(death.at)}`,
-    expected: 'the bot still running',
-    received: clipValue(death.reason),
+    where: `tick ${String(first.t)} · ${point(first.at)}`,
+    expected: 'a tile the filed route covers',
+    received: clipValue(`${String(stray.length)} tiles in the old workings`),
   };
 }
 
@@ -484,12 +517,12 @@ export const w8_04: LevelDef = {
     '**CC:** Contractor #4470\\',
     '**RE:** Countersignature',
     '',
-    'There is a locker in the workings with a printed form in it and a spare chair caster. The',
-    'form is KD-0001-T and it has never been signed. There are lockers at the end of every other',
-    'working too, and every one of those is signed, filed and empty. The route to the one that is',
-    'not was filed eleven months ago by the contractor who put it there. Most of it is still true.',
+    'A locker down one of the workings holds an unsigned form and a spare chair caster. #4470',
+    'filed the route eleven months ago; most of it is still true. The rest of the site is logged',
+    'unsafe, so keep to his route and nobody has to write you up.',
     '',
-    'Bring the form up. The run ends once it is in the bot.',
+    'Bring the form up, and tell me what shift he filed under and how many legs he filed. Nobody',
+    'here can read the band.',
   ].join('\n'),
   board: {
     fixed: [
@@ -583,12 +616,6 @@ export const w8_04: LevelDef = {
         }),
       },
     ),
-    Objectives.custom(
-      'bot-intact',
-      'Finish the shift with the bot in one piece',
-      (ctx) => ctx.world.bots[0]?.alive === true,
-      { divergence: died },
-    ),
   ],
   bonus: [
     Objectives.custom(
@@ -596,6 +623,12 @@ export const w8_04: LevelDef = {
       'Report the shift the plan was filed under, and how many legs it describes',
       planRead,
       { divergence: misreadPlan },
+    ),
+    Objectives.custom(
+      'walk-the-plan',
+      'Reach the locker standing only on the filed route and the ways round its falls',
+      walkedTheRoute,
+      { divergence: strayed },
     ),
   ],
   starter: [

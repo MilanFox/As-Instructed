@@ -570,7 +570,6 @@ function firstBreach(ctx: ObjectiveContext): Breach | undefined {
   );
 }
 
-const HOLD_KEYWORD = 'held';
 const GATE_KEYWORD = 'gate';
 
 function filedLines(ctx: ObjectiveContext, keyword: string): string[] {
@@ -586,94 +585,6 @@ function readClaim(line: string): { id: string; count: number } | null {
   const count = Number(parts[2]);
   if (!Number.isInteger(count)) return null;
   return { id: parts[1] as string, count };
-}
-
-function holdsIn(ctx: ObjectiveContext): Map<string, number> {
-  const firstUse = new Map<string, number>();
-  const lastDone = new Map<string, number>();
-  for (const record of machineUseLog(ctx)) {
-    const start = firstUse.get(record.machineId);
-    if (start === undefined || record.t < start) firstUse.set(record.machineId, record.t);
-    const done = lastDone.get(record.machineId);
-    if (done === undefined || record.done > done) lastDone.set(record.machineId, record.done);
-  }
-  const held = new Map<string, number>();
-  for (const station of machinesWithPrefix(ctx.initialWorld, STATION_PREFIX)) {
-    const start = firstUse.get(station.id);
-    if (start === undefined) continue;
-    let fed = -1;
-    for (const feeder of dependenciesOf(station)) {
-      const done = lastDone.get(feeder);
-      if (done !== undefined && done > fed) fed = done;
-    }
-    if (fed < 0) continue;
-    held.set(station.id, start - fed);
-  }
-  return held;
-}
-
-function longestHold(ctx: ObjectiveContext): { ticks: number; stations: Set<string> } {
-  const held = holdsIn(ctx);
-  const stations = new Set<string>();
-  if (held.size === 0) return { ticks: -1, stations };
-  const ticks = Math.max(...held.values());
-  for (const [id, own] of held) if (own === ticks) stations.add(id);
-  return { ticks, stations };
-}
-
-function longestHoldFiled(ctx: ObjectiveContext): boolean {
-  const said = filedLines(ctx, HOLD_KEYWORD);
-  if (said.length !== 1) return false;
-  const claim = readClaim(said[0] as string);
-  if (claim === null) return false;
-  const { ticks, stations } = longestHold(ctx);
-  return ticks >= 0 && stations.has(claim.id) && claim.count === ticks;
-}
-
-function misreadHold(ctx: ObjectiveContext): Divergence {
-  const said = filedLines(ctx, HOLD_KEYWORD);
-  const line = said[0];
-  if (line === undefined) {
-    return {
-      where: 'the hand-over note',
-      expected: 'a line naming the substation that stood',
-      received: NOTHING,
-    };
-  }
-  if (said.length > 1) {
-    return {
-      where: 'the hand-over note',
-      expected: 'one line',
-      received: `${String(said.length)} lines`,
-    };
-  }
-  const claim = readClaim(line);
-  if (claim === null) {
-    return {
-      where: 'the hand-over note',
-      expected: 'a line reading `held <station> <n>`',
-      received: clipValue(line),
-    };
-  }
-  const own = holdsIn(ctx).get(claim.id);
-  if (own === undefined) {
-    const expected = 'a station this run started after its feeders';
-    const known = machinesWithPrefix(ctx.initialWorld, STATION_PREFIX).some(
-      (station) => station.id === claim.id,
-    );
-    if (!known) {
-      return { where: claim.id, expected, received: 'nothing on the site answers to that' };
-    }
-    if (!machineUseLog(ctx).some((record) => record.machineId === claim.id)) {
-      return { where: claim.id, expected, received: 'this run never started it' };
-    }
-    return { where: claim.id, expected, received: 'no feeder of it finished this run' };
-  }
-  return {
-    where: claim.id,
-    expected: own === claim.count ? 'the longest stand on the site' : `${String(own)} ticks`,
-    received: own === claim.count ? 'a shorter one' : `${String(claim.count)} claimed`,
-  };
 }
 
 function gateMovedAt(ctx: ObjectiveContext): number | undefined {
@@ -770,6 +681,42 @@ function misreadGate(ctx: ObjectiveContext): Divergence {
   };
 }
 
+function handleTurns(ctx: ObjectiveContext): { turns: number; dark: number } {
+  let turns = 0;
+  let dark = 0;
+  for (const event of ctx.trace.events) {
+    if (event.kind !== 'use' || event.machineId !== 'airlock') continue;
+    turns++;
+    if (!event.ok) dark++;
+  }
+  return { turns, dark };
+}
+
+function gateOpenedCleanly(ctx: ObjectiveContext): boolean {
+  if (machineById(ctx.world, 'airlock')?.state !== 'open') return false;
+  return handleTurns(ctx).turns === AIRLOCK_STAGES;
+}
+
+function wastedTurns(ctx: ObjectiveContext): Divergence {
+  const airlock = machineById(ctx.world, 'airlock');
+  const where = airlock ? `airlock at ${point(airlock.at)}` : 'the airlock';
+  const wanted = `${String(AIRLOCK_STAGES)} turns of the handle`;
+  const { turns, dark } = handleTurns(ctx);
+  if (turns === 0) return { where, expected: wanted, received: 'nobody turned it' };
+  if (dark > 0) {
+    return {
+      where,
+      expected: `every turn with ${airlockFeeder(ctx.world) ?? 'its substation'} on`,
+      received: `${String(dark)} of ${String(turns)} at a dark gate`,
+    };
+  }
+  return {
+    where,
+    expected: wanted,
+    received: `${String(turns)}, and it reads ${airlock?.state ?? 'sealed'}`,
+  };
+}
+
 const SHIFT_FLOOR = 3000;
 
 export function deadlineFor(world: World): number {
@@ -790,15 +737,13 @@ export function filedIn(world: World): 'charter' | 'renewals' | null {
 }
 
 const BRIEF = [
-  'dot: the Yards run this every night, so nothing is where it was yesterday. the',
-  'airlock past the Yards has wanted the same nine turns of the handle since before I',
-  'got here, and it draws off the grid. nobody wrote that down because nobody had to.',
+  'dot: the Yards run this every night, so nothing is where it was yesterday. the airlock',
+  'past them wants the handle turned and turned, and it draws off the grid; nobody wrote',
+  'that down because nobody had to. Maintenance bill us for turns taken at a dark gate,',
+  'and Vance wants the time it stood lit and shut.',
   '',
-  'Bring the grid up, clear the crates, and file KD-0001-T.',
-  '',
-  'The form is filed when it is left in one of two slots past the airlock. The Charter',
-  'registry countersigns it and the engagement concludes. The renewals tray processes it',
-  'and the Contract runs on, with you as signatory. Either one closes the work order.',
+  'Bring the grid up, clear the crates, and file KD-0001-T. the Charter registry ends the',
+  'engagement; the renewals tray runs the Contract on, with you as signatory.',
 ].join('\n');
 
 const FACTS = [
@@ -850,22 +795,17 @@ const FACTS = [
   {
     label: 'What opens it',
     value:
-      'The door runs off the grid. `probe("airlock").vars` carries a `fed:sub-N` key: until that substation reads `on`, every `use()` at the gate costs its tick and does nothing. It is the station furthest down the grid, never a root, so the order rule puts its whole ancestry in front of the errand east.',
+      'The door runs off the grid. `probe("airlock").vars` carries a `fed:sub-N` key: until that substation reads `on`, every `use()` at the gate costs its tick, moves nothing, and is still a turn of the handle. It is the station furthest down the grid, never a root, so the order rule puts its whole ancestry in front of the errand east.',
   },
   {
     label: 'The form',
     value:
-      'KD-0001-T is a chip on a marked tile in the workings. `probe` gives the positions of `slot-charter` and `slot-renewals`.',
+      'KD-0001-T is a chip on a marked tile in the workings. It is filed by leaving it on the tile of `slot-charter` or `slot-renewals`, both of them past the airlock; either one closes the work order. `probe` gives their positions.',
   },
   {
     label: 'The shift',
     value:
       'The work order fails if the last bot stops after tick **3000**. Par is 1050, so the shift is the wall and par is the medal — a slow, honest program closes this inside the shift.',
-  },
-  {
-    label: 'Hand-over note',
-    value:
-      'One line, `held <station> <n>`: the substation that stood longest between its last feeder **finishing** and its own first `use()`, and how many ticks that was. Only fed stations have a stand — a root waited for nothing. If two are tied, either answers.',
   },
   {
     label: 'Gate note',
@@ -996,10 +936,10 @@ export const w8_05: LevelDef = {
   ],
   bonus: [
     Objectives.custom(
-      'name-the-hold',
-      'Name the substation your order left standing longest, and how long it stood',
-      longestHoldFiled,
-      { divergence: misreadHold },
+      'nine-turns',
+      `Open the airlock in ${String(AIRLOCK_STAGES)} turns of the handle`,
+      gateOpenedCleanly,
+      { divergence: wastedTurns },
     ),
     Objectives.custom(
       'mind-the-gate',
@@ -1024,9 +964,11 @@ export const w8_05: LevelDef = {
     'The gate is on the same grid you were sent here to bring up, and it says which ' +
       'substation before anybody walks anywhere. That substation is not allowed to come ' +
       'up before its own feeders, so the errand east has a queue in front of it.',
-    'Nothing in the grid records when a station could have started, only when it did. ' +
-      'If you want to know which one your order kept standing about, you have to read ' +
-      'the clock as you throw each one.',
+    'A turn of the handle taken while the gate is dark costs its tick, moves nothing, ' +
+      'and still counts against you. What the substation reads is free to ask for, and ' +
+      'asking is cheaper than finding out.',
+    'Nothing in the grid records when a station was thrown, only that it was. If you want ' +
+      'the interval the gate stood waiting, you have to read the clock as you throw.',
   ],
   docs: ['fuel', 'refuel', 'power', 'use', 'receive', 'probe', 'clock', 'scan', 'look'],
 };

@@ -2,11 +2,13 @@ import type { Divergence, ItemKind, ObjectiveContext, Vec, World } from '../../e
 import {
   Dir,
   MachineKind,
+  NOTHING,
   Objectives,
   Terrain,
   addBot,
   addGroundItems,
   addMachine,
+  clipValue,
   countItemsAt,
   createWorld,
   eq,
@@ -19,6 +21,7 @@ import {
   dropLog,
   groundCensus,
   localRng,
+  machinesWithPrefix,
   point,
   reachableTiles,
   roomCentre,
@@ -177,6 +180,7 @@ function landmarks(world: World): Vec[] {
 
 function deliveredBeforeSurveyDone(ctx: ObjectiveContext): number {
   const complete = sightingTick(ctx, landmarks(ctx.initialWorld));
+  if (!Number.isFinite(complete)) return 0;
   let early = 0;
   for (const record of dropLog(ctx)) {
     if (record.t > complete) continue;
@@ -184,6 +188,107 @@ function deliveredBeforeSurveyDone(ctx: ObjectiveContext): number {
     if (bay && eq(bay.at, record.at)) early += record.count;
   }
   return early;
+}
+
+const BAY_NOTE = 'bay';
+
+interface BayLine {
+  text: string;
+  early: boolean;
+}
+
+interface BayClaim {
+  id: string;
+  at: Vec;
+}
+
+function bayLines(ctx: ObjectiveContext): BayLine[] {
+  const firstMove = ctx.trace.events.findIndex((event) => event.kind === 'move');
+  const out: BayLine[] = [];
+  ctx.trace.events.forEach((event, index) => {
+    if (event.kind !== 'print' || !event.text.startsWith(`${BAY_NOTE} `)) return;
+    out.push({ text: event.text, early: firstMove < 0 || index < firstMove });
+  });
+  return out;
+}
+
+function readBayLine(line: string): BayClaim | null {
+  const parts = line.split(' ');
+  const id = parts[1];
+  const x = Number(parts[2]);
+  const y = Number(parts[3]);
+  if (parts.length !== 4 || id === undefined) return null;
+  if (!Number.isInteger(x) || !Number.isInteger(y)) return null;
+  return { id, at: { x, y } };
+}
+
+function tookDelivery(ctx: ObjectiveContext, id: string, at: Vec): boolean {
+  return dropLog(ctx).some((record) => eq(record.at, at) && depotId(record.item) === id);
+}
+
+function baysFiled(ctx: ObjectiveContext): [number, number] {
+  const bays = machinesWithPrefix(ctx.initialWorld, DEPOT_PREFIX);
+  const claims = bayLines(ctx)
+    .filter((line) => line.early)
+    .map((line) => readBayLine(line.text));
+  let filed = 0;
+  for (const bay of bays) {
+    const claim = claims.find((each) => each?.id === bay.id);
+    if (claim && eq(claim.at, bay.at) && tookDelivery(ctx, bay.id, bay.at)) filed += 1;
+  }
+  return [filed, bays.length];
+}
+
+function bayListFiled(ctx: ObjectiveContext): boolean {
+  const [filed, wanted] = baysFiled(ctx);
+  return filed === wanted && bayLines(ctx).length === wanted;
+}
+
+function misfiledBays(ctx: ObjectiveContext): Divergence | undefined {
+  const bays = machinesWithPrefix(ctx.initialWorld, DEPOT_PREFIX);
+  const said = bayLines(ctx);
+  if (said.length === 0) {
+    return {
+      where: 'the bay list',
+      expected: `${String(bays.length)} lines, one per bay`,
+      received: NOTHING,
+    };
+  }
+  const late = said.find((line) => !line.early);
+  if (late) {
+    return {
+      where: clipValue(late.text),
+      expected: 'filed before the bot moved',
+      received: 'filed after it set off',
+    };
+  }
+  if (said.length !== bays.length) {
+    return {
+      where: 'the bay list',
+      expected: `${String(bays.length)} lines`,
+      received: `${String(said.length)} lines`,
+    };
+  }
+  const unreadable = said.find((line) => readBayLine(line.text) === null);
+  if (unreadable) {
+    return {
+      where: 'the bay list',
+      expected: 'a line reading `bay <id> <x> <y>`',
+      received: clipValue(unreadable.text),
+    };
+  }
+  const claims = said.map((line) => readBayLine(line.text));
+  for (const bay of bays) {
+    const claim = claims.find((each) => each?.id === bay.id);
+    if (!claim) return { where: bay.id, expected: 'a line of its own', received: NOTHING };
+    if (!eq(claim.at, bay.at)) {
+      return { where: bay.id, expected: point(bay.at), received: point(claim.at) };
+    }
+    if (!tookDelivery(ctx, bay.id, bay.at)) {
+      return { where: bay.id, expected: 'its class delivered to it', received: 'nothing dropped' };
+    }
+  }
+  return undefined;
 }
 
 const PAR_TICKS = 632;
@@ -197,11 +302,13 @@ export const w8_02: LevelDef = {
   brief: [
     '**FROM:** Dep. Coordinator M. Vance',
     '',
-    'A subsurface depot, last inventoried in 2206. Shipping hold a manifest for it. It lists',
-    'quantities and no locations, which Shipping have described as sufficient.',
+    'A subsurface depot, last inventoried in 2206. Shipping hold a manifest for it: quantities,',
+    'no locations, which they have described as sufficient.',
     '',
-    'Every crate on the floor belongs to a class, and every class has one bay. Carry each crate',
-    'to its bay and drop it there.',
+    'File the bay addresses before you set off, so the next shift is not sent down blind. Keep',
+    'crates moving while you look; nobody upstairs is paying for a survey.',
+    '',
+    'Sort every crate onto the bay for its class.',
   ].join('\n'),
   board: {
     fixed: [
@@ -242,7 +349,12 @@ export const w8_02: LevelDef = {
     {
       label: 'Bay ids',
       value:
-        '`depot-<class>`. `depot-ore` takes ore and nothing else. The classes change every shift.',
+        '`depot-<class>`. `depot-ore` takes ore and nothing else. A shift draws its classes from ore, ice, scrap, part, cell and chip, and the draw changes every shift.',
+    },
+    {
+      label: 'The job',
+      value:
+        'Every crate on the floor belongs to a class, and every class on the shift has exactly one bay.',
     },
     {
       label: 'The arms',
@@ -256,9 +368,13 @@ export const w8_02: LevelDef = {
         'A crate or a bay counts as sighted the moment it stands in a straight, unblocked line — same row or column — from a tile the bot is on. Beam or no beam.',
     },
     {
-      label: 'The budget',
+      label: 'The bay list',
       value:
-        'Par grades the whole shift. The star is the tight one: half the crates on their bays before the last crate or bay has been sighted.',
+        'One line per bay, `bay <id> <x> <y>`, every one of them printed before the bot makes its first move, and nothing else filed under that word.',
+    },
+    {
+      label: 'The budget',
+      value: `Par is ${String(PAR_TICKS)} ticks for the whole shift. Nothing else is metered: looking, probing and printing cost no ticks.`,
     },
   ],
   seeds: [1, 2, 3, 4, 5],
@@ -306,6 +422,12 @@ export const w8_02: LevelDef = {
         },
       },
     ),
+    Objectives.custom(
+      'name-the-bays',
+      "Report every bay, its id and its tile, before the bot's first move",
+      bayListFiled,
+      { progress: baysFiled, divergence: misfiledBays },
+    ),
   ],
   starter: [
     "// import { survey, pathTo } from 'lib';",
@@ -320,6 +442,7 @@ export const w8_02: LevelDef = {
   hints: [
     'Nothing here is known before the shift starts. The bot learns by looking, and it keeps only what your program writes down.',
     'You can route through a tile you have seen. Asking for one the record does not know yet is normal here: look around, then ask again.',
+    'A bay answers to its id from anywhere, and every id on site is the word depot- followed by one of six classes. An id that is not on this shift answers with nothing, and asking costs nothing either.',
     'Walking the depot once for looking and once for carrying loses the star: by the time the last crate is in view, half of them have to be on their bays already.',
     'Full arms are wasted arms. A bay you walk past with the right crate on board is much cheaper than a bay you come back to.',
     'The bot cannot know how many crates exist until it has seen the whole floor. That is a reason to keep looking, not a reason to stop carrying.',

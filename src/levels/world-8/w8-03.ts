@@ -1,12 +1,14 @@
-import type { Machine, ObjectiveContext, Vec, World } from '../../engine/index.ts';
+import type { Divergence, Machine, ObjectiveContext, Vec, World } from '../../engine/index.ts';
 import {
   Dir,
   MANUAL_ONLY,
   MachineKind,
+  NOTHING,
   Objectives,
   Terrain,
   addBot,
   addMachine,
+  clipValue,
   createWorld,
   manhattan,
   setTerrain,
@@ -20,13 +22,17 @@ import {
   localRng,
   machinesWithPrefix,
   overranBy,
+  useLog,
 } from './shared.ts';
 
 const WIDTH = 32;
 const HEIGHT = 24;
 const USE_COST = 2;
 
-const SURVEY_BUDGET = 26;
+const ORDER_NOTE = 'order';
+const FINISH_NOTE = 'finish';
+const TIE_SLACK = 2;
+const FINISH_SLACK = 2;
 
 const DESK = vec(2, 12);
 const CREW: readonly Vec[] = [
@@ -199,6 +205,161 @@ function firstBreach(ctx: ObjectiveContext): Breach | undefined {
   );
 }
 
+interface Note {
+  text: string;
+  filedEarly: boolean;
+}
+
+function notesUnder(ctx: ObjectiveContext, keyword: string): Note[] {
+  const prefix = `${keyword} `;
+  const firstStep = ctx.trace.events.findIndex((event) => event.kind === 'move');
+  const out: Note[] = [];
+  ctx.trace.events.forEach((event, index) => {
+    if (event.kind !== 'print' || !event.text.startsWith(prefix)) return;
+    out.push({
+      text: event.text.slice(prefix.length).trim(),
+      filedEarly: firstStep === -1 || index < firstStep,
+    });
+  });
+  return out;
+}
+
+function startTicks(ctx: ObjectiveContext): Map<string, number> {
+  const starts = new Map<string, number>();
+  for (const record of useLog(ctx)) {
+    const seen = starts.get(record.machineId);
+    if (seen === undefined || record.t < seen) starts.set(record.machineId, record.t);
+  }
+  return starts;
+}
+
+function gridUpAt(ctx: ObjectiveContext): number {
+  let last = -1;
+  for (const record of useLog(ctx)) last = Math.max(last, record.done);
+  return last;
+}
+
+function orderFault(ctx: ObjectiveContext): Divergence | undefined {
+  const filed = notesUnder(ctx, ORDER_NOTE);
+  if (filed.length === 0) {
+    return {
+      where: 'the filing',
+      expected: 'a line `order sub-<n>` per station',
+      received: NOTHING,
+    };
+  }
+  const late = filed.filter((note) => !note.filedEarly).length;
+  if (late > 0) {
+    return {
+      where: 'the filing',
+      expected: 'every line before the first step',
+      received: `${String(late)} filed after it`,
+    };
+  }
+
+  const stations = stationsOf(ctx.initialWorld);
+  const grid = new Set(stations.map((machine) => machine.id));
+  const seen = new Set<string>();
+  for (const note of filed) {
+    if (!grid.has(note.text)) {
+      return {
+        where: clipValue(note.text === '' ? NOTHING : note.text),
+        expected: 'a substation on the grid',
+        received: 'nothing on the site answers to that',
+      };
+    }
+    if (seen.has(note.text)) {
+      return { where: note.text, expected: 'one line each', received: 'filed twice' };
+    }
+    seen.add(note.text);
+  }
+  const left = stations.find((machine) => !seen.has(machine.id));
+  if (left) {
+    return { where: left.id, expected: 'a line in the filing', received: 'left off it' };
+  }
+
+  const place = new Map(filed.map((note, index) => [note.text, index]));
+  for (const machine of stations) {
+    for (const feeder of dependenciesOf(machine)) {
+      if ((place.get(feeder) ?? -1) > (place.get(machine.id) ?? -1)) {
+        return {
+          where: `${machine.id} · feeder ${feeder}`,
+          expected: 'the feeder filed above it',
+          received: 'filed below it',
+        };
+      }
+    }
+  }
+
+  const starts = startTicks(ctx);
+  let ahead = { id: '', t: -1 };
+  for (const note of filed) {
+    const thrown = starts.get(note.text);
+    if (thrown === undefined) {
+      return {
+        where: note.text,
+        expected: 'a use() at the tile',
+        received: 'filed, and then never used',
+      };
+    }
+    if (thrown < ahead.t - TIE_SLACK) {
+      return {
+        where: clipValue(`${ahead.id} · filed above ${note.text}`),
+        expected: `thrown at tick ${String(thrown + TIE_SLACK)} or earlier`,
+        received: `thrown at tick ${String(ahead.t)}`,
+      };
+    }
+    if (thrown > ahead.t) ahead = { id: note.text, t: thrown };
+  }
+  return undefined;
+}
+
+function finishFault(ctx: ObjectiveContext): Divergence | undefined {
+  const posted = notesUnder(ctx, FINISH_NOTE);
+  const note = posted[0];
+  if (note === undefined) {
+    return {
+      where: 'the note',
+      expected: 'a line reading `finish <tick>`',
+      received: NOTHING,
+    };
+  }
+  if (posted.length > 1) {
+    return { where: 'the note', expected: 'one line', received: `${String(posted.length)} lines` };
+  }
+  if (!note.filedEarly) {
+    return {
+      where: 'the note',
+      expected: 'posted before the first step',
+      received: 'posted after the fleet had moved',
+    };
+  }
+  const claim = Number(note.text);
+  if (!Number.isInteger(claim)) {
+    return {
+      where: 'the note',
+      expected: 'a line reading `finish <tick>`',
+      received: clipValue(note.text === '' ? NOTHING : note.text),
+    };
+  }
+  const up = gridUpAt(ctx);
+  if (up < 0) {
+    return {
+      where: 'the grid',
+      expected: 'a station energised at some tick',
+      received: 'none was ever used',
+    };
+  }
+  if (Math.abs(claim - up) > FINISH_SLACK) {
+    return {
+      where: 'the tick posted',
+      expected: `the grid came up at tick ${String(up)}`,
+      received: `the note says tick ${String(claim)}`,
+    };
+  }
+  return undefined;
+}
+
 export const w8_03: LevelDef = {
   id: 'w8-03',
   world: 8,
@@ -210,9 +371,11 @@ export const w8_03: LevelDef = {
     '**FROM:** Dep. Coordinator M. Vance\\',
     '**RE:**   Grid restart',
     '',
-    'The grid is down. Restarting it is a sequencing matter and not, at this time, an',
-    'engineering one. Finance have allocated one shift, costed against the whole fleet, and the',
+    'The grid is down. Restarting it is a sequencing matter, not an engineering one, and the',
     'whole fleet is already standing in the yard.',
+    '',
+    'Procurement want the running order filed before anyone moves, and Finance want the tick you',
+    'will finish on the same note; they costed the shift without asking.',
     '',
     'Energise every substation before the shift ends.',
   ].join('\n'),
@@ -248,7 +411,7 @@ export const w8_03: LevelDef = {
     {
       label: 'A station',
       value:
-        '`probe(id)` reads any machine from anywhere and costs no ticks. The calls are counted, though — the survey bonus is scored on how many the whole fleet makes, not how many each bot makes.',
+        '`probe(id)` reads any machine from anywhere and costs no ticks. Nothing but a station state changes while you run, so one read of each is all the grid has to give.',
     },
     {
       label: 'Feeders',
@@ -271,6 +434,16 @@ export const w8_03: LevelDef = {
         'Open. The cable on the ground is walkable. The layout and the feeder lists are fixed before the shift starts — the only thing that changes while you run is a station state.',
     },
     { label: 'Your score', value: 'The clock stops when the last bot stops.' },
+    {
+      label: 'The running order',
+      value:
+        'The first bonus. Before any bot moves, `print` one line per station reading `order sub-<n>`, in the order you mean to energise them — every station, once each. The run then has to come up in that order, read off the tick of the first `use()` at each tile. Two stations thrown within 2 ticks of each other count as tied, and a tie passes.',
+    },
+    {
+      label: 'The finish note',
+      value:
+        'The second bonus. One more line before any bot moves, `finish <tick>`: the tick the last station finishes. Anything within 2 ticks of the real one is filed correctly. Both notes are read off the whole fleet’s log, so it does not matter which bot prints them.',
+    },
   ],
   seeds: [1, 2, 3, 4, 5],
   par: { ticks: PAR_TICKS },
@@ -394,9 +567,18 @@ export const w8_03: LevelDef = {
     ),
   ],
   bonus: [
-    Objectives.withinSenses('probe', SURVEY_BUDGET, {
-      label: `Plan the restart on ${String(SURVEY_BUDGET)} probe() calls or fewer`,
-    }),
+    Objectives.custom(
+      'file-the-order',
+      'File the running order before the first step, and energise in it',
+      (ctx) => orderFault(ctx) === undefined,
+      { divergence: orderFault },
+    ),
+    Objectives.custom(
+      'call-the-clock',
+      `Post when the grid comes up before the first step, inside ${String(FINISH_SLACK)} of the real finish`,
+      (ctx) => finishFault(ctx) === undefined,
+      { divergence: finishFault },
+    ),
   ],
   starter: [
     "// import { waves, deal, pathTo } from 'lib';",
@@ -416,5 +598,5 @@ export const w8_03: LevelDef = {
     'A bot sitting on its station with nothing to do is cheaper than a bot walking. Decide who goes where before anyone leaves the yard.',
     'The grid is fixed the moment the shift starts. Reading a station to find out whether it came up yet tells you nothing you did not already know.',
   ],
-  docs: ['probe', 'use', 'bots', 'wait', 'sync'],
+  docs: ['probe', 'use', 'bots', 'wait', 'sync', 'print'],
 };

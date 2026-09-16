@@ -37,13 +37,17 @@ export const solution: ReferenceSolution = {
     };
 
     let held = 0;
+    let arms = -1;
     while (ripe.length > 0) {
       const here = sim.pos(botId);
       ripe.sort((a, b) => gap(a, here) - gap(b, here));
-      go(ripe.shift() as Vec);
-      sim.harvest(botId);
-      held++;
-      if (held === sim.capacity(botId) || ripe.length === 0) {
+      go(ripe[0] as Vec);
+      if (sim.harvest(botId) === null) arms = held;
+      else {
+        ripe.shift();
+        held++;
+      }
+      if (held === arms || ripe.length === 0) {
         go(silo);
         sim.drop(botId, ItemKind.Crop, held);
         held = 0;
@@ -68,13 +72,13 @@ export const solution: ReferenceSolution = {
     '  while (pos().x !== t.x) move(pos().x < t.x ? Dir.East : Dir.West);',
     '  while (pos().y !== t.y) move(pos().y < t.y ? Dir.South : Dir.North);',
     '};',
-    'let cap = -1;',
+    'let arms = -1;',
     'for (let n = 0; ripe.length; ) {',
     '  const p = pos();',
     '  ripe.sort((a, b) => gap(a, p) - gap(b, p));',
     '  go(ripe[0]);',
-    '  if (harvest()) { ripe.shift(); n++; } else cap = n;',
-    '  if (n === cap || !ripe.length) { go(silo); drop("crop", n); n = 0; }',
+    '  if (harvest()) { ripe.shift(); n++; } else arms = n;',
+    '  if (n === arms || !ripe.length) { go(silo); drop("crop", n); n = 0; }',
     '}',
   ].join('\n'),
 };

@@ -210,7 +210,7 @@ describe('randomization defeats hardcoding', () => {
     },
   );
 
-  test('w8-01: the World 2 sweep is correct and still misses the shift budget', () => {
+  test('w8-01: the World 2 sweep is correct and now misses the readings budget too', () => {
     const level = getLevel('w8-01') as NonNullable<ReturnType<typeof getLevel>>;
     for (const seed of level.seeds) {
       const result = runReference(level, seed, fieldSweep);
@@ -222,7 +222,7 @@ describe('randomization defeats hardcoding', () => {
       expect(
         unmet.map((objective) => objective.id),
         `seed ${String(seed)}`,
-      ).toEqual(['shift-budget']);
+      ).toEqual(['shift-budget', 'within-16-scan']);
     }
   });
 

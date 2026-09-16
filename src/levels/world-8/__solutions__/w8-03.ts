@@ -10,6 +10,8 @@ interface Station {
 interface Task {
   station: number;
   lane: number;
+  start: number;
+  end: number;
 }
 
 function preferences(from: Vec, to: Vec): Dir[] {
@@ -77,10 +79,10 @@ export const solution: ReferenceSolution = {
         for (const dep of station.deps) ready = Math.max(ready, planned[dep] as number);
         for (let lane = 0; lane < crew.length; lane++) {
           const arrive = (laneFree[lane] as number) + manhattan(lanePos[lane] as Vec, station.at);
-          const end = Math.max(arrive, ready) + 2;
-          if (end < bestEnd) {
-            bestEnd = end;
-            bestTask = { station: s, lane };
+          const start = Math.max(arrive, ready);
+          if (start + 2 < bestEnd) {
+            bestEnd = start + 2;
+            bestTask = { station: s, lane, start, end: start + 2 };
           }
         }
       }
@@ -91,6 +93,13 @@ export const solution: ReferenceSolution = {
       lanePos[bestTask.lane] = chosen;
       rota.push(bestTask);
     }
+
+    const filing = rota.slice().sort((a, b) => a.start - b.start);
+    for (const task of filing) sim.print(botId, `order sub-${String(task.station)}`);
+    sim.print(
+      botId,
+      `finish ${String(filing.reduce((last, task) => Math.max(last, task.end), 0))}`,
+    );
 
     const clock = crew.map(() => 0);
     const finished = stations.map(() => 0);
@@ -169,8 +178,11 @@ export const solution: ReferenceSolution = {
     '    for (let lane = 0; lane < crew.length; lane++) {',
     '      const dx = Math.abs(lanePos[lane].x - st.at.x);',
     '      const dy = Math.abs(lanePos[lane].y - st.at.y);',
-    '      const end = Math.max(laneFree[lane] + dx + dy, ready) + 2;',
-    '      if (end < bestEnd) { bestEnd = end; best = { station: s, lane }; }',
+    '      const start = Math.max(laneFree[lane] + dx + dy, ready);',
+    '      if (start + 2 < bestEnd) {',
+    '        bestEnd = start + 2;',
+    '        best = { station: s, lane, start, end: start + 2 };',
+    '      }',
     '    }',
     '  }',
     '  planned[best.station] = bestEnd;',
@@ -178,6 +190,11 @@ export const solution: ReferenceSolution = {
     '  lanePos[best.lane] = stations[best.station].at;',
     '  rota.push(best);',
     '}',
+    '',
+    '// The plan is the filing: the order the schedule throws them, and the tick it ends on.',
+    'const filing = rota.slice().sort((a, b) => a.start - b.start);',
+    'for (const task of filing) print("order sub-" + task.station);',
+    'print("finish " + filing.reduce((last, task) => Math.max(last, task.end), 0));',
     '',
     '// No sync() anywhere: it would pull every bot up to the clock of the one furthest ahead.',
     'const clock = crew.map(() => 0);',

@@ -54,6 +54,13 @@ export const solution: ReferenceSolution = {
       follow(sim, botId, map, to, { onStep: () => observe() });
     };
 
+    for (const kind of CLASSES) {
+      const bay = sim.probe(botId, `${DEPOT_PREFIX}${kind}`);
+      if (!bay) continue;
+      bays.set(kind, bay.at);
+      sim.print(botId, `bay ${bay.id} ${String(bay.at.x)} ${String(bay.at.y)}`);
+    }
+
     observe();
     let capacity = Number.POSITIVE_INFINITY;
     const guardLimit = DEPOT_W * DEPOT_H;
@@ -165,6 +172,14 @@ export const solution: ReferenceSolution = {
     '  }',
     '  note(scan());',
     '};',
+    '',
+    '// a bay answers to its id from anywhere, and asking costs nothing',
+    'for (const k of KINDS) {',
+    '  const bay = probe("depot-" + k);',
+    '  if (!bay) continue;',
+    '  bays.set(k, key(bay.at));',
+    '  print("bay depot-" + k + " " + bay.at.x + " " + bay.at.y);',
+    '}',
     '',
     'observe();',
     'for (let guard = 0; guard < 34 * 26; guard++) {',
