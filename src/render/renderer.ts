@@ -333,6 +333,7 @@ export class Renderer {
   }
 
   setTrace(trace: Trace | null): void {
+    const keep = this.holdsBoard(trace?.initialWorld ?? this.previewWorld);
     this.trace = trace ? reviveTrace(trace) : null;
     this.timeline = trace ? new TraceTimeline(trace) : null;
     this.trail = this.timeline ? new VisitTrail(this.timeline) : null;
@@ -348,14 +349,14 @@ export class Renderer {
     this.drawOrder.length = 0;
     this.skipCelebration();
     this.leaning = false;
-    this.cameraHeld = false;
+    this.cameraHeld = keep;
     this.completion = 0;
     this.finalObjective = lastObjectiveIndex(this.trace);
 
     if (trace && this.timeline) {
       for (const id of this.timeline.botOrder) this.poses.set(id, createPose(id));
       this.camera.setBounds({ cols: trace.initialWorld.w, rows: trace.initialWorld.h });
-      this.camera.fit(true);
+      if (!keep) this.camera.fit(true);
       this.snapshotUsesFuel = usesFuel(trace.initialWorld);
       this.refreshSnapshot(0);
     } else {
@@ -374,14 +375,22 @@ export class Renderer {
   private enterPreview(): void {
     const world = this.previewWorld;
     if (!world) return;
+    const keep = this.holdsBoard(world);
     this.previewUsesFuel = usesFuel(world);
     this.ensurePreviewPoses(world.bots.length);
     this.indexSnapshot(world);
     this.terrain.invalidate();
     this.camera.setBounds({ cols: world.w, rows: world.h });
-    this.camera.fit(true);
-    this.cameraHeld = false;
+    if (!keep) this.camera.fit(true);
+    this.cameraHeld = keep;
     this.leaning = false;
+  }
+
+  // A re-run of the same board is the player watching the spot they framed, so the camera
+  // only snaps back when the board itself changes size under it.
+  private holdsBoard(next: World | null | undefined): boolean {
+    if (!this.cameraHeld || !next) return false;
+    return this.camera.cols === next.w && this.camera.rows === next.h;
   }
 
   private ensurePreviewPoses(count: number): void {

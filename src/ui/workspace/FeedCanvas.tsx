@@ -88,7 +88,9 @@ export function FeedCanvas({ onReadout, onView }: FeedCanvasProps): React.ReactE
   }, [renderer]);
 
   useEffect(() => {
-    if (level) renderer().setWorld(level.world);
+    if (!level) return;
+    renderer().setWorld(level.world);
+    (renderer() as FeedRenderer).fit?.();
   }, [renderer, level]);
 
   useEffect(() => {
@@ -97,7 +99,7 @@ export function FeedCanvas({ onReadout, onView }: FeedCanvasProps): React.ReactE
 
   useEffect(() => {
     cameraHeld.current = false;
-  }, [world, trace]);
+  }, [level?.id]);
 
   useEffect(() => {
     return (renderer() as FeedRenderer).onHover?.(setReadout);
