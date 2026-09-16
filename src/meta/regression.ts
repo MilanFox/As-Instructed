@@ -331,6 +331,10 @@ export function needsAttention(summary: RegressionSummary): boolean {
   return summary.broken > 0 || summary.degraded > 0;
 }
 
+export function worthShowing(summary: RegressionSummary): boolean {
+  return needsAttention(summary) || summary.improved > 0;
+}
+
 export function summaryLine(summary: RegressionSummary): string {
   if (summary.total === 0) return REGRESSION.nothingToCheck;
   if (!needsAttention(summary)) return REGRESSION.clean;

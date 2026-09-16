@@ -2,8 +2,8 @@
   --ws-order: 384px;
   --ws-telemetry: 322px;
   --ws-board-keep: 380px;
-  --ws-drawer-user: 684px;
-  --ws-drawer: min(var(--ws-drawer-user), calc(100vw - var(--ws-board-keep)));
+  --ws-flyout-user: 684px;
+  --ws-flyout: min(var(--ws-flyout-user), calc(100vw - var(--ws-board-keep)));
   --ws-shift: 0px;
   --ws-handle-x: 0px;
   --ws-edge: var(--ink);
@@ -27,9 +27,11 @@
   letter-spacing: 0.01em;
 }
 
-.workspace[data-drawer='open'] {
-  --ws-shift: var(--ws-drawer);
-  --ws-handle-x: var(--ws-drawer);
+/* Whichever face the flyout is showing, it is the same box over the same board, so the deck
+   and the flaps are moved by one rule rather than by one per surface. */
+.workspace[data-flyout='open'] {
+  --ws-shift: var(--ws-flyout);
+  --ws-handle-x: var(--ws-flyout);
   --ws-deck-left: calc(var(--ws-inset) + 66px);
 }
 

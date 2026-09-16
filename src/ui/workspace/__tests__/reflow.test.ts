@@ -113,10 +113,9 @@ function resolve(selector: string, property: string, viewport: number): string |
   return value;
 }
 
-const OPEN = ".workspace[data-drawer='open']";
-const LIBRARY_OPEN = ".workspace[data-library='open']";
+const OPEN = ".workspace[data-flyout='open']";
 
-// The attribute selector outranks the bare class, so an open drawer takes its value first
+// The attribute selector outranks the bare class, so an open flyout takes its value first
 // whichever sheet declared it.
 function custom(name: string, viewport: number, open: boolean): string | null {
   const scoped = open ? resolve(OPEN, name, viewport) : null;
@@ -241,11 +240,11 @@ const FLAPS = [
   ['the subroutines flap', '.library-handle'],
 ] as const;
 
-const RIDE = 'translateX(max(var(--ws-handle-x), var(--ws-lib-x)))';
+const RIDE = 'translateX(var(--ws-handle-x))';
 
 describe('the flaps stay reachable', () => {
   for (const [name, selector] of FLAPS) {
-    test(`${name} is pinned to the viewport and rides whichever surface is further out`, () => {
+    test(`${name} is pinned to the viewport and rides the one edge the flyout has`, () => {
       expect(['position', resolve(selector, 'position', ROOMY)]).toEqual(['position', 'fixed']);
       expect(['left', resolve(selector, 'left', ROOMY)]).toEqual(['left', '0']);
       expect(['transform', resolve(selector, 'transform', ROOMY)]).toEqual(['transform', RIDE]);
@@ -253,44 +252,56 @@ describe('the flaps stay reachable', () => {
   }
 
   for (const width of [ROOMY, ...BREAKPOINTS]) {
-    test(`an open drawer leaves the whole handle on screen at ${String(width)}px`, () => {
-      const offset = px(custom('--ws-handle-x', width, true) ?? '0px', width, true);
-      const box = {
-        w: px(resolve('.drawer-handle', 'width', width) ?? '0px', width, true),
-        h: px(resolve('.drawer-handle', 'height', width) ?? '0px', width, true),
-      };
-
-      expect([`handle box at ${String(width)}px`, box.w > 0 && box.h > 0]).toEqual([
-        `handle box at ${String(width)}px`,
-        true,
-      ]);
-      expect([
-        `handle right edge at ${String(width)}px`,
-        offset + box.w <= width && offset >= 0,
-      ]).toEqual([`handle right edge at ${String(width)}px`, true]);
-    });
-
-    test(`a shut drawer leaves the whole handle on screen at ${String(width)}px`, () => {
-      const offset = px(custom('--ws-handle-x', width, false) ?? '0px', width, false);
-      const handle = px(resolve('.drawer-handle', 'width', width) ?? '0px', width, false);
-
-      expect([`handle at ${String(width)}px`, offset >= 0 && offset + handle <= width]).toEqual([
-        `handle at ${String(width)}px`,
-        true,
-      ]);
-    });
-
     for (const [name, selector] of FLAPS) {
       test(`an open flyout leaves ${name} on screen at ${String(width)}px`, () => {
-        const offset = px(resolve(LIBRARY_OPEN, '--ws-lib-x', width) ?? '0px', width, true);
-        const flap = px(resolve(selector, 'width', width) ?? '0px', width, true);
+        const offset = px(custom('--ws-handle-x', width, true) ?? '0px', width, true);
+        const box = {
+          w: px(resolve(selector, 'width', width) ?? '0px', width, true),
+          h: px(resolve(selector, 'height', width) ?? '0px', width, true),
+        };
 
-        expect([`${name} at ${String(width)}px`, offset > 0 && offset + flap <= width]).toEqual([
+        expect([`${name} box at ${String(width)}px`, box.w > 0 && box.h > 0]).toEqual([
+          `${name} box at ${String(width)}px`,
+          true,
+        ]);
+        expect([
+          `${name} right edge at ${String(width)}px`,
+          offset > 0 && offset + box.w <= width,
+        ]).toEqual([`${name} right edge at ${String(width)}px`, true]);
+      });
+
+      test(`a shut flyout leaves ${name} on screen at ${String(width)}px`, () => {
+        const offset = px(custom('--ws-handle-x', width, false) ?? '0px', width, false);
+        const flap = px(resolve(selector, 'width', width) ?? '0px', width, false);
+
+        expect([`${name} at ${String(width)}px`, offset >= 0 && offset + flap <= width]).toEqual([
           `${name} at ${String(width)}px`,
           true,
         ]);
       });
     }
+  }
+});
+
+// The deck used to reflow for the workbench and not for lib.ts, which left lib.ts standing on
+// top of the scrubber. One open state and one width is what makes that unstateable.
+describe('an open flyout never stands on the transport deck', () => {
+  test('the deck is pushed by the flyout own width rather than by a fixed number', () => {
+    expect(['--ws-shift while open', resolve(OPEN, '--ws-shift', ROOMY)]).toEqual([
+      '--ws-shift while open',
+      'var(--ws-flyout)',
+    ]);
+  });
+
+  for (const width of [ROOMY, ...BREAKPOINTS]) {
+    test(`the deck starts past the flyout edge at ${String(width)}px`, () => {
+      const flyout = px(custom('--ws-flyout', width, true) ?? '0px', width, true);
+      const left = px(resolve('.workspace .transport-deck', 'left', width) ?? '0px', width, true);
+      const folded = resolve(`${OPEN} .transport-deck`, 'transform', width);
+      const clear = left >= flyout || (folded !== null && /\btranslateY?\(/.test(folded));
+
+      expect([`deck at ${String(width)}px`, clear]).toEqual([`deck at ${String(width)}px`, true]);
+    });
   }
 });
 
@@ -346,8 +357,9 @@ describe('the map is never taken off the screen', () => {
     const mapLayer = Number(resolve('.workspace__map', 'z-index', ROOMY));
     const over = [
       ['the overlay panels', '.overlay-panel'],
-      ['the drawer', '.drawer'],
-      ['the drawer handle', '.drawer-handle'],
+      ['the flyout', '.flyout'],
+      ['the workbench flap', '.drawer-handle'],
+      ['the subroutines flap', '.library-handle'],
       ['the run report', '.report-sheet'],
       ['the postings', '.postings'],
       ['the closing banner', '.closed-banner'],

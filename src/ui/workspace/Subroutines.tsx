@@ -2,7 +2,7 @@ import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 
 import { REPOSITORY_NAME, useLibrary } from '../../meta/index.ts';
 import { closeOverlay, toggleOverlay, useOverlay } from '../hooks/useOverlay.ts';
-import { OverlayPanel, PanelBar } from './OverlayPanel.tsx';
+import { PanelBar } from './OverlayPanel.tsx';
 
 const TITLE = `${REPOSITORY_NAME} · ~/lib.ts`;
 
@@ -50,12 +50,12 @@ export function Subroutines(): React.ReactElement | null {
         </span>
       </button>
 
-      <OverlayPanel
-        className="library-flyout"
+      <section
+        className="flyout library-face"
         id="workspace-library"
-        label={TITLE}
-        open={open}
-        inert={!open}
+        aria-label={TITLE}
+        data-on={String(open)}
+        {...(open ? {} : { inert: true })}
       >
         <PanelBar
           tools={
@@ -72,7 +72,7 @@ export function Subroutines(): React.ReactElement | null {
             <SubroutinesFile />
           </Suspense>
         ) : null}
-      </OverlayPanel>
+      </section>
     </>
   );
 }

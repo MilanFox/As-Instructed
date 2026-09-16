@@ -25,7 +25,7 @@
 /* The HUD is one frame: every surface hangs off --ws-inset rather than its own viewport edge,
    and the right column stacks the telemetry over the postings. The deck and the postings are
    anchored from here because their own sheets pin them to the edge, and a postings panel that
-   no longer stands over the drawer no longer has to dodge it. */
+   no longer stands over the flyout no longer has to dodge it. */
 .hud-right {
   position: fixed;
   top: var(--ws-inset);
@@ -50,7 +50,7 @@
   transform: translateX(calc(100% + var(--ws-inset) + 14px));
 }
 
-.workspace[data-drawer='open'] .hud-right > .postings {
+.workspace[data-flyout='open'] .hud-right > .postings {
   transform: none;
 }
 
@@ -59,24 +59,24 @@
   left: calc(var(--ws-shift) + var(--ws-deck-left));
 }
 
-/* An open drawer costs the deck 684px of its left, which is more than the transport row can
+/* An open flyout costs the deck 684px of its left, which is more than the transport row can
    give up, so the deck takes the right gutter back and runs under the column instead. The two
    are then sized against one shared band rather than against each other's content: the deck
    may not grow past --ws-deck-band off the bottom edge and the column may not reach into it.
    The run log is what gives, because the alternative is a column whose height races the run
    output — it reaches the bottom of the screen on any run long enough to fill it. */
-.workspace[data-drawer='open'] .transport-deck {
+.workspace[data-flyout='open'] .transport-deck {
   right: var(--ws-deck-right);
   max-height: var(--ws-deck-band);
 }
 
-/* A drawer pulled wider than the deck can give up leaves it too little to lay the transport
+/* A flyout pulled wider than the deck can give up leaves it too little to lay the transport
    row out in, so the deck goes the whole way down rather than wrap. */
 .workspace[data-deck='folded'] .transport-deck {
   transform: translateY(calc(100% + var(--ws-inset) + 16px));
 }
 
-.workspace[data-drawer='open'] .hud-right {
+.workspace[data-flyout='open'] .hud-right {
   max-height: calc(100vh - var(--ws-inset) - var(--ws-deck-band) - 12px);
 }
 

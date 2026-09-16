@@ -106,6 +106,7 @@ export {
   summarise,
   summaryLine,
   withCachedRun,
+  worthShowing,
 } from './regression.ts';
 
 export type { DiscrepancyCandidate, ProbeResult } from './discrepancy.ts';

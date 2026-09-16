@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type * as ReactModule from 'react';
-import type { RegressionTarget } from '../regression.ts';
+import type { RegressionTarget, SuiteResult } from '../regression.ts';
 import type { MetaHost } from '../store.ts';
-import type { LibrarySave } from '../types.ts';
+import type { LibrarySave, RegressionEntry } from '../types.ts';
 
 const driver = vi.hoisted(() => {
   interface Slot {
@@ -134,11 +134,15 @@ vi.mock('zustand', async () => {
   };
 });
 
+vi.mock('../ui/LibraryEditor.tsx', () => ({ LibraryEditor: () => null }));
+
+const { LibraryPanel } = await import('../ui/LibraryPanel.tsx');
 const { RegressionReport } = await import('../ui/RegressionReport.tsx');
 const { DiscrepancyList } = await import('../ui/DiscrepancyList.tsx');
 const { DISCREPANCY, REGRESSION } = await import('../copy.ts');
 const { COMPLETIONS_PER_DISCREPANCY, MIN_CLOSED_BEFORE_FIRST } = await import('../discrepancy.ts');
 const { emptyLibrary } = await import('../save.ts');
+const { summarise } = await import('../regression.ts');
 const { useLibrary } = await import('../store.ts');
 
 function text(tree: unknown): string {
@@ -245,6 +249,89 @@ describe('Regression counts the work order in hand as a reader', () => {
     const rendered = text(driver.renderUntilStable(() => RegressionReport()));
 
     expect(rendered).toContain(REGRESSION.readsNothing);
+  });
+});
+
+function badgeClasses(tree: unknown): string[] {
+  const found: string[] = [];
+  const walk = (node: unknown): void => {
+    if (Array.isArray(node)) {
+      node.forEach(walk);
+      return;
+    }
+    if (!node || typeof node !== 'object') return;
+    const props = (node as { props?: Record<string, unknown> }).props;
+    if (!props) return;
+    const className = props['className'];
+    if (typeof className === 'string' && className.startsWith('lib__badge')) found.push(className);
+    walk(props['children']);
+  };
+  walk(tree);
+  return found;
+}
+
+function suiteOf(...states: RegressionEntry['state'][]): SuiteResult {
+  const run = {
+    revisionId: 'r1',
+    startedAt: 1,
+    finishedAt: 2,
+    entries: states.map((state, index) => ({ levelId: `w3-0${index}`, state })),
+  };
+  return { run, summary: summarise(run), cache: [], profiles: [] };
+}
+
+describe('The Regression tab flags a result only when something moved', () => {
+  beforeEach(() => {
+    useLibrary.getState().hydrate(null);
+    useLibrary.setState({ save: playerSave(), suite: null, suiteProgress: null, busy: false });
+    useLibrary.getState().attach(playerHost());
+    driver.reset();
+  });
+
+  test('a run where every level came out the same raises no badge', () => {
+    useLibrary.setState({ suite: suiteOf('nominal', 'nominal') });
+
+    const tree = driver.renderUntilStable(() => LibraryPanel());
+
+    expect(badgeClasses(tree)).toEqual([]);
+    expect(text(tree)).not.toContain('•');
+  });
+
+  test('a level that got slower raises the danger badge', () => {
+    useLibrary.setState({ suite: suiteOf('nominal', 'degraded') });
+
+    const tree = driver.renderUntilStable(() => LibraryPanel());
+
+    expect(badgeClasses(tree)).toEqual(['lib__badge']);
+    expect(text(tree)).toContain('•');
+  });
+
+  test('a level that stopped closing raises the danger badge', () => {
+    useLibrary.setState({ suite: suiteOf('broken', 'nominal') });
+
+    expect(badgeClasses(driver.renderUntilStable(() => LibraryPanel()))).toEqual(['lib__badge']);
+  });
+
+  test('an improvement is announced too, but not in alarm colours', () => {
+    useLibrary.setState({ suite: suiteOf('improved', 'nominal') });
+
+    expect(badgeClasses(driver.renderUntilStable(() => LibraryPanel()))).toEqual([
+      'lib__badge lib__badge--ok',
+    ]);
+  });
+
+  test('an improvement alongside a regression is still an alarm', () => {
+    useLibrary.setState({ suite: suiteOf('improved', 'broken') });
+
+    expect(badgeClasses(driver.renderUntilStable(() => LibraryPanel()))).toEqual(['lib__badge']);
+  });
+
+  test('a suite still running is flagged before its verdict is known', () => {
+    useLibrary.setState({ suite: null, busy: true });
+
+    expect(badgeClasses(driver.renderUntilStable(() => LibraryPanel()))).toEqual([
+      'lib__badge lib__badge--ok',
+    ]);
   });
 });
 
