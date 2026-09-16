@@ -32,7 +32,14 @@ import {
   runSuite,
   summarise,
 } from './regression.ts';
-import { emptyLibrary, loadLibrary, recordRevision, revisionOf, writeLibrary } from './save.ts';
+import {
+  emptyLibrary,
+  loadLibrary,
+  mergeImportedLibrary,
+  recordRevision,
+  revisionOf,
+  writeLibrary,
+} from './save.ts';
 import type { LibraryStorage } from './save.ts';
 import type { Discrepancy, LevelFacts, LibraryRevision, LibrarySave } from './types.ts';
 import { isLibraryUnlocked } from './unlock.ts';
@@ -78,6 +85,7 @@ export interface MetaState {
 
   attach(host: MetaHost | null): void;
   hydrate(storage?: LibraryStorage | null): void;
+  importLibrary(text: string): void;
   refreshUnlock(): void;
   markBriefed(): void;
 
@@ -203,6 +211,14 @@ export const useLibrary = create<MetaState>((set, get) => {
       storage = next;
       const save = loadLibrary(next === undefined ? undefined : next);
       set({ save, source: save.source, dirty: false });
+    },
+
+    importLibrary(text: string): void {
+      const save = get().save;
+      const next = mergeImportedLibrary(save, text);
+      if (next === save) return;
+      set({ source: next.source, dirty: false });
+      write(next);
     },
 
     refreshUnlock(): void {

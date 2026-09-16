@@ -23,6 +23,7 @@ export {
   emptyLibrary,
   lastKnownGoodRevision,
   loadLibrary,
+  mergeImportedLibrary,
   mergeLibrary,
   migrateLibrary,
   parseLibrary,

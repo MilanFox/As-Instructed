@@ -76,7 +76,7 @@ const KNOWN_DEAD: readonly string[] = [
   'src/meta/types.ts ProgressFacts',
 ];
 
-const KNOWN_TEST_ONLY: readonly [number, number] = [85, 45];
+const KNOWN_TEST_ONLY: readonly [number, number] = [83, 43];
 
 const SCANNED_EXPORTS_AT_LEAST = 1300;
 

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { campaignOrder, getLevel } from '../../levels/index.ts';
+import { emptyLibrary, mergeImportedLibrary, recordRevision, revisionOf } from '../../meta/index.ts';
+import type { LibrarySave } from '../../meta/index.ts';
 import { isLevelUnlocked } from '../store.ts';
 import {
   DEFAULT_LAYOUT,
@@ -570,5 +572,73 @@ describe('the seed survey unlock', () => {
     expect(mergeProgress(unlocked, emptyProgress()).seedsUnlocked).toBe(true);
     expect(mergeProgress(emptyProgress(), unlocked).seedsUnlocked).toBe(true);
     expect(mergeProgress(emptyProgress(), emptyProgress())).not.toHaveProperty('seedsUnlocked');
+  });
+});
+
+describe('the library travels with the progress it was written against', () => {
+  const PATH_TO = 'export function pathTo(): void {}\n';
+  const WITH_GAP = `${PATH_TO}export const gap = 2;\n`;
+
+  function stockedLibrary(): LibrarySave {
+    const edited = recordRevision(emptyLibrary(), revisionOf(PATH_TO, 'edit'));
+    const published = recordRevision(
+      edited,
+      revisionOf(WITH_GAP, 'publish', { fromLevel: 'w4-02', added: ['gap'] }),
+    );
+    return {
+      ...published,
+      unlocked: true,
+      published: [{ name: 'pathTo', fromLevel: 'w4-01', at: 10 }],
+    };
+  }
+
+  function exported(library?: unknown): string {
+    const save = emptySave();
+    save.levels['w4-01'] = { ...emptyProgress(), code: 'pathTo();', completed: true };
+    return exportSave(save, library);
+  }
+
+  it('brings lib.ts back verbatim', () => {
+    const restored = mergeImportedLibrary(emptyLibrary(), exported(stockedLibrary()));
+    expect(restored.source).toBe(WITH_GAP);
+  });
+
+  it('brings the revision history and the published functions back with it', () => {
+    const restored = mergeImportedLibrary(emptyLibrary(), exported(stockedLibrary()));
+
+    expect(restored.revisions.map((revision) => revision.source)).toEqual([PATH_TO, WITH_GAP]);
+    expect(restored.revisions[1]?.added).toEqual(['gap']);
+    expect(restored.revisions[1]?.fromLevel).toBe('w4-02');
+    expect(restored.published).toEqual([{ name: 'pathTo', fromLevel: 'w4-01', at: 10 }]);
+    expect(restored.unlocked).toBe(true);
+  });
+
+  it('merges the progress exactly as it did before the library rode along', () => {
+    const merged = importSave(emptySave(), exported(stockedLibrary()));
+
+    expect(merged.levels['w4-01']?.code).toBe('pathTo();');
+    expect(merged.levels['w4-01']?.completed).toBe(true);
+    expect(merged).not.toHaveProperty('library');
+  });
+
+  it('leaves the library alone when the file was written before it carried one', () => {
+    const current = stockedLibrary();
+    expect(mergeImportedLibrary(current, exported())).toBe(current);
+  });
+
+  it('leaves the library alone rather than trusting nonsense in its place', () => {
+    const current = stockedLibrary();
+    for (const nonsense of ['wiped', 7, null, [1, 2], {}, { revisions: 'nope' }]) {
+      expect(mergeImportedLibrary(current, exported(nonsense))).toBe(current);
+    }
+    expect(mergeImportedLibrary(current, '{not json')).toBe(current);
+  });
+
+  it('reads as progress to a build that knows nothing about the extra key', () => {
+    const restored = parseSave(exported(stockedLibrary()));
+
+    expect(restored.levels['w4-01']?.code).toBe('pathTo();');
+    expect(restored.version).toBe(SAVE_VERSION);
+    expect(restored).not.toHaveProperty('library');
   });
 });

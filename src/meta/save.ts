@@ -1,4 +1,5 @@
 import { Medal } from '../engine/index.ts';
+import { exportedLibrary } from '../game/save.ts';
 import { LIBRARY_EMPTY_STARTER } from './copy.ts';
 import { hashText } from './hash.ts';
 import type {
@@ -286,6 +287,13 @@ export function mergeLibrary(current: LibrarySave, incoming: unknown): LibrarySa
     version: LIBRARY_SAVE_VERSION,
     updatedAt: Date.now(),
   };
+}
+
+export function mergeImportedLibrary(current: LibrarySave, text: string): LibrarySave {
+  const payload = exportedLibrary(text);
+  // Anything that cannot name a source would merge as an empty library and blank the player's.
+  if (!isRecord(payload) || typeof payload['source'] !== 'string') return current;
+  return mergeLibrary(current, payload);
 }
 
 function dedupePublished(entries: readonly PublishedFunction[]): PublishedFunction[] {

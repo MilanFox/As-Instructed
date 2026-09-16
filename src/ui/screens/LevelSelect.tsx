@@ -4,6 +4,7 @@ import { buildCampaign } from '../../game/campaign.ts';
 import type { CampaignOrder, CampaignSite } from '../../game/campaign.ts';
 import { exportSave } from '../../game/save.ts';
 import { currentLevel, useGame } from '../../game/store.ts';
+import { useLibrary } from '../../meta/index.ts';
 import { pathFor } from '../router.ts';
 import { IconMap } from '../components/Icons.tsx';
 import { GAME_TITLE, GameMark, GameWordmark } from '../components/GameMark.tsx';
@@ -534,6 +535,8 @@ export function LevelSelect(): JSX.Element {
   const goto = useGame((state) => state.goto);
   const open = useGame(currentLevel);
   const importSaveFile = useGame((state) => state.importSaveFile);
+  const librarySave = useLibrary((state) => state.save);
+  const importLibrary = useLibrary((state) => state.importLibrary);
   const frame = useRef<HTMLDivElement | null>(null);
   const file = useRef<HTMLInputElement | null>(null);
   const pins = useRef(new Map<number, HTMLButtonElement>());
@@ -630,18 +633,20 @@ export function LevelSelect(): JSX.Element {
   };
 
   const onExport = (): void => {
-    const blob = new Blob([exportSave(save)], { type: 'application/json' });
+    const blob = new Blob([exportSave(save, librarySave)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = 'as-instructed-progress.json';
+    anchor.download = 'as-instructed-save.json';
     anchor.click();
     URL.revokeObjectURL(url);
   };
 
   const onImport = async (chosenFile: File | undefined): Promise<void> => {
     if (!chosenFile) return;
-    importSaveFile(await chosenFile.text());
+    const text = await chosenFile.text();
+    importSaveFile(text);
+    importLibrary(text);
   };
 
   return (
@@ -825,7 +830,7 @@ export function LevelSelect(): JSX.Element {
               <button
                 type="button"
                 className="survey-ctl survey-ctl--tight"
-                title="Export progress"
+                title="Export progress and shared subroutines"
                 onClick={onExport}
               >
                 export
@@ -833,7 +838,7 @@ export function LevelSelect(): JSX.Element {
               <button
                 type="button"
                 className="survey-ctl survey-ctl--tight"
-                title="Import progress"
+                title="Import progress and shared subroutines"
                 onClick={() => file.current?.click()}
               >
                 import
@@ -843,7 +848,7 @@ export function LevelSelect(): JSX.Element {
                 type="file"
                 accept="application/json"
                 className="sr-only"
-                aria-label="Import a progress file"
+                aria-label="Import a save file"
                 onChange={(event) => {
                   void onImport(event.target.files?.[0]);
                   event.target.value = '';

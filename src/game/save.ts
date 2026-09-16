@@ -258,8 +258,25 @@ export function writeSave(save: SaveFile, storage: SaveStorage | null = defaultS
   }
 }
 
-export function exportSave(save: SaveFile): string {
-  return JSON.stringify({ ...save, version: SAVE_VERSION }, null, 2);
+export function exportSave(save: SaveFile, library?: unknown): string {
+  const payload = {
+    ...save,
+    version: SAVE_VERSION,
+    ...(library === undefined ? {} : { library }),
+  };
+  return JSON.stringify(payload, null, 2);
+}
+
+// The library lives under its own storage key, so `migrate` deliberately leaves it out of
+// `SaveFile` — a copy inside the progress save would be a second, staler library. This reader is
+// the only thing that keeps the exported section.
+export function exportedLibrary(text: string): unknown {
+  try {
+    const raw: unknown = JSON.parse(text);
+    return isRecord(raw) ? raw['library'] : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export function importSave(current: SaveFile, text: string): SaveFile {

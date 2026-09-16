@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test } from 'vitest';
 import { Medal } from '../../engine/index.ts';
+import { emptySave, exportSave } from '../../game/save.ts';
 import { emptyLibrary } from '../save.ts';
 import { suiteSummary, useLibrary } from '../store.ts';
 import type { MetaHost } from '../store.ts';
@@ -104,5 +105,34 @@ describe('the regression summary reads a stable value', () => {
     const first = suiteSummary(useLibrary.getState());
     expect(first).toBeDefined();
     expect(suiteSummary(useLibrary.getState())).toBe(first);
+  });
+});
+
+describe('an imported save file restores the library beside the progress', () => {
+  const GAP = 'export const gap = 2;\n';
+
+  beforeEach(() => {
+    useLibrary.getState().hydrate(null);
+    useLibrary.setState({ save: emptyLibrary(), source: emptyLibrary().source, dirty: false });
+  });
+
+  test('the lib.ts in the file becomes the working source', () => {
+    const library: LibrarySave = { ...emptyLibrary(), unlocked: true, source: GAP };
+    useLibrary.getState().importLibrary(exportSave(emptySave(), library));
+
+    expect(useLibrary.getState().save.source).toBe(GAP);
+    expect(useLibrary.getState().save.unlocked).toBe(true);
+    expect(useLibrary.getState().source).toBe(GAP);
+    expect(useLibrary.getState().dirty).toBe(false);
+  });
+
+  test('a file that carries no library leaves the working copy where it was', () => {
+    const before = useLibrary.getState().save;
+    useLibrary.setState({ source: 'half-typed', dirty: true });
+    useLibrary.getState().importLibrary(exportSave(emptySave()));
+
+    expect(useLibrary.getState().save).toBe(before);
+    expect(useLibrary.getState().source).toBe('half-typed');
+    expect(useLibrary.getState().dirty).toBe(true);
   });
 });
