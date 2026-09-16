@@ -266,7 +266,7 @@ function firstRepair(ctx: ObjectiveContext): Divergence | undefined {
     if (line === target.line) continue;
     return {
       where: `block ${String(target.index)} on the band`,
-      expected: line === undefined ? 'a repair for it' : 'a different repair',
+      expected: line === undefined ? 'a repair for it' : 'the line it was sent as, repaired',
       received: line === undefined ? NOTHING : clipValue(line),
     };
   }
@@ -294,8 +294,8 @@ export const w6_05: LevelDef = {
     'The band is designated dead. Traffic on a dead band is, by designation, not traffic. The',
     'station still sending on it uses the old nested format.',
     '',
-    'The blocks on the band spell out a route from the tile you are standing on to the landing',
-    'pad. Read them all, start from `main`, and drive the route.',
+    'Read the band, start from `main`, and drive the route. Anything that arrived damaged gets',
+    'repaired, not discarded; a dead band has no resend.',
   ].join('\n'),
   board: {
     fixed: [

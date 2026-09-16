@@ -106,6 +106,19 @@ export function expand(stream: string): string[] {
   return digits === '' ? moves : [];
 }
 
+export function shortestEncoding(moves: readonly string[]): string {
+  let out = '';
+  let run = 0;
+  for (let i = 0; i < moves.length; i++) {
+    run++;
+    if (moves[i] !== moves[i + 1]) {
+      out += `${String(run)}${String(moves[i])}`;
+      run = 0;
+    }
+  }
+  return out;
+}
+
 const inbound = (world: World): string => decipher(queued(world)[0] ?? '', postVar(world, 'key'));
 
 function returnPacket(ctx: ObjectiveContext): Divergence | undefined {
@@ -138,8 +151,8 @@ function returnPacket(ctx: ObjectiveContext): Divergence | undefined {
   }
   return {
     where: 'characters on the wire',
-    expected: `fewer than ${String(theirs.length)}`,
-    received: String(mine.length),
+    expected: `${String(shortestEncoding(routeMoves).length)} characters`,
+    received: `${String(mine.length)} characters`,
   };
 }
 
@@ -153,10 +166,9 @@ export const w6_03: LevelDef = {
     '**FROM:** Field Engineer D. Halloran',
     '',
     'the route comes in compressed because the band is metered by the character. finance reads',
-    'the invoice and nothing else.',
+    'the invoice and nothing else, so send it back tighter than it arrived.',
     '',
-    'One packet is waiting: the route from the tile you are standing on to the landing pad,',
-    'enciphered. Decode it, drive it, and park on the pad.',
+    'Decode the packet, drive the route, and park on the pad.',
   ].join('\n'),
   board: {
     fixed: [
@@ -194,8 +206,9 @@ export const w6_03: LevelDef = {
         'Pit (a terrain). Every tile that is not on the route is a pit, and a bot that ends a move on one does not come back. `scan(dir).walkable` is `true` on a pit; `scan(dir).lethal` is the field that says it kills.',
     },
     {
-      label: 'Shorter encoding',
-      value: 'Transmit one line: the same moves, the same format, fewer characters than arrived.',
+      label: 'Return packet',
+      value:
+        'The same moves in the same format, in as few characters as the format allows. That is 27 on every shift.',
     },
   ],
   seeds: [1, 2, 3, 4],
@@ -227,16 +240,16 @@ export const w6_03: LevelDef = {
   bonus: [
     Objectives.custom(
       'shorter-encoding',
-      'Send the same route back in fewer characters',
+      'Send the same route back in the fewest characters',
       (ctx) => {
         const sent = transmitted(ctx.world);
         if (sent.length !== 1) return false;
         const mine = sent[0] ?? '';
-        const theirs = inbound(ctx.initialWorld);
+        const routeMoves = expand(inbound(ctx.initialWorld));
         return (
-          mine.length < theirs.length &&
           expand(mine).length === ROUTE_MOVES &&
-          expand(mine).join('') === expand(theirs).join('')
+          expand(mine).join('') === routeMoves.join('') &&
+          mine.length === shortestEncoding(routeMoves).length
         );
       },
       { divergence: returnPacket },

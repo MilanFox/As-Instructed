@@ -163,7 +163,7 @@ function firstStraggler(ctx: ObjectiveContext): Divergence | undefined {
     if (decipher(cipher, key) !== got) continue;
     return {
       where: 'the straggler',
-      expected: 'a different shift',
+      expected: 'the shift that reads as English',
       received: `shift ${String(key)}`,
     };
   }
@@ -187,8 +187,8 @@ export const w6_04: LevelDef = {
     'framework that priced the cipher separately, and we did not buy the cipher. There is no',
     'key anywhere on this site.',
     '',
-    'Transmit the plain text of every headed packet, whole and in order. Transmit nothing else',
-    'before them.',
+    'Transmit the plain text of every headed packet, whole and in order. The last one arrives',
+    'without a header; read it anyway.',
   ].join('\n'),
   board: {
     fixed: [
@@ -215,6 +215,10 @@ export const w6_04: LevelDef = {
     {
       label: 'The header',
       value: `Every headed packet begins with \`${MAGIC}\` at position 0, in the plain text. It never changes.`,
+    },
+    {
+      label: 'Order on the wire',
+      value: 'The headed packets, in arrival order, are the first thing you transmit.',
     },
     {
       label: 'The straggler',

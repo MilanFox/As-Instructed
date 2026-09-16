@@ -72,6 +72,8 @@ const cleanTraffic = (world: World): string[] => {
     .map((packet) => packet.text);
 };
 
+const NIL_RETURN = 'bad none';
+
 const faultReports = (world: World): string[] => {
   const salt = postVar(world, 'salt');
   const out: string[] = [];
@@ -83,7 +85,7 @@ const faultReports = (world: World): string[] => {
       if (((i + 1) * plain) % 256 === skewed) out.push(`bad ${String(index)} ${String(i)}`);
     }
   });
-  return out;
+  return out.length === 0 ? [NIL_RETURN] : out;
 };
 
 const relayed = (ctx: ObjectiveContext): string[] => transmitted(ctx.world);
@@ -151,6 +153,13 @@ function firstFault(ctx: ObjectiveContext): Divergence | undefined {
       received: clipValue(got),
     };
   }
+  if (want === NIL_RETURN) {
+    return {
+      where: 'the fault report',
+      expected: NIL_RETURN,
+      received: got === undefined ? NOTHING : clipValue(got),
+    };
+  }
   const target = readFault(want);
   if (target === null) return undefined;
   if (got === undefined) {
@@ -164,7 +173,7 @@ function firstFault(ctx: ObjectiveContext): Divergence | undefined {
   if (mine !== null && mine.packet === target.packet) {
     return {
       where: `packet ${String(target.packet)} on the band`,
-      expected: 'a different byte',
+      expected: 'the byte that explains both checks',
       received: `byte ${String(mine.byte)}`,
     };
   }
@@ -185,10 +194,10 @@ export const w6_02: LevelDef = {
     '**FROM:** Dep. Coordinator M. Vance',
     '',
     'Signal discipline on this band is mandatory. In 2207 an unverified packet was actioned and',
-    'the south field harvested itself on schedule. Memo KD-2601 covers it, in one paragraph, and',
-    'it is not reassuring.',
+    'the south field harvested itself on schedule. Memo KD-2601 covers it and is not reassuring.',
     '',
-    'Relay every packet whose check values match, unchanged and in order. Relay nothing else.',
+    'Relay the packets that verify. Name the failing byte in anything you hold; a nil return is',
+    'still a return.',
   ].join('\n'),
   board: {
     fixed: [
@@ -227,7 +236,7 @@ export const w6_02: LevelDef = {
     {
       label: 'Fault report',
       value:
-        'One line per corrupt packet, in arrival order: `bad <packet> <byte>`. Both counted from 0, and `<packet>` counts the clean ones too.',
+        'One line per corrupt packet, in arrival order: `bad <packet> <byte>`. Both counted from 0, and `<packet>` counts the clean ones too. A shift with nothing corrupt gets one line, `bad none`.',
     },
   ],
   seeds: [1, 2, 3, 4],

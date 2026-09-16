@@ -8,6 +8,7 @@ export const solution: ReferenceSolution = {
     const { receive, transmit, probe, print } = playerApi(sim, botId, 'w6-02');
     const salt = probe('mast')?.vars['salt'] ?? 0;
     let index = 0;
+    let faults = 0;
     let packet = receive();
     while (packet !== null) {
       const star = packet.indexOf('*');
@@ -30,16 +31,21 @@ export const solution: ReferenceSolution = {
         const plain = (sum - (claimed[0] ?? 0) + 256) % 256;
         const skewed = (skew - (claimed[1] ?? 0) + 256) % 256;
         for (let i = 0; i < bytes.length; i++) {
-          if (((i + 1) * plain) % 256 === skewed) print(`bad ${String(index)} ${String(i)}`);
+          if (((i + 1) * plain) % 256 === skewed) {
+            print(`bad ${String(index)} ${String(i)}`);
+            faults++;
+          }
         }
       }
       index++;
       packet = receive();
     }
+    if (faults === 0) print('bad none');
   },
   source: [
     "const salt = probe('mast')?.vars.salt ?? 0;",
     'let index = 0;',
+    'let faults = 0;',
     'let packet = receive();',
     'while (packet !== null) {',
     "  const star = packet.indexOf('*');",
@@ -59,11 +65,14 @@ export const solution: ReferenceSolution = {
     '    const plain = (sum - claimed[0] + 256) % 256;',
     '    const skewed = (skew - claimed[1] + 256) % 256;',
     '    for (let i = 0; i < bytes.length; i++) {',
-    '      if (((i + 1) * plain) % 256 === skewed) print(`bad ${index} ${i}`);',
+    '      if (((i + 1) * plain) % 256 !== skewed) continue;',
+    '      print(`bad ${index} ${i}`);',
+    '      faults++;',
     '    }',
     '  }',
     '  index++;',
     '  packet = receive();',
     '}',
+    "if (faults === 0) print('bad none');",
   ].join('\n'),
 };

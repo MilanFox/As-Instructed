@@ -47,6 +47,26 @@ describe('w6-01 names the line the log first got wrong', () => {
       received: NOTHING,
     });
   });
+
+  test('a log with no ping line is told one was wanted, and never where the ping sat', () => {
+    const band = queued(w6_01.build(1));
+    const report = diverge(w6_01, 1, 'name-the-ping', (sim, botId) => {
+      const { receive, print } = playerApi(sim, botId, 'w6-01');
+      for (let packet = receive(); packet !== null; packet = receive()) print(packet);
+    });
+    const shown = must(report.divergence, 'a divergence');
+
+    expect(report.met).toBe(false);
+    expect(shown).toEqual({
+      where: 'the ping line',
+      expected: 'one line naming the ping',
+      received: NOTHING,
+    });
+    expect(band.indexOf('SESS 4470 ACTIVE')).toBeGreaterThanOrEqual(0);
+    expect(`${shown.where} ${shown.expected} ${shown.received}`).not.toContain(
+      String(band.indexOf('SESS 4470 ACTIVE')),
+    );
+  });
 });
 
 interface Corrupt {
@@ -135,7 +155,7 @@ describe('w6-02 names the packet the relay handled the wrong way', () => {
     expect(report.met).toBe(false);
     expect(report.divergence).toEqual({
       where: `packet ${String(first.index)} on the band`,
-      expected: 'a different byte',
+      expected: 'the byte that explains both checks',
       received: `byte ${String(guess(first))}`,
     });
   });
@@ -149,9 +169,21 @@ describe('w6-02 names the packet the relay handled the wrong way', () => {
     expect(corrupt.length).toBeGreaterThan(0);
     expect(shown.received).toBe(NOTHING);
   });
+
+  test('a clean shift with no report at all is told the nil return was wanted', () => {
+    expect(sortBand(w6_02.build(2)).corrupt).toEqual([]);
+    const report = diverge(w6_02, 2, 'name-the-fault', () => undefined);
+
+    expect(report.met).toBe(false);
+    expect(report.divergence).toEqual({
+      where: 'the fault report',
+      expected: 'bad none',
+      received: NOTHING,
+    });
+  });
 });
 
-describe('w6-03 prices the return packet against the one that arrived', () => {
+describe('w6-03 prices the return packet against the shortest the format allows', () => {
   test('a route sent straight back is told how long it is and how long it may be', () => {
     const report = diverge(w6_03, 1, 'shorter-encoding', (sim, botId) => {
       const { receive, transmit, probe, decode } = playerApi(sim, botId, 'w6-03');
@@ -159,11 +191,13 @@ describe('w6-03 prices the return packet against the one that arrived', () => {
       transmit(decode(receive() ?? '', key));
     });
     const shown = must(report.divergence, 'a divergence');
+    const characters = (field: string): number => Number(field.split(' ')[0]);
 
     expect(report.met).toBe(false);
     expect(shown.where).toBe('characters on the wire');
-    expect(shown.expected).toMatch(/^fewer than \d+$/);
-    expect(shown.received).toBe(shown.expected.replace('fewer than ', ''));
+    expect(shown.expected).toMatch(/^\d+ characters$/);
+    expect(shown.received).toMatch(/^\d+ characters$/);
+    expect(characters(shown.received)).toBeGreaterThan(characters(shown.expected));
   });
 
   test('a route that is not the route is told the first move it disagrees on', () => {
@@ -233,7 +267,7 @@ describe('w6-04 names the packet the relay sent in the wrong alphabet', () => {
 
     expect(report.met).toBe(false);
     expect(shown.where).toBe('the straggler');
-    expect(shown.expected).toBe('a different shift');
+    expect(shown.expected).toBe('the shift that reads as English');
     expect(shown.received).toMatch(/^shift \d+$/);
   });
 
@@ -284,7 +318,7 @@ describe('w6-05 names the pad and the block the repair report got wrong', () => 
 
     expect(report.met).toBe(false);
     expect(shown.where).toMatch(/^block \d+ on the band$/);
-    expect(shown.expected).toBe('a different repair');
+    expect(shown.expected).toBe('the line it was sent as, repaired');
     expect(shown.received).toBe('fix main|1E');
   });
 });
