@@ -1,7 +1,9 @@
 /* ---- shared subroutines: ~/lib.ts, a second file rather than a page of the workbench ---- */
 
+/* One width, two surfaces: resizing either one is resizing the same edge. Below the compact
+   query reflow.css gives lib.ts its own value again, where the drawer takes the whole screen. */
 .workspace {
-  --ws-lib: min(920px, calc(100vw - 66px));
+  --ws-lib: var(--ws-drawer);
   --ws-lib-x: 0px;
 }
 
@@ -69,6 +71,12 @@
 
 .library-flyout[data-open='true'] {
   transform: translateX(0);
+}
+
+/* The panel clips its own children, so this grip is pulled inside the frame rather than
+   straddling it the way the drawer's does. */
+.library-flyout .flyout-grip {
+  right: 0;
 }
 
 .library-flyout .lib {

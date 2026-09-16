@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { PanelBoundary } from '../components/PanelBoundary.tsx';
-import { closeOverlay, overlayState, useOverlay } from '../hooks/useOverlay.ts';
+import { closeLibrary, closeOverlay, overlayState, useOverlay } from '../hooks/useOverlay.ts';
 import { COMPACT_QUERY } from './breakpoints.ts';
 import { ClosedBanner } from './ClosedBanner.tsx';
 import type { DrawerTab } from './Drawer.tsx';
@@ -76,7 +76,8 @@ export function Workspace(): React.ReactElement {
 
   const handleRef = useRef<HTMLButtonElement | null>(null);
 
-  // The drawer covers the left of the canvas, so the board aims at what is left of it.
+  // The flyouts draw over the board rather than push it aside, but their measured width is
+  // still what the deck folds on and what the Site map button is parked beside.
   useEffect(() => {
     const measure = (): void => {
       setMeasured(drawerWidth());
@@ -88,7 +89,6 @@ export function Workspace(): React.ReactElement {
     };
   }, [open, compact, width]);
 
-  const mapInset = open ? measured : 0;
   const [viewport, setViewport] = useState(() => window.innerWidth);
   useEffect(() => {
     const measure = (): void => {
@@ -124,6 +124,7 @@ export function Workspace(): React.ReactElement {
     setOpen(true);
     setTelemetryOpen(false);
     setOrderOpen(false);
+    closeLibrary();
   }, []);
 
   const toggle = useCallback((): void => {
@@ -131,6 +132,7 @@ export function Workspace(): React.ReactElement {
       if (!was) {
         setTelemetryOpen(false);
         setOrderOpen(false);
+        closeLibrary();
       }
       return !was;
     });
@@ -205,11 +207,19 @@ export function Workspace(): React.ReactElement {
     }
   }, [referenceRequested, open, tab, openTo]);
 
+  const libraryOpen = overlayOpen === 'library';
+  useEffect(() => {
+    if (libraryOpen) setOpen(false);
+  }, [libraryOpen]);
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape') return;
-      // The subroutines sheet stands over the drawer, so escape dismisses that first.
-      if (overlayState().open === 'library') return;
+      // lib.ts and the workbench are never open together, so escape has one of them to dismiss.
+      if (overlayState().open === 'library') {
+        closeOverlay();
+        return;
+      }
       setOpen((was) => {
         if (was) handleRef.current?.focus();
         return false;
@@ -233,7 +243,7 @@ export function Workspace(): React.ReactElement {
     <div
       className="workspace"
       data-drawer={open ? 'open' : 'shut'}
-      data-library={overlayOpen === 'library' ? 'open' : 'shut'}
+      data-library={libraryOpen ? 'open' : 'shut'}
       data-watch={String(watching)}
       data-sheet={report ? 'open' : 'shut'}
       data-deck={crowded ? 'folded' : 'shown'}
@@ -246,7 +256,7 @@ export function Workspace(): React.ReactElement {
       {/* Renderer is one canvas for the whole app (src/ui/adapters.ts), so the feed is
           hidden rather than unmounted and stays outside every boundary. */}
       <div className="workspace__map">
-        <FeedCanvas onReadout={setReadout} insetLeft={mapInset} />
+        <FeedCanvas onReadout={setReadout} />
       </div>
 
       <PanelBoundary label="The work order">
@@ -307,11 +317,11 @@ export function Workspace(): React.ReactElement {
       {/* The drawer stands over the work order card and takes its Site map button with it.
           Same action, parked in the strip of board the drawer leaves — and once that strip is
           down to the telemetry column there is no room for it, the same as at compact. */}
-      {open && !compact && !crowded && overlayOpen !== 'library' ? (
+      {open && !compact && !crowded && !libraryOpen ? (
         <button
           type="button"
           className="control control--tight drawer-escape"
-          style={{ '--ws-escape-x': `${String(mapInset)}px` } as React.CSSProperties}
+          style={{ '--ws-escape-x': `${String(measured)}px` } as React.CSSProperties}
           onClick={() => workspace.goto('levels')}
         >
           Site map
@@ -331,7 +341,7 @@ export function Workspace(): React.ReactElement {
       </button>
 
       <PanelBoundary label="Shared Subroutines">
-        <Subroutines />
+        <Subroutines width={width ?? measured} onWidth={resize} resizable={!compact} />
       </PanelBoundary>
 
       {report ? (

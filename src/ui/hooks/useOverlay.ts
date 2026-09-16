@@ -38,6 +38,12 @@ export function closeOverlay(): void {
   set(null, false);
 }
 
+// lib.ts is the one overlay the workbench cannot share the screen with. The manual arrives
+// through this same slot and is what opens the workbench, so it is left where it is.
+export function closeLibrary(): void {
+  if (state.open === 'library') closeOverlay();
+}
+
 export function toggleOverlay(id: OverlayId): void {
   if (state.open === id) closeOverlay();
   else openOverlay(id);

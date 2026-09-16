@@ -21,8 +21,9 @@
   transform: translateX(0);
 }
 
-/* Sits over the drawer's own border so the edge itself is the thing you grab. */
-.drawer__grip {
+/* Both flyouts are the same width, so either one's edge is the thing you grab. It sits over
+   the drawer's own border so the edge itself is what the pointer lands on. */
+.flyout-grip {
   position: absolute;
   top: 0;
   right: -6px;
@@ -37,7 +38,7 @@
 }
 
 /* Both flaps ride out on this same edge, bottom-anchored; the mark sits clear above them. */
-.drawer__grip::after {
+.flyout-grip::after {
   content: '';
   position: absolute;
   right: 4px;
@@ -47,13 +48,13 @@
   background: var(--ws-edge);
 }
 
-.drawer__grip:hover::after,
-.drawer__grip:focus-visible::after,
-.drawer__grip[data-dragging='true']::after {
+.flyout-grip:hover::after,
+.flyout-grip:focus-visible::after,
+.flyout-grip[data-dragging='true']::after {
   background: var(--accent);
 }
 
-.drawer__grip:focus-visible {
+.flyout-grip:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
