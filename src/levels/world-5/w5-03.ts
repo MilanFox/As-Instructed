@@ -22,7 +22,10 @@ const HEIGHT = 18;
 const REACTOR_AT = vec(2, 9);
 const PREREQ_PREFIX = 'prereq:';
 
-const READ_BUDGET = 20;
+const STRANDS = 3;
+const WALK_CUSHION = 1.05;
+const BY_NUMBER_MARGIN = 1.15;
+const PLACEMENT_TRIES = 200;
 
 export type GraphShape = 'mixed' | 'chain' | 'wide' | 'split';
 
@@ -68,7 +71,7 @@ function dependencies(rng: Rng, shape: GraphShape, count: number): string[][] {
     const earlier = Array.from({ length: k }, (_, i) => `sub-${i + 1}`);
     switch (shape) {
       case 'chain':
-        prereqs.push([k === 0 ? 'reactor' : `sub-${k}`]);
+        prereqs.push(k < STRANDS ? ['reactor'] : [`sub-${String(k - STRANDS + 1)}`]);
         break;
       case 'wide':
         if (k < 3) prereqs.push(['reactor']);
@@ -119,55 +122,130 @@ function relabel(rng: Rng, prereqs: readonly string[][]): string[][] {
   return prereqs.map((list) => list.slice());
 }
 
-export function nearestAvailableWalk(from: Vec, stations: readonly StationPlan[]): number {
+const stationNumber = (station: StationPlan): number => Number(station.id.slice('sub-'.length));
+
+function waveDepths(stations: readonly StationPlan[]): Map<string, number> {
+  const depth = new Map<string, number>([['reactor', 0]]);
+  const left = stations.slice();
+  while (left.length > 0) {
+    const ready = left.filter((station) => station.prereqs.every((id) => depth.has(id)));
+    if (ready.length === 0) break;
+    for (const station of ready) {
+      depth.set(station.id, 1 + Math.max(0, ...station.prereqs.map((id) => depth.get(id) ?? 0)));
+      left.splice(left.indexOf(station), 1);
+    }
+  }
+  return depth;
+}
+
+const earliestWave = (
+  ready: readonly StationPlan[],
+  waves: ReadonlyMap<string, number>,
+): StationPlan[] => {
+  const first = Math.min(...ready.map((station) => waves.get(station.id) ?? 0));
+  return ready.filter((station) => (waves.get(station.id) ?? 0) === first);
+};
+
+type Choose = (pool: readonly StationPlan[], at: Vec) => StationPlan;
+
+function walkWith(
+  from: Vec,
+  stations: readonly StationPlan[],
+  choose: Choose,
+  waves?: ReadonlyMap<string, number>,
+): number {
   const done = new Set<string>(['reactor']);
-  const remaining = stations.slice();
+  const left = stations.slice();
   let at = from;
   let total = 0;
 
-  while (remaining.length > 0) {
-    let bestIndex = -1;
-    let bestDistance = Number.POSITIVE_INFINITY;
-    for (let i = 0; i < remaining.length; i++) {
-      const station = remaining[i] as StationPlan;
-      if (!station.prereqs.every((id) => done.has(id))) continue;
-      const distance = manhattan(at, station.at);
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        bestIndex = i;
-      }
-    }
-    if (bestIndex < 0) break;
-    const chosen = remaining[bestIndex] as StationPlan;
-    total += bestDistance;
+  while (left.length > 0) {
+    const ready = left.filter((station) => station.prereqs.every((id) => done.has(id)));
+    if (ready.length === 0) break;
+    const chosen = choose(waves === undefined ? ready : earliestWave(ready, waves), at);
+    total += manhattan(at, chosen.at);
     at = chosen.at;
     done.add(chosen.id);
-    remaining.splice(bestIndex, 1);
+    left.splice(left.indexOf(chosen), 1);
   }
   return total;
 }
 
-export function gridPlan(seed: number): GridPlan {
-  const rng = new Rng(seed * 6151 + 907);
-  const shape = shapeFor(seed);
-  const count = STATION_COUNT[shape];
-  const prereqs = relabel(rng, dependencies(rng, shape, count));
+const nearest =
+  (preferHigher: boolean): Choose =>
+  (pool, at) => {
+    let chosen = pool[0] as StationPlan;
+    for (const station of pool) {
+      const gap = manhattan(at, station.at) - manhattan(at, chosen.at);
+      const beatsTie = preferHigher && stationNumber(station) > stationNumber(chosen);
+      if (gap < 0 || (gap === 0 && beatsTie)) chosen = station;
+    }
+    return chosen;
+  };
 
-  const taken = new Set<string>([`${REACTOR_AT.x},${REACTOR_AT.y}`]);
+const inNumberOrder =
+  (preferHigher: boolean): Choose =>
+  (pool) =>
+    pool.reduce((best, station) =>
+      stationNumber(station) > stationNumber(best) === preferHigher ? station : best,
+    );
+
+export function honestWalk(from: Vec, stations: readonly StationPlan[]): number {
+  const waves = waveDepths(stations);
+  return Math.max(
+    walkWith(from, stations, nearest(false)),
+    walkWith(from, stations, nearest(true)),
+    walkWith(from, stations, nearest(false), waves),
+    walkWith(from, stations, nearest(true), waves),
+  );
+}
+
+export function byNumberWalk(from: Vec, stations: readonly StationPlan[]): number {
+  return Math.min(
+    walkWith(from, stations, inNumberOrder(false)),
+    walkWith(from, stations, inNumberOrder(true)),
+  );
+}
+
+function placeStations(rng: Rng, prereqs: readonly string[][]): StationPlan[] {
+  const taken = new Set<string>([`${String(REACTOR_AT.x)},${String(REACTOR_AT.y)}`]);
   const stations: StationPlan[] = [];
-  while (stations.length < count) {
+  while (stations.length < prereqs.length) {
     const at = vec(rng.int(5, WIDTH - 2), rng.int(1, HEIGHT - 2));
-    const key = `${at.x},${at.y}`;
+    const key = `${String(at.x)},${String(at.y)}`;
     if (taken.has(key)) continue;
     taken.add(key);
     stations.push({
-      id: `sub-${stations.length + 1}`,
+      id: `sub-${String(stations.length + 1)}`,
       at,
       prereqs: prereqs[stations.length] ?? [],
     });
   }
+  return stations;
+}
 
-  return { shape, stations, travelBudget: nearestAvailableWalk(REACTOR_AT, stations) };
+function laidOut(rng: Rng, shape: GraphShape, prereqs: readonly string[][]): GridPlan {
+  const stations = placeStations(rng, prereqs);
+  return {
+    shape,
+    stations,
+    travelBudget: Math.ceil(honestWalk(REACTOR_AT, stations) * WALK_CUSHION),
+  };
+}
+
+const numberOrderOverruns = (plan: GridPlan): boolean =>
+  byNumberWalk(REACTOR_AT, plan.stations) > plan.travelBudget * BY_NUMBER_MARGIN;
+
+export function gridPlan(seed: number): GridPlan {
+  const rng = new Rng(seed * 6151 + 907);
+  const shape = shapeFor(seed);
+  const prereqs = relabel(rng, dependencies(rng, shape, STATION_COUNT[shape]));
+
+  let plan = laidOut(rng, shape, prereqs);
+  for (let attempt = 0; attempt < PLACEMENT_TRIES && !numberOrderOverruns(plan); attempt++) {
+    plan = laidOut(rng, shape, prereqs);
+  }
+  return plan;
 }
 
 const prereqsOf = (machine: Machine): string[] =>
@@ -310,9 +388,9 @@ export const w5_03: LevelDef = {
     '**FROM:** Dep. Coordinator M. Vance\\',
     '**RE:** Energisation order',
     '',
-    'Substations must be energised in dependency order. Energising a station before its',
-    'upstream is not dangerous. It is merely futile, and futility is reportable under the',
-    'site metrics framework, which I am measured on.',
+    'A substation brought up early is not dangerous, merely futile, and futility is',
+    'reportable under the site metrics framework, which I am measured on. So is the',
+    'distance the crew walks, on a separate form.',
     '',
     'Cable the district, then bring every substation up.',
   ].join('\n'),
@@ -327,7 +405,7 @@ export const w5_03: LevelDef = {
     redrawn: [
       'ten to sixteen stations',
       'where each one stands',
-      'the shape of the upstream lists — one deep chain on one shift, one wide flat layer on another, two halves that never touch on another',
+      'the shape of the upstream lists — three deep chains side by side on one shift, one wide flat layer on another, two halves that never touch on another',
       'which station number sits where in that shape',
       'whether any station lists no upstream at all',
       'the crew-walk allowance',
@@ -337,7 +415,7 @@ export const w5_03: LevelDef = {
     {
       label: '`probe(id)`',
       value:
-        'Free, and only counted. Substations are `sub-1` upward; past the last one it returns `null`. Nothing rewires itself while you work.',
+        'Free. Substations are `sub-1` upward; past the last one it returns `null`. Nothing rewires itself while you work.',
     },
     {
       label: 'Upstream',
@@ -356,7 +434,7 @@ export const w5_03: LevelDef = {
     {
       label: 'The crew walk',
       value:
-        "The crew starts at the reactor and walks between stations in the order you energise them, and every `power` call is a visit — a futile one and a second call on the same station each add their leg. The reactor reports the allowance in `vars.travelBudget`. It is one good walk's length, not a margin over one.",
+        'The crew starts at the reactor and walks between stations in the order you energise them, and every `power` call is a visit — a futile one and a second call on the same station each add their leg. The reactor reports the allowance in `vars.travelBudget`. It is tight: which ready station you take next is what decides whether you fit.',
     },
     {
       label: 'The Repository',
@@ -449,9 +527,6 @@ export const w5_03: LevelDef = {
         divergence: walkOverran,
       },
     ),
-    Objectives.withinSenses('probe', READ_BUDGET, {
-      label: `Bring the district up on ${String(READ_BUDGET)} reads or fewer`,
-    }),
   ],
   starter: [
     '// NOTE(4470): the cable does not care what order you lay it in. the power does',

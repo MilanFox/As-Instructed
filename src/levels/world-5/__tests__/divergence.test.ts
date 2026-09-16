@@ -78,18 +78,6 @@ describe('w5-01 — the station that went on before its feeder', () => {
       received: 'never switched on',
     });
   });
-
-  test('one-pass names the tick and tile the run turned round on', () => {
-    const { met, divergence } = diverge(w5_01, 1, 'one-pass', (sim, botId) => {
-      sim.move(botId, Dir.East);
-      sim.move(botId, Dir.West);
-    });
-    expect(met).toBe(false);
-    const shown = must(divergence, 'a divergence');
-    expect(shown.where).toMatch(/^tick \d+ · \(\d+, \d+\)$/);
-    expect(shown.expected).toBe('east, the way the run started');
-    expect(shown.received).toBe('west');
-  });
 });
 
 describe('w5-02 — the patch report, and what it refuses to say', () => {
@@ -150,14 +138,27 @@ describe('w5-03 — the cable, the order and the walk', () => {
   });
 
   test('in-order names which upstream was still off, and when', () => {
+    const downstream = must(
+      withPrefix(w5_03, 2, 'sub-').find((machine) =>
+        Object.keys(machine.vars).some((key) => key.startsWith('prereq:sub-')),
+      ),
+      'a station waiting on another station',
+    );
+    const waits = must(
+      Object.keys(downstream.vars)
+        .find((key) => key.startsWith('prereq:sub-'))
+        ?.slice('prereq:'.length),
+      'its upstream',
+    );
+
     const { met, divergence } = diverge(w5_03, 2, 'in-order', (sim, botId) => {
-      playerApi(sim, botId, 'w5-03').power('sub-2', 'on');
+      playerApi(sim, botId, 'w5-03').power(downstream.id, 'on');
     });
     expect(met).toBe(false);
     expect(divergence).toEqual({
-      where: 'tick 0 · sub-2',
-      expected: 'sub-12 already on',
-      received: 'sub-12 was still off',
+      where: `tick 0 · ${downstream.id}`,
+      expected: `${waits} already on`,
+      received: `${waits} was still off`,
     });
   });
 
@@ -397,9 +398,10 @@ describe('w5-05 — the island, the drum and the dead cable', () => {
     });
   });
 
-  test('name-the-weak-link hands a wrong station back without naming the right one', () => {
+  test('name-the-weak-link tells a wrong station what it actually carries', () => {
     const world = w5_05.build(1);
     const count = world.machines.filter((machine) => machine.id.startsWith('sub-')).length;
+    const leaf = must(withPrefix(w5_05, 1, 'sub-')[0], 'sub-1');
     const { met, divergence } = diverge(w5_05, 1, 'name-the-weak-link', (sim, botId) => {
       const api = playerApi(sim, botId, 'w5-05');
       api.link('reactor', `sub-${String(count)}`);
@@ -407,15 +409,29 @@ describe('w5-05 — the island, the drum and the dead cable', () => {
       api.print('weak sub-1 99');
     });
     expect(met).toBe(false);
-    const shown = must(divergence, 'a divergence');
-    expect(shown.where).toBe('the outage report');
-    expect(shown.expected).toBe('a different station');
-    expect(shown.received).toBe('weak sub-1 99');
+    expect(divergence).toEqual({
+      where: `sub-1 · ${at(leaf.at)}`,
+      expected: 'the station the district most hangs off',
+      received: '1 dark with it',
+    });
+  });
+
+  test('name-the-weak-link refuses a name that is not a substation', () => {
+    const { met, divergence } = diverge(w5_05, 1, 'name-the-weak-link', (sim, botId) => {
+      playerApi(sim, botId, 'w5-05').print('weak reactor 10');
+    });
+    expect(met).toBe(false);
+    expect(divergence).toEqual({
+      where: 'the outage report',
+      expected: 'a substation in the district',
+      received: 'reactor',
+    });
   });
 
   test('name-the-weak-link confirms nothing but the station when the count is off', () => {
     const world = w5_05.build(1);
     const count = world.machines.filter((machine) => machine.id.startsWith('sub-')).length;
+    const last = must(withPrefix(w5_05, 1, 'sub-')[count - 1], `sub-${String(count)}`);
     const { met, divergence } = diverge(w5_05, 1, 'name-the-weak-link', (sim, botId) => {
       const api = playerApi(sim, botId, 'w5-05');
       api.link('reactor', `sub-${String(count)}`);
@@ -424,8 +440,8 @@ describe('w5-05 — the island, the drum and the dead cable', () => {
     });
     expect(met).toBe(false);
     expect(divergence).toEqual({
-      where: `sub-${String(count)}`,
-      expected: 'a different figure',
+      where: `sub-${String(count)} · ${at(last.at)}`,
+      expected: 'the count of what goes dark with it',
       received: '1',
     });
   });

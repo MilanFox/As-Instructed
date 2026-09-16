@@ -33,7 +33,7 @@ const REDUCED_SLACK: Readonly<Record<number, number>> = Object.freeze({
 
 const CONSTRUCTED: Readonly<Record<number, YardPlan>> = Object.freeze({
   3: {
-    capacities: [10, 10, 10, 10, 10, 10, 14],
+    capacities: [14, 10, 10, 10, 10, 10, 10],
     draws: [4, 4, 4, 4, 4, 4, 6, 6, 6, 6, 6, 6],
   },
 });
@@ -57,16 +57,21 @@ const packs = (capacities: number[], order: number[]): boolean => {
 const orderDecides = ({ capacities, draws }: YardPlan): boolean => {
   const bins = workingSet(capacities);
   const heaviestFirst = [...draws].sort((a, b) => b - a);
-  return !packs(bins, draws) && packs(bins, heaviestFirst);
+  const anyColumnOrder = [
+    bins,
+    [...bins].sort((a, b) => a - b),
+    [...bins].sort((a, b) => b - a),
+  ].every((order) => packs(order, heaviestFirst));
+  return !packs(bins, draws) && anyColumnOrder;
 };
 
 function drawPlan(rng: Rng, slack: number): YardPlan {
-  const consumers = rng.int(14, 20);
+  const consumers = rng.int(12, 18);
   const draws: number[] = [];
   for (let i = 0; i < consumers; i++) draws.push(rng.int(3, 9));
   const load = draws.reduce((sum, draw) => sum + draw, 0);
 
-  const feeders = rng.int(5, 8);
+  const feeders = rng.int(5, 7);
   const working = feeders - 1;
   const reduced = Math.ceil(load * slack);
 
@@ -194,8 +199,9 @@ export const w5_04: LevelDef = {
     '**FROM:** Dep. Coordinator M. Vance\\',
     '**RE:** Yard 4 distribution',
     '',
-    'Every feeder in Yard 4 has a ceiling. The ceilings are defined in Appendix C. The index',
-    'entry for Appendix C is a reference to Appendix C. I have requested a copy of that.',
+    'The ceilings are defined in Appendix C. The index entry for Appendix C is a reference',
+    "to Appendix C. I have requested a copy of that. Yard 4's largest feeder is reserved",
+    'for a project that has not arrived and may never.',
     '',
     'Put every consumer on a feeder. Take no feeder over its ceiling.',
   ].join('\n'),

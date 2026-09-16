@@ -17,7 +17,6 @@ import {
   addBot,
   addMachine,
   createWorld,
-  dirName,
   machineById,
   printsUpTo,
   setTerrain,
@@ -118,24 +117,6 @@ const latchedEarly = (ctx: ObjectiveContext): Divergence | undefined => {
   };
 };
 
-const doubledBack = (ctx: ObjectiveContext): Divergence | undefined => {
-  let started: Dir | undefined;
-  for (const event of ctx.trace.events) {
-    if (event.kind !== 'move' || !event.ok) continue;
-    if (started === undefined) {
-      started = event.dir;
-      continue;
-    }
-    if (event.dir === started) continue;
-    return {
-      where: `tick ${String(event.t)} · ${at(event.to)}`,
-      expected: `${dirName(started).toLowerCase()}, the way the run started`,
-      received: dirName(event.dir).toLowerCase(),
-    };
-  }
-  return undefined;
-};
-
 const orderedCount = (ctx: ObjectiveContext): number => {
   const { good, bad } = latchAudit(ctx);
   return substations(ctx.world).filter((m) => good.has(m.id) && !bad.has(m.id)).length;
@@ -220,7 +201,8 @@ export const w5_01: LevelDef = {
     '**RE:** Feeder line 7, energisation',
     '',
     'Feeder line 7 was laid by two crews working inward from opposite ends. Neither crew',
-    'recorded which end it started from. The reactor is at one of them.',
+    'recorded which end it started from. The reactor is at one of them. Scheduling want',
+    'the route in advance; filed afterwards it is a report, not a plan.',
     '',
     'Bring every substation on the line to `on`.',
   ].join('\n'),
@@ -266,7 +248,7 @@ export const w5_01: LevelDef = {
     {
       label: 'The route',
       value:
-        'For the star: before the first step, print the tiles the bot is going to stand on, in the order it will reach them, each as `x,y`. One line holds the lot. Every `x,y` printed before that first step is read as part of the route and the rest of the text is ignored; the reactor tile the bot starts on may be named or left out. The star is earned if the run then steps onto exactly those tiles, in that order.',
+        'For the star: before the first step, print the tiles the bot is going to stand on, in the order it will reach them, each as `x,y`. One line holds the lot. Every `x,y` printed before that first step is read as part of the route and the rest of the text is ignored; the reactor tile the bot starts on may be named or left out. The star is earned if the run then steps onto exactly those tiles, in that order, and takes no step it did not name.',
     },
   ],
   seeds: [1, 2, 3],
@@ -325,18 +307,6 @@ export const w5_01: LevelDef = {
     ),
   ],
   bonus: [
-    Objectives.custom(
-      'one-pass',
-      'Make one pass. Never double back.',
-      (ctx) => {
-        const directions = new Set<Dir>();
-        for (const event of ctx.trace.events) {
-          if (event.kind === 'move' && event.ok) directions.add(event.dir);
-        }
-        return directions.size <= 1;
-      },
-      { divergence: doubledBack },
-    ),
     Objectives.custom('route-declared', 'Print the route before walking it', walkedWhatItSaid, {
       progress: routeProgress,
       divergence: leftTheRoute,

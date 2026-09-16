@@ -216,14 +216,26 @@ const misread = (ctx: ObjectiveContext): Divergence | undefined => {
       received: clipValue(said),
     };
   }
+  const named = substations(ctx.world).find((machine) => machine.id === claim.id);
+  if (named === undefined) {
+    return {
+      where: 'the outage report',
+      expected: 'a substation in the district',
+      received: clipValue(claim.id),
+    };
+  }
   const { ids } = weakestLinks(ctx.world);
   if (ids.has(claim.id)) {
-    return { where: claim.id, expected: 'a different figure', received: String(claim.load) };
+    return {
+      where: `${claim.id} · ${at(named.at)}`,
+      expected: 'the count of what goes dark with it',
+      received: String(claim.load),
+    };
   }
   return {
-    where: 'the outage report',
-    expected: 'a different station',
-    received: clipValue(said),
+    where: `${claim.id} · ${at(named.at)}`,
+    expected: 'the station the district most hangs off',
+    received: `${String(darkWithout(ctx.world, claim.id))} dark with it`,
   };
 };
 
@@ -330,10 +342,11 @@ export const w5_05: LevelDef = {
     '**FROM:** Dep. Coordinator M. Vance\\',
     '**RE:** District 9, reconnection',
     '',
-    'District 9 lost its cabling on Tuesday. Stores have issued a drum against the works',
-    'order. It holds the shortest run that joins the district, plus eight per cent for waste.',
+    'District 9 lost its cabling on Tuesday. Stores have issued one drum against the works',
+    'order. Not two.',
     '',
-    'Re-cable District 9, then bring every substation up.',
+    'Re-cable District 9, then bring every substation up. Insurance renews next month and',
+    'wants one name off the finished grid.',
   ].join('\n'),
   board: {
     fixed: [
