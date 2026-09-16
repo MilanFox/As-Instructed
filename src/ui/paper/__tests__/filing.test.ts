@@ -1,45 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { useGame } from '../../../game/store.ts';
-import type { DocPayload, ReportSnapshot } from '../papers.ts';
+import type { DocPayload } from '../papers.ts';
 import { DOC_HOME, filedDocs, looseDocs, trayDocs, usePapers } from '../papers.ts';
 
 function reset(): void {
   useGame.setState({ currentLevelId: null });
   usePapers.setState({ docs: [], lifted: null, pinned: null, pinnedPage: null, top: 20 });
-}
-
-function report(levelId: string): ReportSnapshot {
-  return {
-    levelId,
-    title: 'THE LAST ONE',
-    passed: false,
-    graded: true,
-    medal: 'none',
-    headline: 'HALTED',
-    ticks: null,
-    par: null,
-    limit: null,
-    bestTicks: null,
-    seeds: [],
-    seedLines: [],
-    objectives: [],
-    causes: [],
-    cause: null,
-    failure: 'stalled',
-    failureCode: 'STALL',
-    failureSeed: null,
-    failureLine: null,
-    passedSeed: null,
-    bonusSeed: null,
-    achievements: [],
-    personalBest: null,
-    points: null,
-    stars: 0,
-    onRecord: null,
-    libraryLine: null,
-    at: 0,
-  };
 }
 
 function issue(id: string, payload: DocPayload): void {
@@ -69,28 +36,18 @@ describe('arriving paper never files the paper already on the desk', () => {
       levelId: 'w8-01',
       hardware: ['survey drone'],
     });
-    issue('certificate:w7-05:1', {
-      kind: 'certificate',
-      report: { ...report('w7-05'), passed: true },
-    });
     issue('order:w8-01', { kind: 'order', levelId: 'w8-01' });
 
     expect(reachable()).toEqual(
-      expect.arrayContaining([
-        'memo:4',
-        'issue:repository',
-        'requisition:w8-01',
-        'certificate:w7-05:1',
-        'order:w8-01',
-      ]),
+      expect.arrayContaining(['memo:4', 'issue:repository', 'requisition:w8-01', 'order:w8-01']),
     );
     expect(filedDocs(usePapers.getState())).toEqual([]);
   });
 
   it('keeps the payload of a sheet the player has never lifted', () => {
     issue('memo:4', { kind: 'memo', rank: 4 });
-    for (let attempt = 1; attempt <= 5; attempt += 1) {
-      issue(`halt:w8-01:${String(attempt)}`, { kind: 'halt', report: report('w8-01') });
+    for (let rank = 5; rank <= 9; rank += 1) {
+      issue(`memo:${String(rank)}`, { kind: 'memo', rank });
     }
 
     const doc = trayDocs(usePapers.getState()).find((each) => each.id === 'memo:4');
@@ -98,86 +55,8 @@ describe('arriving paper never files the paper already on the desk', () => {
   });
 });
 
-describe('a halt notice replaces its predecessor', () => {
+describe('paper belonging to no open level is filed rather than dropped', () => {
   beforeEach(reset);
-
-  it('leaves one sheet for one work order, and files the rest', () => {
-    for (let attempt = 1; attempt <= 5; attempt += 1) {
-      issue(`halt:w8-01:${String(attempt)}`, { kind: 'halt', report: report('w8-01') });
-    }
-
-    expect(reachable()).toEqual(['halt:w8-01:5']);
-    expect(filedDocs(usePapers.getState()).map((doc) => doc.id)).toEqual([
-      'halt:w8-01:4',
-      'halt:w8-01:3',
-      'halt:w8-01:2',
-      'halt:w8-01:1',
-    ]);
-  });
-
-  it('does not touch the halt notice for a different work order', () => {
-    issue('halt:w7-03:1', { kind: 'halt', report: report('w7-03') });
-    issue('halt:w8-01:1', { kind: 'halt', report: report('w8-01') });
-
-    expect(reachable()).toContain('halt:w7-03:1');
-  });
-
-  it('does not touch a certificate for the same work order', () => {
-    issue('certificate:w8-01:1', {
-      kind: 'certificate',
-      report: { ...report('w8-01'), passed: true },
-    });
-    issue('halt:w8-01:2', { kind: 'halt', report: report('w8-01') });
-
-    expect(reachable()).toContain('certificate:w8-01:1');
-  });
-
-  it('is filed by a certificate that closes the same work order', () => {
-    issue('halt:w8-01:1', { kind: 'halt', report: report('w8-01') });
-    issue('certificate:w8-01:2', {
-      kind: 'certificate',
-      report: { ...report('w8-01'), passed: true },
-    });
-
-    expect(reachable()).toContain('certificate:w8-01:2');
-    expect(filedDocs(usePapers.getState()).map((doc) => doc.id)).toContain('halt:w8-01:1');
-  });
-});
-
-describe('a halt notice is filed once its level is no longer open', () => {
-  beforeEach(reset);
-
-  it('files a halt notice for a level the player has left', () => {
-    issue('halt:w8-01:1', { kind: 'halt', report: report('w8-01') });
-    useGame.setState({ currentLevelId: 'w8-02' });
-
-    usePapers.getState().clearLevelPaper();
-
-    expect(reachable()).not.toContain('halt:w8-01:1');
-    expect(filedDocs(usePapers.getState()).map((doc) => doc.id)).toContain('halt:w8-01:1');
-  });
-
-  it('leaves the halt notice alone while its level is still open', () => {
-    useGame.setState({ currentLevelId: 'w8-01' });
-    issue('halt:w8-01:1', { kind: 'halt', report: report('w8-01') });
-
-    usePapers.getState().clearLevelPaper();
-
-    expect(reachable()).toContain('halt:w8-01:1');
-  });
-
-  it('files a certificate for a level the player has left', () => {
-    issue('certificate:w8-01:1', {
-      kind: 'certificate',
-      report: { ...report('w8-01'), passed: true },
-    });
-    useGame.setState({ currentLevelId: 'w8-02' });
-
-    usePapers.getState().clearLevelPaper();
-
-    expect(reachable()).not.toContain('certificate:w8-01:1');
-    expect(filedDocs(usePapers.getState()).map((doc) => doc.id)).toContain('certificate:w8-01:1');
-  });
 
   it('files the career notices that belong to no level at all', () => {
     issue('memo:4', { kind: 'memo', rank: 4 });

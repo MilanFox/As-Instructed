@@ -1,71 +1,12 @@
 import { create } from 'zustand';
-import type { Budget } from '../../game/budgets.ts';
 import { useGame } from '../../game/store.ts';
 
 export const DESK_KEY = 'as-instructed.desk';
 
-export type DocKind = 'order' | 'certificate' | 'halt' | 'requisition' | 'issue' | 'memo';
-
-export interface ReportRow {
-  id: string;
-  label: string;
-  met: boolean;
-  bonus: boolean;
-  progress?: [number, number];
-  budget?: Budget;
-  unit?: string;
-  seeds?: readonly { seed: number; met: boolean }[];
-}
-
-export interface Divergence {
-  where: string;
-  want: string;
-  got: string;
-}
-
-export interface ReportCause {
-  id: string;
-  label: string;
-  detail: string;
-  budget: Budget | null;
-  divergence: Divergence | null;
-}
-
-export interface ReportSnapshot {
-  levelId: string;
-  title: string;
-  passed: boolean;
-  graded: boolean;
-  medal: 'gold' | 'silver' | 'bronze' | 'none' | null;
-  headline: string;
-  ticks: number | null;
-  par: number | null;
-  limit: number | null;
-  bestTicks: number | null;
-  seeds: readonly number[];
-  seedLines: readonly { seed: number; passed: boolean; note: string }[];
-  objectives: readonly ReportRow[];
-  causes: readonly ReportCause[];
-  cause: Divergence | null;
-  failure: string | null;
-  failureCode: string | null;
-  failureSeed: number | null;
-  failureLine: number | null;
-  passedSeed: number | null;
-  bonusSeed: number | null;
-  achievements: readonly string[];
-  personalBest: { previous: number; now: number } | null;
-  points: number | null;
-  stars: number;
-  onRecord: { word: string; note: string } | null;
-  libraryLine: string | null;
-  at: number;
-}
+export type DocKind = 'order' | 'requisition' | 'issue' | 'memo';
 
 export type DocPayload =
   | { kind: 'order'; levelId: string }
-  | { kind: 'certificate'; report: ReportSnapshot }
-  | { kind: 'halt'; report: ReportSnapshot }
   | { kind: 'requisition'; levelId: string; hardware: readonly string[] }
   | { kind: 'issue' }
   | { kind: 'memo'; rank: number };
@@ -84,8 +25,6 @@ export interface DeskDoc {
 
 export const DOC_HOME: Record<DocKind, { x: number; y: number; rot: number }> = {
   order: { x: 214, y: 226, rot: -3.4 },
-  certificate: { x: 196, y: 246, rot: 1.6 },
-  halt: { x: 204, y: 240, rot: -2.2 },
   requisition: { x: 188, y: 234, rot: 1.2 },
   issue: { x: 210, y: 252, rot: -2.0 },
   memo: { x: 200, y: 230, rot: -1.4 },
@@ -99,20 +38,9 @@ function belongsTo(doc: DeskDoc, open: string | null): boolean {
     case 'order':
     case 'requisition':
       return doc.payload.levelId === open;
-    case 'halt':
-    case 'certificate':
-      return doc.payload.report.levelId === open;
     default:
       return false;
   }
-}
-
-function supersedes(next: DeskDoc, doc: DeskDoc): boolean {
-  return (
-    doc.payload.kind === 'halt' &&
-    (next.payload.kind === 'halt' || next.payload.kind === 'certificate') &&
-    next.payload.report.levelId === doc.payload.report.levelId
-  );
 }
 
 const REISSUED: ReadonlySet<DocKind> = new Set<DocKind>(['order', 'requisition']);
@@ -199,9 +127,7 @@ export const usePapers = create<PaperState>((set, get) => ({
     const state = get();
     const z = state.top + 1;
     const next: DeskDoc = { moved: null, filed: false, stowed: false, mark: null, ...doc, z };
-    const without = state.docs.filter((d) => d.id !== next.id);
-    const stale = new Set(without.filter((d) => !d.filed && supersedes(next, d)).map((d) => d.id));
-    const docs = without.map((d) => (stale.has(d.id) ? { ...d, filed: true } : d)).concat(next);
+    const docs = state.docs.filter((d) => d.id !== next.id).concat(next);
     set({ docs, top: z });
     persist(get());
   },

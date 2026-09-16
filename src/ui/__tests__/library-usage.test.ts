@@ -26,7 +26,7 @@ vi.mock('zustand', async () => {
 });
 
 const { ReportSheet } = await import('../workspace/ReportSheet.tsx');
-const { snapshotReport } = await import('../paper/report.ts');
+const { snapshotReport } = await import('../report.ts');
 const { StructureScreen } = await import('../../meta/ui/StructureScreen.tsx');
 const { useGame } = await import('../../game/store.ts');
 const { useLibrary } = await import('../../meta/store.ts');
@@ -182,7 +182,7 @@ describe('the line is a fact, not a scoreline', () => {
     const used = screen(Results);
 
     const scoreline = (text: string): string =>
-      /Ticks \d+.*?(?= Objectives )/.exec(text)?.[0] ?? 'no scoreline';
+      /Ticks \d+.*?(?= Seeds )/.exec(text)?.[0] ?? 'no scoreline';
 
     expect(scoreline(bare)).toMatch(/Points \d/);
     expect(scoreline(used)).toBe(scoreline(bare));

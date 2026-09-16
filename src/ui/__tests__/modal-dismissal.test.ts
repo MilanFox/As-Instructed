@@ -27,12 +27,13 @@ vi.mock('zustand', async () => {
 
 const { App } = await import('../App.tsx');
 const { deliverPaperwork } = await import('../paper/usePaperwork.ts');
-const { usePapers, looseDocs, trayDocs, filedDocs } = await import('../paper/papers.ts');
+const { DOC_HOME, usePapers, looseDocs, trayDocs, filedDocs } = await import(
+  '../paper/papers.ts',
+);
 const { useGame } = await import('../../game/store.ts');
 const { useLibrary } = await import('../../meta/store.ts');
 const { emptySave } = await import('../../game/save.ts');
 const { emptyLibrary } = await import('../../meta/save.ts');
-const { getLevel } = await import('../../levels/index.ts');
 
 type Doc = ReturnType<typeof looseDocs>[number];
 
@@ -41,31 +42,16 @@ function deliver(): void {
   deliverPaperwork();
 }
 
-function runFinished(levelId: string, passed: boolean, ticks: number): void {
-  const level = getLevel(levelId);
-  if (!level) throw new Error(`no level ${levelId}`);
-  useGame.setState({
-    screen: 'workspace',
-    currentLevelId: levelId,
-    trace: null,
-    tick: ticks,
-    showResults: true,
-    resultId: useGame.getState().resultId + 1,
-    seedResults: [],
-    failure: null,
-    freshAchievements: [],
-    personalBest: null,
-    verdict: {
-      passed,
-      ticks,
-      stats: { ticks, ops: ticks, chars: 0, senses: {}, spend: {} },
-      objectives: level.objectives.map((objective) => ({
-        id: objective.id,
-        label: objective.label,
-        met: passed,
-      })),
-    } as never,
+function memoInTray(rank: number): string {
+  const id = `memo:${String(rank)}`;
+  usePapers.getState().issue({
+    id,
+    kind: 'memo',
+    home: DOC_HOME.memo,
+    stowed: true,
+    payload: { kind: 'memo', rank },
   });
+  return id;
 }
 
 function loose(): Doc[] {
@@ -118,23 +104,7 @@ describe('the app layer holds no ceremony that can destroy itself', () => {
   });
 });
 
-describe('a run leaves paper on the desk', () => {
-  test('a pass issues a certificate of closure and closes the store report', () => {
-    runFinished('w1-03', true, 78);
-    deliver();
-
-    expect(ofKind('certificate')).toHaveLength(1);
-    expect(useGame.getState().showResults).toBe(false);
-  });
-
-  test('a failure issues a HALT notice', () => {
-    runFinished('w1-03', false, 900);
-    deliver();
-
-    expect(ofKind('halt')).toHaveLength(1);
-    expect(ofKind('certificate')).toHaveLength(0);
-  });
-
+describe('opening a work order leaves paper on the desk', () => {
   test('the work order is on the desk the moment the level is open', () => {
     useGame.setState({ screen: 'workspace', currentLevelId: 'w1-03' });
     deliver();
@@ -152,85 +122,39 @@ describe('a run leaves paper on the desk', () => {
 
 describe('the paper stays', () => {
   test('nothing in the store closes it, and re-delivering does not duplicate it', () => {
-    runFinished('w1-03', true, 78);
+    useGame.setState({ screen: 'workspace', currentLevelId: 'w1-03' });
     deliver();
-    const issued = ofKind('certificate')[0]?.id;
+    const issued = ofKind('order')[0]?.id;
 
     deliver();
     deliver();
 
-    expect(ofKind('certificate').map((doc) => doc.id)).toEqual([issued]);
+    expect(ofKind('order').map((doc) => doc.id)).toEqual([issued]);
   });
 
-  test('it is filed to the binder, not dropped, when another work order opens', () => {
-    runFinished('w1-03', true, 78);
+  test('a notice is filed to the binder, not dropped, when another work order opens', () => {
+    useGame.setState({ screen: 'workspace', currentLevelId: 'w1-03' });
     deliver();
-    const issued = ofKind('certificate')[0]?.id;
+    const issued = memoInTray(4);
 
-    useGame.setState({ currentLevelId: 'w1-04', showResults: false });
+    useGame.setState({ currentLevelId: 'w1-04' });
     usePapers.getState().clearLevelPaper();
-    deliver();
 
-    expect(ofKind('certificate')).toEqual([]);
+    expect(ofKind('memo')).toEqual([]);
     expect(filedDocs(usePapers.getState()).map((doc) => doc.id)).toContain(issued);
   });
 });
 
-describe('the certificate is a snapshot, so the second run cannot rewrite the first', () => {
-  test('two runs leave two sheets, and the first still says what it said', () => {
-    runFinished('w1-03', true, 78);
-    deliver();
-    const first = ofKind('certificate')[0];
-    const firstTicks = first?.payload.kind === 'certificate' ? first.payload.report.ticks : null;
-
-    runFinished('w1-03', true, 140);
-    deliver();
-
-    const certificates = ofKind('certificate');
-    expect(certificates).toHaveLength(2);
-    const kept = certificates.find((doc) => doc.id === first?.id);
-    expect(kept?.payload.kind === 'certificate' ? kept.payload.report.ticks : null).toBe(
-      firstTicks,
-    );
-    expect(firstTicks).toBe(78);
-  });
-
-  test('a pass then a failure leaves both, not one overwriting the other', () => {
-    runFinished('w1-03', true, 78);
-    deliver();
-    runFinished('w1-03', false, 900);
-    deliver();
-
-    expect(ofKind('certificate')).toHaveLength(1);
-    expect(ofKind('halt')).toHaveLength(1);
-  });
-});
-
 describe('filing is the only way off the desk, and it is not deletion', () => {
-  test('a stamped certificate leaves the desk and is in the record with its mark', () => {
-    runFinished('w1-03', true, 78);
-    deliver();
-    const id = ofKind('certificate')[0]?.id as string;
+  test('a stamped sheet leaves the desk and is in the record with its mark', () => {
+    const id = memoInTray(4);
 
-    usePapers.getState().file(id, 'gold');
+    usePapers.getState().file(id, 'acknowledged');
 
     expect(loose().some((doc) => doc.id === id)).toBe(false);
     const filed = filedDocs(usePapers.getState()).find((doc) => doc.id === id);
     expect(filed).toBeDefined();
-    expect(filed?.mark).toBe('gold');
-  });
-
-  test('an ungraded work order is stamped CLOSED and files the same way', () => {
-    runFinished('w1-01', true, 78);
-    deliver();
-    const certificate = ofKind('certificate')[0];
-    expect(
-      certificate?.payload.kind === 'certificate' ? certificate.payload.report.medal : 'x',
-    ).toBe(null);
-
-    usePapers.getState().file(certificate?.id as string, 'closed');
-
-    expect(filedDocs(usePapers.getState())[0]?.mark).toBe('closed');
+    expect(filed?.mark).toBe('acknowledged');
   });
 
   test('filing a sheet takes it off the copy stand rather than leaving a ghost pinned', () => {
@@ -248,8 +172,9 @@ describe('filing is the only way off the desk, and it is not deletion', () => {
 
 describe('the desk holds one sheet at a time', () => {
   test('everything the company sends arrives in the tray, not on the desk', () => {
-    runFinished('w1-02', false, 900);
+    useGame.setState({ screen: 'workspace', currentLevelId: 'w1-02' });
     deliver();
+    memoInTray(4);
 
     const out = looseDocs(usePapers.getState());
     expect(out.length, `on the desk: ${out.map((doc) => doc.kind).join(', ')}`).toBeLessThanOrEqual(
@@ -260,8 +185,9 @@ describe('the desk holds one sheet at a time', () => {
   });
 
   test('taking one out puts the other one away, and nothing is destroyed', () => {
-    runFinished('w1-02', false, 900);
+    useGame.setState({ screen: 'workspace', currentLevelId: 'w1-02' });
     deliver();
+    memoInTray(4);
 
     const before = loose().length;
     const waiting = trayDocs(usePapers.getState());

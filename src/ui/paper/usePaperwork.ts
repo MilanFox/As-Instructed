@@ -6,7 +6,6 @@ import { isDeliveryNoteOwed } from '../../meta/unlock.ts';
 import { reviewOwed } from '../screens/review.ts';
 import type { DocKind, DocPayload } from './papers.ts';
 import { DOC_ARRIVAL, DOC_HOME, usePapers } from './papers.ts';
-import { snapshotReport } from './report.ts';
 
 function issueOnce(
   id: string,
@@ -33,15 +32,6 @@ export function deliverPaperwork(): void {
       false,
     );
     usePapers.getState().clearLevelPaper();
-  }
-
-  if (game.showResults) {
-    const report = snapshotReport(game);
-    game.dismissResults();
-    if (report) {
-      const kind = report.passed ? 'certificate' : 'halt';
-      issueOnce(`${kind}:${report.levelId}:${String(game.resultId)}`, kind, { kind, report });
-    }
   }
 
   if (game.requisition) {
@@ -71,8 +61,6 @@ export function deliverPaperwork(): void {
 export function usePaperwork(): void {
   const screen = useGame((state) => state.screen);
   const levelId = useGame((state) => state.currentLevelId);
-  const resultId = useGame((state) => state.resultId);
-  const showResults = useGame((state) => state.showResults);
   const requisition = useGame((state) => state.requisition);
   const runState = useGame((state) => state.runState);
   const save = useGame((state) => state.save);
@@ -80,7 +68,7 @@ export function usePaperwork(): void {
 
   useEffect(() => {
     deliverPaperwork();
-  }, [screen, levelId, resultId, showResults, requisition, save, librarySave]);
+  }, [screen, levelId, requisition, save, librarySave]);
 
   useEffect(() => {
     if (runState !== 'running') return;

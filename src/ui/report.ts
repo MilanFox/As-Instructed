@@ -1,12 +1,69 @@
-import type { ObjectiveReport } from '../../engine/index.ts';
-import type { BudgetSource } from '../../game/budgets.ts';
-import { budgetFor, failureCauses } from '../../game/budgets.ts';
-import { playbackFor } from '../../game/playback.ts';
-import { Medal, isGraded, levelPoints, medalForLevel, medalOf } from '../../game/score.ts';
-import type { GameState } from '../../game/store.ts';
-import { currentLevel } from '../../game/store.ts';
-import { codeForKind, failureLineAt, libraryUsageLine, successLine } from '../copy.ts';
-import type { ReportCause, ReportRow, ReportSnapshot } from './papers.ts';
+import { useEffect } from 'react';
+import { create } from 'zustand';
+
+import type { ObjectiveReport } from '../engine/index.ts';
+import type { Budget, BudgetSource } from '../game/budgets.ts';
+import { budgetFor, failureCauses } from '../game/budgets.ts';
+import { playbackFor } from '../game/playback.ts';
+import { Medal, isGraded, levelPoints, medalForLevel, medalOf } from '../game/score.ts';
+import type { GameState } from '../game/store.ts';
+import { currentLevel, useGame } from '../game/store.ts';
+import { codeForKind, failureLineAt, libraryUsageLine, successLine } from './copy.ts';
+
+export interface ReportRow {
+  id: string;
+  label: string;
+  met: boolean;
+  bonus: boolean;
+  progress?: [number, number];
+  budget?: Budget;
+  unit?: string;
+  seeds?: readonly { seed: number; met: boolean }[];
+}
+
+export interface Divergence {
+  where: string;
+  want: string;
+  got: string;
+}
+
+export interface ReportCause {
+  id: string;
+  label: string;
+  detail: string;
+  budget: Budget | null;
+  divergence: Divergence | null;
+}
+
+export interface ReportSnapshot {
+  levelId: string;
+  title: string;
+  passed: boolean;
+  graded: boolean;
+  medal: 'gold' | 'silver' | 'bronze' | 'none' | null;
+  headline: string;
+  ticks: number | null;
+  par: number | null;
+  limit: number | null;
+  bestTicks: number | null;
+  seeds: readonly number[];
+  seedLines: readonly { seed: number; passed: boolean; note: string }[];
+  objectives: readonly ReportRow[];
+  causes: readonly ReportCause[];
+  cause: Divergence | null;
+  failure: string | null;
+  failureCode: string | null;
+  failureSeed: number | null;
+  failureLine: number | null;
+  passedSeed: number | null;
+  bonusSeed: number | null;
+  achievements: readonly string[];
+  personalBest: { previous: number; now: number } | null;
+  points: number | null;
+  stars: number;
+  onRecord: { word: string; note: string } | null;
+  libraryLine: string | null;
+}
 
 const MEDAL_WORD: Record<Medal, string> = {
   gold: 'gold',
@@ -173,6 +230,61 @@ export function snapshotReport(state: GameState): ReportSnapshot | null {
         ? { word: resultWord(medalOf(level, progress)), note: 'this run changed nothing' }
         : { word: 'still open', note: 'nothing to lose' },
     libraryLine: usage && routines > 0 ? libraryUsageLine(routines, usage.ticks) : null,
-    at: Date.now(),
   };
+}
+
+interface RunReportState {
+  report: ReportSnapshot | null;
+  acknowledged: boolean;
+  post(report: ReportSnapshot): void;
+  clear(): void;
+  acknowledge(): void;
+}
+
+// One report, never a history: the sheet can only ever show the run the board is showing. It is
+// deliberately not persisted — a reloaded report outlives the trace and verdict it describes.
+export const useReport = create<RunReportState>((set) => ({
+  report: null,
+  acknowledged: false,
+
+  post(report) {
+    set({ report, acknowledged: false });
+  },
+
+  clear() {
+    set({ report: null, acknowledged: false });
+  },
+
+  acknowledge() {
+    set({ acknowledged: true });
+  },
+}));
+
+export function postRunReport(): void {
+  const game = useGame.getState();
+  if (!game.showResults) return;
+  const report = snapshotReport(game);
+  game.dismissResults();
+  if (report) useReport.getState().post(report);
+  else useReport.getState().clear();
+}
+
+export function useRunReport(): void {
+  const showResults = useGame((state) => state.showResults);
+  const runState = useGame((state) => state.runState);
+  const levelId = useGame((state) => state.currentLevelId);
+
+  useEffect(() => {
+    postRunReport();
+  }, [showResults]);
+
+  // A dispatch in flight must not leave the previous verdict on screen.
+  useEffect(() => {
+    if (runState !== 'running') return;
+    useReport.getState().clear();
+  }, [runState]);
+
+  useEffect(() => {
+    useReport.getState().clear();
+  }, [levelId]);
 }

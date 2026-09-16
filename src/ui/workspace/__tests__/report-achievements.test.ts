@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from 'vitest';
 
 import { ACHIEVEMENTS } from '../../../game/achievements.ts';
-import type { ReportSnapshot } from '../../paper/papers.ts';
+import type { ReportSnapshot } from '../../report.ts';
 import { ReportSheet } from '../ReportSheet.tsx';
 
 const AWARDED = ACHIEVEMENTS.slice(0, 2);
@@ -37,7 +37,6 @@ function reportWith(achievements: readonly string[]): ReportSnapshot {
     stars: 0,
     onRecord: null,
     libraryLine: null,
-    at: 0,
   };
 }
 

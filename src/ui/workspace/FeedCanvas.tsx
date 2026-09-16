@@ -10,7 +10,7 @@ import { divergenceCells } from '../feed/divergence.ts';
 import { LEGIBLE_DEVICE_TILE_PX } from '../feed/geometry.ts';
 import type { FeedRenderer } from '../feed/renderer.ts';
 import { readoutLine } from '../feed/renderer.ts';
-import { usePapers } from '../paper/papers.ts';
+import { useReport } from '../report.ts';
 import { cameraHeld } from './useFeedZoom.ts';
 
 const VIEW: BoardView = { originX: 0, originY: 0, tilePx: 0, cols: 0, rows: 0 };
@@ -32,7 +32,7 @@ export function FeedCanvas({ onReadout, onView }: FeedCanvasProps): React.ReactE
   const celebrations = useGame((state) => state.save.settings.celebrations);
   const level = useGame(currentLevel);
   const surveySeed = useGame((state) => state.surveySeed);
-  const docs = usePapers((state) => state.docs);
+  const report = useReport((state) => state.report);
 
   const [readout, setReadout] = useState<TileReadout | null>(null);
 
@@ -52,16 +52,10 @@ export function FeedCanvas({ onReadout, onView }: FeedCanvasProps): React.ReactE
   const active = activeTrack(playback, flooredTick);
   const highlights = useMemo(() => highlightsAt(playback, flooredTick), [playback, flooredTick]);
 
-  const cause = useMemo(() => {
-    if (!level) return null;
-    for (let i = docs.length - 1; i >= 0; i--) {
-      const payload = docs[i]?.payload;
-      if (payload?.kind !== 'certificate' && payload?.kind !== 'halt') continue;
-      if (payload.report.levelId !== level.id) continue;
-      return payload.report.cause;
-    }
-    return null;
-  }, [docs, level]);
+  const cause = useMemo(
+    () => (report && level && report.levelId === level.id ? report.cause : null),
+    [report, level],
+  );
   const failure = useMemo(() => divergenceCells(cause, world), [cause, world]);
   const marking = failure.length > 0 && !playing && endTick > 0 && flooredTick >= endTick;
   const cells = marking ? failure : highlights.cells;

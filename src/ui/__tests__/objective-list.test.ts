@@ -26,9 +26,10 @@ vi.mock('zustand', async () => {
 });
 
 const { WorkOrderCard } = await import('../workspace/WorkOrderCard.tsx');
+const { ObjectiveItem } = await import('../workspace/ObjectiveItem.tsx');
 const { ReportSheet } = await import('../workspace/ReportSheet.tsx');
 const { useWorkspace } = await import('../workspace/useWorkspace.ts');
-const { snapshotReport } = await import('../paper/report.ts');
+const { snapshotReport } = await import('../report.ts');
 const { useGame } = await import('../../game/store.ts');
 const { emptySave } = await import('../../game/save.ts');
 const { campaignOrder } = await import('../../levels/index.ts');
@@ -46,7 +47,28 @@ function OrderCard(): unknown {
   return WorkOrderCard({ workspace: useWorkspace() });
 }
 
-function Report(): unknown {
+// The sheet no longer lists objectives; the rail is the only list. What the run was graded on
+// still lives in the snapshot, so that is what the rail is held against.
+function Graded(): unknown {
+  const report = snapshotReport(useGame.getState());
+  if (!report) return null;
+  return report.objectives.map((row) =>
+    ObjectiveItem({
+      row: {
+        id: row.id,
+        label: row.label,
+        met: row.met,
+        bonus: row.bonus,
+        active: false,
+        ...(row.progress ? { progress: row.progress } : {}),
+        ...(row.budget ? { budget: row.budget } : {}),
+        ...(row.unit ? { unit: row.unit } : {}),
+      },
+    }),
+  );
+}
+
+function Sheet(): unknown {
   const report = snapshotReport(useGame.getState());
   return report ? ReportSheet({ report }) : null;
 }
@@ -225,7 +247,7 @@ function sweep(present: (level: LevelDef) => void): { rows: number; found: Disag
   for (const level of campaignOrder()) {
     present(level);
     const order = rowsOf(OrderCard);
-    const report = rowsOf(Report);
+    const report = rowsOf(Graded);
     expect(
       report.map((row) => row.label),
       level.id,
@@ -270,8 +292,8 @@ const onEverySeed =
   (level: LevelDef): void =>
     showAggregate(level, seedRunsOf(level, drive));
 
-describe('one objective, two screens', () => {
-  test('a run that did nothing is described the same way on both', () => {
+describe('one objective list, and it is the run that was graded', () => {
+  test('a run that did nothing reads the same on the rail as it was graded', () => {
     const { rows, found } = sweep(onOneSeed(idle));
 
     expect(found).toEqual([]);
@@ -316,14 +338,14 @@ describe('one objective, two screens', () => {
     const bonus = level.bonus?.[0]?.label as string;
     const probes = rowsOf(OrderCard).find((row) => row.label.endsWith(bonus));
     expect(probes?.gauge).toBe(true);
-    expect(probes?.readout).toBe(rowsOf(Report).find((row) => row.label.endsWith(bonus))?.readout);
+    expect(probes?.readout).toBe(rowsOf(Graded).find((row) => row.label.endsWith(bonus))?.readout);
   });
 
   test('a met budget is kinded apart from a progress meter, and names any headroom', () => {
     const level = campaignOrder().find((each) => each.id === 'w1-03') as LevelDef;
     show(level, reference(level));
 
-    for (const screen of [rowsOf(OrderCard), rowsOf(Report)]) {
+    for (const screen of [rowsOf(OrderCard), rowsOf(Graded)]) {
       const tiles = screen.find((row) => !row.label.startsWith('BONUS'));
       const moves = screen.find((row) => row.label.startsWith('BONUS'));
 
@@ -338,7 +360,7 @@ describe('one objective, two screens', () => {
     const roomy = campaignOrder().find((each) => each.id === 'w2-03') as LevelDef;
     show(roomy, reference(roomy));
 
-    for (const screen of [rowsOf(OrderCard), rowsOf(Report)]) {
+    for (const screen of [rowsOf(OrderCard), rowsOf(Graded)]) {
       const footprint = screen.find((row) => row.label.startsWith('BONUS'));
 
       expect(footprint?.kind).toBe('budget');
@@ -362,7 +384,7 @@ describe('one objective, two screens', () => {
 
     showAggregate(level, runs);
 
-    for (const screen of [rowsOf(OrderCard), rowsOf(Report)]) {
+    for (const screen of [rowsOf(OrderCard), rowsOf(Graded)]) {
       const tiles = screen.find((row) => !row.label.startsWith('BONUS')) as Row;
       const moves = screen.find((row) => row.label.startsWith('BONUS')) as Row;
       const [, used, allowance] = /^(\d+) \/ (\d+) moves · over by \d+$/.exec(moves.readout) ?? [];
@@ -380,7 +402,7 @@ describe('one objective, two screens', () => {
     const runs = wastefulRuns(level, wasteful);
 
     showAggregate(level, runs);
-    const lines = linesOf(Report);
+    const lines = linesOf(Sheet);
     const bonusLabel = level.bonus?.[0]?.label as string;
 
     expect(lines.find((line) => line.label === 'Bonus')?.value).toBe(
@@ -397,7 +419,7 @@ describe('one objective, two screens', () => {
   test('and no seed is named when there is no star to account for', () => {
     const level = campaignOrder().find((each) => each.id === 'w1-03') as LevelDef;
     const wasteful = level.seeds[level.seeds.length - 1] as number;
-    const named = (): boolean => linesOf(Report).some((line) => line.label === 'Bonus');
+    const named = (): boolean => linesOf(Sheet).some((line) => line.label === 'Bonus');
 
     showAggregate(level, seedRunsOf(level, referenceAt));
     expect(named()).toBe(false);
@@ -410,8 +432,34 @@ describe('one objective, two screens', () => {
     );
     showAggregate(level, onlyWasteful);
     expect(named()).toBe(false);
-    expect(linesOf(Report).find((line) => line.label === `Seed ${String(wasteful)}`)?.value).toBe(
+    expect(linesOf(Sheet).find((line) => line.label === `Seed ${String(wasteful)}`)?.value).toBe(
       'closed',
     );
+  });
+});
+
+describe('the one list is the latest dispatch', () => {
+  test('a second run replaces the first, with nothing of it left on the rail', () => {
+    const level = campaignOrder().find((each) => each.id === 'w1-03') as LevelDef;
+
+    show(level, idle(level));
+    const first = rowsOf(OrderCard);
+    const required = (rows: Row[]): Row[] => rows.filter((row) => !row.label.startsWith('BONUS'));
+    expect(required(first).every((row) => row.state !== 'met')).toBe(true);
+
+    show(level, reference(level));
+    const second = rowsOf(OrderCard);
+
+    expect(second.filter((row) => row.state === 'met').length).toBe(second.length);
+    expect(second).not.toEqual(first);
+    expect(second).toEqual(rowsOf(Graded));
+  });
+
+  test('the sheet carries no second copy of the list', () => {
+    const level = campaignOrder().find((each) => each.id === 'w1-03') as LevelDef;
+    show(level, reference(level));
+
+    expect(rowsOf(Sheet)).toEqual([]);
+    expect(rowsOf(OrderCard).length).toBeGreaterThan(0);
   });
 });

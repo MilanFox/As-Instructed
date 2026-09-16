@@ -107,9 +107,8 @@ No meaning outside the fiction, each sitting over a real mechanic. Re-skinnable.
 |---|---|
 | memo | the points-tier performance review (`src/ui/screens/review.ts:59`); the UI labels it "Review" |
 | requisition | the per-level API unlock (`src/ui/copy.ts:272`) |
-| issue | the Repository delivery note (`src/ui/paper/usePaperwork.ts:62`) — never a bug |
+| issue | the Repository delivery note (`src/ui/paper/usePaperwork.ts:51`) — never a bug |
 | Interlock | the lock on an unreachable level (`src/ui/screens/LockedLevel.tsx:99`) |
-| certificate, halt | the pass and fail forms of one run report (`usePaperwork.ts:42`); neither word reaches the player |
 | Dot | a copy slot on the workspace (`useWorkspace.ts:146`), not only a character |
 
 ## Two registers, both live

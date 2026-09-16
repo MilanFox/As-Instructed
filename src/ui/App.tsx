@@ -12,6 +12,7 @@ import { useKeyboard } from './hooks/useKeyboard.ts';
 import { Settings } from './screens/Settings.tsx';
 import { LevelSelect } from './screens/LevelSelect.tsx';
 import { Workspace } from './workspace/Workspace.tsx';
+import { useRunReport } from './report.ts';
 import './art.ts';
 import './router.ts';
 import './styles/fonts.css';
@@ -23,6 +24,7 @@ import './styles/art/deepsite.css';
 export function App(): React.JSX.Element {
   useKeyboard();
   usePaperwork();
+  useRunReport();
   const screen = useGame((state) => state.screen);
 
   useEffect(() => {

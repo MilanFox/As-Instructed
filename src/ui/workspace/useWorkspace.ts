@@ -33,8 +33,9 @@ import { CATEGORIES, costLabel, levelCost } from '../reference/api.ts';
 import type { LegendSection } from '../reference/legend.ts';
 import { legendFor } from '../reference/legend.ts';
 import { divergenceCells, divergenceLine } from '../feed/divergence.ts';
-import type { DeskDoc, ReportSnapshot } from '../paper/papers.ts';
 import { usePapers } from '../paper/papers.ts';
+import type { ReportSnapshot } from '../report.ts';
+import { useReport } from '../report.ts';
 
 const TICK_OBJECTIVE = /\bticks?\b/i;
 
@@ -242,24 +243,6 @@ function signatureOf(fn: ApiFunctionSpec): string {
   return `${fn.name}(${params.join(', ')}): ${fn.returns}`;
 }
 
-function latestReport(docs: readonly DeskDoc[], levelId: string | null): ReportSnapshot | null {
-  if (levelId === null) return null;
-  for (let i = docs.length - 1; i >= 0; i--) {
-    const payload = docs[i]?.payload;
-    if (payload?.kind !== 'certificate' && payload?.kind !== 'halt') continue;
-    if (payload.report.levelId !== levelId) continue;
-    return payload.report;
-  }
-  return null;
-}
-
-function unfiledCertificate(docs: readonly DeskDoc[]): DeskDoc | null {
-  return (
-    docs.find((doc) => !doc.filed && doc.payload.kind === 'certificate' && doc.mark === null) ??
-    null
-  );
-}
-
 const NO_HINTS: readonly string[] = [];
 const NO_BANKED: readonly string[] = [];
 
@@ -465,17 +448,18 @@ export function useWorkspace(): WorkspaceData {
 
   const legend = useMemo(() => legendFor(initialWorld), [initialWorld]);
 
-  const report = useMemo(() => latestReport(docs, levelId), [docs, levelId]);
+  const posted = useReport((state) => state.report);
+  const acknowledged = useReport((state) => state.acknowledged);
+  // The store is cleared when the level changes, but not before the render that changes it.
+  const report = posted && posted.levelId === levelId ? posted : null;
   const cause = report?.cause ?? null;
   const cells = useMemo(() => divergenceCells(cause, initialWorld), [cause, initialWorld]);
   const marking = cells.length > 0 && !playing && endTick > 0 && flooredTick >= endTick;
   const divergence = marking ? divergenceLine(cause, cells) : null;
 
-  const waiting = useMemo(() => unfiledCertificate(docs), [docs]);
-  const closePending = waiting !== null;
+  const closePending = report !== null && report.passed && !acknowledged;
   const closeOut = useCallback((): void => {
-    const pending = unfiledCertificate(usePapers.getState().docs);
-    if (pending) usePapers.getState().file(pending.id, 'closed');
+    useReport.getState().acknowledge();
   }, []);
 
   const brief = useMemo<BriefData | null>(() => {

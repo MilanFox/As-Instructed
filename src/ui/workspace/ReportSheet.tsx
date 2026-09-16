@@ -1,9 +1,8 @@
 import { useEffect, useRef } from 'react';
 
 import { getAchievement } from '../../game/achievements.ts';
-import type { ReportSnapshot } from '../paper/papers.ts';
-import { ObjectiveItem } from './ObjectiveItem.tsx';
 import { OverlayPanel, PanelBar, ReportLine, StatCell } from './OverlayPanel.tsx';
+import type { ReportSnapshot } from '../report.ts';
 
 export interface ReportSheetProps {
   report: ReportSnapshot;
@@ -89,25 +88,6 @@ export function ReportSheet({ report, onDismiss, onNext }: ReportSheetProps): Re
         {report.bonusSeed === null ? null : (
           <ReportLine label="Bonus" value={`Missed on seed ${String(report.bonusSeed)}`} />
         )}
-
-        <PanelBar sub>Objectives</PanelBar>
-        <ul>
-          {report.objectives.map((row) => (
-            <ObjectiveItem
-              key={row.id}
-              row={{
-                id: row.id,
-                label: row.label,
-                met: row.met,
-                bonus: row.bonus,
-                active: false,
-                ...(row.progress ? { progress: row.progress } : {}),
-                ...(row.budget ? { budget: row.budget } : {}),
-                ...(row.unit ? { unit: row.unit } : {}),
-              }}
-            />
-          ))}
-        </ul>
 
         {report.causes.length === 0 ? null : (
           <>
