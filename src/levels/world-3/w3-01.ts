@@ -114,7 +114,9 @@ export const w3_01: LevelDef = {
     '',
     'the arm on RIG-04 has one clamp. the log still shows you tried for a second.',
     '',
-    'Every pad on the east side of the shed must end the shift holding a crate.',
+    'planning prices the row changes. count the straight runs.',
+    '',
+    'Every pad on the east side must end the shift holding a crate.',
   ].join('\n'),
   board: {
     fixed: [
@@ -153,7 +155,7 @@ export const w3_01: LevelDef = {
     {
       label: 'The shift report',
       value:
-        'For the star: file one line, `straight <n>`. Pair up as many crates as you can with pads in their own row, one crate to one pad. `n` is the total across all three rows. Where the bot drives does not change it.',
+        'For the star: print one line, `straight <n>`. Pair up as many crates as you can with pads in their own row, one crate to one pad. `n` is the total across all three rows. Where the bot drives does not change it.',
     },
   ],
   seeds: [1, 2, 3],

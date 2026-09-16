@@ -179,9 +179,11 @@ export const w3_03: LevelDef = {
     'later, with no note.',
     '',
     'I have kept the ticket. I am not sure why.',
+    '',
+    'Racking holds a bot only where a crate sits.',
     '```',
     '',
-    'Move every crate onto the outbound bay pad, lowest arrival number first.',
+    'Move every crate onto the outbound bay, lowest arrival number first.',
   ].join('\n'),
   board: {
     fixed: [

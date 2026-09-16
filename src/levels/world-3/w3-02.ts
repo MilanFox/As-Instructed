@@ -122,9 +122,11 @@ export const w3_02: LevelDef = {
     '"Shortcut" is not an approved routing term. Log it as an efficiency',
     'and I will approve it retroactively, which is the only direction in',
     'which I am able to approve things.',
+    '',
+    'Stock control closes a pad the moment you leave it.',
     '```',
     '',
-    'Every crate on the yard floor belongs on the depot pad stencilled with its class.',
+    'Every crate belongs on the depot pad stencilled with its class.',
   ].join('\n'),
   board: {
     fixed: [
