@@ -318,6 +318,9 @@ export function useWorkspace(): WorkspaceData {
   const banked = useGame((state) =>
     levelId ? (state.save.levels[levelId]?.objectives ?? NO_BANKED) : NO_BANKED,
   );
+  const starred = useGame((state) =>
+    levelId ? (state.save.levels[levelId]?.stars ?? NO_BANKED) : NO_BANKED,
+  );
   const seedsUnlocked = useGame((state) =>
     levelId ? state.save.levels[levelId]?.seedsUnlocked === true : false,
   );
@@ -333,7 +336,7 @@ export function useWorkspace(): WorkspaceData {
   const atEnd = !trace || flooredTick >= trace.endTick;
   const active = activeTrack(playback, flooredTick);
 
-  const bankedIds = useMemo(() => new Set(banked), [banked]);
+  const clearedIds = useMemo(() => new Set([...banked, ...starred]), [banked, starred]);
 
   const rows: ObjectiveRow[] = useMemo(() => {
     if (!level) return [];
@@ -351,7 +354,7 @@ export function useWorkspace(): WorkspaceData {
         met,
         bonus: bonusIds.has(objective.id),
         active: !atEnd && active?.id === objective.id,
-        ...(bankedIds.has(objective.id) ? { cleared: true } : {}),
+        ...(clearedIds.has(objective.id) ? { cleared: true } : {}),
         ...(objective.meter ? { meter: objective.meter } : {}),
         ...(objective.unit ? { unit: objective.unit } : {}),
       };
@@ -367,7 +370,7 @@ export function useWorkspace(): WorkspaceData {
       if (budget) row.budget = budget;
       return row;
     });
-  }, [level, verdict, playback, atEnd, active, flooredTick, trace, bankedIds]);
+  }, [level, verdict, playback, atEnd, active, flooredTick, trace, clearedIds]);
 
   const objectives = useMemo(() => rows.filter((row) => !row.bonus), [rows]);
   const bonus = useMemo(() => rows.filter((row) => row.bonus), [rows]);
