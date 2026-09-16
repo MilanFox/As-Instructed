@@ -51,10 +51,9 @@ export const w2_02: LevelDef = {
     'The hopper leaves the depot full of seed. It does not open at the other end; Legal have',
     'confirmed this is a feature and have declined to say of what.',
     '',
-    'Two things get checked at the end of shift: every tile that started with a crop must have',
-    'been harvested at some point, and every tile in the plot must be planted when you clock out.',
-    'These are not the same tile list — a tile can satisfy the second without ever having grown',
-    'anything for the first.',
+    'The buyer grades on arrival and docks the load for every tick a ripe crop stood waiting.',
+    '',
+    'Clear the north plot and leave it planted.',
   ].join('\n'),
   board: {
     fixed: [
@@ -74,6 +73,13 @@ export const w2_02: LevelDef = {
   },
   facts: [
     { label: 'The plot', value: 'Six tiles. Three across, two deep.' },
+    {
+      label: 'The two checks',
+      value:
+        'Every tile that started with a crop must be harvested at some point. Every tile in the ' +
+        'plot must be planted at the end of the shift. A tile that started bare has nothing to ' +
+        'harvest, and still has to be planted.',
+    },
     {
       label: 'The bare patch',
       value:

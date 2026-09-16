@@ -53,6 +53,8 @@ export const w2_01: LevelDef = {
     'you will have seen the rotation memo. it is real and they do check. the silo was moved',
     'again over the winter, so the mule drops you at a different corner than last time.',
     '',
+    'the arm bills by the swing and the seed is counted out by the sack.',
+    '',
     'Work every tile of the field.',
   ].join('\n'),
   board: {

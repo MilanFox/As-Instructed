@@ -81,6 +81,8 @@ export const w2_03: LevelDef = {
     'two things grow in the west field. one of them is the crop. the other is ice-scrub,',
     'which likes the same soil and is worth nothing to anybody.',
     '',
+    'the beds were turned last week. every tile the wheels cross, somebody rakes again.',
+    '',
     '**Come back with the hopper full of crop.**',
   ].join('\n'),
   board: {
@@ -116,12 +118,17 @@ export const w2_03: LevelDef = {
     {
       label: '`scan().crop`',
       value:
-        '`"crop"` counts towards the quota. `"ice"` does not, and the slot it takes stays spent.',
+        'The ice-scrub reads as `"ice"`. `"crop"` counts towards the quota; `"ice"` does not, and the slot it takes stays spent.',
     },
     {
       label: 'Sensor reach',
       value:
         '`scan(Dir.North)` and `scan(Dir.South)` read the rows either side. Three rows from one; the wheels cover one.',
+    },
+    {
+      label: 'Footprint',
+      value:
+        'For the star: the number of different tiles the wheels enter, the starting tile included. Crossing one a second time adds nothing.',
     },
   ],
   seeds: [1, 2, 3, 4, 5],
