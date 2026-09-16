@@ -1,6 +1,6 @@
 # AGENTS.md
 
-`ARCHITECTURE.md` has the layer invariants; `README.md` has the game.
+`ARCHITECTURE.md` has the layer invariants; `README.md` has the game; `CONTEXT.md` maps spoken words to what they name in the code.
 
 | Command | When |
 |---|---|
