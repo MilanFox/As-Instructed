@@ -403,10 +403,10 @@ export function useWorkspace(): WorkspaceData {
 
   const showFuel = useMemo(() => (level ? levelUsesFuel(level) : false), [level]);
   const fuel = useMemo<FuelRow | null>(() => {
-    if (!showFuel || !trace || !board) return null;
+    if (!showFuel || !board) return null;
     const bot = board.bots.find((candidate) => Number.isFinite(candidate.fuelMax));
     return bot ? { fuel: bot.fuel, max: bot.fuelMax } : null;
-  }, [showFuel, trace, board]);
+  }, [showFuel, board]);
 
   const crew = useMemo<CrewRow[]>(() => {
     if (!board) return [];
