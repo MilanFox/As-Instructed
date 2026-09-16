@@ -84,7 +84,7 @@ export const solution: ReferenceSolution = {
     observe();
 
     let mined = 0;
-    for (let round = 0; round < 400; round++) {
+    for (let round = 0; round < 800; round++) {
       const have = mined;
       if (have >= 5) break;
 
@@ -131,8 +131,16 @@ export const solution: ReferenceSolution = {
           frontier = tile;
         }
       }
-      if (!frontier) break;
-      walk(pathTo(via, at, frontier));
+      if (frontier) {
+        walk(pathTo(via, at, frontier));
+        continue;
+      }
+      if (key(at) !== key(home)) {
+        walk(pathTo(via, at, home));
+        if (!sim.refuel(botId)) break;
+        continue;
+      }
+      if (!sim.refuel(botId) || sim.fuel(botId) <= budget) break;
     }
 
     const at = sim.pos(botId);
@@ -192,7 +200,7 @@ export const solution: ReferenceSolution = {
     '}',
     'observe();',
     'let mined = 0;',
-    'for (let round = 0; round < 400; round++) {',
+    'for (let round = 0; round < 800; round++) {',
     '  const have = mined;',
     '  if (have >= 5) break;',
     '  const at = pos();',
@@ -228,8 +236,17 @@ export const solution: ReferenceSolution = {
     '    const s = out * 2 + Math.abs(tile.x - home.x) + Math.abs(tile.y - home.y);',
     '    if (s < score) { score = s; front = tile; }',
     '  }',
-    '  if (!front) break;',
-    '  drive(route(here.via, at, front));',
+    '  if (front) {',
+    '    drive(route(here.via, at, front));',
+    '    continue;',
+    '  }',
+    '  // Nothing affordable left. One tank is not always the whole shift.',
+    '  if (k(at) !== k(home)) {',
+    '    drive(route(here.via, at, home));',
+    '    if (!refuel()) break;',
+    '    continue;',
+    '  }',
+    '  if (!refuel() || fuel() <= budget) break;',
     '}',
     '// Cost the way back, say what it costs, then drive it. That order is the reservation.',
     'const at = pos();',

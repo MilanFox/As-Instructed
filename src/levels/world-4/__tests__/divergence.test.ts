@@ -140,23 +140,36 @@ describe('w4-03 prices the order the run took against the best one', () => {
 });
 
 describe('the rest of World 4 names a point too', () => {
-  test('w4-01 within-60-look counts the rays against the allowance', () => {
+  test('w4-01 reading-allowance counts every reading, scans included', () => {
     const drive = (SOLUTIONS[w4_01.id] as ReferenceSolution).run;
-    const { met, divergence } = diverge(w4_01, 1, 'within-60-look', (sim, botId) => {
-      for (let n = 0; n < 61; n++) sim.look(botId, ALL_DIRS[0] as (typeof ALL_DIRS)[number], 8);
+    const { met, divergence } = diverge(w4_01, 1, 'reading-allowance', (sim, botId) => {
+      for (let n = 0; n < 100; n++) sim.scan(botId, ALL_DIRS[0] as (typeof ALL_DIRS)[number]);
       drive(sim, botId);
     });
     expect(met).toBe(false);
     const shown = must(divergence, 'a divergence');
-    expect(shown.where).toBe('look()');
-    expect(shown.expected).toBe('60 rays');
-    expect(Number.parseInt(shown.received, 10)).toBeGreaterThan(60);
+    expect(shown.where).toBe('readings this shift');
+    expect(shown.expected).toBe('69 at most');
+    expect(Number.parseInt(shown.received, 10)).toBeGreaterThan(69);
   });
 
-  test('w4-01 within-60-look names the pad when the bot never got there', () => {
+  test('w4-01 no-wasted-steps prices the walk against the tunnel it had to walk', () => {
+    const drive = (SOLUTIONS[w4_01.id] as ReferenceSolution).run;
+    const { met, divergence } = diverge(w4_01, 1, 'no-wasted-steps', (sim, botId) => {
+      drive(sim, botId);
+      for (let n = 0; n < 4; n++) sim.move(botId, ALL_DIRS[0] as (typeof ALL_DIRS)[number]);
+    });
+    expect(met).toBe(false);
+    const shown = must(divergence, 'a divergence');
+    expect(shown.where).toBe('steps this shift');
+    expect(shown.expected).toBe('51 at most');
+    expect(shown.received).toBe('52 walked');
+  });
+
+  test('w4-01 tight-reading-bound names the pad when the bot never got there', () => {
     const world = w4_01.build(1);
     const pad = must(tilesWithTerrain(world, Terrain.Pad)[0], 'the pad');
-    const { met, divergence } = diverge(w4_01, 1, 'within-60-look', () => undefined);
+    const { met, divergence } = diverge(w4_01, 1, 'tight-reading-bound', () => undefined);
     expect(met).toBe(false);
     expect(must(divergence, 'a divergence').expected).toBe(`(${String(pad.x)}, ${String(pad.y)})`);
   });

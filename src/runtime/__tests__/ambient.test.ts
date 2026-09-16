@@ -87,7 +87,7 @@ describe('buildAmbientDts', () => {
   test('spells out a default value in the parameter doc, since `declare` cannot carry one', () => {
     const dts = buildAmbientDts(unlockedApiNames('w4-01'));
     expect(dts).toContain('declare function look(dir: Dir, range?: number): TileView[];');
-    expect(dts).toContain('Defaults to `8`.');
+    expect(dts).toContain('Defaults to `Infinity`.');
   });
 
   test('never opens a JSDoc it does not close', () => {

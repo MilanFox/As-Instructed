@@ -245,7 +245,7 @@ const BINDERS: Record<string, Binder> = {
   look:
     (sim, botId) =>
     (dir, range): unknown =>
-      sim.look(botId, dir as Dir, range === undefined ? 8 : Number(range)),
+      sim.look(botId, dir as Dir, range === undefined ? Number.POSITIVE_INFINITY : Number(range)),
   mark:
     (sim, botId) =>
     (text): void => {

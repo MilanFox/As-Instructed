@@ -62,6 +62,8 @@ describe('budgets that are still read out of their own English', () => {
 const UNDECLARED_SLACK: readonly string[] = [
   'w2-02/crop-spoilage',
   'w2-03/tile-footprint',
+  'w4-01/reading-allowance',
+  'w4-01/tight-reading-bound',
   'w5-05/budget',
 ];
 

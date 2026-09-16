@@ -1,15 +1,16 @@
-import type { ObjectiveContext, Rng, World } from '../../engine/index.ts';
+import type { ObjectiveContext, Rng, Vec, World } from '../../engine/index.ts';
 import {
   Objectives,
   Terrain,
   addBot,
   createWorld,
+  eq,
   senseTotals,
   setTerrain,
   tileAt,
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
-import { carveTunnel, cellTile, paintCave } from './caves.ts';
+import { carveTunnel, cellTile, paintCave, walkableNeighbours } from './caves.ts';
 import { botEndsOn, endedOn } from './objectives.ts';
 
 const CELLS = 11;
@@ -32,10 +33,48 @@ function build(seed: number): World {
   return world;
 }
 
-const LOOK_BUDGET = 60;
+const PER_RUN = 3;
+const SPARE = 12;
+const AT_THE_DEAD_END = 4;
+const PER_BEND = 2;
+const STEP_SLACK = 3;
 
-const raysCast = (ctx: ObjectiveContext): number =>
-  ctx.senses?.['look'] ?? senseTotals(ctx.trace)['look'] ?? 0;
+function tunnelShape(world: World): { runs: number; steps: number } {
+  const bot = world.bots[0];
+  if (bot === undefined) return { runs: 0, steps: 0 };
+  let at: Vec = bot.at;
+  let from: Vec | undefined;
+  let heading: string | undefined;
+  let runs = 0;
+  let steps = 0;
+  for (;;) {
+    const onward = walkableNeighbours(world, at).find(
+      (next) => from === undefined || !eq(next, from),
+    );
+    if (onward === undefined) return { runs, steps };
+    const along = `${String(onward.x - at.x)},${String(onward.y - at.y)}`;
+    if (along !== heading) runs++;
+    heading = along;
+    steps++;
+    from = at;
+    at = onward;
+  }
+}
+
+const allowance = (ctx: ObjectiveContext): number =>
+  PER_RUN * tunnelShape(ctx.initialWorld).runs + SPARE;
+
+const tightAllowance = (ctx: ObjectiveContext): number =>
+  AT_THE_DEAD_END + PER_BEND * Math.max(tunnelShape(ctx.initialWorld).runs - 1, 0);
+
+const stepAllowance = (ctx: ObjectiveContext): number =>
+  tunnelShape(ctx.initialWorld).steps + STEP_SLACK;
+
+const readingsTaken = (ctx: ObjectiveContext): number =>
+  Object.values(ctx.senses ?? senseTotals(ctx.trace)).reduce((sum, count) => sum + count, 0);
+
+const stepsTaken = (ctx: ObjectiveContext): number =>
+  ctx.trace.events.filter((event) => event.kind === 'move').length;
 
 export const w4_01: LevelDef = {
   id: 'w4-01',
@@ -49,13 +88,13 @@ export const w4_01: LevelDef = {
     'FROM: Dep. Coordinator M. Vance',
     'RE:   Subsurface access',
     '',
-    'The tunnels are not lit, not surveyed, and not, in the strict',
-    'sense, ours. The Charter grants us surface rights. Legal advise',
-    'that "surface" is defined in Appendix C.',
+    'The tunnels are not lit, not surveyed, and not, strictly, ours.',
+    'The Charter grants us surface rights. Legal advise that "surface"',
+    'is defined in Appendix C.',
     '```',
     '',
-    'There is one tunnel. It bends, it does not fork, and it ends on a marked pad.',
-    'Drive the bot onto that pad.',
+    'One tunnel. It bends, does not fork, and ends on a marked pad. Drive the bot there',
+    'on a metered lamp, without a wasted step. Both allowances are below.',
   ].join('\n'),
   board: {
     fixed: [
@@ -64,11 +103,11 @@ export const w4_01: LevelDef = {
       'the tunnel is one tile wide and never runs alongside itself, so no tile on it has more than two openings',
       'a tile with an even `x` and an even `y` is always rock',
       'RIG-04 starts at one end of the tunnel and the pad is at the other',
-      'the ray allowance is for the whole shift, however long the tunnel is drawn',
     ],
     redrawn: [
       'the shape of the tunnel, bend for bend',
       'its length — 31 to 59 tiles of floor',
+      `both allowances with it — ${String(PER_RUN)} readings per straight run plus ${String(SPARE)}, and one step per tile between RIG-04 and the pad, plus ${String(STEP_SLACK)}`,
       'where in the rock it is carved',
       'which end of it RIG-04 starts from',
     ],
@@ -83,16 +122,25 @@ export const w4_01: LevelDef = {
     {
       label: '`look(dir)`',
       value:
-        'Returns the tiles along that direction, nearest first. It stops at the first thing it cannot see through.',
+        'Returns the tiles along that direction, nearest first. It stops at the first thing it cannot see through, and reports that tile last. The second argument limits how far to look; left out, the ray runs until something stops it.',
     },
     {
       label: 'Looking',
-      value: 'Costs no ticks. The star below is the only thing that counts rays.',
+      value:
+        'Costs no ticks. Every question the bot asks is one reading — `look`, `scan`, `pos`, any of them, whatever range it was given — and both allowances below count all of them.',
     },
     { label: 'The pad', value: 'The only tile in the tunnel that is not plain floor.' },
     {
       label: 'The lamp',
-      value: `For the star: reach the pad having cast at most ${String(LOOK_BUDGET)} rays in the whole shift. One ray reports a whole corridor.`,
+      value: `The shift allows ${String(PER_RUN)} readings for every straight run of the tunnel, plus ${String(SPARE)}. One ray reports a whole run; feeling along the tunnel a tile at a time does not fit.`,
+    },
+    {
+      label: 'The steps',
+      value: `The shift allows one step for every tile of tunnel between RIG-04 and the pad, plus ${String(STEP_SLACK)}. A move into rock takes a tick and counts as a step, so finding the way by walking into walls does not fit either.`,
+    },
+    {
+      label: 'The star',
+      value: `${String(AT_THE_DEAD_END)} readings, plus ${String(PER_BEND)} for every bend. The dead end can cost four rays before one of them opens; after that, the ray that carried you in already reported the rock ahead, so a bend has two candidates left and costs at most two.`,
     },
   ],
   seeds: [1, 2, 46],
@@ -109,37 +157,66 @@ export const w4_01: LevelDef = {
       },
       { divergence: (ctx) => endedOn(ctx, Terrain.Pad) },
     ),
+    Objectives.custom(
+      'reading-allowance',
+      'Stay inside the reading allowance',
+      (ctx) => readingsTaken(ctx) <= allowance(ctx),
+      {
+        progress: (ctx) => [Math.min(readingsTaken(ctx), allowance(ctx)), allowance(ctx)],
+        divergence: (ctx) => ({
+          where: 'readings this shift',
+          expected: `${String(allowance(ctx))} at most`,
+          received: `${String(readingsTaken(ctx))} taken`,
+        }),
+      },
+    ),
+    Objectives.custom(
+      'no-wasted-steps',
+      'Walk the tunnel and nothing else',
+      (ctx) => stepsTaken(ctx) <= stepAllowance(ctx),
+      {
+        meter: { kind: 'events', event: 'move' },
+        unit: 'steps',
+        progress: (ctx) => [Math.min(stepsTaken(ctx), stepAllowance(ctx)), stepAllowance(ctx)],
+        divergence: (ctx) => ({
+          where: 'steps this shift',
+          expected: `${String(stepAllowance(ctx))} at most`,
+          received: `${String(stepsTaken(ctx))} walked`,
+        }),
+      },
+    ),
   ],
   bonus: [
     Objectives.custom(
-      'within-60-look',
-      `Reach the pad on ${String(LOOK_BUDGET)} rays or fewer`,
-      (ctx) => botEndsOn(ctx, Terrain.Pad) && raysCast(ctx) <= LOOK_BUDGET,
+      'tight-reading-bound',
+      'Reach the pad on 4 readings, plus 2 for each bend',
+      (ctx) => botEndsOn(ctx, Terrain.Pad) && readingsTaken(ctx) <= tightAllowance(ctx),
       {
-        progress: (ctx) => [Math.min(raysCast(ctx), LOOK_BUDGET), LOOK_BUDGET],
+        progress: (ctx) => [Math.min(readingsTaken(ctx), tightAllowance(ctx)), tightAllowance(ctx)],
         divergence: (ctx) =>
           botEndsOn(ctx, Terrain.Pad)
             ? {
-                where: 'look()',
-                expected: `${String(LOOK_BUDGET)} rays`,
-                received: `${String(raysCast(ctx))} rays`,
+                where: 'readings this shift',
+                expected: `${String(tightAllowance(ctx))} at most`,
+                received: `${String(readingsTaken(ctx))} taken`,
               }
             : endedOn(ctx, Terrain.Pad),
       },
     ),
   ],
   starter: [
-    '// look(dir, 1) returns a single tile view; look(dir) returns up to eight.',
+    '// look(dir, 1) and look(dir) cost one reading each. Only one of them is a survey.',
     '',
-    'const ahead = look(Dir.East, 1)[0];',
-    'print(ahead ? ahead.terrain : "off the map");',
+    'const east = look(Dir.East);',
+    'print(east.length + " tiles east, ending in " + east[east.length - 1].terrain);',
     '',
   ].join('\n'),
   hints: [
-    'The bot cannot see the tunnel. It can see along each of four directions, for free, as often as it likes.',
+    'The bot cannot see the tunnel. It can see along each of four directions, and looking costs no ticks.',
+    'A move into rock still takes a tick, and the step allowance counts it. The way through has to be known before it is walked, not found by bumping.',
     'Standing anywhere in the middle of the tunnel there are exactly two openings, and you arrived through one of them.',
     'So you already know one direction you do not want. Hold on to it across the loop, rather than working it out again.',
-    'The pad is the only tile in the tunnel that is not plain floor. Check what is under the bot before you decide to move again.',
+    'The pad is the only tile in the tunnel that is not plain floor. A ray reports the terrain of every tile it crosses, so the pad arrives in the same reading that reports the corridor.',
     'A ray is not a feeler. `look(dir)` hands back the whole straight run of corridor at once, so one call is worth as many steps as the corridor is long — and the next call is only needed where it bends.',
   ],
   docs: ['look', 'coordinates', 'memory'],

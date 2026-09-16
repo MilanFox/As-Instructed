@@ -222,7 +222,7 @@ export const w4_04: LevelDef = {
     },
     {
       label: 'The hold',
-      value: `For the star: bring the quota up having called \`inventory()\` at most ${String(FIX_BUDGET)} times in the shift. A \`mine(dir)\` that returns an item put exactly one ore in the hold, and one that returns nothing put none, so the tally is the bot's own. \`fuel()\` and \`look()\` are not counted.`,
+      value: `For the star: the whole shift spends at most ${String(FIX_BUDGET)} \`inventory()\` calls, the ones after the quota is cut included. A \`mine(dir)\` that returns an item put exactly one ore in the hold, and one that returns nothing put none, so the tally is the bot's own. \`fuel()\` and \`look()\` are not counted.`,
     },
   ],
   seeds: [1, 2, 3, 4, 5],
@@ -258,7 +258,7 @@ export const w4_04: LevelDef = {
       { divergence: unfiled },
     ),
     Objectives.withinSenses('inventory', FIX_BUDGET, {
-      label: `Cut the quota on ${String(FIX_BUDGET)} inventory() calls or fewer`,
+      label: `Call inventory() at most ${String(FIX_BUDGET)} times in the shift`,
     }),
   ],
   starter: [

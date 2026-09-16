@@ -1,7 +1,16 @@
-import type { Divergence, Machine, ObjectiveContext, Vec, World } from '../../engine/index.ts';
+import type {
+  Divergence,
+  Machine,
+  MoveEvent,
+  ObjectiveContext,
+  PrintEvent,
+  Vec,
+  World,
+} from '../../engine/index.ts';
 import {
   Dir,
   MachineKind,
+  NOTHING,
   Objectives,
   Rng,
   Terrain,
@@ -10,6 +19,7 @@ import {
   createWorld,
   dirName,
   machineById,
+  printsUpTo,
   setTerrain,
   vec,
 } from '../../engine/index.ts';
@@ -18,7 +28,6 @@ import { at, firstNotIn } from './objectives.ts';
 
 const WIDTH = 22;
 const HEIGHT = 5;
-const FIX_BUDGET = 4;
 const ROW = 2;
 const WEST_END = 1;
 const EAST_END = WIDTH - 2;
@@ -132,6 +141,73 @@ const orderedCount = (ctx: ObjectiveContext): number => {
   return substations(ctx.world).filter((m) => good.has(m.id) && !bad.has(m.id)).length;
 };
 
+const keyOf = (tile: Vec): string => `${String(tile.x)},${String(tile.y)}`;
+
+const tilesIn = (prints: readonly PrintEvent[]): Vec[] =>
+  prints.flatMap((line) =>
+    (line.text.match(/\d+,\d+/g) ?? []).map((pair) => {
+      const [x = '0', y = '0'] = pair.split(',');
+      return vec(Number(x), Number(y));
+    }),
+  );
+
+interface DeclaredRoute {
+  declared: Vec[];
+  walked: Vec[];
+  matched: number;
+  droveFirst: boolean;
+}
+
+function declaredRoute(ctx: ObjectiveContext): DeclaredRoute {
+  const steps = ctx.trace.events.filter(
+    (event): event is MoveEvent => event.kind === 'move' && event.ok,
+  );
+  const first = steps[0];
+  const declared = tilesIn(printsUpTo(ctx.trace, first?.t ?? Number.POSITIVE_INFINITY));
+  const start = ctx.initialWorld.bots[0]?.at;
+  const head = declared[0];
+  if (start !== undefined && head !== undefined && keyOf(head) === keyOf(start)) declared.shift();
+
+  const walked = steps.map((step) => step.to);
+  let matched = 0;
+  while (matched < declared.length && matched < walked.length) {
+    if (keyOf(declared[matched] as Vec) !== keyOf(walked[matched] as Vec)) break;
+    matched++;
+  }
+  const droveFirst =
+    first !== undefined && declared.length === 0 && tilesIn(printsUpTo(ctx.trace)).length > 0;
+  return { declared, walked, matched, droveFirst };
+}
+
+const walkedWhatItSaid = (ctx: ObjectiveContext): boolean => {
+  const { declared, walked, matched } = declaredRoute(ctx);
+  return declared.length > 0 && matched === declared.length && matched === walked.length;
+};
+
+const routeProgress = (ctx: ObjectiveContext): [number, number] => {
+  const { declared, walked, matched } = declaredRoute(ctx);
+  return [matched, Math.max(declared.length, walked.length)];
+};
+
+const leftTheRoute = (ctx: ObjectiveContext): Divergence | undefined => {
+  const { declared, walked, matched, droveFirst } = declaredRoute(ctx);
+  if (declared.length === 0) {
+    return {
+      where: 'the route',
+      expected: 'tiles printed before the first step',
+      received: droveFirst ? 'the bot stepped off first' : NOTHING,
+    };
+  }
+  if (matched === declared.length && matched === walked.length) return undefined;
+  const said = declared[matched];
+  const took = walked[matched];
+  return {
+    where: `step ${String(matched + 1)}`,
+    expected: said === undefined ? 'the route to end here' : at(said),
+    received: took === undefined ? 'the run stopped here' : at(took),
+  };
+};
+
 export const w5_01: LevelDef = {
   id: 'w5-01',
   world: 5,
@@ -188,8 +264,9 @@ export const w5_01: LevelDef = {
         '`index` — its place in the chain, the reactor being 0. `feed` — the index of the machine that feeds it. `at` — the tile it stands on.',
     },
     {
-      label: 'Fixes',
-      value: `For the star: bring the line up having called \`pos()\` at most ${String(FIX_BUDGET)} times in the shift. Every call counts, wherever it is made. Nothing else on this level is counted — \`probe()\` and \`move()\` are both unlimited, and a \`move()\` along the line returns whether it took.`,
+      label: 'The route',
+      value:
+        'For the star: before the first step, print the tiles the bot is going to stand on, in the order it will reach them, each as `x,y`. One line holds the lot. Every `x,y` printed before that first step is read as part of the route and the rest of the text is ignored; the reactor tile the bot starts on may be named or left out. The star is earned if the run then steps onto exactly those tiles, in that order.',
     },
   ],
   seeds: [1, 2, 3],
@@ -260,8 +337,9 @@ export const w5_01: LevelDef = {
       },
       { divergence: doubledBack },
     ),
-    Objectives.withinSenses('pos', FIX_BUDGET, {
-      label: `Bring the line up on ${String(FIX_BUDGET)} pos() calls or fewer`,
+    Objectives.custom('route-declared', 'Print the route before walking it', walkedWhatItSaid, {
+      progress: routeProgress,
+      divergence: leftTheRoute,
     }),
   ],
   starter: [

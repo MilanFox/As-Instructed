@@ -192,7 +192,7 @@ export class Sim {
     return view;
   }
 
-  look(botId: number, dir: Dir, range = 8): TileView[] {
+  look(botId: number, dir: Dir, range = Number.POSITIVE_INFINITY): TileView[] {
     const bot = this.requireBot(botId);
     const out: TileView[] = [];
     let at = bot.at;

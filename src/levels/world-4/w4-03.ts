@@ -28,7 +28,6 @@ import {
 
 const CELLS = 14;
 const SIZE = 30;
-const FIX_BUDGET = 4;
 
 const MODES = ['spread', 'clustered', 'mixed', 'clustered'] as const;
 type Mode = (typeof MODES)[number];
@@ -242,10 +241,6 @@ export const w4_03: LevelDef = {
         'It pays for one look around and one good circuit. It does not pay for three separate trips.',
     },
     {
-      label: 'Fixes',
-      value: `For the star: finish the circuit having called \`pos()\` at most ${String(FIX_BUDGET)} times in the shift. Every route the bot drives is built out of tiles it has already written down, and a step onto a named tile puts it on that tile. \`look()\` and \`scan()\` are not counted.`,
-    },
-    {
       label: 'The Repository',
       value:
         'Nothing here needs it. But the two halves you write get names later: `survey` and `pathTo`.',
@@ -276,9 +271,6 @@ export const w4_03: LevelDef = {
       (ctx) => tookBestOrder(ctx),
       { divergence: orderTaken },
     ),
-    Objectives.withinSenses('pos', FIX_BUDGET, {
-      label: `Finish the circuit on ${String(FIX_BUDGET)} pos() calls or fewer`,
-    }),
   ],
   starter: [
     '// NOTE(4470): i kept mine like this. key(x, y) names a tile, the',
