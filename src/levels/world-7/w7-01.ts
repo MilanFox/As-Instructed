@@ -117,7 +117,7 @@ function misreportedIdle(ctx: ObjectiveContext): Divergence | undefined {
   if (botOfLine(got) === subject) {
     return {
       where: `bot #${subject}`,
-      expected: 'a different figure',
+      expected: 'its wait ticks plus what sync() cost it',
       received: clipValue(got),
     };
   }
@@ -137,9 +137,9 @@ export const w7_01: LevelDef = {
   brief: [
     '**FROM:** Field Eng. D. Halloran',
     '',
-    'two bots now. they run at the same time, on separate clocks, and the number Finance',
-    'reads is the finish time of the last one. not the total. the total is a much larger',
-    'number that nobody upstairs has ever asked for.',
+    'two bots now. add their two clocks together and you get a much larger number that',
+    'nobody upstairs has ever asked for. accounts wants the standing-about itemised per',
+    'bot; nobody has said why.',
     '',
     'Park each bot on the pad at the end of its own corridor, and have each one hear from',
     'the other.',

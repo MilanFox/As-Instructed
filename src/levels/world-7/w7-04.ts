@@ -22,7 +22,6 @@ const DEPOT_X = 2;
 const YARD_X0 = 8;
 const WALK_OUT = YARD_X0 - DEPOT_X;
 const JOB_PREFIX = 'job-';
-const FIX_BUDGET = 12;
 
 export type Shape = 'uniform' | 'spread' | 'skewed' | 'bimodal' | 'heavy';
 
@@ -207,6 +206,72 @@ function misreadDecider(ctx: ObjectiveContext): Divergence | undefined {
   };
 }
 
+function begunAt(ctx: ObjectiveContext): Map<string, number> {
+  const begun = new Map<string, number>();
+  for (const event of ctx.trace.events) {
+    if (event.kind !== 'use' || !event.ok) continue;
+    const id = event.machineId;
+    if (id === null || !id.startsWith(JOB_PREFIX)) continue;
+    if (!begun.has(id)) begun.set(id, event.t);
+  }
+  return begun;
+}
+
+function costOfEach(ctx: ObjectiveContext): Map<string, number> {
+  return new Map(jobMachines(ctx.initialWorld).map((job) => [job.id, job.vars.cost ?? 0]));
+}
+
+interface FirstWave {
+  size: number;
+  wave: { id: string; cost: number; begun: number }[];
+  dearest: number[];
+  begun: number;
+}
+
+function firstWave(ctx: ObjectiveContext): FirstWave {
+  const cost = costOfEach(ctx);
+  const size = Math.min(ctx.initialWorld.bots.length, cost.size);
+  const started = [...begunAt(ctx)]
+    .map(([id, at]) => ({ id, cost: cost.get(id) ?? 0, begun: at }))
+    .sort((a, b) => a.begun - b.begun || b.cost - a.cost);
+  return {
+    size,
+    wave: started.slice(0, size),
+    dearest: [...cost.values()].sort((a, b) => b - a).slice(0, size),
+    begun: started.length,
+  };
+}
+
+function dearestFirst(ctx: ObjectiveContext): boolean {
+  const { size, wave, dearest } = firstWave(ctx);
+  if (size === 0 || wave.length < size) return false;
+  const taken = wave.map((job) => job.cost).sort((a, b) => b - a);
+  return taken.every((each, index) => each === dearest[index]);
+}
+
+function wrongWave(ctx: ObjectiveContext): Divergence {
+  const { size, wave, begun } = firstWave(ctx);
+  if (wave.length < size) {
+    return {
+      where: 'the first wave',
+      expected: `${String(size)} jobs begun`,
+      received: `${String(begun)} begun all shift`,
+    };
+  }
+  const inWave = new Set(wave.map((job) => job.id));
+  let passedOver = 0;
+  for (const [id, cost] of costOfEach(ctx)) {
+    if (!inWave.has(id) && cost > passedOver) passedOver = cost;
+  }
+  let weakest = wave[0] as { id: string; cost: number; begun: number };
+  for (const job of wave) if (job.cost < weakest.cost) weakest = job;
+  return {
+    where: weakest.id,
+    expected: `a job costing ${String(passedOver)} or more`,
+    received: `cost ${String(weakest.cost)}, begun at tick ${String(weakest.begun)}`,
+  };
+}
+
 export const w7_04: LevelDef = {
   id: 'w7-04',
   world: 7,
@@ -218,11 +283,11 @@ export const w7_04: LevelDef = {
     '**FROM:** Dep. Coordinator M. Vance\\',
     '**RE:** Yard 7 dispatch',
     '',
-    'The board has a different number of work items every shift. Some of them are a minute. Some',
-    'of them are the rest of the shift. The board does not distinguish between these, and',
-    'neither, historically, have we.',
+    'The board is a different size every shift. Some items are a minute. Some are the whole',
+    'shift. The board does not distinguish between these, and neither, historically, have we.',
+    'Head office wants the long ones started first, and a line naming whatever held us open.',
     '',
-    'Clear the board. Every job has to be `done` when your program stops.',
+    'Clear the board.',
   ].join('\n'),
   board: {
     fixed: [
@@ -267,8 +332,9 @@ export const w7_04: LevelDef = {
         'One line, `last <job> <tick>`: the job whose final `use()` landed latest — not necessarily the last one you dispatched — and the clock reading of the bot that closed it, straight after that use.',
     },
     {
-      label: 'Fixes',
-      value: `For the star: close the board having called \`pos()\` at most ${String(FIX_BUDGET)} times in the shift, every bot's calls counted together. The fleet moves only where your program sends it, and \`move()\` reports whether the step took. Nothing else is counted — \`probe()\`, \`canMove()\` and \`clock()\` are all unlimited.`,
+      label: 'The first wave',
+      value:
+        'A job is begun on the tick of its first `use()`. For the star, the first jobs begun — one for each bot in the fleet — must be the most expensive jobs on the board. Costs are compared, not job ids, so jobs of equal cost are interchangeable, and jobs begun on the same tick are in no order.',
     },
   ],
   seeds: [1, 2, 3, 4, 5],
@@ -343,9 +409,12 @@ export const w7_04: LevelDef = {
       },
       { divergence: misreadDecider },
     ),
-    Objectives.withinSenses('pos', FIX_BUDGET, {
-      label: `Close the board on ${String(FIX_BUDGET)} pos() calls or fewer`,
-    }),
+    Objectives.custom(
+      'long-jobs-first',
+      'Put the fleet on the most expensive jobs first',
+      dearestFirst,
+      { divergence: wrongWave },
+    ),
   ],
   starter: [
     '// NOTE(4470): the board is not sorted. it has never been sorted',
@@ -362,7 +431,7 @@ export const w7_04: LevelDef = {
     'Two bots do not become free at the same moment. The interesting question at any point is which one is free soonest, and you can answer it without asking the bot.',
     'The last job to be started decides when the shift ends. It is much better for that job to be a short one.',
     'A bot that is nearer to a job finishes it sooner. That matters, but not as much as the number written on the job.',
-    'Nothing moves a bot except your own program. Read each one out of the depot once, then keep its tile yourself as you send it about, and the yard never has to be asked again.',
+    'Every bot is idle at the start, so the opening move is one free choice per bot, made with the whole board already known. Nothing later in the shift is that unconstrained.',
   ],
   docs: ['bots', 'sync', 'probe', 'use'],
 };

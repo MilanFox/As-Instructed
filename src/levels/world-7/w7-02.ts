@@ -35,7 +35,7 @@ interface Layout {
 
 const LAYOUTS: Record<number, Layout> = {
   1: { fleet: 4, patches: [{ x: 3, y: 3, w: 4, h: 8 }] },
-  2: { fleet: 1, patches: [{ x: 5, y: 4, w: 2, h: 5 }] },
+  2: { fleet: 2, patches: [{ x: 5, y: 4, w: 2, h: 5 }] },
   3: { fleet: 6, patches: [{ x: 1, y: 6, w: 22, h: 2 }] },
   4: { fleet: 8, patches: [{ x: 9, y: 3, w: 8, h: 10 }] },
 };
@@ -119,8 +119,8 @@ export const w7_02: LevelDef = {
     '**FROM:** Dep. Coordinator M. Vance\\',
     '**RE:**   Fleet requisition, north apron',
     '',
-    'The requisition has been approved at the level Finance considered appropriate this week.',
-    'It will be a different level on Monday. Please do not write the number down.',
+    'Finance approved a requisition this week. It will be a different one on Monday.',
+    'Please do not write it down. Every unit earns its requisition. We do not itemise.',
     '',
     'Harvest every crop in the field.',
   ].join('\n'),
@@ -133,7 +133,7 @@ export const w7_02: LevelDef = {
       'every bot holds 99 crops, so nothing has to be hauled anywhere',
     ],
     redrawn: [
-      'the requisition — one to eight bots, counting the one already on the apron',
+      'the requisition — two to eight bots, counting the one already on the apron',
       'how many crops the field carries',
       'where the patch sits and what shape it is',
       'whether an equal-area cut is also an equal-work cut',

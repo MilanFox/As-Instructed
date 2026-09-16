@@ -15,7 +15,7 @@ import {
   vec,
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
-import { idleTicks, localSeed } from './shared.ts';
+import { localSeed } from './shared.ts';
 
 const WIDTH = 36;
 const HEIGHT = 28;
@@ -81,26 +81,31 @@ export function workerIds(world: World): number[] {
 interface Orders {
   ordered: number;
   switched: number;
-  jumped?: { botId: number; t: number; told: number | undefined };
+  jumped?: { botId: number; t: number; nth: number; told: number | undefined };
 }
 
 function readOrders(ctx: ObjectiveContext): Orders {
-  const briefed = new Map<number, number>();
+  const briefed = new Map<number, number[]>();
+  const switched = new Map<number, number>();
   const sites = new Set(siteMachines(ctx.initialWorld).map((machine) => key(machine.at)));
   const out: Orders = { ordered: 0, switched: 0 };
   for (const event of ctx.trace.events) {
     if (event.kind === 'recv' && event.from !== null && event.from !== event.botId) {
-      if (!briefed.has(event.botId)) briefed.set(event.botId, event.t);
+      const read = briefed.get(event.botId) ?? [];
+      read.push(event.t);
+      briefed.set(event.botId, read);
       continue;
     }
     if (event.kind !== 'use' || !event.ok || !sites.has(key(event.at))) continue;
     out.switched++;
-    const told = briefed.get(event.botId);
+    const nth = (switched.get(event.botId) ?? 0) + 1;
+    switched.set(event.botId, nth);
+    const told = briefed.get(event.botId)?.[nth - 1];
     if (told !== undefined && told <= event.t) {
       out.ordered++;
       continue;
     }
-    if (out.jumped === undefined) out.jumped = { botId: event.botId, t: event.t, told };
+    if (out.jumped === undefined) out.jumped = { botId: event.botId, t: event.t, nth, told };
   }
   return out;
 }
@@ -148,8 +153,12 @@ function firstUnordered(ctx: ObjectiveContext): Divergence {
       expected: 'an order read before this',
       received:
         jumped.told === undefined
-          ? 'no order all shift'
-          : `first order at tick ${String(jumped.told)}`,
+          ? jumped.nth === 1
+            ? 'no order all shift'
+            : `only ${String(jumped.nth - 1)} orders all shift`
+          : jumped.nth === 1
+            ? `first order at tick ${String(jumped.told)}`
+            : `order ${String(jumped.nth)} at tick ${String(jumped.told)}`,
     };
   }
   const total = Math.max(orders.switched, siteMachines(ctx.initialWorld).length);
@@ -160,29 +169,47 @@ function firstUnordered(ctx: ObjectiveContext): Divergence {
   };
 }
 
-function idleWorkers(ctx: ObjectiveContext): Divergence {
-  const ids = workerIds(ctx.initialWorld);
-  const span = ctx.trace.endTick * ids.length;
-  if (span === 0) {
+interface Dispatch {
+  sent: number;
+  repeat?: { botId: number; t: number; had: number };
+}
+
+function dispatched(ctx: ObjectiveContext): Dispatch {
+  const holder = new Map<string, number>();
+  const out: Dispatch = { sent: 0 };
+  for (const event of ctx.trace.events) {
+    if (event.kind !== 'send' || !event.ok || event.to === event.botId) continue;
+    out.sent++;
+    const body = String(event.body);
+    const had = holder.get(body);
+    if (had !== undefined && had !== event.to && out.repeat === undefined) {
+      out.repeat = { botId: event.to, t: event.t, had };
+    }
+    holder.set(body, event.to);
+  }
+  return out;
+}
+
+function oneEach(ctx: ObjectiveContext): boolean {
+  const total = siteMachines(ctx.initialWorld).length;
+  const orders = dispatched(ctx);
+  return total > 0 && orders.sent >= total && orders.repeat === undefined;
+}
+
+function repeatedOrder(ctx: ObjectiveContext): Divergence {
+  const orders = dispatched(ctx);
+  if (orders.repeat !== undefined) {
     return {
-      where: 'the workers',
-      expected: 'a shift with work in it',
-      received: `the run ended at tick ${String(ctx.trace.endTick)}`,
+      where: `bot #${String(orders.repeat.botId)} · tick ${String(orders.repeat.t)}`,
+      expected: 'an order no other bot had',
+      received: `the order bot #${String(orders.repeat.had)} already had`,
     };
   }
-  const idle = idleTicks(ctx.trace.events, new Set(ids));
-  let worst = ids[0] as number;
-  let worstIdle = -1;
-  for (const id of ids) {
-    const own = idleTicks(ctx.trace.events, new Set([id]));
-    if (own <= worstIdle) continue;
-    worstIdle = own;
-    worst = id;
-  }
+  const total = siteMachines(ctx.initialWorld).length;
   return {
-    where: `bot #${String(worst)} waited longest`,
-    expected: `under ${String(Math.ceil(span * 0.1))} idle ticks in all`,
-    received: `${String(idle)} in all, ${String(worstIdle)} on this bot`,
+    where: 'the orders',
+    expected: `${String(total)} sent, one for each site`,
+    received: `${String(orders.sent)} sent all shift`,
   };
 }
 
@@ -202,10 +229,11 @@ export const w7_05: LevelDef = {
     '**RE:** Conclusion of previous engagement',
     '',
     'The relay sites in the north workings are not on any plan. They were put in by somebody who',
-    'did not file, and they are still running. Field Engineering have declined to assist and',
-    'have not given a reason. Dot does give reasons.',
+    'did not file, and they still run. Field Engineering have declined to assist and',
+    'have not given a reason. Dot does give reasons. One docket per site, please. That is how',
+    'the last lot got lost.',
     '',
-    'Bring every relay site up. No bot may bring up a site it was not sent to.',
+    'Bring every relay site up.',
   ].join('\n'),
   board: {
     fixed: [
@@ -246,7 +274,7 @@ export const w7_05: LevelDef = {
     {
       label: 'Sent to',
       value:
-        "Before a bot uses a site it must already have read a message another bot sent it. `send` stamps the sender's clock, and a bot running behind sees an empty inbox.",
+        "One order for one site: before a bot switches on its **n**th site it must already have read its **n**th message from another bot. `send` stamps the sender's clock, and a bot running behind sees an empty inbox.",
     },
     {
       label: 'Seeing',
@@ -254,11 +282,9 @@ export const w7_05: LevelDef = {
         '`look(dir, range)` is free and stops at the first thing it cannot see through. A bot only knows what it has seen.',
     },
     {
-      label: 'Waiting',
+      label: 'The orders',
       value:
-        'A worker waits for every tick it spends in `wait`, and for every tick `sync` moves its ' +
-        'clock forward to meet the fleet. The star wants that total under a tenth of the shift, ' +
-        'where the shift is the final tick times the number of workers. Scout waiting is not counted.',
+        'For the star: at least one order per site goes out, and no message body is sent to two different bots. Two bots holding the same body are two bots sent to one site. Bodies sent twice to the same bot are not counted.',
     },
   ],
   seeds: [1, 2, 3, 4, 5],
@@ -374,14 +400,10 @@ export const w7_05: LevelDef = {
   ],
   bonus: [
     Objectives.custom(
-      'workers-busy',
-      'Keep the workers waiting for under a tenth of the shift',
-      (ctx) => {
-        const ids = new Set(workerIds(ctx.initialWorld));
-        const span = ctx.trace.endTick * ids.size;
-        return span > 0 && idleTicks(ctx.trace.events, ids) < span * 0.1;
-      },
-      { divergence: idleWorkers },
+      'one-order-per-site',
+      'One order for each site, and no two alike',
+      oneEach,
+      { divergence: repeatedOrder },
     ),
   ],
   starter: [

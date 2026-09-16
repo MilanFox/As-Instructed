@@ -28,7 +28,8 @@ export const solution: ReferenceSolution = {
     const found = new Map<string, Vec>();
     const claimed = new Set<string>();
     const orders = new Map<number, Site>();
-    const told = new Set<number>();
+    const given = new Map<number, number>();
+    const read = new Map<number, number>();
 
     const observe = (id: number): void => {
       const here = sim.pos(id);
@@ -143,10 +144,11 @@ export const solution: ReferenceSolution = {
         claimed.add(id);
         orders.set(pick, { id, at });
         sim.send(boss, pick, at.y * width + at.x);
+        given.set(pick, (given.get(pick) ?? 0) + 1);
       }
       for (const hand of hands) {
         // Reading is what makes the order this worker's; the position was in the body.
-        while (sim.recv(hand) !== null) told.add(hand);
+        while (sim.recv(hand) !== null) read.set(hand, (read.get(hand) ?? 0) + 1);
       }
 
       const reserved = new Set<string>();
@@ -156,8 +158,9 @@ export const solution: ReferenceSolution = {
         if (order) {
           const at = sim.pos(id);
           if (at.x === order.at.x && at.y === order.at.y) {
-            if (!told.has(id)) {
-              stepAside(id);
+            // The order is not this worker's until it has read the message that carries it.
+            if ((read.get(id) ?? 0) < (given.get(id) ?? 0)) {
+              sim.wait(id, 1);
               acted = true;
               continue;
             }
@@ -199,7 +202,8 @@ export const solution: ReferenceSolution = {
     'const found = new Map();',
     'const claimed = new Set();',
     'const orders = new Map();',
-    'const told = new Set();',
+    'const given = new Map();',
+    'const read = new Map();',
     'const observe = (id) => {',
     '  const here = bot(id).pos();',
     '  seen.add(k(here));',
@@ -292,9 +296,10 @@ export const solution: ReferenceSolution = {
     '    claimed.add(id);',
     '    orders.set(pick, { id, at });',
     '    bot(boss).send(pick, at.y * 36 + at.x);',
+    '    given.set(pick, (given.get(pick) ?? 0) + 1);',
     '  }',
     '  for (const h of hands) {',
-    '    while (bot(h).recv() !== null) told.add(h);',
+    '    while (bot(h).recv() !== null) read.set(h, (read.get(h) ?? 0) + 1);',
     '  }',
     '  const reserved = new Set();',
     '  let acted = false;',
@@ -303,8 +308,8 @@ export const solution: ReferenceSolution = {
     '    if (order) {',
     '      const at = bot(id).pos();',
     '      if (at.x === order.at.x && at.y === order.at.y) {',
-    '        if (!told.has(id)) {',
-    '          stepAside(id);',
+    '        if ((read.get(id) ?? 0) < (given.get(id) ?? 0)) {',
+    '          bot(id).wait(1);',
     '          acted = true;',
     '          continue;',
     '        }',

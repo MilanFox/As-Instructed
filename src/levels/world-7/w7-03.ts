@@ -1,4 +1,4 @@
-import type { Divergence, ObjectiveContext, Vec, World } from '../../engine/index.ts';
+import type { Divergence, MoveEvent, ObjectiveContext, Vec, World } from '../../engine/index.ts';
 import {
   Dir,
   ItemKind,
@@ -7,6 +7,7 @@ import {
   Terrain,
   addBot,
   addGroundItems,
+  clipValue,
   createWorld,
   setTile,
   vec,
@@ -15,7 +16,9 @@ import type { LevelDef } from '../types.ts';
 import { at, blockedMoves, firstBump, localSeed } from './shared.ts';
 
 const HEIGHT = 9;
-const FIX_BUDGET = 16;
+const MOUTH_X = 8;
+const ROOM_W = 7;
+const REVERSAL_BUDGET = 3;
 export const AISLE = 7;
 export const SILO_X = 1;
 
@@ -42,7 +45,7 @@ export function siteFor(seed: number): Site {
 }
 
 export function siteWidth(site: Site): number {
-  return 16 + site.tunnel;
+  return MOUTH_X + site.tunnel + ROOM_W + 1;
 }
 
 function totalCrates(world: World): number {
@@ -86,6 +89,47 @@ function strayCrate(ctx: ObjectiveContext): Divergence | undefined {
   };
 }
 
+function tunnelSteps(ctx: ObjectiveContext): MoveEvent[] {
+  const eastX = ctx.initialWorld.w - ROOM_W - 1;
+  return ctx.trace.events
+    .filter(
+      (event): event is MoveEvent =>
+        event.kind === 'move' &&
+        event.ok &&
+        event.to.y === AISLE &&
+        event.to.x >= MOUTH_X &&
+        event.to.x < eastX,
+    )
+    .sort((a, b) => a.t - b.t || a.botId - b.botId);
+}
+
+function reversals(ctx: ObjectiveContext): MoveEvent[] {
+  const steps = tunnelSteps(ctx);
+  const turns: MoveEvent[] = [];
+  for (let i = 1; i < steps.length; i++) {
+    const before = steps[i - 1] as MoveEvent;
+    const step = steps[i] as MoveEvent;
+    if (Math.sign(step.to.x - step.from.x) !== Math.sign(before.to.x - before.from.x)) {
+      turns.push(step);
+    }
+  }
+  return turns;
+}
+
+function overTurned(ctx: ObjectiveContext): Divergence | undefined {
+  const turns = reversals(ctx);
+  const spare = turns[REVERSAL_BUDGET];
+  if (spare === undefined) return undefined;
+  const heading = spare.to.x > spare.from.x ? 'east' : 'west';
+  return {
+    where: `bot #${String(spare.botId)} · tick ${String(spare.t)}`,
+    expected: `${String(REVERSAL_BUDGET)} reversals or fewer`,
+    received: clipValue(
+      `reversal ${String(REVERSAL_BUDGET + 1)} of ${String(turns.length)} · turned ${heading}`,
+    ),
+  };
+}
+
 export const w7_03: LevelDef = {
   id: 'w7-03',
   world: 7,
@@ -99,9 +143,9 @@ export const w7_03: LevelDef = {
     'widening it as an option under review. the review is also under review.',
     '',
     'two bots that each stand aside for the other stand aside all shift. the framework calls',
-    'that a sustained mutual courtesy.',
+    'that a sustained mutual courtesy. Facilities log every turnaround in there as an incident.',
     '',
-    'Every crate in the east yard has to end up in the silo. All of it goes through the tunnel.',
+    'Clear the east yard into the silo.',
   ].join('\n'),
   board: {
     fixed: [
@@ -142,8 +186,8 @@ export const w7_03: LevelDef = {
         "Free, and it asks `move`'s own question about the tick this bot would arrive on. Only another bot moving can change the answer, so a `canMove` answered by that same `move` never bounces.",
     },
     {
-      label: 'Fixes',
-      value: `For the star: clear the yard having called \`canMove()\` at most ${String(FIX_BUDGET)} times in the shift, every bot's calls counted together. The tunnel is dug once and is the same length for every bot and every crossing, both ways. Nothing else is counted.`,
+      label: 'Turning the tunnel',
+      value: `A step into the tunnel that goes the opposite way to the step into it before is a reversal. For the star: at most ${String(REVERSAL_BUDGET)} in the shift, every bot's steps counted together in tick order.`,
     },
   ],
   seeds: [1, 2, 3, 4],
@@ -152,14 +196,14 @@ export const w7_03: LevelDef = {
     const site = siteFor(seed);
     const width = siteWidth(site);
     const world = createWorld({ w: width, h: HEIGHT, seed, fill: Terrain.Wall });
-    const eastX = 8 + site.tunnel;
+    const eastX = MOUTH_X + site.tunnel;
     for (let y = 1; y <= AISLE; y++) {
-      for (let x = 1; x <= 7; x++) setTile(world, vec(x, y), { terrain: Terrain.Floor });
-      for (let x = eastX; x <= eastX + 6; x++)
+      for (let x = 1; x <= ROOM_W; x++) setTile(world, vec(x, y), { terrain: Terrain.Floor });
+      for (let x = eastX; x < eastX + ROOM_W; x++)
         setTile(world, vec(x, y), { terrain: Terrain.Floor });
     }
     for (let y = 1; y <= AISLE; y++) setTile(world, vec(SILO_X, y), { terrain: Terrain.Pad });
-    for (let x = 8; x < eastX; x++) setTile(world, vec(x, AISLE), { terrain: Terrain.Floor });
+    for (let x = MOUTH_X; x < eastX; x++) setTile(world, vec(x, AISLE), { terrain: Terrain.Floor });
 
     site.columns.forEach((column, i) => {
       addBot(world, { at: vec(2, 1 + i), facing: Dir.East, name: `HAUL-0${i + 1}`, capacity: 1 });
@@ -183,9 +227,16 @@ export const w7_03: LevelDef = {
       (ctx) => blockedMoves(ctx.trace.events) === 0,
       { divergence: (ctx) => firstBump(ctx.trace.events) },
     ),
-    Objectives.withinSenses('canMove', FIX_BUDGET, {
-      label: `Clear the yard on ${String(FIX_BUDGET)} canMove() calls or fewer`,
-    }),
+    Objectives.custom(
+      'one-way-tunnel',
+      `Reverse the tunnel at most ${String(REVERSAL_BUDGET)} times`,
+      (ctx) => reversals(ctx).length <= REVERSAL_BUDGET,
+      {
+        progress: (ctx) => [Math.min(reversals(ctx).length, REVERSAL_BUDGET), REVERSAL_BUDGET],
+        divergence: overTurned,
+        unit: 'reversals',
+      },
+    ),
   ],
   starter: [
     '// The tunnel row is y = 7. Everything crosses on it.',
@@ -200,7 +251,7 @@ export const w7_03: LevelDef = {
     'Both bots are being polite. Politeness is symmetric. Something here needs to not be.',
     'You know every cost before the run starts, so you can work out the tick a bot reaches the tunnel mouth without asking it. The question is not whether the tunnel is free now. It is when.',
     'A queue that runs one way empties faster than a queue that alternates. Once the tunnel is pointed one way, ask what it costs you to turn it around, and how many bots you should send before you pay that.',
-    'Feeling for the far end of the tunnel is worth doing once. It is the same length for the bot behind, and the same length again on the way back, so the figure is worth keeping rather than finding a second time.',
+    'A pile of two crates cannot be cleared on one crossing each way, so the shift needs a second lap. Count the direction changes that whole plan costs before the first bot moves.',
   ],
   docs: ['ticks', 'wait', 'sync', 'canMove', 'pickup', 'drop'],
 };

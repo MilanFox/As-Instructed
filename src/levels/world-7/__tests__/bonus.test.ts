@@ -148,7 +148,7 @@ describe('w7-02 even-share', () => {
     expect(run.met('even-share')).toBe(false);
   });
 
-  test('working the field single-handed is refused on every multi-bot seed', () => {
+  test('working the field single-handed is refused on every seed', () => {
     for (const seed of w7_02.seeds) {
       const run = scored(w7_02, seed, (sim, botId) => {
         const depot = sim.probe(botId, 'depot');
@@ -174,7 +174,7 @@ describe('w7-02 even-share', () => {
         }
       });
       expect(run.passed, `seed ${String(seed)}`).toBe(true);
-      expect(run.met('even-share'), `seed ${String(seed)}`).toBe(seed === 2);
+      expect(run.met('even-share'), `seed ${String(seed)}`).toBe(false);
     }
   });
 });

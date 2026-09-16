@@ -103,7 +103,7 @@ describe('w7-01 names the bot rather than counting them', () => {
 
     expect(report.met).toBe(false);
     expect(shown.where).toBe('bot #0');
-    expect(shown.expected).toBe('a different figure');
+    expect(shown.expected).toBe('its wait ticks plus what sync() cost it');
     expect(shown.received).toBe('idle 0 0');
   });
 });
@@ -312,15 +312,19 @@ describe('w7-05 names the site and the bot that jumped its orders', () => {
     });
   });
 
-  test('a fleet that stood about is told its idle total and which bot was worst', () => {
-    const { report } = diverge(w7_05, 1, 'workers-busy', (sim) => {
-      for (const id of sim.botIds()) sim.wait(id, 5);
-    });
-    const shown = must(report.divergence, 'a divergence');
+  test('a relay that deals the same site twice is told which bot already had it', () => {
+    const initialWorld = w7_05.build(1);
+    const objective = objectiveIn(w7_05, 'one-order-per-site');
+    const ctx = contextFrom(initialWorld, [
+      { t: 3, botId: 0, dt: 0, kind: 'send', to: 2, body: 412, ok: true },
+      { t: 5, botId: 0, dt: 0, kind: 'send', to: 4, body: 412, ok: true },
+    ]);
 
-    expect(report.met).toBe(false);
-    expect(shown.where).toMatch(/^bot #\d+ waited longest$/);
-    expect(shown.expected).toMatch(/^under \d+ idle ticks in all$/);
-    expect(shown.received).toMatch(/^\d+ in all, \d+ on this bot$/);
+    expect(objective.evaluate(ctx)).toBe(false);
+    expect(objective.divergence?.(ctx)).toEqual({
+      where: 'bot #4 · tick 5',
+      expected: 'an order no other bot had',
+      received: 'the order bot #2 already had',
+    });
   });
 });
