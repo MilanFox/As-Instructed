@@ -123,7 +123,9 @@
   transition-duration: var(--ws-slam);
 }
 
-.drawer-handle:hover {
+/* The pair: whichever face is up is the filled one. Shut, neither is. */
+.drawer-handle:hover,
+.drawer-handle[aria-expanded='true'] {
   background: var(--accent);
 }
 

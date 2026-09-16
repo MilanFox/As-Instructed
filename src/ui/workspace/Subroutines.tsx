@@ -2,7 +2,6 @@ import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 
 import { REPOSITORY_NAME, useLibrary } from '../../meta/index.ts';
 import { closeOverlay, toggleOverlay, useOverlay } from '../hooks/useOverlay.ts';
-import { PanelBar } from './OverlayPanel.tsx';
 
 const TITLE = `${REPOSITORY_NAME} · ~/lib.ts`;
 
@@ -57,15 +56,11 @@ export function Subroutines(): React.ReactElement | null {
         data-on={String(open)}
         {...(open ? {} : { inert: true })}
       >
-        <PanelBar
-          tools={
-            <button type="button" className="control control--tight" onClick={closeOverlay}>
-              Close
-            </button>
-          }
-        >
-          {TITLE}
-        </PanelBar>
+        {/* The face's own tab row is the strip below, rendered from the library store — the
+            close is parked over its right end rather than given a header bar of its own. */}
+        <button type="button" className="control library-face__close" onClick={closeOverlay}>
+          Close
+        </button>
 
         {opened ? (
           <Suspense fallback={<p className="empty-note">opening lib.ts…</p>}>

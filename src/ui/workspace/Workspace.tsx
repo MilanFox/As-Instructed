@@ -35,6 +35,8 @@ import '../styles/workspace/banner.css';
 import '../styles/workspace/library.css';
 import '../styles/workspace/reflow.css';
 
+// Both faces stand in the same box at --ws-flyout and the workbench is the one always mounted,
+// so it is the ruler for the flyout's edge whichever face is actually up.
 function drawerWidth(): number {
   const drawer = document.getElementById('workspace-drawer');
   return drawer ? drawer.getBoundingClientRect().width : 0;
@@ -357,7 +359,7 @@ export function Workspace(): React.ReactElement {
       {/* The flyout stands over the work order card and takes its Site map button with it.
           Same action, parked in the strip of board the flyout leaves — and once that strip is
           down to the telemetry column there is no room for it, the same as at compact. */}
-      {open && !compact && !crowded && !libraryOpen ? (
+      {flyoutOpen && !compact && !crowded ? (
         <button
           type="button"
           className="control control--tight drawer-escape"
