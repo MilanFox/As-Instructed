@@ -1,79 +1,96 @@
 import type { Sim, Vec } from '../../../engine/index.ts';
-import { ALL_DIRS, ItemKind, Terrain, dirBetween, manhattan, step } from '../../../engine/index.ts';
+import { ALL_DIRS, ItemKind, Terrain, dirBetween } from '../../../engine/index.ts';
 import type { ReferenceSolution } from '../../types.ts';
 
-const RANGE = 14;
+const QUOTA = 5;
+const CUT = 2;
+const OVER = 12;
+const ROUNDS = 4000;
+
 const key = (at: Vec): string => `${String(at.x)},${String(at.y)}`;
+const parse = (id: string): Vec => {
+  const [x = '0', y = '0'] = id.split(',');
+  return { x: Number(x), y: Number(y) };
+};
+const around = (at: Vec): Vec[] => [
+  { x: at.x, y: at.y - 1 },
+  { x: at.x + 1, y: at.y },
+  { x: at.x, y: at.y + 1 },
+  { x: at.x - 1, y: at.y },
+];
+const solid = (at: Vec): boolean => at.x % 2 === 0 && at.y % 2 === 0;
 
-interface Survey {
-  open: Map<string, Vec>;
-  seen: Set<string>;
-  veins: Map<string, Vec>;
+interface Reach {
+  cost: Map<string, number>;
+  via: Map<string, Vec>;
 }
 
-function record(survey: Survey, at: Vec, terrain: Terrain, walkable: boolean): void {
-  survey.seen.add(key(at));
-  if (walkable) survey.open.set(key(at), at);
-  else if (terrain === Terrain.Ore) survey.veins.set(key(at), at);
-}
-
-function reachable(
-  survey: Survey,
-  from: Vec,
-): { cost: Map<string, number>; via: Map<string, Vec> } {
-  const cost = new Map<string, number>([[key(from), 0]]);
-  const via = new Map<string, Vec>();
-  const queue: Vec[] = [from];
-  for (let head = 0; head < queue.length; head++) {
-    const at = queue[head] as Vec;
-    const here = cost.get(key(at)) ?? 0;
-    for (const dir of ALL_DIRS) {
-      const next = step(at, dir);
-      if (!survey.open.has(key(next)) || cost.has(key(next))) continue;
-      cost.set(key(next), here + 1);
-      via.set(key(next), at);
-      queue.push(next);
-    }
-  }
-  return { cost, via };
-}
-
-function pathTo(via: Map<string, Vec>, from: Vec, to: Vec): Vec[] {
-  const route: Vec[] = [];
-  let at = to;
-  while (key(at) !== key(from)) {
-    route.push(at);
-    const back = via.get(key(at));
-    if (!back) return [];
-    at = back;
-  }
-  return route.reverse();
+interface Target {
+  stand: Vec;
+  face: Vec;
+  out: number;
+  deep: boolean;
 }
 
 export const solution: ReferenceSolution = {
   levelId: 'w4-04',
   run(sim: Sim, botId: number): void {
     const home = sim.pos(botId);
-    const survey: Survey = {
-      open: new Map([[key(home), home]]),
-      seen: new Set([key(home)]),
-      veins: new Map(),
-    };
+    const deepest = (sim.fuel(botId) - CUT - OVER) / 2;
+    const ground = new Map<string, Terrain>();
+    const walkable = new Map<string, boolean>();
     const cut = new Set<string>();
+    let mined = 0;
+    let deepCut = false;
 
     const observe = (): void => {
       const at = sim.pos(botId);
-      survey.seen.add(key(at));
-      survey.open.set(key(at), at);
+      walkable.set(key(at), true);
       for (const dir of ALL_DIRS) {
-        for (const view of sim.look(botId, dir, RANGE)) {
+        for (const view of sim.look(botId, dir)) {
           if (!view.inBounds) break;
-          record(survey, view.at, view.terrain, view.walkable);
+          ground.set(key(view.at), view.terrain);
+          walkable.set(key(view.at), view.walkable);
         }
       }
     };
 
-    const walk = (route: readonly Vec[]): void => {
+    const isOpen = (at: Vec): boolean => walkable.get(key(at)) === true;
+    const isDry = (at: Vec): boolean =>
+      around(at).some((side) => ground.get(key(side)) === Terrain.Rubble);
+    const halfLit = (at: Vec): boolean =>
+      around(at).some((side) => !walkable.has(key(side)) && !solid(side));
+
+    const flood = (from: Vec): Reach => {
+      const cost = new Map<string, number>([[key(from), 0]]);
+      const via = new Map<string, Vec>();
+      const queue: Vec[] = [from];
+      for (let head = 0; head < queue.length; head++) {
+        const at = queue[head] as Vec;
+        const base = cost.get(key(at)) ?? 0;
+        for (const next of around(at)) {
+          if (!isOpen(next) || isDry(next) || cost.has(key(next))) continue;
+          cost.set(key(next), base + 1);
+          via.set(key(next), at);
+          queue.push(next);
+        }
+      }
+      return { cost, via };
+    };
+
+    const trail = (via: Map<string, Vec>, from: Vec, to: Vec): Vec[] => {
+      const route: Vec[] = [];
+      let at = to;
+      while (key(at) !== key(from)) {
+        route.push(at);
+        const back = via.get(key(at));
+        if (back === undefined) return [];
+        at = back;
+      }
+      return route.reverse();
+    };
+
+    const drive = (route: readonly Vec[]): void => {
       for (const next of route) {
         const dir = dirBetween(sim.pos(botId), next);
         if (dir === null || !sim.move(botId, dir)) return;
@@ -83,175 +100,200 @@ export const solution: ReferenceSolution = {
 
     observe();
 
-    let mined = 0;
-    for (let round = 0; round < 800; round++) {
-      const have = mined;
-      if (have >= 5) break;
+    for (let round = 0; round < ROUNDS; round++) {
+      const here = flood(sim.pos(botId));
+      const homeward = flood(home).cost;
+      const fuel = sim.fuel(botId);
+      const done = mined >= QUOTA && deepCut;
 
-      const at = sim.pos(botId);
-      const { cost, via } = reachable(survey, at);
-      const homeward = reachable(survey, home).cost;
-      const budget = sim.fuel(botId);
-
-      let bestVein: { stand: Vec; face: Vec; price: number } | null = null;
-      for (const [id, face] of survey.veins) {
-        if (cut.has(id)) continue;
-        for (const dir of ALL_DIRS) {
-          const stand = step(face, dir);
-          const out = cost.get(key(stand));
-          const back = homeward.get(key(stand));
-          if (out === undefined || back === undefined) continue;
-          const price = out + 2 + back;
-          if (price > budget) continue;
-          if (!bestVein || out < bestVein.price) bestVein = { stand, face, price: out };
-        }
+      let target: Target | null = null;
+      for (const [id, terrain] of ground) {
+        if (done || terrain !== Terrain.Ore || cut.has(id)) continue;
+        const face = parse(id);
+        const stand = around(face).find((side) => isOpen(side));
+        if (stand === undefined) continue;
+        const out = here.cost.get(key(stand));
+        const legs = homeward.get(key(stand));
+        if (out === undefined || legs === undefined) continue;
+        const deep = legs >= deepest;
+        if (mined >= QUOTA && !deep) continue;
+        if (out + CUT + legs > fuel) continue;
+        if (target === null || out < target.out) target = { stand, face, out, deep };
       }
-      if (bestVein) {
-        walk(pathTo(via, at, bestVein.stand));
-        const dir = dirBetween(sim.pos(botId), bestVein.face);
-        if (dir !== null && sim.mine(botId, dir) === ItemKind.Ore) mined++;
-        cut.add(key(bestVein.face));
+      if (target !== null) {
+        drive(trail(here.via, sim.pos(botId), target.stand));
+        const dir = dirBetween(sim.pos(botId), target.face);
+        if (dir !== null && sim.mine(botId, dir) === ItemKind.Ore) {
+          mined += 1;
+          if (target.deep) deepCut = true;
+        }
+        cut.add(key(target.face));
         observe();
         continue;
       }
 
-      const reserve = (5 - have) * 2 + 2;
-      let frontier: Vec | null = null;
-      let cheapest = Number.POSITIVE_INFINITY;
-      for (const [id, tile] of survey.open) {
-        const out = cost.get(id);
-        const back = homeward.get(id);
-        if (out === undefined || back === undefined || out === 0) continue;
-        if (out + back + reserve > budget) continue;
-        const unknown = ALL_DIRS.some((dir) => !survey.seen.has(key(step(tile, dir))));
-        if (!unknown) continue;
-        const score = out * 2 + manhattan(tile, home);
-        if (score < cheapest) {
-          cheapest = score;
-          frontier = tile;
+      let goal: Vec | null = null;
+      let best = Number.POSITIVE_INFINITY;
+      for (const [id, out] of here.cost) {
+        if (done) continue;
+        const legs = homeward.get(id);
+        if (legs === undefined || legs > deepest) continue;
+        const tile = parse(id);
+        if (!halfLit(tile)) continue;
+        if (out + legs + CUT > fuel) continue;
+        if (out - legs < best) {
+          best = out - legs;
+          goal = tile;
         }
       }
-      if (frontier) {
-        walk(pathTo(via, at, frontier));
+      if (goal !== null) {
+        drive(trail(here.via, sim.pos(botId), goal));
         continue;
       }
-      if (key(at) !== key(home)) {
-        walk(pathTo(via, at, home));
-        if (!sim.refuel(botId)) break;
-        continue;
-      }
-      if (!sim.refuel(botId) || sim.fuel(botId) <= budget) break;
-    }
 
-    const at = sim.pos(botId);
-    const route = key(at) === key(home) ? [] : pathTo(reachable(survey, at).via, at, home);
-    sim.print(botId, `home ${String(route.length)}`);
-    walk(route);
+      if (key(sim.pos(botId)) !== key(home)) {
+        drive(trail(here.via, sim.pos(botId), home));
+        continue;
+      }
+      if (done || !sim.refuel(botId) || sim.fuel(botId) <= fuel) break;
+    }
   },
   source: [
-    '// Four free rays at every stop; the map they build is what makes the way home a number.',
+    '// The tank is the survey. It holds the drive out to the deepest face, the cut,',
+    '// the drive back and twelve tiles over, so the deepest face is (fuel() - 14) / 2',
+    '// out and nothing needs looking at beyond that ring.',
+    'const QUOTA = 5;',
+    'const CUT = 2;',
     'const home = pos();',
-    'const open = new Map([[`${home.x},${home.y}`, home]]);',
-    'const seen = new Set([`${home.x},${home.y}`]);',
-    'const veins = new Map();',
+    'const deepest = (fuel() - CUT - 12) / 2;',
+    'const ground = new Map();',
+    'const walkable = new Map();',
     'const cut = new Set();',
-    'const dirs = [Dir.North, Dir.East, Dir.South, Dir.West];',
+    'let mined = 0;',
+    'let deepCut = false;',
+    '',
     'const k = (p) => `${p.x},${p.y}`;',
-    'const stepTo = (p, d) => ({',
-    '  x: p.x + (d === Dir.East ? 1 : d === Dir.West ? -1 : 0),',
-    '  y: p.y + (d === Dir.South ? 1 : d === Dir.North ? -1 : 0),',
-    '});',
+    'const parse = (id) => ({ x: Number(id.split(",")[0]), y: Number(id.split(",")[1]) });',
+    'const around = (p) => [',
+    '  { x: p.x, y: p.y - 1 },',
+    '  { x: p.x + 1, y: p.y },',
+    '  { x: p.x, y: p.y + 1 },',
+    '  { x: p.x - 1, y: p.y },',
+    '];',
+    '// An even x with an even y is always rock, so it is never worth walking to.',
+    'const solid = (p) => p.x % 2 === 0 && p.y % 2 === 0;',
+    '',
     'function observe() {',
-    '  const at = pos();',
-    '  seen.add(k(at)); open.set(k(at), at);',
-    '  for (const d of dirs) {',
-    '    for (const v of look(d, 14)) {',
+    '  walkable.set(k(pos()), true);',
+    '  for (const d of [Dir.North, Dir.East, Dir.South, Dir.West]) {',
+    '    for (const v of look(d)) {',
     '      if (!v.inBounds) break;',
-    '      seen.add(k(v.at));',
-    '      if (v.walkable) open.set(k(v.at), v.at);',
-    '      else if (v.terrain === Terrain.Ore) veins.set(k(v.at), v.at);',
+    '      ground.set(k(v.at), v.terrain);',
+    '      walkable.set(k(v.at), v.walkable);',
     '    }',
     '  }',
     '}',
+    'const isOpen = (p) => walkable.get(k(p)) === true;',
+    '// Spoil beside a tile means that tile is the blind end of an empty passage.',
+    'const isDry = (p) => around(p).some((s) => ground.get(k(s)) === Terrain.Rubble);',
+    'const halfLit = (p) => around(p).some((s) => !walkable.has(k(s)) && !solid(s));',
+    '',
     'function flood(from) {',
-    '  const cost = new Map([[k(from), 0]]); const via = new Map(); const q = [from];',
-    '  for (let i = 0; i < q.length; i++) {',
-    '    const at = q[i];',
-    '    for (const d of dirs) {',
-    '      const n = stepTo(at, d);',
-    '      if (!open.has(k(n)) || cost.has(k(n))) continue;',
-    '      cost.set(k(n), cost.get(k(at)) + 1); via.set(k(n), at); q.push(n);',
+    '  const cost = new Map([[k(from), 0]]);',
+    '  const via = new Map();',
+    '  const queue = [from];',
+    '  for (let head = 0; head < queue.length; head++) {',
+    '    const at = queue[head];',
+    '    for (const next of around(at)) {',
+    '      if (!isOpen(next) || isDry(next) || cost.has(k(next))) continue;',
+    '      cost.set(k(next), cost.get(k(at)) + 1);',
+    '      via.set(k(next), at);',
+    '      queue.push(next);',
     '    }',
     '  }',
     '  return { cost, via };',
     '}',
-    'function route(via, from, to) {',
-    '  const out = []; let at = to;',
-    '  while (k(at) !== k(from)) { out.push(at); at = via.get(k(at)); if (!at) return []; }',
-    '  return out.reverse();',
+    'function trail(via, from, to) {',
+    '  const route = [];',
+    '  let at = to;',
+    '  while (k(at) !== k(from)) {',
+    '    route.push(at);',
+    '    at = via.get(k(at));',
+    '    if (!at) return [];',
+    '  }',
+    '  return route.reverse();',
     '}',
-    'function drive(path) {',
-    '  for (const n of path) {',
+    'function drive(route) {',
+    '  for (const next of route) {',
     '    const at = pos();',
-    '    const d = n.x > at.x ? Dir.East : n.x < at.x ? Dir.West : n.y > at.y ? Dir.South : Dir.North;',
+    '    const d =',
+    '      next.x > at.x ? Dir.East : next.x < at.x ? Dir.West : next.y > at.y ? Dir.South : Dir.North;',
     '    if (!move(d)) return;',
     '    observe();',
     '  }',
     '}',
+    '',
     'observe();',
-    'let mined = 0;',
-    'for (let round = 0; round < 800; round++) {',
-    '  const have = mined;',
-    '  if (have >= 5) break;',
-    '  const at = pos();',
-    '  const here = flood(at);',
-    '  const back = flood(home).cost;',
-    '  const budget = fuel();',
-    '  let best = null;',
-    '  for (const [id, face] of veins) {',
-    '    if (cut.has(id)) continue;',
-    '    for (const d of dirs) {',
-    '      const stand = stepTo(face, d);',
-    '      const out = here.cost.get(k(stand)); const home2 = back.get(k(stand));',
-    '      if (out === undefined || home2 === undefined) continue;',
-    '      if (out + 2 + home2 > budget) continue;',
-    '      if (!best || out < best.out) best = { stand, face, out };',
+    'for (let round = 0; round < 4000; round++) {',
+    '  const here = flood(pos());',
+    '  const homeward = flood(home).cost;',
+    '  const tank = fuel();',
+    '  const done = mined >= QUOTA && deepCut;',
+    '',
+    '  // Cut whatever is affordable, nearest first, and always keep the way home.',
+    '  let target = null;',
+    '  for (const [id, terrain] of ground) {',
+    '    if (done || terrain !== Terrain.Ore || cut.has(id)) continue;',
+    '    const face = parse(id);',
+    '    const stand = around(face).find((s) => isOpen(s));',
+    '    if (!stand) continue;',
+    '    const out = here.cost.get(k(stand));',
+    '    const legs = homeward.get(k(stand));',
+    '    if (out === undefined || legs === undefined) continue;',
+    '    const deep = legs >= deepest;',
+    '    if (mined >= QUOTA && !deep) continue;',
+    '    if (out + CUT + legs > tank) continue;',
+    '    if (!target || out < target.out) target = { stand, face, out, deep };',
+    '  }',
+    '  if (target) {',
+    '    drive(trail(here.via, pos(), target.stand));',
+    '    const at = pos();',
+    '    const f = target.face;',
+    '    const d = f.x > at.x ? Dir.East : f.x < at.x ? Dir.West : f.y > at.y ? Dir.South : Dir.North;',
+    '    if (mine(d) === ItemKind.Ore) {',
+    '      mined += 1;',
+    '      if (target.deep) deepCut = true;',
+    '    }',
+    '    cut.add(k(target.face));',
+    '    observe();',
+    '    continue;',
+    '  }',
+    '',
+    '  // Otherwise read somewhere new: close to the bot, far from the lift.',
+    '  let goal = null;',
+    '  let best = Infinity;',
+    '  for (const [id, out] of here.cost) {',
+    '    if (done) continue;',
+    '    const legs = homeward.get(id);',
+    '    if (legs === undefined || legs > deepest) continue;',
+    '    const tile = parse(id);',
+    '    if (!halfLit(tile)) continue;',
+    '    if (out + legs + CUT > tank) continue;',
+    '    if (out - legs < best) {',
+    '      best = out - legs;',
+    '      goal = tile;',
     '    }',
     '  }',
-    '  if (best) {',
-    '    drive(route(here.via, at, best.stand));',
-    '    const p = pos();',
-    '    const d = best.face.x > p.x ? Dir.East : best.face.x < p.x ? Dir.West : best.face.y > p.y ? Dir.South : Dir.North;',
-    '    if (mine(d) === ItemKind.Ore) mined++;',
-    '    cut.add(k(best.face)); observe();',
+    '  if (goal) {',
+    '    drive(trail(here.via, pos(), goal));',
     '    continue;',
     '  }',
-    '  const reserve = (5 - have) * 2 + 2;',
-    '  let front = null; let score = Infinity;',
-    '  for (const [id, tile] of open) {',
-    '    const out = here.cost.get(id); const home2 = back.get(id);',
-    '    if (out === undefined || home2 === undefined || out === 0) continue;',
-    '    if (out + home2 + reserve > budget) continue;',
-    '    if (!dirs.some((d) => !seen.has(k(stepTo(tile, d))))) continue;',
-    '    const s = out * 2 + Math.abs(tile.x - home.x) + Math.abs(tile.y - home.y);',
-    '    if (s < score) { score = s; front = tile; }',
-    '  }',
-    '  if (front) {',
-    '    drive(route(here.via, at, front));',
+    '',
+    '  if (k(pos()) !== k(home)) {',
+    '    drive(trail(here.via, pos(), home));',
     '    continue;',
     '  }',
-    '  // Nothing affordable left. One tank is not always the whole shift.',
-    '  if (k(at) !== k(home)) {',
-    '    drive(route(here.via, at, home));',
-    '    if (!refuel()) break;',
-    '    continue;',
-    '  }',
-    '  if (!refuel() || fuel() <= budget) break;',
+    '  if (done || !refuel() || fuel() <= tank) break;',
     '}',
-    '// Cost the way back, say what it costs, then drive it. That order is the reservation.',
-    'const at = pos();',
-    'const back2 = k(at) === k(home) ? [] : route(flood(at).via, at, home);',
-    'print(`home ${back2.length}`);',
-    'drive(back2);',
   ].join('\n'),
 };

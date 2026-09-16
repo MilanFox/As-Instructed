@@ -2,10 +2,11 @@ import { describe, expect, test } from 'vitest';
 import type { Dir, ObjectiveContext, Sim, Vec } from '../../../engine/index.ts';
 import {
   ALL_DIRS,
+  ItemKind,
   Terrain,
+  dirBetween,
   evaluateObjectives,
   opposite,
-  senseTotals,
   step,
 } from '../../../engine/index.ts';
 import { must } from '../../../engine/__tests__/helpers.ts';
@@ -305,167 +306,240 @@ describe('w4-02 breadcrumb-trail', () => {
   });
 });
 
-function filedAs(seed: number, rewrite: (line: string) => string | null) {
-  const solution = SOLUTIONS[w4_04.id] as ReferenceSolution;
-  const result = runReference(w4_04, seed, solution);
-  const events = result.trace.events.flatMap((event) => {
-    if (event.kind !== 'print' || !event.text.startsWith('home ')) return [event];
-    const line = rewrite(event.text);
-    return line === null ? [] : [{ ...event, text: line }];
-  });
-  const stars = evaluateObjectives(w4_04.bonus ?? [], {
-    world: result.world,
-    initialWorld: result.initialWorld,
-    trace: { ...result.trace, events },
-    ops: result.ops,
-  });
-  return {
-    passed: result.verdict.passed,
-    ticks: result.trace.endTick,
-    met: must(stars[0], 'the star').met,
+interface Habit {
+  chaseDeep: boolean;
+  readAhead: boolean;
+}
+
+const QUOTA = 5;
+const CUT = 2;
+const OVER = 12;
+
+const around = (at: Vec): Vec[] => ALL_DIRS.map((dir) => step(at, dir));
+const rock = (at: Vec): boolean => at.x % 2 === 0 && at.y % 2 === 0;
+const parseAt = (id: string): Vec => {
+  const [x = '0', y = '0'] = id.split(',');
+  return { x: Number(x), y: Number(y) };
+};
+
+function prospecting(habit: Habit) {
+  return (sim: Sim, botId: number): void => {
+    const home = sim.pos(botId);
+    const deepest = (sim.fuel(botId) - CUT - OVER) / 2;
+    const ground = new Map<string, Terrain>();
+    const open = new Map<string, boolean>();
+    const stood = new Set<string>([keyAt(home)]);
+    const cut = new Set<string>();
+    let mined = 0;
+    let deepCut = !habit.chaseDeep;
+
+    const observe = (): void => {
+      const at = sim.pos(botId);
+      open.set(keyAt(at), true);
+      stood.add(keyAt(at));
+      for (const dir of ALL_DIRS) {
+        for (const view of sim.look(botId, dir)) {
+          if (!view.inBounds) break;
+          ground.set(keyAt(view.at), view.terrain);
+          open.set(keyAt(view.at), view.walkable);
+        }
+      }
+    };
+
+    const isOpen = (at: Vec): boolean => open.get(keyAt(at)) === true;
+    const isDry = (at: Vec): boolean =>
+      habit.readAhead && around(at).some((side) => ground.get(keyAt(side)) === Terrain.Rubble);
+    const worthSeeing = (at: Vec): boolean =>
+      habit.readAhead
+        ? around(at).some((side) => !open.has(keyAt(side)) && !rock(side))
+        : !stood.has(keyAt(at));
+
+    const flood = (from: Vec): { cost: Map<string, number>; via: Map<string, Vec> } => {
+      const cost = new Map<string, number>([[keyAt(from), 0]]);
+      const via = new Map<string, Vec>();
+      const queue: Vec[] = [from];
+      for (let head = 0; head < queue.length; head++) {
+        const at = queue[head] as Vec;
+        const base = cost.get(keyAt(at)) ?? 0;
+        for (const next of around(at)) {
+          if (!isOpen(next) || isDry(next) || cost.has(keyAt(next))) continue;
+          cost.set(keyAt(next), base + 1);
+          via.set(keyAt(next), at);
+          queue.push(next);
+        }
+      }
+      return { cost, via };
+    };
+
+    const trail = (via: Map<string, Vec>, from: Vec, to: Vec): Vec[] => {
+      const route: Vec[] = [];
+      let at = to;
+      while (keyAt(at) !== keyAt(from)) {
+        route.push(at);
+        const back = via.get(keyAt(at));
+        if (back === undefined) return [];
+        at = back;
+      }
+      return route.reverse();
+    };
+
+    const drive = (route: readonly Vec[]): void => {
+      for (const next of route) {
+        const dir = dirBetween(sim.pos(botId), next);
+        if (dir === null || !sim.move(botId, dir)) return;
+        observe();
+      }
+    };
+
+    observe();
+    for (let round = 0; round < 4000; round++) {
+      const here = flood(sim.pos(botId));
+      const homeward = flood(home).cost;
+      const fuel = sim.fuel(botId);
+      const done = mined >= QUOTA && deepCut;
+
+      let face: { stand: Vec; at: Vec; out: number; deep: boolean } | null = null;
+      for (const [id, terrain] of ground) {
+        if (done || terrain !== Terrain.Ore || cut.has(id)) continue;
+        const at = parseAt(id);
+        const stand = around(at).find((side) => isOpen(side));
+        if (stand === undefined) continue;
+        const out = here.cost.get(keyAt(stand));
+        const legs = homeward.get(keyAt(stand));
+        if (out === undefined || legs === undefined) continue;
+        const deep = habit.chaseDeep && legs >= deepest;
+        if (mined >= QUOTA && !deep) continue;
+        if (out + CUT + legs > fuel) continue;
+        if (face === null || out < face.out) face = { stand, at, out, deep };
+      }
+
+      let goal: Vec | null = null;
+      let best = Number.POSITIVE_INFINITY;
+      for (const [id, out] of here.cost) {
+        if (done) continue;
+        const legs = homeward.get(id);
+        if (legs === undefined || legs > deepest) continue;
+        const tile = parseAt(id);
+        if (!worthSeeing(tile)) continue;
+        if (out + legs + CUT > fuel) continue;
+        const rank = habit.chaseDeep ? out - legs : out;
+        if (rank < best) {
+          best = rank;
+          goal = tile;
+        }
+      }
+
+      if (face !== null && (habit.readAhead || goal === null)) {
+        drive(trail(here.via, sim.pos(botId), face.stand));
+        const dir = dirBetween(sim.pos(botId), face.at);
+        if (dir !== null && sim.mine(botId, dir) === ItemKind.Ore) {
+          mined += 1;
+          if (face.deep) deepCut = true;
+        }
+        cut.add(keyAt(face.at));
+        observe();
+        continue;
+      }
+      if (goal !== null) {
+        drive(trail(here.via, sim.pos(botId), goal));
+        continue;
+      }
+      if (keyAt(sim.pos(botId)) !== keyAt(home)) {
+        drive(trail(here.via, sim.pos(botId), home));
+        continue;
+      }
+      if (done || !sim.refuel(botId) || sim.fuel(botId) <= fuel) break;
+    }
   };
 }
 
-describe('w4-04 filed-return', () => {
+function starOf(seed: number, id: string, drive: (sim: Sim, bot: number) => void) {
+  const result = runLevel(w4_04, seed, drive);
+  const ctx: ObjectiveContext = {
+    world: result.world,
+    initialWorld: result.initialWorld,
+    trace: result.trace,
+    ops: result.ops,
+  };
+  return must(
+    evaluateObjectives(w4_04.bonus ?? [], ctx).find((star) => star.id === id),
+    id,
+  );
+}
+
+describe('w4-04 deep-face', () => {
   test('the reference solution earns it on every seed', () => {
-    referenceEarns(w4_04, 'filed-return');
+    referenceEarns(w4_04, 'deep-face');
   });
 
-  test('the same run without its filed price brings the ore home and is refused', () => {
+  test('taking the whole quota off the near faces is correct and is refused', () => {
     for (const seed of w4_04.seeds) {
-      const run = filedAs(seed, () => null);
+      const run = scored(w4_04, seed, prospecting({ chaseDeep: false, readAhead: true }));
+
       expect(run.passed, `seed ${String(seed)}`).toBe(true);
       expect(run.ticks, `seed ${String(seed)}`).toBeLessThanOrEqual(w4_04.par.ticks);
-      expect(run.met, `seed ${String(seed)}`).toBe(false);
+      expect(run.met('no-dry-holes'), `seed ${String(seed)}`).toBe(true);
+      expect(run.met('deep-face'), `seed ${String(seed)}`).toBe(false);
     }
   });
 
-  test('a price that is off by one is refused on every seed', () => {
+  test('the face the run stopped short at is quoted against the one it wanted', () => {
     for (const seed of w4_04.seeds) {
-      const run = filedAs(seed, (line) => `home ${String(Number(line.split(' ')[1]) - 1)}`);
-      expect(run.met, `seed ${String(seed)}`).toBe(false);
-    }
-  });
+      const star = starOf(seed, 'deep-face', prospecting({ chaseDeep: false, readAhead: true }));
+      const shown = must(star.divergence, 'a divergence');
 
-  test('reporting the trip after driving it is not filing it', () => {
-    const solution = SOLUTIONS[w4_04.id] as ReferenceSolution;
-    for (const seed of w4_04.seeds) {
-      const result = runReference(w4_04, seed, solution);
-      const filed = result.trace.events.filter(
-        (event) => event.kind === 'print' && event.text.startsWith('home '),
-      );
-      const events = [
-        ...result.trace.events.filter(
-          (event) => !(event.kind === 'print' && event.text.startsWith('home ')),
-        ),
-        ...filed,
-      ];
-      const ctx: ObjectiveContext = {
-        world: result.world,
-        initialWorld: result.initialWorld,
-        trace: { ...result.trace, events },
-        ops: result.ops,
-      };
-      const star = must(evaluateObjectives(w4_04.bonus ?? [], ctx)[0], 'the star');
-
-      expect(result.verdict.passed, `seed ${String(seed)}`).toBe(true);
-      expect(star.met, `seed ${String(seed)}`).toBe(false);
-      expect(star.divergence?.received, `seed ${String(seed)}`).toBe('the bot drove off first');
+      expect(shown.where, `seed ${String(seed)}`).toBe('the deepest face');
+      expect(shown.expected, `seed ${String(seed)}`).toMatch(/^\d+ tiles from the lift$/);
+      expect(shown.received, `seed ${String(seed)}`).toMatch(/^\d+ tiles from the lift$/);
+      expect(shown.received, `seed ${String(seed)}`).not.toBe(shown.expected);
     }
   });
 
   test('an idle program is refused on every seed', () => {
     for (const seed of w4_04.seeds) {
       const run = scored(w4_04, seed, idle);
+      const star = starOf(seed, 'deep-face', idle);
+
       expect(run.passed, `seed ${String(seed)}`).toBe(false);
-      expect(run.met('filed-return'), `seed ${String(seed)}`).toBe(false);
-      const result = runLevel(w4_04, seed, idle);
-      const star = must(
-        evaluateObjectives(w4_04.bonus ?? [], {
-          world: result.world,
-          initialWorld: result.initialWorld,
-          trace: result.trace,
-          ops: result.ops,
-        })[0],
-        'the star',
-      );
-      expect(star.divergence?.received, `seed ${String(seed)}`).toBe('the quota was never made');
+      expect(run.met('deep-face'), `seed ${String(seed)}`).toBe(false);
+      expect(star.divergence?.received, `seed ${String(seed)}`).toBe('no face was cut');
     }
   });
 });
 
-function asking(seed: number, extra: number) {
-  const solution = SOLUTIONS[w4_04.id] as ReferenceSolution;
-  const result = runReference(w4_04, seed, solution);
-  const asked = Array.from({ length: extra }, (_, i) => ({
-    t: i,
-    botId: 0,
-    dt: 0,
-    kind: 'sense' as const,
-    name: 'inventory',
-    ok: true,
-    count: 1,
-  }));
-  const stars = evaluateObjectives(w4_04.bonus ?? [], {
-    world: result.world,
-    initialWorld: result.initialWorld,
-    trace: { ...result.trace, events: [...asked, ...result.trace.events] },
-    ops: result.ops,
-  });
-  return {
-    passed: result.verdict.passed,
-    met: must(
-      stars.find((star) => star.id === 'within-3-inventory'),
-      'the star',
-    ).met,
-  };
-}
-
-describe('w4-04 within-3-inventory', () => {
+describe('w4-04 no-dry-holes', () => {
   test('the reference solution earns it on every seed', () => {
-    referenceEarns(w4_04, 'within-3-inventory');
+    referenceEarns(w4_04, 'no-dry-holes');
   });
 
-  test('the reference never asks the hold at all', () => {
-    const solution = SOLUTIONS[w4_04.id] as ReferenceSolution;
+  test('walking each side passage instead of reading it fills the quota and is refused', () => {
     for (const seed of w4_04.seeds) {
-      const result = runReference(w4_04, seed, solution);
-      expect(senseTotals(result.trace)['inventory'] ?? 0, `seed ${String(seed)}`).toBe(0);
-    }
-  });
+      const run = scored(w4_04, seed, prospecting({ chaseDeep: false, readAhead: false }));
 
-  test('the same run brings the ore home and is refused on a fourth reading', () => {
-    for (const seed of w4_04.seeds) {
-      expect(asking(seed, 3).met, `seed ${String(seed)}`).toBe(true);
-      const run = asking(seed, 4);
       expect(run.passed, `seed ${String(seed)}`).toBe(true);
-      expect(run.met, `seed ${String(seed)}`).toBe(false);
+      expect(run.met('no-dry-holes'), `seed ${String(seed)}`).toBe(false);
     }
   });
 
-  test('readings taken after the quota is cut still count', () => {
-    const solution = SOLUTIONS[w4_04.id] as ReferenceSolution;
-    const seed = w4_04.seeds[0] as number;
-    const result = runReference(w4_04, seed, solution);
-    const late = Array.from({ length: 4 }, () => ({
-      t: result.trace.endTick,
-      botId: 0,
-      dt: 0,
-      kind: 'sense' as const,
-      name: 'inventory',
-      ok: true,
-      count: 1,
-    }));
-    const star = must(
-      evaluateObjectives(w4_04.bonus ?? [], {
-        world: result.world,
-        initialWorld: result.initialWorld,
-        trace: { ...result.trace, events: [...result.trace.events, ...late] },
-        ops: result.ops,
-      }).find((one) => one.id === 'within-3-inventory'),
-      'the star',
-    );
-    expect(star.met).toBe(false);
-    expect(star.divergence?.received).toBe('4 calls');
+  test('the empty passage is quoted back with the tile the bot stood on', () => {
+    for (const seed of w4_04.seeds) {
+      const star = starOf(seed, 'no-dry-holes', prospecting({ chaseDeep: false, readAhead: false }));
+      const shown = must(star.divergence, 'a divergence');
+
+      expect(shown.where, `seed ${String(seed)}`).toMatch(/^\(\d+, \d+\)$/);
+      expect(shown.expected, `seed ${String(seed)}`).toBe('a face at the blind end');
+      expect(shown.received, `seed ${String(seed)}`).toBe('spoil');
+    }
+  });
+
+  test('an idle program is refused on every seed', () => {
+    for (const seed of w4_04.seeds) {
+      const run = scored(w4_04, seed, idle);
+      const star = starOf(seed, 'no-dry-holes', idle);
+
+      expect(run.passed, `seed ${String(seed)}`).toBe(false);
+      expect(run.met('no-dry-holes'), `seed ${String(seed)}`).toBe(false);
+      expect(star.divergence?.received, `seed ${String(seed)}`).toBe('0 ore');
+    }
   });
 });

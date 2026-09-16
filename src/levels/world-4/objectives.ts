@@ -1,11 +1,4 @@
-import type {
-  DieEvent,
-  Divergence,
-  ObjectiveContext,
-  Terrain,
-  Vec,
-  World,
-} from '../../engine/index.ts';
+import type { Divergence, ObjectiveContext, Terrain, Vec, World } from '../../engine/index.ts';
 import { NOTHING, tileAt } from '../../engine/index.ts';
 import { keyOf } from './caves.ts';
 
@@ -68,17 +61,5 @@ export function endedOn(
     where: 'end of run',
     expected: at(target),
     received: bot.alive ? at(bot.at) : `${at(bot.at)}, and not running`,
-  };
-}
-
-export function died(ctx: ObjectiveContext, botId = 0): Divergence | undefined {
-  const death = ctx.trace.events.find(
-    (event): event is DieEvent => event.kind === 'die' && event.botId === botId,
-  );
-  if (death === undefined) return undefined;
-  return {
-    where: `tick ${String(death.t)} · ${at(death.at)}`,
-    expected: 'the bot still running',
-    received: death.reason,
   };
 }
