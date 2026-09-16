@@ -17,7 +17,8 @@ export const w1_02: LevelDef = {
     '**FROM:** Field Eng. D. Halloran',
     '',
     'survey corridor, west wall. it was measured in 2204 and the 2204 figure is a guess.',
-    'i am not walking it for you.',
+    'i am not walking it for you. the survey head is billed by the reading, not the hour,',
+    'so seven of them and no wandering.',
     '',
     'Drive East and park on the landing pad at the end.',
   ].join('\n'),
@@ -37,9 +38,13 @@ export const w1_02: LevelDef = {
   facts: [
     {
       label: '`canMove(Dir.East)`',
-      value: 'True when the next tile East is clear. Asking is free.',
+      value: 'True when the next tile East is clear. Asking costs no tick. Every ask is counted.',
     },
     { label: 'A blocked move', value: 'Goes nowhere and still costs a tick.' },
+    {
+      label: 'A wasted step',
+      value: 'One tick beyond the straight drive from the start to the pad. A blocked move is one.',
+    },
     { label: 'The bay', value: '30 tiles end to end. The corridor has never run the whole of it.' },
   ],
   seeds: [1, 4, 7],
