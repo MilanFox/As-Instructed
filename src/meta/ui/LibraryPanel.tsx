@@ -1,7 +1,8 @@
 import type * as React from 'react';
 import { REFACTOR, REGRESSION, REPOSITORY_NAME, UNLOCK_MEMO, UNLOCK_NOTE } from '../copy.ts';
 import { openDiscrepancies } from '../discrepancy.ts';
-import { useLibrary } from '../store.ts';
+import { needsAttention, worthShowing } from '../regression.ts';
+import { suiteSummary, useLibrary } from '../store.ts';
 import type { MetaPanel } from '../store.ts';
 import { DiscrepancyList } from './DiscrepancyList.tsx';
 import { LibraryEditor } from './LibraryEditor.tsx';
@@ -52,7 +53,7 @@ export function LibraryPanel(): React.JSX.Element | null {
   const panel = useLibrary((state) => state.panel);
   const setPanel = useLibrary((state) => state.setPanel);
   const busy = useLibrary((state) => state.busy);
-  const suite = useLibrary((state) => state.suite);
+  const summary = useLibrary(suiteSummary);
 
   if (!save.unlocked) return null;
   if (!save.briefed) {
@@ -66,6 +67,8 @@ export function LibraryPanel(): React.JSX.Element | null {
   }
 
   const openCount = openDiscrepancies(save).filter((each) => !each.seen).length;
+  const flagRegression = busy || (summary !== undefined && worthShowing(summary));
+  const regressionAlarms = summary !== undefined && needsAttention(summary);
   const flush = panel === 'library';
 
   return (
@@ -84,8 +87,10 @@ export function LibraryPanel(): React.JSX.Element | null {
             {tab.id === 'discrepancies' && openCount > 0 ? (
               <span className="lib__badge">{openCount}</span>
             ) : null}
-            {tab.id === 'regression' && (busy || suite) ? (
-              <span className="lib__badge">•</span>
+            {tab.id === 'regression' && flagRegression ? (
+              <span className={regressionAlarms ? 'lib__badge' : 'lib__badge lib__badge--ok'}>
+                •
+              </span>
             ) : null}
           </button>
         ))}

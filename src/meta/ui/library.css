@@ -48,6 +48,10 @@
   font-variant-numeric: tabular-nums;
 }
 
+.lib__badge--ok {
+  background: var(--ok);
+}
+
 .lib__body {
   flex: 1 1 auto;
   min-height: 0;
