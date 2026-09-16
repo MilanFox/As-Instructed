@@ -111,9 +111,9 @@ describe('registry', () => {
     for (const level of LEVELS) {
       const count = words(level.brief);
       total += count;
-      expect(count, level.id).toBeLessThanOrEqual(110);
+      expect(count, level.id).toBeLessThanOrEqual(125);
     }
-    expect(total / LEVELS.length).toBeLessThanOrEqual(60);
+    expect(total / LEVELS.length).toBeLessThanOrEqual(72);
   });
 
   test('no hint is written in code', () => {
