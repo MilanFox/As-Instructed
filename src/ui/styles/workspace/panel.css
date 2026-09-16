@@ -70,6 +70,12 @@
   max-height: var(--ws-deck-band);
 }
 
+/* A drawer pulled wider than the deck can give up leaves it too little to lay the transport
+   row out in, so the deck goes the whole way down rather than wrap. */
+.workspace[data-deck='folded'] .transport-deck {
+  transform: translateY(calc(100% + var(--ws-inset) + 16px));
+}
+
 .workspace[data-drawer='open'] .hud-right {
   max-height: calc(100vh - var(--ws-inset) - var(--ws-deck-band) - 12px);
 }

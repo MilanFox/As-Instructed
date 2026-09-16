@@ -4,7 +4,7 @@
   .workspace {
     --ws-order: 348px;
     --ws-telemetry: 300px;
-    --ws-drawer: 600px;
+    --ws-drawer-user: 600px;
   }
 }
 
@@ -12,7 +12,7 @@
   .workspace {
     --ws-order: 318px;
     --ws-telemetry: 274px;
-    --ws-drawer: 548px;
+    --ws-drawer-user: 548px;
     --ws-cut: 18px;
   }
 

@@ -1,7 +1,9 @@
 .workspace {
   --ws-order: 384px;
   --ws-telemetry: 322px;
-  --ws-drawer: 684px;
+  --ws-board-keep: 380px;
+  --ws-drawer-user: 684px;
+  --ws-drawer: min(var(--ws-drawer-user), calc(100vw - var(--ws-board-keep)));
   --ws-shift: 0px;
   --ws-handle-x: 0px;
   --ws-edge: var(--ink);

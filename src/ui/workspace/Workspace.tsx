@@ -6,6 +6,12 @@ import { COMPACT_QUERY } from './breakpoints.ts';
 import { ClosedBanner } from './ClosedBanner.tsx';
 import type { DrawerTab } from './Drawer.tsx';
 import { Drawer } from './Drawer.tsx';
+import {
+  clampDrawer,
+  deckIsCrowded,
+  rememberDrawerWidth,
+  storedDrawerWidth,
+} from './drawerSize.ts';
 import { FeedCanvas } from './FeedCanvas.tsx';
 import { Postings } from './Postings.tsx';
 import { ReportSheet } from './ReportSheet.tsx';
@@ -65,21 +71,54 @@ export function Workspace(): React.ReactElement {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [problems, setProblems] = useState(0);
   const [readout, setReadout] = useState<string | null>(null);
-  const [mapInset, setMapInset] = useState(0);
+  const [measured, setMeasured] = useState(0);
+  const [width, setWidth] = useState(storedDrawerWidth);
 
   const handleRef = useRef<HTMLButtonElement | null>(null);
 
   // The drawer covers the left of the canvas, so the board aims at what is left of it.
   useEffect(() => {
     const measure = (): void => {
-      setMapInset(open ? drawerWidth() : 0);
+      setMeasured(drawerWidth());
     };
     measure();
     window.addEventListener('resize', measure);
     return () => {
       window.removeEventListener('resize', measure);
     };
-  }, [open, compact]);
+  }, [open, compact, width]);
+
+  const mapInset = open ? measured : 0;
+  const [viewport, setViewport] = useState(() => window.innerWidth);
+  useEffect(() => {
+    const measure = (): void => {
+      setViewport(window.innerWidth);
+    };
+    window.addEventListener('resize', measure);
+    return () => {
+      window.removeEventListener('resize', measure);
+    };
+  }, []);
+  const crowded = open && !compact && measured > 0 && deckIsCrowded(measured, viewport);
+
+  // A stored width outlives the viewport it was chosen on, so it is pulled back inside the
+  // one in front of us rather than left to overhang it.
+  useEffect(() => {
+    if (width === null || compact) return;
+    const fit = (): void => {
+      setWidth((was) => (was === null ? was : clampDrawer(was, window.innerWidth)));
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    return () => {
+      window.removeEventListener('resize', fit);
+    };
+  }, [width, compact]);
+
+  const resize = useCallback((next: number): void => {
+    setWidth(next);
+    rememberDrawerWidth(next);
+  }, []);
 
   const openDrawer = useCallback((): void => {
     setOpen(true);
@@ -197,6 +236,12 @@ export function Workspace(): React.ReactElement {
       data-library={overlayOpen === 'library' ? 'open' : 'shut'}
       data-watch={String(watching)}
       data-sheet={report ? 'open' : 'shut'}
+      data-deck={crowded ? 'folded' : 'shown'}
+      style={
+        width === null
+          ? undefined
+          : ({ '--ws-drawer-user': `${String(width)}px` } as React.CSSProperties)
+      }
     >
       {/* Renderer is one canvas for the whole app (src/ui/adapters.ts), so the feed is
           hidden rather than unmounted and stays outside every boundary. */}
@@ -253,13 +298,16 @@ export function Workspace(): React.ReactElement {
           onRun={dispatch}
           onProblems={setProblems}
           problems={problems}
+          width={width ?? measured}
+          onWidth={resize}
+          resizable={!compact}
         />
       </PanelBoundary>
 
       {/* The drawer stands over the work order card and takes its Site map button with it.
-          Same action, parked in the strip of board the drawer leaves — and at compact the
-          drawer is the whole width, so there is no strip and no second way out to offer. */}
-      {open && !compact && overlayOpen !== 'library' ? (
+          Same action, parked in the strip of board the drawer leaves — and once that strip is
+          down to the telemetry column there is no room for it, the same as at compact. */}
+      {open && !compact && !crowded && overlayOpen !== 'library' ? (
         <button
           type="button"
           className="control control--tight drawer-escape"
