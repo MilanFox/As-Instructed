@@ -58,10 +58,6 @@ export const SOURCE_NAMES: Readonly<Record<EventOrigin['file'], string>> = {
   lib: 'lib.ts',
 };
 
-// Every keystroke resets the loaded run, so the replacement is only worth running once the
-// typing stops.
-const PRIME_IDLE_MS = 400;
-
 export interface GameState {
   screen: Screen;
   currentLevelId: string | null;
@@ -244,7 +240,7 @@ export function traceIsAttributed(trace: Trace): boolean {
 
 let lineId = 0;
 let watchdog: ReturnType<typeof setTimeout> | null = null;
-let primeTimer: ReturnType<typeof setTimeout> | null = null;
+let primePending = false;
 let primeGeneration = 0;
 
 let lastDispatched: { levelId: string; attempt: number; source: string } | null = null;
@@ -423,21 +419,8 @@ export const useGame = create<GameState>((set, get) => {
   }
 
   function cancelPrime(): void {
-    if (primeTimer) clearTimeout(primeTimer);
-    primeTimer = null;
+    primePending = false;
     primeGeneration += 1;
-  }
-
-  function schedulePrime(): void {
-    cancelPrime();
-    primeTimer = setTimeout(() => {
-      primeTimer = null;
-      const state = get();
-      if (state.runState === 'running' || state.previewState === 'running') return;
-      if (state.trace !== null || state.currentLevelId === null) return;
-      if (state.surveySeed !== null) return;
-      primeTrace(state.currentLevelId, state.code);
-    }, PRIME_IDLE_MS);
   }
 
   // The seed a single-seed run runs: the one being surveyed, or the order's own first.
@@ -579,28 +562,41 @@ export const useGame = create<GameState>((set, get) => {
       });
   }
 
-  function primeTrace(levelId: string, code: string): void {
+  // The transport cannot move without a trace, and nothing runs a half-typed program to get
+  // one: the board is cleared on an edit and the step the player presses pays for the run,
+  // landing on `landOn`.
+  function primeTrace(levelId: string, code: string, landOn: number): void {
     const level = getLevel(levelId);
     if (!level) return;
+    const seed = get().surveySeed ?? (level.seeds[0] as number);
     const token = get().runToken;
     const generation = primeGeneration;
+    primePending = true;
     get()
       .runner()
-      .run({ code, levelId, seeds: [level.seeds[0] as number] })
+      .run({ code, levelId, seeds: [seed] })
       .then((response) => {
-        if (get().runToken !== token || primeGeneration !== generation || !response.ok) return;
-        if (get().surveySeed !== null) return;
+        if (get().runToken !== token || primeGeneration !== generation) return;
+        primePending = false;
+        // The board moved to another seed while this ran, so this trace is of the wrong world.
+        if ((get().surveySeed ?? (level.seeds[0] as number)) !== seed) return;
+        if (!response.ok) {
+          if (response.error.kind !== 'cancelled') set({ debugNote: response.error.message });
+          return;
+        }
         get().renderer().setTrace(response.trace);
-        get().renderer().seek(0);
         set({
           trace: response.trace,
           verdict: response.verdict,
           tick: 0,
           endTick: response.trace.endTick,
         });
+        get().seek(landOn);
       })
-      .catch(() => {
-        // Nothing the player asked for failed, so nothing is said about it.
+      .catch((error: unknown) => {
+        if (primeGeneration !== generation) return;
+        primePending = false;
+        set({ debugNote: error instanceof Error ? error.message : String(error) });
       });
   }
 
@@ -725,7 +721,6 @@ export const useGame = create<GameState>((set, get) => {
         suppressed: 0,
         brief: 'brief',
       });
-      primeTrace(levelId, get().code);
     },
 
     setCode(code) {
@@ -735,7 +730,6 @@ export const useGame = create<GameState>((set, get) => {
       // A survey has the run off the board, so the edit retires it there instead.
       else if (changed && get().heldRun !== null) set({ heldRun: null });
       set({ code });
-      if (changed) schedulePrime();
       if (!id) return;
       const levels = { ...get().save.levels };
       levels[id] = { ...(levels[id] ?? emptyProgress()), code };
@@ -777,7 +771,10 @@ export const useGame = create<GameState>((set, get) => {
 
       cancelPrime();
       state.pause();
-      const next = surveyTransition(seed === null ? state : holdableRun(state, state.runMode), seed);
+      const next = surveyTransition(
+        seed === null ? state : holdableRun(state, state.runMode),
+        seed,
+      );
       state.renderer().setTrace(next.trace);
       if (next.trace) state.renderer().seek(next.tick);
       set({ ...next, eventCursor: null, debugNote: null });
@@ -1169,8 +1166,18 @@ export const useGame = create<GameState>((set, get) => {
     },
 
     step(delta) {
-      get().pause();
-      get().seek(Math.round(get().tick) + delta);
+      const state = get();
+      state.pause();
+      if (state.trace === null) {
+        if (state.runState === 'running' || state.previewState === 'running' || primePending) {
+          return;
+        }
+        if (state.currentLevelId === null) return;
+        set({ debugNote: 'Running the program.' });
+        primeTrace(state.currentLevelId, state.code, Math.max(0, delta));
+        return;
+      }
+      get().seek(Math.round(state.tick) + delta);
     },
 
     stepEvent(delta) {

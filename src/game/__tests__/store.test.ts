@@ -387,65 +387,79 @@ describe('preview', () => {
   });
 });
 
-describe('an edit primes the transport again', () => {
-  // Longer than the store's idle delay, so a single advance covers the debounce and the run.
-  const AFTER_THE_TYPING = 1000;
-
+describe('an edit clears the transport, and the first step pays for it', () => {
   afterEach(() => {
     useGame.getState().resetPreview();
   });
 
-  it('leaves the scrubber usable once the typing stops, with no dispatch', async () => {
+  it('runs nothing while the player types', async () => {
     reset();
-    vi.useFakeTimers();
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
     useGame.getState().openLevel('w1-01');
-    await vi.advanceTimersByTimeAsync(AFTER_THE_TYPING);
-
-    useGame.getState().setCode('move(Dir.East);move(Dir.East);move(Dir.North);');
-    expect(useGame.getState().trace).toBeNull();
-    expect(useGame.getState().endTick).toBe(0);
-
-    await vi.advanceTimersByTimeAsync(AFTER_THE_TYPING);
-
-    expect(useGame.getState().trace).not.toBeNull();
-    expect(useGame.getState().endTick).toBeGreaterThan(0);
-
-    useGame.getState().step(1);
-    expect(useGame.getState().tick).toBe(1);
-  });
-
-  it('primes once for a burst of keystrokes, not once per character', async () => {
-    reset();
-    vi.useFakeTimers();
-    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
-    useGame.getState().openLevel('w1-01');
-    await vi.advanceTimersByTimeAsync(AFTER_THE_TYPING);
 
     const runner = new ScriptedRunner();
     useGame.getState().attachRunner(runner);
-    for (const typed of ['m', 'mo', 'mov', 'move']) {
-      useGame.getState().setCode(typed);
-      await vi.advanceTimersByTimeAsync(50);
-    }
-    expect(runner.requests).toEqual([]);
+    for (const typed of ['m', 'mo', 'mov', 'move']) useGame.getState().setCode(typed);
 
-    await vi.advanceTimersByTimeAsync(AFTER_THE_TYPING);
+    expect(runner.requests).toEqual([]);
+    expect(useGame.getState().trace).toBeNull();
+    expect(useGame.getState().endTick).toBe(0);
+  });
+
+  it('runs once on the first step and lands on the tick asked for', async () => {
+    reset();
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+    useGame.getState().openLevel('w1-01');
+
+    useGame.getState().setCode('move(Dir.East);move(Dir.East);move(Dir.North);');
+    expect(useGame.getState().trace).toBeNull();
+
+    useGame.getState().step(1);
+    await vi.waitFor(() => expect(useGame.getState().trace).not.toBeNull());
+
+    expect(useGame.getState().endTick).toBeGreaterThan(0);
+    expect(useGame.getState().tick).toBe(1);
+  });
+
+  it('asks for one run, however often the step is pressed while it is out', async () => {
+    reset();
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+    useGame.getState().openLevel('w1-01');
+
+    const runner = new ScriptedRunner();
+    useGame.getState().attachRunner(runner);
+    useGame.getState().setCode('move(Dir.East);');
+    useGame.getState().step(1);
+    useGame.getState().step(1);
+    useGame.getState().step(1);
 
     expect(runner.requests.length).toBe(1);
-    expect(runner.requests[0]?.code).toBe('move');
+    expect(runner.requests[0]?.code).toBe('move(Dir.East);');
+  });
+
+  it('says what went wrong when the step is the thing that ran it', async () => {
+    reset();
+    useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
+    useGame.getState().openLevel('w1-01');
+
+    const runner = new ScriptedRunner();
+    useGame.getState().attachRunner(runner);
+    useGame.getState().setCode('boom();');
+    useGame.getState().step(1);
+    runner.settle(0, { ok: false, error: { kind: 'runtime', message: 'boom is not defined' } });
+
+    await vi.waitFor(() => expect(useGame.getState().debugNote).toBe('boom is not defined'));
   });
 
   it('grades nothing and says nothing while it does it', async () => {
     reset();
-    vi.useFakeTimers();
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
     useGame.getState().openLevel('w1-01');
     useGame.getState().setCode(W1_01_SOLUTION);
-    await vi.advanceTimersByTimeAsync(AFTER_THE_TYPING);
+    useGame.getState().step(1);
+    await vi.waitFor(() => expect(useGame.getState().trace).not.toBeNull());
 
     const state = useGame.getState();
-    expect(state.trace).not.toBeNull();
     expect(state.runMode).toBeNull();
     expect(state.showResults).toBe(false);
     expect(state.console).toEqual([]);
@@ -454,20 +468,37 @@ describe('an edit primes the transport again', () => {
 
   it('stands down for a dispatch rather than overwriting it', async () => {
     reset();
-    vi.useFakeTimers();
     useGame.getState().attachRunner(new FakeRunner({ latencyMs: 0 }));
     useGame.getState().openLevel('w1-01');
-    await vi.advanceTimersByTimeAsync(AFTER_THE_TYPING);
 
     useGame.getState().setCode(W1_01_SOLUTION);
+    useGame.getState().step(1);
     useGame.getState().run();
-    await vi.advanceTimersByTimeAsync(AFTER_THE_TYPING);
+    await vi.waitFor(() => expect(useGame.getState().runState).toBe('idle'));
 
     const state = useGame.getState();
     expect(state.runMode).toBe('dispatch');
     expect(state.showResults).toBe(true);
     expect(state.verdict).not.toBeNull();
     expect(state.save.levels['w1-01']?.attempts).toBe(1);
+  });
+
+  it('steps the order that is open, with the code that came with it', () => {
+    reset();
+    const runner = new ScriptedRunner();
+    useGame.getState().attachRunner(runner);
+    pickUp('w1-01');
+    useGame.getState().setCode('move(Dir.East);');
+    useGame.getState().step(1);
+    expect(runner.requests[0]?.levelId).toBe('w1-01');
+
+    pickUp('w1-02');
+    const carried = useGame.getState().code;
+    expect(carried).not.toBe('move(Dir.East);');
+
+    useGame.getState().step(1);
+    expect(runner.requests[1]?.levelId).toBe('w1-02');
+    expect(runner.requests[1]?.code).toBe(carried);
   });
 
   it('empties the log, so no line outlives the program that wrote it', async () => {
