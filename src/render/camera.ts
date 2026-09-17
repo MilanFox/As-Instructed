@@ -77,6 +77,10 @@ export class Camera {
   private insetTop = 0;
   private insetRight = 0;
   private insetBottom = 0;
+  private slackLeft = 0;
+  private slackTop = 0;
+  private slackRight = 0;
+  private slackBottom = 0;
   private frameX = 0;
   private frameY = 0;
   private frameW = 1;
@@ -120,6 +124,17 @@ export class Camera {
     this.insetRight = Math.max(0, inset.right ?? 0);
     this.insetBottom = Math.max(0, inset.bottom ?? 0);
     this.measureFrame();
+    this.clampTarget();
+    this.clampCurrent();
+  }
+
+  // Travel the camera is allowed past the frame edge, so board under a panel that draws over
+  // the canvas can still be pulled out into the clear.
+  setPanSlack(slack: CameraInset): void {
+    this.slackLeft = Math.max(0, slack.left ?? 0);
+    this.slackTop = Math.max(0, slack.top ?? 0);
+    this.slackRight = Math.max(0, slack.right ?? 0);
+    this.slackBottom = Math.max(0, slack.bottom ?? 0);
     this.clampTarget();
     this.clampCurrent();
   }
@@ -345,14 +360,32 @@ export class Camera {
     const halfH = this.frameH / 2 / tilePx;
     const slack = this.focusSlack;
     return {
-      x: clampBetween(x, halfW, this.cols - halfW, slack),
-      y: clampBetween(y, halfH, this.rows - halfH, slack),
+      x: clampBetween(
+        x,
+        halfW,
+        this.cols - halfW,
+        slack + this.slackLeft / tilePx,
+        slack + this.slackRight / tilePx,
+      ),
+      y: clampBetween(
+        y,
+        halfH,
+        this.rows - halfH,
+        slack + this.slackTop / tilePx,
+        slack + this.slackBottom / tilePx,
+      ),
     };
   }
 }
 
-function clampBetween(value: number, a: number, b: number, slack: number): number {
-  const low = Math.min(a, b) - slack;
-  const high = Math.max(a, b) + slack;
+function clampBetween(
+  value: number,
+  a: number,
+  b: number,
+  lowSlack: number,
+  highSlack: number,
+): number {
+  const low = Math.min(a, b) - lowSlack;
+  const high = Math.max(a, b) + highSlack;
   return Math.min(Math.max(value, low), high);
 }

@@ -285,7 +285,10 @@ export function Workspace(): React.ReactElement {
       {/* Renderer is one canvas for the whole app (src/ui/adapters.ts), so the feed is
           hidden rather than unmounted and stays outside every boundary. */}
       <div className="workspace__map">
-        <FeedCanvas onReadout={setReadout} />
+        <FeedCanvas
+          onReadout={setReadout}
+          coveredLeft={flyoutOpen && !compact ? measured : 0}
+        />
       </div>
 
       <PanelBoundary label="The work order">

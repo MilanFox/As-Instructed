@@ -141,6 +141,36 @@ describe('clamping', () => {
   });
 });
 
+describe('slack for a panel drawn over the board', () => {
+  it('lets the board be pushed clear of the covered strip', () => {
+    const cam = camera(1280, 640, 1, 12, 9);
+    cam.fit(true);
+    cam.setPanSlack({ left: 600 });
+    cam.panBy(5000, 0);
+    cam.settle();
+    expect(cam.originX()).toBeGreaterThanOrEqual(600 - 0.001);
+  });
+
+  it('holds the far edge where it was', () => {
+    const cam = camera(1280, 640, 1, 40, 9);
+    cam.setZoom(48);
+    cam.setPanSlack({ left: 600 });
+    cam.panBy(-5000, 0);
+    cam.settle();
+    expect(cam.originX()).toBeLessThanOrEqual(0.001);
+  });
+
+  it('pulls the board back in when the panel goes away', () => {
+    const cam = camera(1280, 640, 1, 12, 9);
+    cam.fit(true);
+    cam.setPanSlack({ left: 600 });
+    cam.panBy(5000, 0);
+    cam.settle();
+    cam.setPanSlack({});
+    expect(cam.originX() + 12 * cam.tilePx).toBeLessThanOrEqual(1280 + 0.001);
+  });
+});
+
 describe('a panel over the canvas', () => {
   it('fits and centres the grid in what is left of the canvas', () => {
     const cam = camera(1280, 640, 1, 12, 9);

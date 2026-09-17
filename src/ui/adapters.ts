@@ -200,6 +200,10 @@ export class CanvasRenderer implements RendererPort {
     this.renderer.setViewInset(inset);
   }
 
+  setPanSlack(slack: CameraInset): void {
+    this.renderer.setPanSlack(slack);
+  }
+
   zoomBy(steps: number): void {
     this.renderer.camera.zoomBy(steps);
   }

@@ -18,9 +18,14 @@ const VIEW: BoardView = { originX: 0, originY: 0, tilePx: 0, cols: 0, rows: 0 };
 export interface FeedCanvasProps {
   onReadout?: (line: string | null) => void;
   onView?: (view: BoardView) => void;
+  coveredLeft?: number;
 }
 
-export function FeedCanvas({ onReadout, onView }: FeedCanvasProps): React.ReactElement {
+export function FeedCanvas({
+  onReadout,
+  onView,
+  coveredLeft = 0,
+}: FeedCanvasProps): React.ReactElement {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const pointer = useRef<{ x: number; y: number } | null>(null);
 
@@ -72,6 +77,10 @@ export function FeedCanvas({ onReadout, onView }: FeedCanvasProps): React.ReactE
   useEffect(() => {
     renderer().setCelebrationsEnabled(celebrations);
   }, [renderer, celebrations]);
+
+  useEffect(() => {
+    (renderer() as FeedRenderer).setPanSlack?.({ left: coveredLeft });
+  }, [renderer, coveredLeft]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
