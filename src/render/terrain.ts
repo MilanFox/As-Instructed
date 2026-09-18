@@ -1,6 +1,7 @@
 import { Terrain, tileAt } from '../engine/index.ts';
 import type { Tile, World } from '../engine/index.ts';
 import { snapTilePx } from './camera.ts';
+import { drawRuns, machineRuns, runRevision } from './conduit.ts';
 import { alpha, artDirection, palette } from './theme.ts';
 import type { ArtId } from './art/types.ts';
 import type { Biome, TileSet } from './tiles.ts';
@@ -13,6 +14,7 @@ export interface TerrainKey {
   rows: number;
   biome: Biome;
   revision: number;
+  runs: number;
   cacheTilePx: number;
   art: ArtId;
 }
@@ -30,6 +32,7 @@ export function keysEqual(a: TerrainKey | null, b: TerrainKey): boolean {
     a.rows === b.rows &&
     a.biome === b.biome &&
     a.revision === b.revision &&
+    a.runs === b.runs &&
     a.cacheTilePx === b.cacheTilePx &&
     a.art === b.art
   );
@@ -71,6 +74,7 @@ export class TerrainLayer {
       rows: world.h,
       biome,
       revision,
+      runs: runRevision(world),
       cacheTilePx,
       art: artDirection().id,
     };
@@ -108,14 +112,25 @@ export class TerrainLayer {
         tiles.draw(ctx, art.base, x * tilePx, y * tilePx, tilePx);
       }
     }
+    const runs = machineRuns(world);
     for (let y = 0; y < world.h; y++) {
       for (let x = 0; x < world.w; x++) {
         const tile = tileAt(world, { x, y });
         if (!tile) continue;
+        if (runs.length > 0 && tile.terrain === Terrain.Cable) continue;
         const art = terrainArt(tile.terrain, tile, biome, x, y);
         if (art.prop) tiles.draw(ctx, art.prop, x * tilePx, y * tilePx, tilePx);
       }
     }
+    drawRuns(ctx, runs, tilePx, {
+      rail: alpha(palette.bgVoid, 0.55),
+      deck: alpha(palette.inkDim, 0.22),
+      core: palette.accent2,
+      dead: alpha(palette.bgVoid, 0.8),
+      railWidth: 0.94,
+      deckWidth: 0.72,
+      coreWidth: 0.14,
+    });
 
     this.tintSolids(world, ctx, tilePx);
     this.renderPits(world, ctx, tilePx);

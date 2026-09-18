@@ -1,3 +1,4 @@
+import { LIVE, continuityReadings } from './continuity.ts';
 import type { CostOverrides, CostTable } from './costs.ts';
 import { resolveCosts } from './costs.ts';
 import {
@@ -901,6 +902,25 @@ export class Sim {
       after: cloneMachine(machine),
     });
     this.applyMachineLinks(machine, t);
+    this.settleContinuity(t);
+  }
+
+  private settleContinuity(t: number): void {
+    const readings = continuityReadings(this.world);
+    if (readings.size === 0) return;
+    for (const machine of this.world.machines) {
+      const carries = readings.get(machine.id);
+      if (carries === undefined || machine.vars[LIVE] === carries) continue;
+      const before = cloneMachine(machine);
+      machine.vars[LIVE] = carries;
+      this.builder.push({
+        t,
+        kind: 'machineChange',
+        id: machine.id,
+        before,
+        after: cloneMachine(machine),
+      });
+    }
   }
 
   private applyMachineLinks(machine: Machine, t: number): void {

@@ -10,6 +10,7 @@ function key(over: Partial<TerrainKey> = {}): TerrainKey {
     rows: 9,
     biome: 'hangar',
     revision: 0,
+    runs: 0,
     cacheTilePx: 48,
     art: 'flat',
     ...over,
@@ -54,6 +55,10 @@ describe('layer invalidation key', () => {
 
   it('invalidates when the tick crosses a tileChange', () => {
     expect(keysEqual(key({ revision: 0 }), key({ revision: 1 }))).toBe(false);
+  });
+
+  it('invalidates when a repair changes what a run carries', () => {
+    expect(keysEqual(key({ runs: 0 }), key({ runs: 7 }))).toBe(false);
   });
 
   it('invalidates on zoom, biome or grid change', () => {

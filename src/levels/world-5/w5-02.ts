@@ -1,6 +1,9 @@
 import type { Divergence, Machine, ObjectiveContext, World } from '../../engine/index.ts';
 import {
+  BROKEN,
   Dir,
+  FED_BY,
+  LIVE,
   MachineKind,
   NOTHING,
   Objectives,
@@ -11,6 +14,7 @@ import {
   clipValue,
   createWorld,
   setTerrain,
+  settleContinuity,
   vec,
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
@@ -132,7 +136,7 @@ export const w5_02: LevelDef = {
       at: vec(1, 1),
       state: 'on',
       inventory: [],
-      vars: { segments: SEGMENTS, probeBudget: 10 },
+      vars: { segments: SEGMENTS },
     });
     for (let index = 0; index < SEGMENTS; index++) {
       const { x, y } = segmentAt(index);
@@ -140,11 +144,16 @@ export const w5_02: LevelDef = {
         id: `relay-${index}`,
         kind: MachineKind.Node,
         at: vec(x, y),
-        state: 'open',
+        state: index === broken ? BROKEN : 'open',
         inventory: [],
-        vars: { segment: index, live: index < broken ? 1 : 0 },
+        vars: {
+          segment: index,
+          [LIVE]: 1,
+          ...(index > 0 ? { [`${FED_BY}relay-${index - 1}`]: 1 } : {}),
+        },
       });
     }
+    settleContinuity(world);
 
     addBot(world, { at: vec(1, 1), facing: Dir.East, name: 'RIG-01' });
     return world;

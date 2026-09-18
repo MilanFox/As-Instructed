@@ -20,6 +20,8 @@ export {
   usesFuel,
 } from './types.ts';
 
+export { BROKEN, LIVE, continuityReadings, settleContinuity } from './continuity.ts';
+
 export type { RngState } from './rng.ts';
 export { Rng } from './rng.ts';
 

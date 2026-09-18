@@ -1,6 +1,8 @@
 import { Terrain } from '../../engine/index.ts';
 import type { Tile } from '../../engine/index.ts';
 import { alpha, mix, shade } from './color.ts';
+import { drawRepair, drawRuns, isRepaired, machineRuns } from '../conduit.ts';
+import type { RunStyle } from '../conduit.ts';
 import type {
   ArtDirection,
   BackdropPaint,
@@ -937,6 +939,18 @@ const SOLIDS = new Set<string>([
 
 const CABLE_CORE = shade(PALETTE.bronze, 0.82);
 
+const RUN_STYLE: RunStyle = {
+  rail: shade(FLOOR, 0.34),
+  deck: mix(FLOOR, PALETTE.bgPanel, 0.42),
+  core: PALETTE.accent,
+  dead: PALETTE.bgVoid,
+  railWidth: 0.96,
+  deckWidth: 0.76,
+  coreWidth: 0.2,
+};
+
+const REPAIR_CLAMP = PALETTE.ok;
+
 function facingOf(tile: Tile): number {
   const raw = tile.meta?.['facing'] ?? tile.meta?.['dir'];
   if (typeof raw === 'number') return ((raw % 4) + 4) % 4;
@@ -985,6 +999,7 @@ function paintTerrain(paint: TerrainPaint): void {
 
   const w = world.w;
   const h = world.h;
+  const runs = machineRuns(world);
   const stride = w + 2;
   const solid = new Uint8Array(stride * (h + 2)).fill(1);
   const cable = new Uint8Array(stride * (h + 2));
@@ -1047,17 +1062,19 @@ function paintTerrain(paint: TerrainPaint): void {
           continue;
         case Terrain.Cable:
           blit(ROW.floor, v, ox, oy);
-          drawCableRun(
-            ctx,
-            ox,
-            oy,
-            T,
-            floorRamp,
-            (cable[i - stride] as number) |
-              ((cable[i + 1] as number) << 1) |
-              ((cable[i + stride] as number) << 2) |
-              ((cable[i - 1] as number) << 3),
-          );
+          if (runs.length === 0) {
+            drawCableRun(
+              ctx,
+              ox,
+              oy,
+              T,
+              floorRamp,
+              (cable[i - stride] as number) |
+                ((cable[i + 1] as number) << 1) |
+                ((cable[i + stride] as number) << 2) |
+                ((cable[i - 1] as number) << 3),
+            );
+          }
           break;
         case Terrain.Rack:
           blit(
@@ -1084,6 +1101,8 @@ function paintTerrain(paint: TerrainPaint): void {
       if (solid[i + 1] === 1) blit(ROW.aoE, 0, ox, oy);
     }
   }
+
+  drawRuns(ctx, runs, T, RUN_STYLE);
 
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
@@ -2243,6 +2262,8 @@ function paintMachine(paint: MachinePaint): void {
       break;
     }
   }
+
+  if (isRepaired(paint.state)) drawRepair(c, paint.x, paint.y, T, REPAIR_CLAMP);
 }
 
 const CROP_DETAIL_TILE_PX = 14;

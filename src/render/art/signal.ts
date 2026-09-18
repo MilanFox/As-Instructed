@@ -1,6 +1,8 @@
 import { Terrain, tileAt } from '../../engine/index.ts';
 import type { Tile, World } from '../../engine/index.ts';
 import { alpha } from './color.ts';
+import { drawRepair, drawRuns, isRepaired, machineRuns } from '../conduit.ts';
+import type { RunStyle } from '../conduit.ts';
 import type {
   ArtDirection,
   BackdropPaint,
@@ -472,8 +474,19 @@ function paintTerrain(paint: TerrainPaint): void {
   ctx.restore();
 }
 
+const RUN_STYLE: RunStyle = {
+  rail: alpha(INK, 0.85),
+  deck: TUBE,
+  core: alpha(HOT, 0.9),
+  dead: TUBE,
+  railWidth: 0.94,
+  deckWidth: 0.78,
+  coreWidth: 0.14,
+};
+
 function paintStructure(ctx: CanvasRenderingContext2D, world: World, t: number): void {
   const lw = Math.max(1, Math.round(t / 14));
+  const runs = machineRuns(world);
   const crown = alpha(HOT, 0.62);
   const footer = alpha(INK, 0.14);
   const join = alpha(WARM, 0.62);
@@ -511,14 +524,31 @@ function paintStructure(ctx: CanvasRenderingContext2D, world: World, t: number):
       }
 
       if (tile.terrain === Terrain.Cable) {
+        if (runs.length > 0) continue;
         const cw = Math.max(1, Math.round(t / 12));
         const cx = Math.round(px + t / 2 - cw / 2);
+        const cy = Math.round(py + t / 2 - cw / 2);
+        const north = tileAt(world, { x, y: y - 1 })?.terrain === Terrain.Cable;
+        const east = tileAt(world, { x: x + 1, y })?.terrain === Terrain.Cable;
+        const south = tileAt(world, { x, y: y + 1 })?.terrain === Terrain.Cable;
+        const west = tileAt(world, { x: x - 1, y })?.terrain === Terrain.Cable;
+        const legs = Number(north) + Number(east) + Number(south) + Number(west);
         ctx.fillStyle = join;
-        if (tileAt(world, { x, y: y - 1 })?.terrain === Terrain.Cable) {
-          ctx.fillRect(cx, py, cw, Math.round(t / 2));
-        }
-        if (tileAt(world, { x, y: y + 1 })?.terrain === Terrain.Cable) {
-          ctx.fillRect(cx, py + Math.round(t / 2), cw, Math.round(t / 2));
+        ctx.fillRect(cx, cy, cw, cw);
+        if (north) ctx.fillRect(cx, py, cw, cy + cw - py);
+        if (south) ctx.fillRect(cx, cy, cw, py + t - cy);
+        if (west) ctx.fillRect(px, cy, cx + cw - px, cw);
+        if (east) ctx.fillRect(cx, cy, px + t - cx, cw);
+        if (legs === 0) ctx.fillRect(px, cy, t, cw);
+        if (legs === 1) {
+          const cap = Math.max(2, Math.round(t / 6));
+          ctx.fillStyle = seed;
+          ctx.fillRect(
+            Math.round(px + t / 2 - cap / 2),
+            Math.round(py + t / 2 - cap / 2),
+            cap,
+            cap,
+          );
         }
         continue;
       }
@@ -536,6 +566,8 @@ function paintStructure(ctx: CanvasRenderingContext2D, world: World, t: number):
       }
     }
   }
+
+  drawRuns(ctx, runs, t, RUN_STYLE);
 }
 
 let deadRaster: CanvasPattern | null = null;
@@ -1350,6 +1382,8 @@ function drawMachine(paint: MachinePaint): void {
     ctx.fillStyle = MACHINE_LAMP_OFF;
     ctx.fillRect(lx, ly + lamp - Math.max(1, lamp >> 2), lamp, Math.max(1, lamp >> 2));
   }
+
+  if (isRepaired(paint.state)) drawRepair(ctx, paint.x, paint.y, tilePx, HOT);
 }
 
 const CROP_INK: readonly string[] = [

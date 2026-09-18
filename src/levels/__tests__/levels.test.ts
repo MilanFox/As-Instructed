@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { Dir, evaluateObjectives, medalFor } from '../../engine/index.ts';
+import { Dir, LIVE, evaluateObjectives, medalFor } from '../../engine/index.ts';
 import { SILVER_FACTOR } from '../../game/score.ts';
 import { apiUnlockedAt } from '../../runtime/api-spec.ts';
 import { LIBRARY_FIRST_WORLD, requirementsFor } from '../../meta/unlock.ts';
@@ -131,6 +131,24 @@ describe('registry', () => {
       }
     }
   });
+
+  test(
+    'only w5-02 publishes continuity, so no other board propagates one',
+    { timeout: 30_000 },
+    () => {
+      for (const level of LEVELS) {
+        for (const seed of level.seeds) {
+          const carrying = level
+            .build(seed)
+            .machines.filter((machine) => LIVE in machine.vars)
+            .map((machine) => machine.id);
+          const where = `${level.id}/${String(seed)}`;
+          if (level.id === 'w5-02') expect(carrying, where).toHaveLength(200);
+          else expect(carrying, where).toEqual([]);
+        }
+      }
+    },
+  );
 });
 
 describe('reference solutions', () => {
