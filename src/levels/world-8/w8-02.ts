@@ -368,6 +368,11 @@ export const w8_02: LevelDef = {
         'A crate or a bay counts as sighted the moment it stands in a straight, unblocked line — same row or column — from a tile the bot is on. Beam or no beam.',
     },
     {
+      label: 'The survey',
+      value:
+        'It is done on the tick the last crate and the last bay have been sighted. A crate ships early if it is lying on its bay by then, and half the floor has to.',
+    },
+    {
       label: 'The bay list',
       value:
         'One line per bay, `bay <id> <x> <y>`, every one of them printed before the bot makes its first move, and nothing else filed under that word.',

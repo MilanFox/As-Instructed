@@ -785,7 +785,7 @@ const FACTS = [
   {
     label: 'Fuel',
     value:
-      'Every bot starts full and a full cell has no gauge, so `fuel()` before anybody moves is the number. Every bot needs the pumps more than once tonight. `refuel()` works on any depot **tile** — the terrain, not a `depot-<class>` sink: the muster bay has one on the row the desk stands on, and the rest are scattered over the site — no packet lists them, so `scan()` and `look()` on the terrain are how you find them. A bot that reaches zero does not stop on its own — it ends the shift for the whole fleet.',
+      'Every bot starts full and a full cell has no gauge, so `fuel()` before anybody moves is the number. A full cell is not a night of walking. `refuel()` works on any depot **tile** — the terrain, not a `depot-<class>` sink: the muster bay has one on the row the desk stands on, and the rest are scattered over the site — no packet lists them, so `scan()` and `look()` on the terrain are how you find them. A bot that reaches zero does not stop on its own — it ends the shift for the whole fleet.',
   },
   {
     label: 'The airlock',

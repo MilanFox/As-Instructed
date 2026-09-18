@@ -373,7 +373,7 @@ export const w8_01: LevelDef = {
     'The bot does not have to stand on a tile to know what grows there. One pass along the edge can report every row, and a line costs the same as a single tile.',
     'A green crop is two ticks and nothing to show for it. Check how ripe a crop is, not just that it is there.',
     'The bot carries a fixed number of crops. Decide which ones travel together before you set off.',
-    'A harvest into full arms comes back with nothing, and that is the only thing on site that will tell you how much the arms hold.',
+    'A harvest into full arms comes back with nothing and still costs its ticks. What the bot was already carrying is how much the arms hold.',
     'Nothing on the field changes except what you harvest. Keep what a beam told you, and never spend a second beam on the same row.',
     'The field will not still say which row was heaviest once you have worked it. Anything you mean to report about how the shift opened has to be counted while the survey is still fresh.',
   ],

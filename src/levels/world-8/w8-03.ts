@@ -15,6 +15,7 @@ import {
   vec,
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
+import type { UseRecord } from './shared.ts';
 import {
   carveLine,
   criticalChain,
@@ -224,18 +225,28 @@ function notesUnder(ctx: ObjectiveContext, keyword: string): Note[] {
   return out;
 }
 
+function firstUses(ctx: ObjectiveContext): Map<string, UseRecord> {
+  const first = new Map<string, UseRecord>();
+  for (const record of useLog(ctx)) {
+    const seen = first.get(record.machineId);
+    if (seen === undefined || record.t < seen.t) first.set(record.machineId, record);
+  }
+  return first;
+}
+
 function startTicks(ctx: ObjectiveContext): Map<string, number> {
   const starts = new Map<string, number>();
-  for (const record of useLog(ctx)) {
-    const seen = starts.get(record.machineId);
-    if (seen === undefined || record.t < seen) starts.set(record.machineId, record.t);
-  }
+  for (const [id, record] of firstUses(ctx)) starts.set(id, record.t);
   return starts;
 }
 
 function gridUpAt(ctx: ObjectiveContext): number {
+  const first = firstUses(ctx);
   let last = -1;
-  for (const record of useLog(ctx)) last = Math.max(last, record.done);
+  for (const machine of stationsOf(ctx.initialWorld)) {
+    const came = first.get(machine.id);
+    if (came !== undefined) last = Math.max(last, came.done);
+  }
   return last;
 }
 
@@ -421,7 +432,7 @@ export const w8_03: LevelDef = {
     {
       label: 'Energising',
       value:
-        'Stand on the station tile and call `use()`. Two ticks. The cycle is `off, on` and it wraps, so a second use turns it back off.',
+        'Stand on the station tile and call `use()`. Two ticks. The cycle is `off, on` and it wraps, so a second use turns it back off. Every station is hand-operated — `power()` reaches none of them, and `vars.manual` is 1 on every one.',
     },
     {
       label: 'The order rule',
@@ -442,7 +453,7 @@ export const w8_03: LevelDef = {
     {
       label: 'The finish note',
       value:
-        'The second bonus. One more line before any bot moves, `finish <tick>`: the tick the last station finishes. Anything within 2 ticks of the real one is filed correctly. Both notes are read off the whole fleet’s log, so it does not matter which bot prints them.',
+        'The second bonus. One more line before any bot moves, `finish <tick>`: the tick the last station to come up finishes its first `use()`. Switching a station off and on again later does not move it. Anything within 2 ticks of the real one is filed correctly. Both notes are read off the whole fleet’s log, so it does not matter which bot prints them.',
     },
   ],
   seeds: [1, 2, 3, 4, 5],

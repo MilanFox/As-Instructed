@@ -391,6 +391,7 @@ function readPlanNote(line: string): { cipher: number; legs: number } | null {
 }
 
 function planRead(ctx: ObjectiveContext): boolean {
+  if (!holdsForm(ctx)) return false;
   const said = planLines(ctx);
   if (said.length !== 1) return false;
   const claim = readPlanNote(said[0] as string);
@@ -428,10 +429,17 @@ function misreadPlan(ctx: ObjectiveContext): Divergence {
       received: `shift ${String(claim.cipher)} of the ninety-five`,
     };
   }
+  if (claim.legs !== survey.legs.length) {
+    return {
+      where: 'the plan',
+      expected: 'the legs the filed sections describe',
+      received: `${String(claim.legs)} legs`,
+    };
+  }
   return {
-    where: 'the plan',
-    expected: 'the legs the filed sections describe',
-    received: `${String(claim.legs)} legs`,
+    where: 'KD-0001-T at the end of the run',
+    expected: 'in the bot, under the filed note',
+    received: clipValue(formStanding(ctx)),
   };
 }
 
@@ -596,7 +604,7 @@ export const w8_04: LevelDef = {
     {
       label: 'The reading',
       value:
-        'One line, `plan <cipher> <legs>`: the shift the filed traffic decodes under, and how many groups of moves the plan describes once the decoys are thrown away. Neither is anywhere in the workings.',
+        'One line, `plan <cipher> <legs>`: the shift the filed traffic decodes under, and how many groups of moves the plan describes once the decoys are thrown away. Neither is anywhere in the workings. The note is read only on a shift that brings KD-0001-T up.',
     },
   ],
   seeds: [1, 2, 3, 4, 5],
@@ -620,7 +628,7 @@ export const w8_04: LevelDef = {
   bonus: [
     Objectives.custom(
       'read-the-plan',
-      'Report the shift the plan was filed under, and how many legs it describes',
+      'Report the shift the plan was filed under and its leg count, holding KD-0001-T',
       planRead,
       { divergence: misreadPlan },
     ),
