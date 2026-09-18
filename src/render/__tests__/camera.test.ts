@@ -95,79 +95,119 @@ describe('fit', () => {
   });
 });
 
-describe('clamping', () => {
-  it('lets an axis smaller than the viewport pan until the grid edge is flush', () => {
-    const cam = camera(960, 200, 1, 8, 3);
-    cam.setZoom(48);
-    cam.panBy(5000, 5000);
-    cam.settle();
-    expect(cam.originX() + 8 * cam.tilePx).toBeCloseTo(960);
-    expect(cam.originY() + 3 * cam.tilePx).toBeCloseTo(200);
-    cam.panBy(-5000, -5000);
-    cam.settle();
-    expect(cam.originX()).toBeCloseTo(0);
-    expect(cam.originY()).toBeCloseTo(0);
-  });
+// The sliver of board the clamp holds inside the frame, in CSS pixels. Mirrors
+// MIN_BOARD_ON_SCREEN_PX in camera.ts, which stays private to it.
+const SLIVER_PX = 96;
 
-  it('never pans a grid smaller than the viewport off it', () => {
-    const cam = camera(960, 200, 1, 8, 3);
-    cam.setZoom(48);
-    for (const [dx, dy] of [
-      [4000, 0],
-      [0, 4000],
-      [-4000, -4000],
-      [300, -120],
-    ] as const) {
-      cam.panBy(dx, dy);
-      cam.settle();
-      expect(cam.originX()).toBeGreaterThanOrEqual(-0.001);
-      expect(cam.originX() + 8 * cam.tilePx).toBeLessThanOrEqual(960 + 0.001);
-      expect(cam.originY()).toBeGreaterThanOrEqual(-0.001);
-      expect(cam.originY() + 3 * cam.tilePx).toBeLessThanOrEqual(200 + 0.001);
+// Wide-and-short is the shape that provoked this (w5-02 is 43x7); tall-and-narrow is the
+// same complaint turned on its side, and neither must be fixed at the other's expense.
+const SHAPES: readonly (readonly [number, number])[] = [
+  [43, 7],
+  [7, 43],
+  [40, 40],
+  [8, 3],
+];
+
+const SHOVES: readonly (readonly [number, number])[] = [
+  [9000, 0],
+  [-9000, 0],
+  [0, 9000],
+  [0, -9000],
+  [9000, 9000],
+  [-9000, -9000],
+];
+
+function onScreen(
+  cam: Camera,
+  cols: number,
+  rows: number,
+  width: number,
+  height: number,
+): { x: number; y: number } {
+  const tile = cam.tilePx;
+  return {
+    x: Math.max(0, Math.min(width, cam.originX() + cols * tile) - Math.max(0, cam.originX())),
+    y: Math.max(0, Math.min(height, cam.originY() + rows * tile) - Math.max(0, cam.originY())),
+  };
+}
+
+describe('clamping', () => {
+  it('always leaves a sliver of the board on screen, however hard the player shoves', () => {
+    for (const [cols, rows] of SHAPES) {
+      for (const zoom of [12, 24, 48, 96]) {
+        const cam = camera(960, 540, 1, cols, rows);
+        cam.setZoom(zoom);
+        for (const [dx, dy] of SHOVES) {
+          cam.panBy(dx, dy);
+          cam.settle();
+          const seen = onScreen(cam, cols, rows, 960, 540);
+          const label = `${String(cols)}x${String(rows)} @${String(zoom)} ${String(dx)},${String(dy)}`;
+          expect([label, seen.x > 1, seen.y > 1]).toEqual([label, true, true]);
+        }
+      }
     }
   });
 
-  it('never lets the grid edge come inside the viewport when zoomed in', () => {
-    const cam = camera(480, 320, 1, 40, 40);
+  it('holds back exactly the sliver, not a frame of board', () => {
+    const cam = camera(960, 540, 1, 43, 7);
     cam.setZoom(48);
-    cam.panBy(-100000, -100000);
+    for (const [dx, dy] of SHOVES.slice(0, 4)) {
+      cam.panBy(dx, dy);
+      cam.settle();
+      const seen = onScreen(cam, 43, 7, 960, 540);
+      const moved = dx !== 0 ? seen.x : seen.y;
+      expect(moved).toBeCloseTo(SLIVER_PX, 3);
+    }
+  });
+
+  it('lets the board be shoved right past the frame edge', () => {
+    const cam = camera(960, 540, 1, 43, 7);
+    cam.setZoom(48);
+    cam.panBy(9000, 0);
     cam.settle();
-    expect(cam.originX()).toBeLessThanOrEqual(0.001);
-    expect(cam.originY()).toBeLessThanOrEqual(0.001);
-    cam.panBy(100000, 100000);
+    expect(cam.originX()).toBeGreaterThan(960 - SLIVER_PX - 0.001);
+    cam.panBy(-9000, 0);
     cam.settle();
-    expect(cam.originX() + 40 * cam.tilePx).toBeGreaterThanOrEqual(480 - 0.001);
-    expect(cam.originY() + 40 * cam.tilePx).toBeGreaterThanOrEqual(320 - 0.001);
+    expect(cam.originX() + 43 * cam.tilePx).toBeLessThan(SLIVER_PX + 0.001);
   });
 });
 
-describe('slack for a panel drawn over the board', () => {
-  it('lets the board be pushed clear of the covered strip', () => {
-    const cam = camera(1280, 640, 1, 12, 9);
-    cam.fit(true);
-    cam.setPanSlack({ left: 600 });
-    cam.panBy(5000, 0);
-    cam.settle();
-    expect(cam.originX()).toBeGreaterThanOrEqual(600 - 0.001);
+// The floor under the sliver rule: if any tile can be put in the middle of the frame, no
+// tile can be stuck under an overlay, whatever shape the board is and however far in we are.
+describe('every tile reaches the middle of the frame', () => {
+  it('puts any corner or edge tile dead centre, on any board shape at any zoom', () => {
+    for (const [cols, rows] of SHAPES) {
+      for (const zoom of ZOOM_LADDER) {
+        const cam = camera(960, 540, 1, cols, rows);
+        cam.setZoom(zoom);
+        for (const tx of [0, cols >> 1, cols - 1]) {
+          for (const ty of [0, rows >> 1, rows - 1]) {
+            cam.setCenter(tx + 0.5, ty + 0.5, true);
+            cam.settle();
+            const out = { x: 0, y: 0 };
+            cam.worldToScreen(tx + 0.5, ty + 0.5, out);
+            const label = `${String(cols)}x${String(rows)} @${String(zoom)} tile ${String(tx)},${String(ty)}`;
+            expect([label, out.x, out.y]).toEqual([label, 480, 270]);
+          }
+        }
+      }
+    }
   });
 
-  it('holds the far edge where it was', () => {
-    const cam = camera(1280, 640, 1, 40, 9);
+  it('gets there by dragging, not only by being told to', () => {
+    const cam = camera(960, 540, 1, 43, 7);
     cam.setZoom(48);
-    cam.setPanSlack({ left: 600 });
-    cam.panBy(-5000, 0);
+    const out = { x: 0, y: 0 };
+    cam.panBy(9000, 9000);
     cam.settle();
-    expect(cam.originX()).toBeLessThanOrEqual(0.001);
-  });
-
-  it('pulls the board back in when the panel goes away', () => {
-    const cam = camera(1280, 640, 1, 12, 9);
-    cam.fit(true);
-    cam.setPanSlack({ left: 600 });
-    cam.panBy(5000, 0);
+    cam.worldToScreen(0.5, 0.5, out);
+    expect(out.x).toBeGreaterThan(480);
+    expect(out.y).toBeGreaterThan(270);
+    cam.panBy(-9000, -9000);
     cam.settle();
-    cam.setPanSlack({});
-    expect(cam.originX() + 12 * cam.tilePx).toBeLessThanOrEqual(1280 + 0.001);
+    cam.worldToScreen(42.5, 6.5, out);
+    expect(out.x).toBeLessThan(480);
+    expect(out.y).toBeLessThan(270);
   });
 });
 
@@ -181,7 +221,7 @@ describe('a panel over the canvas', () => {
     expect(cam.originX() - 640).toBeCloseTo(1280 - (cam.originX() + 12 * cam.tilePx), 5);
   });
 
-  it('keeps the grid out from under the panel while panning', () => {
+  it('lets the grid be pushed out from under the panel', () => {
     const cam = camera(1280, 640, 1, 12, 9);
     cam.setInset({ left: 640 });
     cam.fit(true);

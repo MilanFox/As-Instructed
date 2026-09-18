@@ -9,7 +9,6 @@ export interface FeedRenderer {
   setHover?(cell: Vec | null): void;
   fit?(): void;
   setViewInset?(inset: CameraInset): void;
-  setPanSlack?(slack: CameraInset): void;
   zoomBy?(steps: number): void;
   deviceTilePx?(): number;
   setFollow?(botId: number | null): void;

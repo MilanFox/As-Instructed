@@ -57,6 +57,10 @@ export const MAX_KICK_PX = 3;
 
 export const MAX_FOCUS_PX = 44;
 
+// How much board, in CSS pixels, the pan clamp holds inside the frame. Everything short of
+// this is reachable, so a board can be shoved almost clear of any overlay but never lost.
+const MIN_BOARD_ON_SCREEN_PX = 96;
+
 export class Camera {
   viewWidth = 1;
   viewHeight = 1;
@@ -77,10 +81,6 @@ export class Camera {
   private insetTop = 0;
   private insetRight = 0;
   private insetBottom = 0;
-  private slackLeft = 0;
-  private slackTop = 0;
-  private slackRight = 0;
-  private slackBottom = 0;
   private frameX = 0;
   private frameY = 0;
   private frameW = 1;
@@ -124,17 +124,6 @@ export class Camera {
     this.insetRight = Math.max(0, inset.right ?? 0);
     this.insetBottom = Math.max(0, inset.bottom ?? 0);
     this.measureFrame();
-    this.clampTarget();
-    this.clampCurrent();
-  }
-
-  // Travel the camera is allowed past the frame edge, so board under a panel that draws over
-  // the canvas can still be pulled out into the clear.
-  setPanSlack(slack: CameraInset): void {
-    this.slackLeft = Math.max(0, slack.left ?? 0);
-    this.slackTop = Math.max(0, slack.top ?? 0);
-    this.slackRight = Math.max(0, slack.right ?? 0);
-    this.slackBottom = Math.max(0, slack.bottom ?? 0);
     this.clampTarget();
     this.clampCurrent();
   }
@@ -353,27 +342,19 @@ export class Camera {
     this.y = c.y;
   }
 
-  // Either edge of the board may be drawn up to the matching edge of the frame, whether or
-  // not the board is larger than the frame: that is the whole travel the player gets.
+  // The board may be pushed almost out of frame in any direction; the only stop is that
+  // MIN_BOARD_ON_SCREEN_PX of it stays inside. Holding the sliver below half the frame plus
+  // half a tile is what makes every tile, corners included, reachable to the frame centre.
   private clampCentre(x: number, y: number, tilePx: number): { x: number; y: number } {
     const halfW = this.frameW / 2 / tilePx;
     const halfH = this.frameH / 2 / tilePx;
+    const sliver = MIN_BOARD_ON_SCREEN_PX / tilePx;
+    const keepX = Math.min(sliver, this.cols, halfW + 0.5);
+    const keepY = Math.min(sliver, this.rows, halfH + 0.5);
     const slack = this.focusSlack;
     return {
-      x: clampBetween(
-        x,
-        halfW,
-        this.cols - halfW,
-        slack + this.slackLeft / tilePx,
-        slack + this.slackRight / tilePx,
-      ),
-      y: clampBetween(
-        y,
-        halfH,
-        this.rows - halfH,
-        slack + this.slackTop / tilePx,
-        slack + this.slackBottom / tilePx,
-      ),
+      x: clampBetween(x, keepX - halfW, this.cols + halfW - keepX, slack, slack),
+      y: clampBetween(y, keepY - halfH, this.rows + halfH - keepY, slack, slack),
     };
   }
 }

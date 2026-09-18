@@ -520,12 +520,6 @@ export class Renderer {
     if (!this.cameraHeld) this.camera.fit(false);
   }
 
-  // A panel that draws over the board does not move it; it only widens how far the player may
-  // push the board past that edge to see what it covers.
-  setPanSlack(slack: CameraInset): void {
-    this.camera.setPanSlack(slack);
-  }
-
   readoutAt(cssX: number, cssY: number): TileReadout | null {
     const cell = this.camera.tileAtScreen(cssX, cssY);
     const world = this.world;
