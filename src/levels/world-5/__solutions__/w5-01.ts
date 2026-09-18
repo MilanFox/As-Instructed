@@ -11,23 +11,18 @@ export const solution: ReferenceSolution = {
     const reactor = probe('reactor');
     const stations: MachineView[] = [];
     for (let i = 1; ; i++) {
-      const station = probe(`sub-${i}`);
+      const station = probe(`sub-${String(i)}`);
       if (station === null) break;
       stations.push(station);
     }
     stations.sort((a, b) => (a.vars.index ?? 0) - (b.vars.index ?? 0));
 
     const first = stations[0];
-    const last = stations[stations.length - 1];
-    if (reactor === null || first === undefined || last === undefined) return;
+    if (reactor === null || first === undefined) return;
     const dir = first.at.x > reactor.at.x ? Dir.East : Dir.West;
-
     const stride = dir === Dir.East ? 1 : -1;
-    const route: string[] = [];
-    for (let step = reactor.at.x + stride; step !== last.at.x + stride; step += stride) {
-      route.push(`${String(step)},${String(reactor.at.y)}`);
-    }
-    print(route.join(' '));
+
+    print(stations.map((station) => station.id).join(' '));
 
     let x = reactor.at.x;
     for (const station of stations) {
@@ -48,15 +43,10 @@ export const solution: ReferenceSolution = {
     '}',
     'stations.sort((a, b) => a.vars.index - b.vars.index);',
     '',
-    'const dir = reactor !== null && stations[0].at.x > reactor.at.x ? Dir.East : Dir.West;',
+    'const dir = stations[0].at.x > reactor.at.x ? Dir.East : Dir.West;',
     'const stride = dir === Dir.East ? 1 : -1;',
-    'const last = stations[stations.length - 1];',
     '',
-    'const route = [];',
-    'for (let s = reactor.at.x + stride; s !== last.at.x + stride; s += stride) {',
-    '  route.push(s + "," + reactor.at.y);',
-    '}',
-    'print(route.join(" "));',
+    'print(stations.map((s) => s.id).join(" "));',
     '',
     'let x = reactor.at.x;',
     'for (const station of stations) {',

@@ -4,6 +4,7 @@ import type {
   MoveEvent,
   ObjectiveContext,
   PrintEvent,
+  UseEvent,
   Vec,
   World,
 } from '../../engine/index.ts';
@@ -34,6 +35,7 @@ const EAST_END = WIDTH - 2;
 export interface MainsLayout {
   reactorAt: Vec;
   stations: number[];
+  names: number[];
 }
 
 export function mainsLayout(seed: number): MainsLayout {
@@ -48,17 +50,19 @@ export function mainsLayout(seed: number): MainsLayout {
     stations.push(x);
     x += stepSign * rng.int(1, 2);
   }
-  return { reactorAt: vec(reactorX, ROW), stations };
+  const names = rng.shuffle(Array.from({ length: count }, (_, k) => k + 1));
+  return { reactorAt: vec(reactorX, ROW), stations, names };
 }
 
 const isSubstation = (machine: Machine): boolean => machine.id.startsWith('sub-');
 
-const feederOf = (machine: Machine): string => {
-  const feed = machine.vars.feed ?? 0;
-  return feed === 0 ? 'reactor' : `sub-${feed}`;
-};
-
 const substations = (world: World): Machine[] => world.machines.filter(isSubstation);
+
+const byIndex = (world: World, index: number): Machine | undefined =>
+  world.machines.find((machine) => machine.vars.index === index);
+
+const feederOf = (world: World, machine: Machine): string =>
+  byIndex(world, machine.vars.feed ?? 0)?.id ?? 'reactor';
 
 const energisedCount = (world: World): number =>
   substations(world).filter((machine) => machine.state === 'on').length;
@@ -85,7 +89,7 @@ function latchAudit(ctx: ObjectiveContext): LatchLog {
     if (next === undefined) continue;
     state.set(machine.id, next);
     if (before !== 'off' || next !== 'on') continue;
-    const feeder = feederOf(machine);
+    const feeder = feederOf(ctx.world, machine);
     const feederLive = feeder === 'reactor' || state.get(feeder) === 'on';
     if (feederLive) good.add(machine.id);
     else {
@@ -112,7 +116,7 @@ const latchedEarly = (ctx: ObjectiveContext): Divergence | undefined => {
   if (missed === undefined) return undefined;
   return {
     where: `${missed.id} · ${at(missed.at)}`,
-    expected: `switched on after ${feederOf(missed)}`,
+    expected: `switched on after ${feederOf(ctx.world, missed)}`,
     received: 'never switched on',
   };
 };
@@ -122,70 +126,69 @@ const orderedCount = (ctx: ObjectiveContext): number => {
   return substations(ctx.world).filter((m) => good.has(m.id) && !bad.has(m.id)).length;
 };
 
-const keyOf = (tile: Vec): string => `${String(tile.x)},${String(tile.y)}`;
+const throwsTaken = (ctx: ObjectiveContext): number =>
+  ctx.trace.events.filter((event) => event.kind === 'use').length;
 
-const tilesIn = (prints: readonly PrintEvent[]): Vec[] =>
-  prints.flatMap((line) =>
-    (line.text.match(/\d+,\d+/g) ?? []).map((pair) => {
-      const [x = '0', y = '0'] = pair.split(',');
-      return vec(Number(x), Number(y));
-    }),
-  );
+const throwsAllowed = (ctx: ObjectiveContext): number => substations(ctx.world).length;
 
-interface DeclaredRoute {
-  declared: Vec[];
-  walked: Vec[];
+const idsIn = (prints: readonly PrintEvent[]): string[] =>
+  prints.flatMap((line) => line.text.match(/sub-\d+/g) ?? []);
+
+interface DeclaredOrder {
+  declared: string[];
+  latched: string[];
   matched: number;
   droveFirst: boolean;
 }
 
-function declaredRoute(ctx: ObjectiveContext): DeclaredRoute {
+function declaredOrder(ctx: ObjectiveContext): DeclaredOrder {
   const steps = ctx.trace.events.filter(
     (event): event is MoveEvent => event.kind === 'move' && event.ok,
   );
   const first = steps[0];
-  const declared = tilesIn(printsUpTo(ctx.trace, first?.t ?? Number.POSITIVE_INFINITY));
-  const start = ctx.initialWorld.bots[0]?.at;
-  const head = declared[0];
-  if (start !== undefined && head !== undefined && keyOf(head) === keyOf(start)) declared.shift();
+  const declared = idsIn(printsUpTo(ctx.trace, first?.t ?? Number.POSITIVE_INFINITY));
 
-  const walked = steps.map((step) => step.to);
+  const latched = ctx.trace.events
+    .filter((event): event is UseEvent => event.kind === 'use' && event.ok)
+    .map((event) => event.machineId)
+    .filter((id): id is string => id !== null && id.startsWith('sub-'));
+
   let matched = 0;
-  while (matched < declared.length && matched < walked.length) {
-    if (keyOf(declared[matched] as Vec) !== keyOf(walked[matched] as Vec)) break;
+  while (matched < declared.length && matched < latched.length) {
+    if (declared[matched] !== latched[matched]) break;
     matched++;
   }
   const droveFirst =
-    first !== undefined && declared.length === 0 && tilesIn(printsUpTo(ctx.trace)).length > 0;
-  return { declared, walked, matched, droveFirst };
+    first !== undefined && declared.length === 0 && idsIn(printsUpTo(ctx.trace)).length > 0;
+  return { declared, latched, matched, droveFirst };
 }
 
-const walkedWhatItSaid = (ctx: ObjectiveContext): boolean => {
-  const { declared, walked, matched } = declaredRoute(ctx);
-  return declared.length > 0 && matched === declared.length && matched === walked.length;
+const latchedWhatItSaid = (ctx: ObjectiveContext): boolean => {
+  const { declared, latched, matched } = declaredOrder(ctx);
+  return declared.length > 0 && matched === declared.length && matched === latched.length;
 };
 
-const routeProgress = (ctx: ObjectiveContext): [number, number] => {
-  const { declared, walked, matched } = declaredRoute(ctx);
-  return [matched, Math.max(declared.length, walked.length)];
+const orderProgress = (ctx: ObjectiveContext): [number, number] => {
+  const { declared, latched, matched } = declaredOrder(ctx);
+  return [matched, Math.max(declared.length, latched.length)];
 };
 
-const leftTheRoute = (ctx: ObjectiveContext): Divergence | undefined => {
-  const { declared, walked, matched, droveFirst } = declaredRoute(ctx);
+const leftTheOrder = (ctx: ObjectiveContext): Divergence | undefined => {
+  const { declared, latched, matched, droveFirst } = declaredOrder(ctx);
   if (declared.length === 0) {
     return {
-      where: 'the route',
-      expected: 'tiles printed before the first step',
+      where: 'the order',
+      expected: 'ids printed before the first step',
       received: droveFirst ? 'the bot stepped off first' : NOTHING,
     };
   }
-  if (matched === declared.length && matched === walked.length) return undefined;
+  if (matched === declared.length && matched === latched.length) return undefined;
   const said = declared[matched];
-  const took = walked[matched];
+  const took = latched[matched];
   return {
-    where: `step ${String(matched + 1)}`,
-    expected: said === undefined ? 'the route to end here' : at(said),
-    received: took === undefined ? 'the run stopped here' : at(took),
+    where: `latch ${String(matched + 1)}`,
+    expected: said ?? 'the list to end here',
+    received: took ?? 'the run stopped here',
   };
 };
 
@@ -200,23 +203,25 @@ export const w5_01: LevelDef = {
     '**FROM:** Dep. Coordinator M. Vance\\',
     '**RE:** Feeder line 7, energisation',
     '',
-    'Feeder line 7 was laid by two crews working inward from opposite ends. Neither crew',
-    'recorded which end it started from. The reactor is at one of them. Scheduling want',
-    'the route in advance; filed afterwards it is a report, not a plan.',
+    'Feeder line 7 was laid by two crews working inward from opposite ends. Neither recorded',
+    'which end it started from, and both stencilled cabinet numbers as they went, so the',
+    'numbers are labels and nothing more. Scheduling want the switching order in advance;',
+    'filed afterwards it is a report, not a plan.',
     '',
-    'Bring every substation on the line to `on`.',
+    'Bring every substation on the line to `on`. One throw each — Safety counts the handles.',
   ].join('\n'),
   board: {
     fixed: [
       'feeder line 7 is one row of cable, twenty tiles long, walled on every side',
       'the reactor sits on one end of it, already on, and RIG-01 starts on the reactor',
-      'every substation starts off, and `sub-1` is the one the reactor feeds',
-      'each station after that is fed by the one before it',
+      'every substation starts off, and the chain runs outward from the reactor',
+      'the number in a substation id is a stencilled label, not its place on the line',
     ],
     redrawn: [
       'which end of the line the reactor sits on',
       'six to nine substations',
       'the gaps between them',
+      'which id got stencilled on which substation',
     ],
   },
   facts: [
@@ -231,6 +236,11 @@ export const w5_01: LevelDef = {
         'Steps the substation under the bot one place along its cycle, `off` → `on` → `off`. Costs 2 ticks, so a second call takes the same station back off again.',
     },
     {
+      label: 'Latch handles',
+      value:
+        'The shift carries one throw per substation and no more. Every `use()` call counts against it, including the ones that hit bare cable.',
+    },
+    {
       label: 'Latching',
       value:
         '`use()` flips a substation on either way. It only **counts** if the machine feeding it was already `on`, and a station latched early stays uncounted for the rest of the shift — there is no repairing it later.',
@@ -238,23 +248,23 @@ export const w5_01: LevelDef = {
     {
       label: '`probe(id)`',
       value:
-        'Reads any machine anywhere, for free. Substations are `sub-1` upward; past the last one it returns `null`.',
+        'Reads any machine anywhere, for free. The ids run `sub-1` upward; past the last one it returns `null`. Which id sits where on the line is not fixed.',
     },
     {
       label: 'What a station reports',
       value:
-        '`index` — its place in the chain, the reactor being 0. `feed` — the index of the machine that feeds it. `at` — the tile it stands on.',
+        '`index` — its place in the chain, the reactor being 0, and not the number in its id. `feed` — the index of the machine that feeds it. `at` — the tile it stands on.',
     },
     {
-      label: 'The route',
+      label: 'The order',
       value:
-        'For the star: before the first step, print the tiles the bot is going to stand on, in the order it will reach them, each as `x,y`. One line holds the lot. Every `x,y` printed before that first step is read as part of the route and the rest of the text is ignored; the reactor tile the bot starts on may be named or left out. The star is earned if the run then steps onto exactly those tiles, in that order, and takes no step it did not name.',
+        'For the star: before the first step, print the substation ids in the order the bot is going to latch them — a four-station line would file `sub-4 sub-1 sub-6 sub-2`. One line holds the lot. Every `sub-n` printed before that first step is read as part of the order and the rest of the text is ignored; the reactor is not named. The star is earned if the run then latches exactly those stations, in that order, and latches no other.',
     },
   ],
   seeds: [1, 2, 3],
   par: { ticks: 32 },
   build(seed: number): World {
-    const { reactorAt, stations } = mainsLayout(seed);
+    const { reactorAt, stations, names } = mainsLayout(seed);
     const world = createWorld({ w: WIDTH, h: HEIGHT, seed, fill: Terrain.Wall });
     for (let x = WEST_END; x <= EAST_END; x++) setTerrain(world, vec(x, ROW), Terrain.Cable);
 
@@ -268,7 +278,7 @@ export const w5_01: LevelDef = {
     });
     stations.forEach((x, i) => {
       addMachine(world, {
-        id: `sub-${i + 1}`,
+        id: `sub-${String(names[i] ?? i + 1)}`,
         kind: MachineKind.Node,
         at: vec(x, ROW),
         state: 'off',
@@ -305,12 +315,32 @@ export const w5_01: LevelDef = {
         divergence: latchedEarly,
       },
     ),
+    Objectives.custom(
+      'one-throw-each',
+      'Call `use()` once per substation and no more',
+      (ctx) => throwsTaken(ctx) <= throwsAllowed(ctx),
+      {
+        meter: { kind: 'events', event: 'use' },
+        unit: 'throws',
+        progress: (ctx) => [Math.min(throwsTaken(ctx), throwsAllowed(ctx)), throwsAllowed(ctx)],
+        divergence: (ctx) => ({
+          where: 'throws this shift',
+          expected: `${String(throwsAllowed(ctx))} at most`,
+          received: `${String(throwsTaken(ctx))} taken`,
+        }),
+      },
+    ),
   ],
   bonus: [
-    Objectives.custom('route-declared', 'Print the route before walking it', walkedWhatItSaid, {
-      progress: routeProgress,
-      divergence: leftTheRoute,
-    }),
+    Objectives.custom(
+      'order-declared',
+      'Print the latch order before walking it',
+      latchedWhatItSaid,
+      {
+        progress: orderProgress,
+        divergence: leftTheOrder,
+      },
+    ),
   ],
   starter: [
     '// probe(id) reads any machine in the world. use() switches the one under the bot.',
@@ -321,8 +351,8 @@ export const w5_01: LevelDef = {
   hints: [
     'The reactor is not at the same end every shift. Where it is, is in the world, and reading the world costs nothing.',
     'probe() answers about any machine by id, not only the one under the bot. Ask about a station that might not be there and it tells you so.',
-    'Every substation reports the index of the machine that feeds it. Start at the reactor and follow that chain outward; the order comes out of the chain, not out of the map.',
-    'A probe already hands back the tile every machine stands on, and the bot starts on the reactor. One step along the line changes the bot column by one, so its place on the line after any number of steps is arithmetic, not a question for the world.',
+    'Every substation reports the index of the machine that feeds it. Start at the reactor and follow that chain outward; the order comes out of the chain, not out of the stencilled number.',
+    'Nothing about the order needs the bot to move. probe() answers while RIG-01 is still standing on the reactor, so the whole list can be filed before the first step.',
   ],
   docs: ['probe', 'use', 'move'],
 };

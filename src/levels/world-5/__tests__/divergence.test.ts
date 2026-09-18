@@ -41,18 +41,19 @@ const nowhere = (level: LevelDef, seed: number, id: string) =>
 
 describe('w5-01 — the station that went on before its feeder', () => {
   test('energised names the first station left off, and its tile', () => {
-    const first = must(withPrefix(w5_01, 1, 'sub-')[0], 'sub-1');
+    const first = must(withPrefix(w5_01, 1, 'sub-')[0], 'the first station');
     const { met, divergence } = nowhere(w5_01, 1, 'energised');
     expect(met).toBe(false);
     expect(divergence).toEqual({
-      where: `sub-1 · ${at(first.at)}`,
+      where: `${first.id} · ${at(first.at)}`,
       expected: 'on',
       received: 'off',
     });
   });
 
   test('in-order names the pair and the tick when a station is latched too early', () => {
-    const second = must(withPrefix(w5_01, 1, 'sub-')[1], 'sub-2');
+    const first = must(withPrefix(w5_01, 1, 'sub-')[0], 'the first station');
+    const second = must(withPrefix(w5_01, 1, 'sub-')[1], 'the second station');
     const { met, divergence, result } = diverge(w5_01, 1, 'in-order', (sim, botId) => {
       const { pos, move, use } = playerApi(sim, botId, 'w5-01');
       while (pos().x !== second.at.x) move(pos().x < second.at.x ? Dir.East : Dir.West);
@@ -64,16 +65,16 @@ describe('w5-01 — the station that went on before its feeder', () => {
     );
     expect(met).toBe(false);
     expect(divergence).toEqual({
-      where: `tick ${String(latch.t)} · sub-2`,
-      expected: 'sub-1 already on',
-      received: 'sub-1 was still off',
+      where: `tick ${String(latch.t)} · ${second.id}`,
+      expected: `${first.id} already on`,
+      received: `${first.id} was still off`,
     });
   });
 
   test('a run that latched nothing is told which station, and what feeds it', () => {
-    const first = must(withPrefix(w5_01, 1, 'sub-')[0], 'sub-1');
+    const first = must(withPrefix(w5_01, 1, 'sub-')[0], 'the first station');
     expect(nowhere(w5_01, 1, 'in-order').divergence).toEqual({
-      where: `sub-1 · ${at(first.at)}`,
+      where: `${first.id} · ${at(first.at)}`,
       expected: 'switched on after reactor',
       received: 'never switched on',
     });

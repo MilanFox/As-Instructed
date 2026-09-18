@@ -100,9 +100,9 @@ describe('w5-05 name-the-weak-link', () => {
   });
 });
 
-const ROUTE_STAR = 'route-declared';
+const ORDER_STAR = 'order-declared';
 
-function routeStar(seed: number, rewrite?: (text: string) => string | null) {
+function orderStar(seed: number, rewrite?: (text: string) => string | null) {
   const solution = SOLUTIONS[w5_01.id] as ReferenceSolution;
   const result = runReference(w5_01, seed, solution);
   const events = result.trace.events.flatMap((event) => {
@@ -120,61 +120,58 @@ function routeStar(seed: number, rewrite?: (text: string) => string | null) {
     passed: result.verdict.passed,
     ticks: result.trace.endTick,
     star: must(
-      stars.find((each) => each.id === ROUTE_STAR),
-      ROUTE_STAR,
+      stars.find((each) => each.id === ORDER_STAR),
+      ORDER_STAR,
     ),
   };
 }
 
-describe('w5-01 route-declared', () => {
+describe('w5-01 order-declared', () => {
   test('the reference solution earns it on every seed, still inside par', () => {
     for (const seed of w5_01.seeds) {
-      const run = routeStar(seed);
+      const run = orderStar(seed);
       expect(run.passed, `seed ${String(seed)}`).toBe(true);
       expect(run.ticks, `seed ${String(seed)}`).toBeLessThanOrEqual(w5_01.par.ticks);
       expect(run.star.met, `seed ${String(seed)}`).toBe(true);
     }
   });
 
-  test('the same run without its route line brings the line up and is refused', () => {
+  test('the same run without its order line brings the line up and is refused', () => {
     for (const seed of w5_01.seeds) {
-      const run = routeStar(seed, () => null);
+      const run = orderStar(seed, () => null);
       expect(run.passed, `seed ${String(seed)}`).toBe(true);
       expect(run.star.met, `seed ${String(seed)}`).toBe(false);
-      expect(run.star.divergence?.where, `seed ${String(seed)}`).toBe('the route');
+      expect(run.star.divergence?.where, `seed ${String(seed)}`).toBe('the order');
     }
   });
 
-  test('a route one tile short of the walk is refused, and the step is named', () => {
+  test('an order one station short of the walk is refused, and the latch is named', () => {
     for (const seed of w5_01.seeds) {
-      const run = routeStar(seed, (text) => text.split(' ').slice(0, -1).join(' '));
-      const solution = SOLUTIONS[w5_01.id] as ReferenceSolution;
-      const steps = runReference(w5_01, seed, solution).trace.events.filter(
-        (event) => event.kind === 'move' && event.ok,
-      ).length;
+      const stations = mainsLayout(seed).names.length;
+      const run = orderStar(seed, (text) => text.split(' ').slice(0, -1).join(' '));
       expect(run.star.met, `seed ${String(seed)}`).toBe(false);
-      expect(run.star.divergence?.where, `seed ${String(seed)}`).toBe(`step ${String(steps)}`);
-      expect(run.star.divergence?.received, `seed ${String(seed)}`).toMatch(/^\(\d+, \d+\)$/);
+      expect(run.star.divergence?.where, `seed ${String(seed)}`).toBe(`latch ${String(stations)}`);
+      expect(run.star.divergence?.expected, `seed ${String(seed)}`).toBe('the list to end here');
     }
   });
 
-  test('a route off the cable row is refused at the first step it misnames', () => {
+  test('the stencilled numbering is refused: sub-1 upward is not the chain', () => {
     for (const seed of w5_01.seeds) {
-      const run = routeStar(seed, (text) => text.replace(/,2\b/g, ',3'));
+      const count = mainsLayout(seed).names.length;
+      const byLabel = Array.from({ length: count }, (_, k) => `sub-${String(k + 1)}`).join(' ');
+      const run = orderStar(seed, () => byLabel);
       expect(run.star.met, `seed ${String(seed)}`).toBe(false);
-      expect(run.star.divergence?.where, `seed ${String(seed)}`).toBe('step 1');
-      expect(run.star.divergence?.expected, `seed ${String(seed)}`).toMatch(/^\(\d+, 3\)$/);
-      expect(run.star.divergence?.received, `seed ${String(seed)}`).toMatch(/^\(\d+, 2\)$/);
+      expect(run.star.divergence?.where, `seed ${String(seed)}`).toMatch(/^latch \d+$/);
     }
   });
 
-  test('a run that names the route only after it has driven is refused', () => {
+  test('a run that names the order only after it has driven is refused', () => {
     for (const seed of w5_01.seeds) {
-      const { reactorAt, stations } = mainsLayout(seed);
+      const { reactorAt, stations, names } = mainsLayout(seed);
       const stride = (stations[0] ?? 0) > reactorAt.x ? 1 : -1;
       const result = runLevel(w5_01, seed, (sim, botId) => {
         sim.move(botId, stride > 0 ? Dir.East : Dir.West);
-        sim.print(botId, `${String(reactorAt.x + stride)},${String(reactorAt.y)}`);
+        sim.print(botId, `sub-${String(names[0] ?? 1)}`);
       });
       const stars = evaluateObjectives(w5_01.bonus ?? [], {
         world: result.world,
@@ -183,8 +180,8 @@ describe('w5-01 route-declared', () => {
         ops: result.ops,
       });
       const star = must(
-        stars.find((each) => each.id === ROUTE_STAR),
-        ROUTE_STAR,
+        stars.find((each) => each.id === ORDER_STAR),
+        ORDER_STAR,
       );
       expect(star.met, `seed ${String(seed)}`).toBe(false);
       expect(star.divergence?.received, `seed ${String(seed)}`).toBe('the bot stepped off first');
@@ -203,8 +200,8 @@ describe('w5-01 route-declared', () => {
         ops: result.ops,
       });
       const star = must(
-        stars.find((each) => each.id === ROUTE_STAR),
-        ROUTE_STAR,
+        stars.find((each) => each.id === ORDER_STAR),
+        ORDER_STAR,
       );
       expect(result.verdict.passed, `seed ${String(seed)}`).toBe(false);
       expect(star.met, `seed ${String(seed)}`).toBe(false);
