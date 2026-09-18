@@ -10,6 +10,7 @@ import type {
 } from '../../engine/index.ts';
 import {
   Dir,
+  MANUAL_ONLY,
   MachineKind,
   NOTHING,
   Objectives,
@@ -205,7 +206,8 @@ export const w5_01: LevelDef = {
     '',
     'Feeder line 7 was laid by two crews working inward from opposite ends. Neither recorded',
     'which end it started from, and both stencilled cabinet numbers as they went, so the',
-    'numbers are labels and nothing more. Scheduling want the switching order in advance;',
+    'numbers are labels and nothing more. Line 7 also predates the addressed loop, so every',
+    'cabinet on it is hand-throw. Scheduling want the switching order in advance;',
     'filed afterwards it is a report, not a plan.',
     '',
     'Bring every substation on the line to `on`. One throw each — Safety counts the handles.',
@@ -233,7 +235,7 @@ export const w5_01: LevelDef = {
     {
       label: '`use()`',
       value:
-        'Steps the substation under the bot one place along its cycle, `off` → `on` → `off`. Costs 2 ticks, so a second call takes the same station back off again.',
+        'Steps the substation under the bot one place along its cycle, `off` → `on` → `off`. Costs 2 ticks, so a second call takes the same station back off again. Line 7 is hand-throw gear: a substation moves for nothing else, and `probe(id).vars.manual` is 1 on every one.',
     },
     {
       label: 'Latch handles',
@@ -283,7 +285,7 @@ export const w5_01: LevelDef = {
         at: vec(x, ROW),
         state: 'off',
         inventory: [],
-        vars: { index: i + 1, feed: i },
+        vars: { index: i + 1, feed: i, [MANUAL_ONLY]: 1 },
         cycle: ['off', 'on'],
       });
     });

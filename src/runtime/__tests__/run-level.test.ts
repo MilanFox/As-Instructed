@@ -196,7 +196,7 @@ describe('power() on a hand-operated machine', () => {
     return machine;
   }
 
-  for (const id of ['w8-03', 'w8-05']) {
+  for (const id of ['w7-04', 'w7-05', 'w8-03', 'w8-05']) {
     test(`${id} tells the player which machine and where`, () => {
       const level = getLevel(id) as LevelDef;
       const seed = level.seeds[0] as number;
