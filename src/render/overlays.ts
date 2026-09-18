@@ -394,7 +394,6 @@ export const BADGE_VARS: readonly string[] = [
   'workers',
   'crops',
   'jobs',
-  'probeBudget',
   'bound',
   'sent',
 ];
@@ -712,7 +711,7 @@ export function describeTile(
   }
   if (overripe > 0) parts.push(`ripe ${overripe}t`);
   if (bot) parts.push(bot.name);
-  if (machine) parts.push(`${machine.kind}:${machine.state}`);
+  if (machine) parts.push(machine.id, `${machine.kind}:${machine.state}`);
   if (machine) {
     const cycle = machine.cycle;
     const step = cycle && cycle.length > 2 ? cycle.indexOf(machine.state) : -1;
@@ -722,6 +721,9 @@ export function describeTile(
     if (machine.vars[MANUAL_ONLY] === 1) parts.push('manual');
     for (const varKey in machine.vars) {
       if (varKey.startsWith(FED_BY)) parts.push(`fed by ${varKey.slice(FED_BY.length)}`);
+      else if (varKey !== badged && varKey !== MANUAL_ONLY) {
+        parts.push(`${varKey} ${String(machine.vars[varKey])}`);
+      }
     }
   }
   if (buffer) {
