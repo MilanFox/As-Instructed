@@ -1,6 +1,7 @@
 import type { Dir as DirType, Sim, Vec } from '../../engine/index.ts';
 import { Dir, ItemKind, Terrain, step } from '../../engine/index.ts';
 import type { ReferenceSolution } from '../types.ts';
+import { playerApi } from '../world-6/__solutions__/_api.ts';
 import { KEY_SPACE, KnownMap, drainAntenna, follow, readPacket } from '../world-8/shared.ts';
 
 const SITE = 30;
@@ -17,19 +18,16 @@ const HEADING: Record<string, Dir> = {
 export const rawRelay: ReferenceSolution = {
   levelId: 'w6-04',
   run(sim: Sim, botId: number): void {
-    for (const packet of drainAntenna(sim, botId, 'mast')) {
-      sim.applyMachineChange(
-        botId,
-        'mast',
-        (machine) => {
-          machine.vars['sent'] = (machine.vars['sent'] ?? 0) + 1;
-        },
-        1,
-      );
-      void packet;
-    }
+    const { receive, transmit } = playerApi(sim, botId, 'w6-04');
+    for (let packet = receive(); packet !== null; packet = receive()) transmit(packet);
   },
-  source: '',
+  source: [
+    'let packet = receive();',
+    'while (packet !== null) {',
+    '  transmit(packet);',
+    '  packet = receive();',
+    '}',
+  ].join('\n'),
 };
 
 export const flatReader: ReferenceSolution = {

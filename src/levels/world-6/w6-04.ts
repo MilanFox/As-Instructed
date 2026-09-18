@@ -49,7 +49,7 @@ interface Shift {
 const SHIFTS: Readonly<Record<number, Shift>> = Object.freeze({
   1: { key: 37, tailKey: 62, packets: 8 },
   2: { key: 71, tailKey: 19, packets: 11 },
-  3: { key: 0, tailKey: 44, packets: 9 },
+  3: { key: 44, tailKey: 0, packets: 9 },
   4: { key: 94, tailKey: 7, packets: 13 },
 });
 
@@ -200,8 +200,8 @@ export const w6_04: LevelDef = {
       'nothing on the site reports either shift — no `probe` will hand one over',
     ],
     redrawn: [
-      'the shift, anywhere in the space from 0 to 94 — including the one that changes nothing',
-      "the straggler's own shift",
+      'the shift, anywhere in the space from 0 to 94',
+      "the straggler's own shift, and which of the two is the one that changes nothing",
       'eight to thirteen headed packets',
       'what the packets say, and how long they run',
     ],
@@ -298,7 +298,7 @@ export const w6_04: LevelDef = {
   hints: [
     'There are not many keys. There is exactly one way to know when you have the right one.',
     'You are not looking for the key. You are looking for a packet that starts with the four characters you were promised, and the key is whatever produced it.',
-    'One shift in the space is not interesting at all, and it is still a shift. A program that skips it will pass three shifts and fail the fourth.',
+    'One shift in the space changes nothing at all, and it is still a shift. Either the headed packets or the straggler can be the one that arrived under it.',
     'The straggler has no header, so nothing can confirm a candidate outright. Something else about English text is true of the plain version and untrue of the other ninety-four.',
   ],
   docs: ['decode', 'receive', 'buffered', 'transmit'],
