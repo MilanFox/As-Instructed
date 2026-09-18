@@ -4,7 +4,15 @@ import { Dir, evaluateObjectives, senseTotals } from '../../../engine/index.ts';
 import { must } from '../../../engine/__tests__/helpers.ts';
 import { runLevel } from '../../harness.ts';
 import { solution } from '../__solutions__/w7-04.ts';
-import { w7_04 } from '../w7-04.ts';
+import { boundOf, deadlineOf, jobsFor, w7_04 } from '../w7-04.ts';
+
+const deadlineOn = (seed: number): number =>
+  deadlineOf(
+    boundOf(
+      jobsFor(seed).map((job) => job.cost),
+      w7_04.build(seed).bots.length,
+    ),
+  );
 
 type Order = 'dearest' | 'cheapest' | 'board';
 
@@ -29,7 +37,7 @@ const SHIFT: Record<Dir, [number, number]> = {
 };
 
 // the reference walker, so a probe differs from the reference only in dispatch order and padding
-function dispatch(sim: Sim, order: Order, pad: number): void {
+function dispatch(sim: Sim, order: Order, pad: number, share = 1): void {
   const board = sim.probe(0, 'board');
   if (!board) return;
   const jobs: { id: string; at: Vec; cost: number }[] = [];
@@ -99,10 +107,11 @@ function dispatch(sim: Sim, order: Order, pad: number): void {
 
   let decider = '';
   let decidedAt = -1;
+  const hands = fleet.slice(0, Math.max(1, Math.floor(fleet.length * share)));
   for (const job of jobs) {
-    let hand = fleet[0] as Hand;
+    let hand = hands[0] as Hand;
     let best = Number.POSITIVE_INFINITY;
-    for (const candidate of fleet) {
+    for (const candidate of hands) {
       const start = candidate.clock + gap(candidate.at, job.at);
       if (start < best) {
         best = start;
@@ -136,7 +145,7 @@ function scored(seed: number, drive: (sim: Sim, bot: number) => void) {
     initialWorld: result.initialWorld,
     ops: result.ops,
   };
-  const stars = evaluateObjectives(w7_04.bonus ?? [], ctx);
+  const graded = evaluateObjectives([...w7_04.objectives, ...(w7_04.bonus ?? [])], ctx);
   return {
     ctx,
     passed: result.verdict.passed,
@@ -144,7 +153,7 @@ function scored(seed: number, drive: (sim: Sim, bot: number) => void) {
     senses: senseTotals(result.trace),
     met: (id: string) =>
       must(
-        stars.find((star) => star.id === id),
+        graded.find((objective) => objective.id === id),
         id,
       ).met,
   };
@@ -169,6 +178,22 @@ const firstWaveCosts = (ctx: ObjectiveContext): number[] => {
     .slice(0, ctx.initialWorld.bots.length)
     .map((job) => job.cost)
     .sort((a, b) => b - a);
+};
+
+const openingHands = (ctx: ObjectiveContext): Set<number> => {
+  const begun = new Map<string, { t: number; by: number }>();
+  for (const event of ctx.trace.events) {
+    if (event.kind !== 'use' || !event.ok) continue;
+    const id = event.machineId;
+    if (id === null || !id.startsWith('job-')) continue;
+    if (!begun.has(id)) begun.set(id, { t: event.t, by: event.botId });
+  }
+  return new Set(
+    [...begun.values()]
+      .sort((a, b) => a.t - b.t)
+      .slice(0, ctx.initialWorld.bots.length)
+      .map((job) => job.by),
+  );
 };
 
 const dearestCosts = (ctx: ObjectiveContext): number[] =>
@@ -267,6 +292,47 @@ describe('w7-04 long-jobs-first is missed by a fleet that ignores cost', () => {
   });
 });
 
+describe('w7-04 long-jobs-first wants one bot per opening job', () => {
+  test('one bot working dearest first takes the dearest jobs and still misses it', () => {
+    for (const seed of w7_04.seeds) {
+      const run = scored(seed, (sim) => {
+        dispatch(sim, 'dearest', 0, 0);
+      });
+      const label = `seed ${String(seed)}`;
+      expect(firstWaveCosts(run.ctx), label).toEqual(dearestCosts(run.ctx));
+      expect(run.met('long-jobs-first'), label).toBe(false);
+    }
+  });
+
+  test('the divergence counts the bots that opened on a job of their own', () => {
+    const short = (text: string): boolean => text.length <= 44;
+    for (const seed of w7_04.seeds) {
+      const run = scored(seed, (sim) => {
+        dispatch(sim, 'dearest', 0, 0);
+      });
+      const shown = must(objectiveIn('long-jobs-first').divergence?.(run.ctx), 'a divergence');
+      const label = `seed ${String(seed)}`;
+      expect(shown.where, label).toBe('the first wave');
+      expect(shown.expected, label).toBe(
+        `${String(run.ctx.initialWorld.bots.length)} bots on a job of their own`,
+      );
+      expect(shown.received, label).toBe('1 ever began one');
+      expect([shown.where, shown.expected, shown.received].every(short), label).toBe(true);
+    }
+  });
+
+  test('the reference opens with a different bot on each of the dearest jobs', () => {
+    for (const seed of w7_04.seeds) {
+      const run = scored(seed, (sim, bot) => {
+        solution.run(sim, bot);
+      });
+      expect(openingHands(run.ctx).size, `seed ${String(seed)}`).toBe(
+        run.ctx.initialWorld.bots.length,
+      );
+    }
+  });
+});
+
 describe('w7-04 long-jobs-first is not par in disguise', () => {
   test('dearest first but deliberately slow still earns it well past par', () => {
     const par = must(w7_04.par, 'par').ticks;
@@ -275,7 +341,6 @@ describe('w7-04 long-jobs-first is not par in disguise', () => {
         dispatch(sim, 'dearest', 12);
       });
       const label = `seed ${String(seed)}`;
-      expect(run.passed, label).toBe(true);
       expect(run.met('long-jobs-first'), label).toBe(true);
       expect(run.ticks, label).toBeGreaterThan(par);
     }
@@ -353,8 +418,8 @@ describe('w7-04 divergences name a place and a value', () => {
       const label = `seed ${String(seed)}`;
       expect(run.met('long-jobs-first'), label).toBe(false);
       expect(shown.where, label).toBe('the first wave');
-      expect(shown.expected, label).toMatch(/^\d+ jobs begun$/);
-      expect(shown.received, label).toBe('0 begun all shift');
+      expect(shown.expected, label).toMatch(/^\d+ bots on a job of their own$/);
+      expect(shown.received, label).toBe('0 ever began one');
       expect([shown.where, shown.expected, shown.received].every(short), label).toBe(true);
     }
   });
@@ -415,20 +480,98 @@ describe('w7-04 name-the-decider still refuses a wrong line', () => {
   });
 });
 
-describe('w7-04 the tick budget is a runaway guard, not a grader', () => {
-  test('the reference and a deliberately slow run are both far inside it', () => {
+describe('w7-04 the tick budget is a runaway guard, not the grader', () => {
+  test('the objective refuses the overrun the cap never sees', () => {
     const cap = must(w7_04.budget?.maxTicks, 'maxTicks');
     for (const seed of w7_04.seeds) {
       const reference = scored(seed, (sim, bot) => {
         solution.run(sim, bot);
       });
-      const slow = scored(seed, (sim) => {
-        dispatch(sim, 'dearest', 12);
+      const oneBot = scored(seed, (sim) => {
+        dispatch(sim, 'dearest', 0, 0);
       });
       const label = `seed ${String(seed)}`;
+      expect(deadlineOn(seed) * 4, label).toBeLessThan(cap);
       expect(reference.ticks * 4, label).toBeLessThan(cap);
-      expect(slow.ticks * 4, label).toBeLessThan(cap);
-      expect(slow.passed, label).toBe(true);
+      expect(oneBot.ticks, label).toBeLessThan(cap);
+      expect(oneBot.met('inside-the-deadline'), label).toBe(false);
+      expect(oneBot.met('board-clear'), label).toBe(true);
+    }
+  });
+});
+
+describe('w7-04 the deadline grades the fleet, not the dispatch order', () => {
+  test('the reference stops every bot well inside the posted deadline', () => {
+    for (const seed of w7_04.seeds) {
+      const run = scored(seed, (sim, bot) => {
+        solution.run(sim, bot);
+      });
+      const label = `seed ${String(seed)}`;
+      expect(run.met('inside-the-deadline'), label).toBe(true);
+      expect(run.ticks, label).toBeLessThan(deadlineOn(seed));
+    }
+  });
+
+  test('the board posts the figure the objective grades', () => {
+    for (const seed of w7_04.seeds) {
+      const board = must(
+        w7_04.build(seed).machines.find((machine) => machine.id === 'board'),
+        'board',
+      );
+      const label = `seed ${String(seed)}`;
+      expect(board.vars['deadline'], label).toBe(deadlineOn(seed));
+      expect(board.vars['deadline'], label).toBe(deadlineOf(must(board.vars['bound'], 'bound')));
+    }
+  });
+
+  test('a fleet dealt the board in id order clears it inside the deadline, every seed', () => {
+    for (const seed of w7_04.seeds) {
+      const run = scored(seed, (sim) => {
+        dispatch(sim, 'board', 0);
+      });
+      const label = `seed ${String(seed)}`;
+      expect(run.passed, label).toBe(true);
+      expect(run.met('inside-the-deadline'), label).toBe(true);
+      expect(run.met('long-jobs-first'), label).toBe(false);
+    }
+  });
+
+  test('half the fleet is not enough, however well the half is dispatched', () => {
+    for (const seed of w7_04.seeds) {
+      const run = scored(seed, (sim) => {
+        dispatch(sim, 'dearest', 0, 0.5);
+      });
+      const label = `seed ${String(seed)}`;
+      expect(run.met('board-clear'), label).toBe(true);
+      expect(run.met('inside-the-deadline'), label).toBe(false);
+      expect(run.passed, label).toBe(false);
+    }
+  });
+
+  test('one bot working the whole board clears it and misses the deadline, every seed', () => {
+    for (const seed of w7_04.seeds) {
+      const run = scored(seed, (sim) => {
+        dispatch(sim, 'dearest', 0, 0);
+      });
+      const label = `seed ${String(seed)}`;
+      expect(run.met('board-clear'), label).toBe(true);
+      expect(run.met('inside-the-deadline'), label).toBe(false);
+      expect(run.ticks, label).toBeGreaterThan(deadlineOn(seed) * 2);
+    }
+  });
+
+  test('the overrun names the bot that stopped last and both ticks', () => {
+    const short = (text: string): boolean => text.length <= 44;
+    for (const seed of w7_04.seeds) {
+      const run = scored(seed, (sim) => {
+        dispatch(sim, 'dearest', 0, 0);
+      });
+      const shown = must(objectiveIn('inside-the-deadline').divergence?.(run.ctx), 'a divergence');
+      const label = `seed ${String(seed)}`;
+      expect(shown.where, label).toMatch(/^YARD-\d+, the last to stop$/);
+      expect(shown.expected, label).toBe(`tick ${String(deadlineOn(seed))}`);
+      expect(shown.received, label).toBe(`tick ${String(run.ticks)}`);
+      expect([shown.where, shown.expected, shown.received].every(short), label).toBe(true);
     }
   });
 });

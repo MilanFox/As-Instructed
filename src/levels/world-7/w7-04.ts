@@ -1,6 +1,7 @@
 import type { Divergence, Machine, ObjectiveContext, Vec, World } from '../../engine/index.ts';
 import {
   Dir,
+  MANUAL_ONLY,
   MachineKind,
   NOTHING,
   Objectives,
@@ -10,6 +11,7 @@ import {
   addMachine,
   clipValue,
   createWorld,
+  machineById,
   setTerrain,
   vec,
 } from '../../engine/index.ts';
@@ -110,6 +112,23 @@ export function boundOf(jobCosts: readonly number[], fleet: number): number {
   return Math.max(longest, Math.ceil(total / Math.max(1, fleet))) + WALK_OUT;
 }
 
+export function deadlineOf(bound: number): number {
+  return bound * 2;
+}
+
+function deadlineIn(world: World): number {
+  return machineById(world, 'board')?.vars.deadline ?? 0;
+}
+
+function overranDeadline(ctx: ObjectiveContext): Divergence {
+  const last = [...ctx.world.bots].sort((a, b) => b.clock - a.clock)[0];
+  return {
+    where: last === undefined ? 'the shift' : `${last.name}, the last to stop`,
+    expected: `tick ${String(deadlineIn(ctx.initialWorld))}`,
+    received: `tick ${String(ctx.trace.endTick)}`,
+  };
+}
+
 function progress(ctx: ObjectiveContext): [number, number] {
   return [doneCount(ctx.world), jobMachines(ctx.initialWorld).length];
 }
@@ -206,13 +225,13 @@ function misreadDecider(ctx: ObjectiveContext): Divergence | undefined {
   };
 }
 
-function begunAt(ctx: ObjectiveContext): Map<string, number> {
-  const begun = new Map<string, number>();
+function begunAt(ctx: ObjectiveContext): Map<string, { t: number; by: number }> {
+  const begun = new Map<string, { t: number; by: number }>();
   for (const event of ctx.trace.events) {
     if (event.kind !== 'use' || !event.ok) continue;
     const id = event.machineId;
     if (id === null || !id.startsWith(JOB_PREFIX)) continue;
-    if (!begun.has(id)) begun.set(id, event.t);
+    if (!begun.has(id)) begun.set(id, { t: event.t, by: event.botId });
   }
   return begun;
 }
@@ -221,24 +240,40 @@ function costOfEach(ctx: ObjectiveContext): Map<string, number> {
   return new Map(jobMachines(ctx.initialWorld).map((job) => [job.id, job.vars.cost ?? 0]));
 }
 
+interface WaveJob {
+  id: string;
+  cost: number;
+  begun: number;
+  by: number;
+}
+
 interface FirstWave {
   size: number;
-  wave: { id: string; cost: number; begun: number }[];
+  wave: WaveJob[];
   dearest: number[];
-  begun: number;
+  hands: number;
+}
+
+function openingJobs(ctx: ObjectiveContext): WaveJob[] {
+  const cost = costOfEach(ctx);
+  const opened = new Map<number, WaveJob>();
+  for (const [id, first] of begunAt(ctx)) {
+    const held = opened.get(first.by);
+    if (held !== undefined && held.begun <= first.t) continue;
+    opened.set(first.by, { id, cost: cost.get(id) ?? 0, begun: first.t, by: first.by });
+  }
+  return [...opened.values()].sort((a, b) => a.begun - b.begun || b.cost - a.cost);
 }
 
 function firstWave(ctx: ObjectiveContext): FirstWave {
   const cost = costOfEach(ctx);
   const size = Math.min(ctx.initialWorld.bots.length, cost.size);
-  const started = [...begunAt(ctx)]
-    .map(([id, at]) => ({ id, cost: cost.get(id) ?? 0, begun: at }))
-    .sort((a, b) => a.begun - b.begun || b.cost - a.cost);
+  const opened = openingJobs(ctx);
   return {
     size,
-    wave: started.slice(0, size),
+    wave: opened.slice(0, size),
     dearest: [...cost.values()].sort((a, b) => b - a).slice(0, size),
-    begun: started.length,
+    hands: opened.length,
   };
 }
 
@@ -250,12 +285,12 @@ function dearestFirst(ctx: ObjectiveContext): boolean {
 }
 
 function wrongWave(ctx: ObjectiveContext): Divergence {
-  const { size, wave, begun } = firstWave(ctx);
+  const { size, wave, hands } = firstWave(ctx);
   if (wave.length < size) {
     return {
       where: 'the first wave',
-      expected: `${String(size)} jobs begun`,
-      received: `${String(begun)} begun all shift`,
+      expected: `${String(size)} bots on a job of their own`,
+      received: `${String(hands)} ever began one`,
     };
   }
   const inWave = new Set(wave.map((job) => job.id));
@@ -263,7 +298,7 @@ function wrongWave(ctx: ObjectiveContext): Divergence {
   for (const [id, cost] of costOfEach(ctx)) {
     if (!inWave.has(id) && cost > passedOver) passedOver = cost;
   }
-  let weakest = wave[0] as { id: string; cost: number; begun: number };
+  let weakest = wave[0] as WaveJob;
   for (const job of wave) if (job.cost < weakest.cost) weakest = job;
   return {
     where: weakest.id,
@@ -287,7 +322,7 @@ export const w7_04: LevelDef = {
     'shift. The board does not distinguish between these, and neither, historically, have we.',
     'Head office wants the long ones started first, and a line naming whatever held us open.',
     '',
-    'Clear the board.',
+    'Clear the board inside the shift.',
   ].join('\n'),
   board: {
     fixed: [
@@ -314,7 +349,8 @@ export const w7_04: LevelDef = {
     },
     {
       label: 'Clearing one',
-      value: 'Stand on the job and call `use()` exactly `cost` times. One tick each.',
+      value:
+        'Stand on the job and call `use()` exactly `cost` times. One tick each. A job is hand-worked and `power()` reaches none of them — `vars.manual` is 1 on every one.',
     },
     { label: 'One use too many', value: 'The state wraps and the job goes back to `open`.' },
     {
@@ -327,6 +363,11 @@ export const w7_04: LevelDef = {
         "`probe('board').vars.bound` — the longer of the longest single job, or every job plus two ticks of walking shared out across the fleet, plus the walk out from Depot 0.",
     },
     {
+      label: 'The deadline',
+      value:
+        "`probe('board').vars.deadline` — twice the load bound, posted before anybody moves. The shift is only cleared if the last bot stops on or before it, which no fleet that leaves bots at the depot will manage.",
+    },
+    {
       label: 'Shift report',
       value:
         'One line, `last <job> <tick>`: the job whose final `use()` landed latest — not necessarily the last one you dispatched — and the clock reading of the bot that closed it, straight after that use.',
@@ -334,12 +375,12 @@ export const w7_04: LevelDef = {
     {
       label: 'The first wave',
       value:
-        'A job is begun on the tick of its first `use()`. For the star, the first jobs begun — one for each bot in the fleet — must be the most expensive jobs on the board. Costs are compared, not job ids, so jobs of equal cost are interchangeable, and jobs begun on the same tick are in no order.',
+        'A job is begun on the tick of its first `use()`. For the star, the job each bot begins first must be one of the most expensive jobs on the board — one bot to each of them, so a bot that never begins a job costs you the star. Costs are compared, not job ids, so jobs of equal cost are interchangeable.',
     },
   ],
   seeds: [1, 2, 3, 4, 5],
   par: { ticks: 79 },
-  budget: { maxTicks: 4000 },
+  budget: { maxTicks: 1200 },
   build(seed: number): World {
     const { bots } = requisitionFor(seed);
     const world = createWorld({ w: WIDTH, h: HEIGHT, seed, fill: Terrain.Floor, vars: { seed } });
@@ -360,24 +401,22 @@ export const w7_04: LevelDef = {
         at: job.at,
         state: 'open',
         inventory: [],
-        vars: { cost: job.cost },
+        vars: { cost: job.cost, [MANUAL_ONLY]: 1 },
         cycle: cycleFor(job.cost),
       });
     }
 
+    const bound = boundOf(
+      jobs.map((job) => job.cost),
+      bots,
+    );
     addMachine(world, {
       id: 'board',
       kind: MachineKind.Lever,
       at: vec(DEPOT_X, 1),
       state: 'idle',
       inventory: [],
-      vars: {
-        jobs: jobs.length,
-        bound: boundOf(
-          jobs.map((job) => job.cost),
-          bots,
-        ),
-      },
+      vars: { jobs: jobs.length, bound, deadline: deadlineOf(bound) },
     });
 
     for (let i = 0; i < bots; i++) {
@@ -393,6 +432,20 @@ export const w7_04: LevelDef = {
       'Leave every job on the board done',
       (ctx) => doneCount(ctx.world) === jobMachines(ctx.initialWorld).length,
       { progress, divergence: unfinishedJob },
+    ),
+    Objectives.custom(
+      'inside-the-deadline',
+      'Stop the last bot inside the deadline the board posts',
+      (ctx) => ctx.trace.endTick <= deadlineIn(ctx.initialWorld),
+      {
+        progress: (ctx) => {
+          const limit = deadlineIn(ctx.initialWorld);
+          return [Math.min(ctx.trace.endTick, limit), limit];
+        },
+        divergence: overranDeadline,
+        meter: { kind: 'ticks' },
+        unit: 'ticks',
+      },
     ),
   ],
   bonus: [
@@ -423,7 +476,7 @@ export const w7_04: LevelDef = {
     'const board = probe("board");',
     'const jobs = [];',
     'for (let i = 0; i < board.vars.jobs; i++) jobs.push(probe(`job-${i}`));',
-    'print(`${jobs.length} jobs, bound ${board.vars.bound}`);',
+    'print(`${jobs.length} jobs, bound ${board.vars.bound}, deadline ${board.vars.deadline}`);',
     '',
   ].join('\n'),
   hints: [

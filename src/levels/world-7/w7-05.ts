@@ -1,6 +1,7 @@
 import type { Divergence, Machine, ObjectiveContext, Vec, World } from '../../engine/index.ts';
 import {
   Dir,
+  MANUAL_ONLY,
   MachineKind,
   Objectives,
   Rng,
@@ -21,6 +22,8 @@ const WIDTH = 36;
 const HEIGHT = 28;
 const MUSTER_X = 2;
 const SITE_PREFIX = 'site-';
+const ID_ALPHABET = 'bcdfghjklmnpqrstvwxyz';
+const ID_LENGTH = 6;
 
 export interface Detail {
   scouts: number;
@@ -42,6 +45,18 @@ function detailFor(seed: number): Detail {
 }
 
 const key = (at: Vec): string => `${String(at.x)},${String(at.y)}`;
+
+function drawSiteId(rng: Rng, taken: ReadonlySet<string>): string {
+  let id = '';
+  do {
+    let token = '';
+    for (let i = 0; i < ID_LENGTH; i++) {
+      token += ID_ALPHABET.charAt(rng.int(0, ID_ALPHABET.length - 1));
+    }
+    id = `${SITE_PREFIX}${token}`;
+  } while (taken.has(id));
+  return id;
+}
 
 function walkable(world: World, at: Vec): boolean {
   return tileAt(world, at)?.terrain === Terrain.Floor;
@@ -246,6 +261,7 @@ export const w7_05: LevelDef = {
     redrawn: [
       'how many relay sites there are, six to nine',
       'where they are — they are on no plan, and finding them is the order',
+      'what each one is called — the six letters after `site-`',
       'how many scouts, one or two',
       'how many workers, four to eight',
       'where the standing rock lies, and so what a `look` can see past',
@@ -255,12 +271,13 @@ export const w7_05: LevelDef = {
     { label: 'Your score', value: 'The clock stops when the **last** bot stops.' },
     {
       label: 'A site is up',
-      value: 'When its state is `on`. Stand on it and `use()` once. Twice puts it back to `cold`.',
+      value:
+        'When its state is `on`. Stand on it and `use()` once. Twice puts it back to `cold`. The sites are hand-thrown: `power()` reaches none of them — `vars.manual` is 1 on every one.',
     },
     {
       label: 'Finding one',
       value:
-        'The sites are not listed. `probe()` with **no argument** reports the machine under or ahead of the bot, and that is the only way to find one.',
+        'The sites are on no plan, and their ids are drawn fresh for the shift: `site-` and six letters. `probe(id)` answers for any id that exists and returns null for one that does not, so there is nothing to guess. A bot finds a site by standing on or in front of it — `probe()` with **no argument** — or by seeing it from a distance.',
     },
     {
       label: 'The muster',
@@ -279,7 +296,7 @@ export const w7_05: LevelDef = {
     {
       label: 'Seeing',
       value:
-        '`look(dir, range)` is free and stops at the first thing it cannot see through. A bot only knows what it has seen.',
+        '`look(dir, range)` is free and stops at the first thing it cannot see through. It reports the id of every machine it passes. A bot only knows what it has seen.',
     },
     {
       label: 'The orders',
@@ -347,14 +364,17 @@ export const w7_05: LevelDef = {
       if (placed.some((other) => manhattan(other, at) < 7)) continue;
       placed.push(at);
     }
+    const taken = new Set<string>();
     placed.forEach((at, index) => {
+      const id = drawSiteId(rng, taken);
+      taken.add(id);
       addMachine(world, {
-        id: `${SITE_PREFIX}${String(index)}`,
+        id,
         kind: MachineKind.Node,
         at,
         state: 'cold',
         inventory: [],
-        vars: { index },
+        vars: { index, [MANUAL_ONLY]: 1 },
         cycle: ['cold', 'on'],
       });
     });
@@ -390,7 +410,7 @@ export const w7_05: LevelDef = {
     ),
     Objectives.custom(
       'told-where-to-go',
-      'Bring up no site that nobody sent a bot to',
+      'Read an order before switching each site on',
       (ctx) => {
         const [ordered, total] = underOrders(ctx);
         return total > 0 && ordered === total;

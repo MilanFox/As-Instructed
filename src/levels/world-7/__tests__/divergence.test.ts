@@ -232,24 +232,26 @@ function contextFrom(initialWorld: World, events: readonly TraceEvent[]): Object
   return { world: cloneWorld(initialWorld), initialWorld, trace };
 }
 
+const firstSite = (world: World) =>
+  must(
+    world.machines.find((machine) => machine.id.startsWith('site-')),
+    'a relay site',
+  );
+
 describe('w7-05 names the site and the bot that jumped its orders', () => {
   test('a fleet that never left the muster is told how near it got to the first site', () => {
     const { report } = diverge(w7_05, 1, 'sites-up', () => undefined);
 
     expect(report.met).toBe(false);
     expect(report.divergence).toEqual({
-      where: 'site-0',
+      where: firstSite(w7_05.build(1)).id,
       expected: 'on',
       received: 'cold, never reached',
     });
   });
 
   test('no part of the report says where a site is', () => {
-    const world = w7_05.build(1);
-    const site = must(
-      world.machines.find((machine) => machine.id === 'site-0'),
-      'site-0',
-    );
+    const site = firstSite(w7_05.build(1));
     const { report } = diverge(w7_05, 1, 'sites-up', () => undefined);
     const shown = must(report.divergence, 'a divergence');
     const whole = `${shown.where} ${shown.expected} ${shown.received}`;
@@ -260,10 +262,7 @@ describe('w7-05 names the site and the bot that jumped its orders', () => {
 
   test('a bot that switched a site on with an empty inbox is told the tick it did it', () => {
     const initialWorld = w7_05.build(1);
-    const site = must(
-      initialWorld.machines.find((machine) => machine.id === 'site-0'),
-      'site-0',
-    );
+    const site = firstSite(initialWorld);
     const objective = objectiveIn(w7_05, 'told-where-to-go');
     const ctx = contextFrom(initialWorld, [
       { t: 12, botId: 2, dt: 1, kind: 'use', at: site.at, machineId: site.id, ok: true },
@@ -279,10 +278,7 @@ describe('w7-05 names the site and the bot that jumped its orders', () => {
 
   test('a bot that read an order stamped later is told both ticks', () => {
     const initialWorld = w7_05.build(1);
-    const site = must(
-      initialWorld.machines.find((machine) => machine.id === 'site-0'),
-      'site-0',
-    );
+    const site = firstSite(initialWorld);
     const objective = objectiveIn(w7_05, 'told-where-to-go');
     const ctx = contextFrom(initialWorld, [
       { t: 30, botId: 2, dt: 0, kind: 'recv', from: 0, body: 'go' },

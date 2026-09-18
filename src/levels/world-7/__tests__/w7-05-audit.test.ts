@@ -483,7 +483,7 @@ describe('w7-05 told-where-to-go wants an order for every site, not one for the 
       expect(run.required('sites-up'), label).toBe(false);
       expect(run.required('told-where-to-go'), label).toBe(false);
       const shown = must(objectiveIn('sites-up').divergence?.(run.ctx), 'a divergence');
-      expect(shown.where, label).toMatch(/^site-\d+$/);
+      expect(shown.where, label).toMatch(/^site-[b-z]{6}$/);
       expect(shown.expected, label).toBe('on');
       expect(shown.received, label).toBe('cold, never reached');
     }
@@ -562,6 +562,42 @@ describe('w7-05 divergences name a place and a value', () => {
       const shown = objective.divergence?.(run.ctx);
       if (shown === undefined) continue;
       expect([shown.where, shown.expected, shown.received].every(short), objective.id).toBe(true);
+    }
+  });
+});
+
+describe('w7-05 the site ids cannot be enumerated', () => {
+  const siteIds = (seed: number): string[] =>
+    w7_05
+      .build(seed)
+      .machines.filter((machine) => machine.id.startsWith('site-'))
+      .map((machine) => machine.id);
+
+  test('no site answers to a counted id', () => {
+    for (const seed of w7_05.seeds) {
+      const world = w7_05.build(seed);
+      const label = `seed ${String(seed)}`;
+      for (let index = 0; index < 32; index++) {
+        expect(
+          world.machines.some((machine) => machine.id === `site-${String(index)}`),
+          label,
+        ).toBe(false);
+      }
+      for (const id of siteIds(seed)) expect(id, label).toMatch(/^site-[b-z]{6}$/);
+    }
+  });
+
+  test('a seed rebuilds the same ids, and two seeds share none', () => {
+    const everywhere = new Set<string>();
+    for (const seed of w7_05.seeds) {
+      const ids = siteIds(seed);
+      const label = `seed ${String(seed)}`;
+      expect(siteIds(seed), label).toEqual(ids);
+      expect(new Set(ids).size, label).toBe(ids.length);
+      for (const id of ids) {
+        expect(everywhere.has(id), label).toBe(false);
+        everywhere.add(id);
+      }
     }
   });
 });
