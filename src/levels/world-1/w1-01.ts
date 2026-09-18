@@ -91,7 +91,7 @@ export const w1_01: LevelDef = {
     'move() gives back false when something blocks it. The tick is spent either way.',
     'Five legs. Only two things change between them: how far, and which way.',
     'Write 19 once. Write 22 once. Write 5 once. That should be enough.',
-    'Driving until a wall stops you does reach the corner, but every blocked move costs a tick, and the bay is only booked for ninety.',
+    'Driving until a wall stops you does reach the corner, and every blocked move costs a tick. Counting the legs instead spends none of them.',
   ],
   docs: ['coordinates', 'move', 'print'],
 };
