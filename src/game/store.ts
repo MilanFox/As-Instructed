@@ -273,11 +273,12 @@ function dispatchedOneCall(source: string): boolean {
 }
 
 function foldShapes(results: readonly PerSeedResult[]): TraceShape {
-  if (results.length === 0) return { moves: 0, printed: false, markedUnread: false };
+  if (results.length === 0) return { moves: 0, printed: false, markedUnread: false, sensed: 0 };
   return {
     moves: results.reduce((most, result) => Math.max(most, result.shape.moves), 0),
     printed: results.every((result) => result.shape.printed),
     markedUnread: results.every((result) => result.shape.markedUnread),
+    sensed: results.reduce((most, result) => Math.max(most, result.shape.sensed), 0),
   };
 }
 
@@ -1029,6 +1030,7 @@ export const useGame = create<GameState>((set, get) => {
           seeds: levelDef.seeds.length,
           seedsPassed: onSchedule.filter((result) => result.passed).length,
           moves: shape.moves,
+          sensed: shape.sensed,
           printed: shape.printed,
           markedUnread: shape.markedUnread,
           emptyProgram: dispatchedNothing(source),

@@ -20,6 +20,7 @@ function facts(patch: Partial<RunFacts> = {}): RunFacts {
     seeds: 3,
     seedsPassed: 3,
     moves: 30,
+    sensed: 12,
     printed: false,
     markedUnread: false,
     emptyProgram: false,
@@ -103,6 +104,7 @@ function everythingEarned(): string[] {
     { passed: false, emptyProgram: true, unchanged: true },
     { passed: false, seeds: 5, seedsPassed: 1 },
     { world: 8 },
+    { seeds: 4, sensed: 0 },
   ];
   return runs.flatMap((patch) => earnedBy(facts(patch)));
 }

@@ -198,7 +198,7 @@ function layoutResult(
     ticks,
     ops: ticks * 2,
     objectives: [reportOf(OBJECTIVE, passed)],
-    shape: options.shape ?? { moves: 1, printed: false, markedUnread: false },
+    shape: options.shape ?? { moves: 1, printed: false, markedUnread: false, sensed: 1 },
     bonus: [reportOf(BONUS, options.bonus ?? true)],
   };
 }

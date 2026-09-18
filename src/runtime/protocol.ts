@@ -30,10 +30,11 @@ export interface TraceShape {
   moves: number;
   printed: boolean;
   markedUnread: boolean;
+  sensed: number;
 }
 
 export function traceShape(trace: Trace): TraceShape {
-  const shape: TraceShape = { moves: 0, printed: false, markedUnread: false };
+  const shape: TraceShape = { moves: 0, printed: false, markedUnread: false, sensed: 0 };
   let marked = false;
   let readBack = false;
 
@@ -49,6 +50,7 @@ export function traceShape(trace: Trace): TraceShape {
       }
       case 'sense': {
         if (event.name === 'readMark') readBack = true;
+        shape.sensed += event.count;
         break;
       }
       case 'print': {

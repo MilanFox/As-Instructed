@@ -206,6 +206,13 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     hidden: true,
   },
   {
+    id: 'sight-unseen',
+    title: 'RAN IT BLIND',
+    requirement: 'Close a work order on every layout without taking a single reading.',
+    note: 'Every layout cleared, and not one reading on the ledger. Metering have queried the bill. Operations have confirmed it is correct.',
+    hidden: true,
+  },
+  {
     id: 'note-on-the-ground',
     title: 'A NOTE LEFT ON THE GROUND',
     requirement: 'Mark a tile during a run and never read the mark back.',
@@ -256,6 +263,7 @@ export interface RunFacts {
   seeds: number;
   seedsPassed: number;
   moves: number;
+  sensed: number;
   printed: boolean;
   markedUnread: boolean;
   emptyProgram: boolean;
@@ -307,6 +315,7 @@ export function earnedBy(facts: RunFacts): string[] {
 
   if (facts.printed) earned.push('diagnostics-retained');
   if (facts.moves === 0) earned.push('did-not-move');
+  if (facts.seeds > 1 && facts.sensed === 0) earned.push('sight-unseen');
   if (facts.markedUnread) earned.push('note-on-the-ground');
 
   return earned;

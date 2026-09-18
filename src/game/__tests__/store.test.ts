@@ -1218,7 +1218,7 @@ describe('the facts a single discarded layout used to decide', () => {
       ticks: 10,
       ops: 20,
       objectives: [{ id: DONE, label: DONE, met: passed }],
-      shape: { moves: 4, printed: false, markedUnread: false, ...shape },
+      shape: { moves: 4, printed: false, markedUnread: false, sensed: 6, ...shape },
       ...(libraryUsage ? { libraryUsage } : {}),
     };
   }
