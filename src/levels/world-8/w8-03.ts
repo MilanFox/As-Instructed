@@ -595,6 +595,8 @@ export const w8_03: LevelDef = {
     "// import { waves, deal, pathTo } from 'lib';",
     '// The desk publishes how many substations there are and how long the shift is.',
     '// Each station publishes its own feeders.',
+    '// NOTE(4470): the grid went down the night i switched my code off. it was not a fault',
+    '// NOTE(4470): two bots at one station finish no sooner than one',
     '',
     'const count = probe("desk").vars.stations;',
     'for (let i = 0; i < count; i++) {',

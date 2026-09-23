@@ -750,7 +750,7 @@ const FACTS = [
   {
     label: 'The desk',
     value:
-      '`probe("desk")` publishes `stations`, `classes` and `crates`. The stations are `sub-0` up to `sub-N`.',
+      '`probe("desk")` publishes `stations`, `classes` and `crates`. The stations are `sub-0` up to `sub-<stations-1>`.',
   },
   {
     label: 'Feeders',
@@ -952,7 +952,7 @@ export const w8_05: LevelDef = {
   hints: [
     'Ask the desk and the stations where everything is before anybody walks anywhere. ' +
       'Machine positions are free. The ground between them is not.',
-    'Nothing on this site answers to an id from a distance. Work out who is nearest to ' +
+    'Nothing on this site is switched from a distance. Work out who is nearest to ' +
       'what before you work out what order it all has to happen in.',
     'A bot that is not allowed to switch its station on yet is not a bot that is stuck. ' +
       'It is a bot that has something else it could be doing first.',

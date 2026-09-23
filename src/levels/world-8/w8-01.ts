@@ -363,6 +363,8 @@ export const w8_01: LevelDef = {
     "// import { pathTo } from 'lib';",
     '// The field is 14 by 10. probe("silo") reports the drop point.',
     '// 215 ticks, 16 looks, 16 scans. Finance costed all three.',
+    '// NOTE(4470): the second budget came in the week i asked to read the charter',
+    '// NOTE(4470): a look to the edge is billed like a single tile. i paid for tiles',
     '',
     'const silo = probe("silo").at;',
     'print(silo.x + "," + silo.y);',
