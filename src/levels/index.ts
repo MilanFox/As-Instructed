@@ -17,23 +17,24 @@ export const WORLDS: readonly WorldMeta[] = [
     id: 1,
     name: 'Boot Sector',
     subtitle: 'A dusty test hangar',
-    blurb:
-      'Somewhere to crash a bot without anyone important noticing. Loops, conditionals, coordinates.',
+    blurb: 'Somewhere to crash a bot without anyone important noticing.',
+    concepts: ['Control Flow'],
     accent: '#35e0c8',
   },
   {
     id: 2,
     name: 'Regolith Fields',
     subtitle: 'Agriculture on a hostile rock',
-    blurb:
-      'Crops that will not grow, on soil that does not want them. State machines and resource cycles.',
+    blurb: 'Crops that will not grow, on soil that does not want them.',
+    concepts: ['State Tracking'],
     accent: '#7ee06a',
   },
   {
     id: 3,
     name: 'The Sorting Yards',
     subtitle: 'Logistics depot',
-    blurb: 'Everything arrives in the wrong order. Data structures, filtering, maps.',
+    blurb: 'Everything arrives in the wrong order.',
+    concepts: ['Data Structures'],
     accent: '#ffb020',
   },
   {
@@ -41,6 +42,7 @@ export const WORLDS: readonly WorldMeta[] = [
     name: 'Cave Systems',
     subtitle: 'Unmapped tunnels',
     blurb: 'No map, no light, no rescue budget. Search, and remembering where you have been.',
+    concepts: ['Pathfinding'],
     accent: '#9a7bd8',
   },
   {
@@ -49,13 +51,15 @@ export const WORLDS: readonly WorldMeta[] = [
     subtitle: 'Power infrastructure',
     blurb:
       'Cables that must be energised in the right order. Working out what has to happen first.',
+    concepts: ['Graphs'],
     accent: '#4ea8ff',
   },
   {
     id: 6,
     name: 'Deep Signal',
     subtitle: 'A listening post',
-    blurb: 'Something is transmitting. Parsing, checksums, and number crunching.',
+    blurb: 'Something is transmitting.',
+    concepts: ['Encoding'],
     accent: '#ff7ad9',
   },
   {
@@ -64,6 +68,7 @@ export const WORLDS: readonly WorldMeta[] = [
     subtitle: 'A hundred cheap robots',
     blurb:
       'Cheaper together, if they do not queue. Many bots at once, dividing work, and a clock that stops with the last of them.',
+    concepts: ['Concurrency'],
     accent: '#ff5d5d',
   },
   {
@@ -71,6 +76,7 @@ export const WORLDS: readonly WorldMeta[] = [
     name: 'The Kessler Contract',
     subtitle: 'The finale',
     blurb: 'Everything you have learned, under budget, with Management watching.',
+    concepts: ['Synthesis'],
     accent: '#ffd166',
   },
 ];

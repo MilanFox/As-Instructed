@@ -38,5 +38,6 @@ export interface WorldMeta {
   name: string;
   subtitle: string;
   blurb: string;
+  concepts: readonly string[];
   accent: string;
 }

@@ -913,6 +913,15 @@ export function LevelSelect(): JSX.Element {
           <div className="site-brief" data-open={String(site?.unlocked ?? false)}>
             <span className="site-brief__kicker">Briefing</span>
             <p className="site-brief__body">{site ? site.world.blurb : 'No briefing filed.'}</p>
+            {site && site.world.concepts.length > 0 ? (
+              <ul className="site-brief__concepts" aria-label="Concepts on this site">
+                {site.world.concepts.map((concept) => (
+                  <li key={concept} className="site-brief__concept">
+                    {concept}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </div>
           <ul className="dossier__rows" aria-label="Work orders on this site" onKeyDown={onRowKeys}>
             {orders.map((order, i) => (
