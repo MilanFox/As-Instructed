@@ -24,6 +24,7 @@ const MUSTER_X = 2;
 const SITE_PREFIX = 'site-';
 const ID_ALPHABET = 'bcdfghjklmnpqrstvwxyz';
 const ID_LENGTH = 6;
+const SPAWN_COST = 2;
 
 export interface Detail {
   scouts: number;
@@ -228,6 +229,25 @@ function repeatedOrder(ctx: ObjectiveContext): Divergence {
   };
 }
 
+function requisitioned(world: World): number {
+  return machineById(world, 'muster')?.vars.workers ?? 0;
+}
+
+function raisedCount(ctx: ObjectiveContext): number {
+  return ctx.world.bots.length - ctx.initialWorld.bots.length;
+}
+
+function overRaised(ctx: ObjectiveContext): Divergence | undefined {
+  const allowed = requisitioned(ctx.initialWorld);
+  const raised = raisedCount(ctx);
+  if (raised <= allowed) return undefined;
+  return {
+    where: `bot #${String(ctx.initialWorld.bots.length + allowed)}`,
+    expected: `${String(allowed)} workers or fewer`,
+    received: `${String(raised)} raised`,
+  };
+}
+
 function progress(ctx: ObjectiveContext): [number, number] {
   return [litCount(ctx.world), siteMachines(ctx.initialWorld).length];
 }
@@ -244,7 +264,7 @@ export const w7_05: LevelDef = {
     '**RE:** Conclusion of previous engagement',
     '',
     'The relay sites in the north workings are not on any plan. They were put in by somebody who',
-    'did not file, and they still run. Field Engineering have declined to assist and',
+    'did not file, and they still run. Field Engineering have declined to send a crew and',
     'have not given a reason. Dot does give reasons. One docket per site, please. That is how',
     'the last lot got lost.',
     '',
@@ -253,7 +273,7 @@ export const w7_05: LevelDef = {
   board: {
     fixed: [
       'the workings are 34 by 26 inside the wall, with standing rock scattered through them',
-      'the whole crew musters in two columns at the west wall, the scouts first in id order',
+      'only the scouts stand at the muster on the west wall; every worker is raised on site',
       'every relay site is reachable from the muster — nothing is sealed behind rock',
       'no site stands within fourteen steps of the muster, and no two within seven tiles of each other',
       'the muster publishes how many sites, scouts and workers there are before anybody moves',
@@ -263,7 +283,7 @@ export const w7_05: LevelDef = {
       'where they are — they are on no plan, and finding them is the order',
       'what each one is called — the six letters after `site-`',
       'how many scouts, one or two',
-      'how many workers, four to eight',
+      'how many workers the muster requisitions, four to eight',
       'where the standing rock lies, and so what a `look` can see past',
     ],
   },
@@ -281,12 +301,17 @@ export const w7_05: LevelDef = {
     },
     {
       label: 'The muster',
-      value: "`probe('muster')` publishes `vars.sites`, `vars.scouts` and `vars.workers`.",
+      value:
+        "`probe('muster')` publishes `vars.sites`, `vars.scouts` and `vars.workers` — how many workers you may raise.",
     },
     {
       label: 'Scouts',
       value:
-        'The first `scouts` bot ids. The rest are workers. They are identical machines; the difference is what you do with them.',
+        'The bots on site when the shift opens. Every other bot is a worker somebody raised. They are identical machines; the difference is what you do with them.',
+    },
+    {
+      label: '`spawn(dir)`',
+      value: `Raises a worker on the next tile in \`dir\`, from wherever the parent stands, and gives back its id. Costs ${String(SPAWN_COST)} ticks on this order, charged to the parent; the worker's clock starts at the parent's plus ${String(SPAWN_COST)}. A tile another bot holds refuses it, giving back \`-1\` and charging the ticks anyway. Raise no more than \`vars.workers\`.`,
     },
     {
       label: 'Sent to',
@@ -307,6 +332,7 @@ export const w7_05: LevelDef = {
   seeds: [1, 2, 3, 4, 5],
   par: { ticks: 100 },
   budget: { maxTicks: 6000 },
+  costs: { spawn: SPAWN_COST },
   build(seed: number): World {
     const detail = detailFor(seed);
     const rng = new Rng(localSeed(seed) + 733);
@@ -388,13 +414,8 @@ export const w7_05: LevelDef = {
       vars: { sites: placed.length, scouts: detail.scouts, workers: detail.workers },
     });
 
-    for (let i = 0; i < detail.scouts + detail.workers; i++) {
-      const scout = i < detail.scouts;
-      addBot(world, {
-        at: vec(MUSTER_X, 2 + i),
-        facing: Dir.East,
-        name: scout ? `SCOUT-${String(i + 1)}` : `HAND-${String(i - detail.scouts + 1)}`,
-      });
+    for (let i = 0; i < detail.scouts; i++) {
+      addBot(world, { at: vec(MUSTER_X, 2 + i), facing: Dir.East, name: `SCOUT-${String(i + 1)}` });
     }
     return world;
   },
@@ -417,6 +438,12 @@ export const w7_05: LevelDef = {
       },
       { progress: underOrders, divergence: firstUnordered },
     ),
+    Objectives.custom(
+      'inside-requisition',
+      'Raise no more workers than the muster requisitions',
+      (ctx) => raisedCount(ctx) <= requisitioned(ctx.initialWorld),
+      { divergence: overRaised },
+    ),
   ],
   bonus: [
     Objectives.custom(
@@ -432,9 +459,8 @@ export const w7_05: LevelDef = {
     '// NOTE(4470): whoever finds one has to say so. nothing else finds it for them',
     '',
     'const muster = probe("muster");',
-    'const scouts = bots().slice(0, muster.vars.scouts);',
-    'const hands = bots().slice(muster.vars.scouts);',
-    'print(`${scouts.length} scouts, ${hands.length} hands, ${muster.vars.sites} sites`);',
+    'const scouts = bots();',
+    'print(`${scouts.length} scouts, ${muster.vars.workers} workers to raise, ${muster.vars.sites} sites`);',
     '',
   ].join('\n'),
   hints: [
@@ -443,6 +469,7 @@ export const w7_05: LevelDef = {
     "A message is stamped with the sender's clock, and a bot that is behind in time has not been handed it yet. The order in which you sync matters more than the order in which you send.",
     'Two scouts is not one scout twice. Whatever collects the findings has to survive two of them reporting the same thing.',
     'A worker with nothing to do is the expensive part of this level, not a worker walking a long way.',
+    'A worker starts next to whoever raised it. The muster is only one of the places a worker can start.',
   ],
-  docs: ['bots', 'sync', 'send', 'recv', 'probe', 'look', 'use'],
+  docs: ['bots', 'spawn', 'sync', 'send', 'recv', 'probe', 'look', 'use'],
 };

@@ -1,5 +1,5 @@
-import type { Dir, Sim, Vec } from '../../../engine/index.ts';
-import { ALL_DIRS, manhattan, step } from '../../../engine/index.ts';
+import type { Sim, Vec } from '../../../engine/index.ts';
+import { ALL_DIRS, Dir, manhattan, step } from '../../../engine/index.ts';
 import type { ReferenceSolution } from '../../types.ts';
 
 const LEG = 3;
@@ -18,6 +18,12 @@ export const solution: ReferenceSolution = {
     if (!muster) return;
     const total = muster.vars['sites'] ?? 0;
     const width = 36;
+    let parent = sim.botIds().at(-1) as number;
+    for (let i = 0; i < (muster.vars['workers'] ?? 0); i++) {
+      const child = sim.spawn(parent, Dir.South);
+      if (child < 0) break;
+      parent = child;
+    }
     const ids = sim.botIds();
     const scouts = ids.slice(0, muster.vars['scouts'] ?? 1);
     const hands = ids.slice(muster.vars['scouts'] ?? 1);
@@ -186,6 +192,12 @@ export const solution: ReferenceSolution = {
   },
   source: [
     'const muster = probe("muster");',
+    'let parent = bots()[bots().length - 1];',
+    'for (let i = 0; i < muster.vars.workers; i++) {',
+    '  const child = bot(parent).spawn(Dir.South);',
+    '  if (child < 0) break;',
+    '  parent = child;',
+    '}',
     'const ids = bots();',
     'const scouts = ids.slice(0, muster.vars.scouts);',
     'const hands = ids.slice(muster.vars.scouts);',

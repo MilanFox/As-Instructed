@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import type { Dir, ObjectiveContext, Sim, Vec } from '../../../engine/index.ts';
-import { ALL_DIRS, evaluateObjectives, manhattan, step } from '../../../engine/index.ts';
+import type { ObjectiveContext, Sim, Vec } from '../../../engine/index.ts';
+import { ALL_DIRS, Dir, evaluateObjectives, manhattan, step } from '../../../engine/index.ts';
 import { must } from '../../../engine/__tests__/helpers.ts';
 import { runLevel } from '../../harness.ts';
 import { solution } from '../__solutions__/w7-05.ts';
@@ -14,10 +14,21 @@ interface Order {
   at: Vec;
 }
 
+function raiseCrew(sim: Sim, workers: number): number[] {
+  let parent = sim.botIds().at(-1) as number;
+  for (let i = 0; i < workers; i++) {
+    const child = sim.spawn(parent, Dir.South);
+    if (child < 0) break;
+    parent = child;
+  }
+  return sim.botIds();
+}
+
 interface Habits {
   dedup: boolean;
   pipelined: boolean;
   range: number;
+  crew?: number;
 }
 
 // the reference relay, with the two habits a lazy program drops: dedup, and pipelining
@@ -26,7 +37,7 @@ function relay(sim: Sim, habits: Habits): void {
   if (!muster) return;
   const total = muster.vars['sites'] ?? 0;
   const width = 36;
-  const ids = sim.botIds();
+  const ids = raiseCrew(sim, habits.crew ?? muster.vars['workers'] ?? 0);
   const hands = ids.slice(muster.vars['scouts'] ?? 1);
   const boss = ids[0] as number;
 
@@ -222,7 +233,7 @@ function wiggling(sim: Sim): Sim {
 
 // one scout does the lot, after a worker posts it a dummy at tick 0
 function loneScout(sim: Sim, dummies: number): void {
-  const ids = sim.botIds();
+  const ids = raiseCrew(sim, sim.probe(0, 'muster')?.vars['workers'] ?? 0);
   const boss = ids[0] as number;
   const mate = ids[1] as number;
   for (let i = 0; i < dummies; i++) sim.send(mate, boss, i);
@@ -339,7 +350,7 @@ function scored(seed: number, drive: (sim: Sim, bot: number) => void) {
     ticks: result.trace.endTick,
     sends: sends.length,
     bodies: bodies.size,
-    idle: idleTicks(result.trace.events, new Set(workerIds(result.initialWorld))),
+    idle: idleTicks(result.trace.events, new Set(workerIds(result.world))),
     required: (id: string) =>
       must(
         w7_05.objectives.find((each) => each.id === id),
@@ -401,9 +412,8 @@ describe('w7-05 the reference brings every site up under orders and earns the st
       const label = `seed ${String(seed)}`;
       expect(placed, label).toBe(muster.vars['sites']);
       expect(placed, label).toBeGreaterThanOrEqual(6);
-      expect(world.bots.length, label).toBe(
-        (world.vars['scouts'] ?? 0) + (world.vars['workers'] ?? 0),
-      );
+      expect(world.bots.length, label).toBe(world.vars['scouts']);
+      expect(muster.vars['workers'], label).toBe(world.vars['workers']);
     }
   });
 });
@@ -617,12 +627,74 @@ describe('w7-05 carries no sense budget and no idle budget', () => {
       const reference = scored(seed, (sim, bot) => {
         solution.run(sim, bot);
       });
-      const workers = workerIds(w7_05.build(seed)).length;
+      const workers = w7_05.build(seed).vars['workers'] ?? 0;
       const label = `seed ${String(seed)}`;
       // the workers stood at the muster the whole shift and the old measure read zero
       expect(parked.idle, label).toBe(0);
       expect(parked.ticks, label).toBeGreaterThan(0);
       expect(reference.idle, label).toBeLessThan(reference.ticks * workers * 0.1);
+    }
+  });
+});
+
+describe('w7-05 the crew is raised on site, inside the requisition', () => {
+  test('every shift opens with the scouts alone, and the reference raises exactly the requisition', () => {
+    for (const seed of w7_05.seeds) {
+      const world = w7_05.build(seed);
+      const run = scored(seed, (sim, bot) => {
+        solution.run(sim, bot);
+      });
+      const label = `seed ${String(seed)}`;
+      expect(world.bots.length, label).toBe(world.vars['scouts']);
+      expect(run.ctx.world.bots.length, label).toBe(
+        (world.vars['scouts'] ?? 0) + (world.vars['workers'] ?? 0),
+      );
+      expect(run.required('inside-requisition'), label).toBe(true);
+    }
+  });
+
+  test('a lone scout that raises nobody has nobody to take an order from', () => {
+    const lone = w7_05.seeds.filter((seed) => w7_05.build(seed).bots.length === 1);
+    expect(lone).toContain(1);
+    for (const seed of lone) {
+      const run = scored(seed, (sim) => {
+        relay(sim, { ...HONEST, crew: 0 });
+      });
+      const label = `seed ${String(seed)}`;
+      expect(run.sends, label).toBe(0);
+      expect(run.passed, label).toBe(false);
+    }
+  });
+
+  test('a short-handed crew still passes, and is slower on every seed', () => {
+    for (const seed of w7_05.seeds) {
+      const full = scored(seed, (sim) => {
+        relay(sim, HONEST);
+      });
+      const short = scored(seed, (sim) => {
+        relay(sim, { ...HONEST, crew: 1 });
+      });
+      const label = `seed ${String(seed)}`;
+      expect(short.passed, label).toBe(true);
+      expect(short.ticks, label).toBeGreaterThan(full.ticks);
+    }
+  });
+
+  test('one worker over the requisition is refused, and named', () => {
+    for (const seed of w7_05.seeds) {
+      const world = w7_05.build(seed);
+      const allowed = world.vars['workers'] ?? 0;
+      const run = scored(seed, (sim) => {
+        relay(sim, { ...HONEST, crew: allowed + 1 });
+      });
+      const label = `seed ${String(seed)}`;
+      expect(run.required('inside-requisition'), label).toBe(false);
+      expect(run.passed, label).toBe(false);
+      expect(objectiveIn('inside-requisition').divergence?.(run.ctx), label).toEqual({
+        where: `bot #${String(world.bots.length + allowed)}`,
+        expected: `${String(allowed)} workers or fewer`,
+        received: `${String(allowed + 1)} raised`,
+      });
     }
   });
 });
