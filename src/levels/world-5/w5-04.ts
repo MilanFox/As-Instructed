@@ -1,6 +1,8 @@
 import type { Divergence, Machine, ObjectiveContext, Vec, World } from '../../engine/index.ts';
 import {
+  CEILING,
   Dir,
+  FED_BY,
   MachineKind,
   NOTHING,
   Objectives,
@@ -8,185 +10,390 @@ import {
   Terrain,
   addBot,
   addMachine,
+  cabledTo,
   clipValue,
   createWorld,
+  manhattan,
   setTerrain,
+  treeSegments,
   vec,
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
+import { at } from './objectives.ts';
 
 const WIDTH = 26;
 const HEIGHT = 20;
-const DEPOT_AT = vec(1, 1);
+const COLUMN_X = [1, 6, 11, 16];
+const TAP_X = 16;
+const CONSUMER_X: readonly [number, number] = [19, 24];
 
-export interface YardPlan {
-  capacities: number[];
-  draws: number[];
+const BLOCK = 8;
+const RESERVE = 8;
+const SPLITS: readonly (readonly number[])[] = [
+  [8],
+  [8],
+  [4, 4],
+  [4, 2, 2],
+  [2, 4, 2],
+  [2, 2, 2, 2],
+];
+
+export interface YardNode {
+  id: string;
+  parent: string;
+  depth: number;
+  at: Vec;
+  ceiling: number;
+  tap: boolean;
 }
 
-const REDUCED_SLACK: Readonly<Record<number, number>> = Object.freeze({
-  1: 1.15,
-  2: 1.12,
-  4: 1.08,
-  5: 1.08,
-});
+export interface YardPlan {
+  reactorAt: Vec;
+  nodes: YardNode[];
+  reserveTap: string;
+  draws: number[];
+  consumersAt: Vec[];
+  planted: string[];
+}
 
-const CONSTRUCTED: Readonly<Record<number, YardPlan>> = Object.freeze({
-  3: {
-    capacities: [14, 10, 10, 10, 10, 10, 10],
-    draws: [4, 4, 4, 4, 4, 4, 6, 6, 6, 6, 6, 6],
-  },
-});
+interface Sketch {
+  id: string;
+  parent: string;
+  depth: number;
+  tap: boolean;
+  blocks: number;
+  slack: number;
+  children: Sketch[];
+}
 
-const workingSet = (capacities: number[]): number[] => {
-  const largest = capacities.reduce((best, capacity) => Math.max(best, capacity), 0);
-  const at = capacities.indexOf(largest);
-  return capacities.filter((_, index) => index !== at);
-};
+function sketchTree(rng: Rng): Sketch[] {
+  const all: Sketch[] = [];
+  let junctions = 0;
+  let taps = 0;
+  const node = (parent: string, depth: number, tap: boolean): Sketch => {
+    const id = tap ? `tap-${String(++taps)}` : `junction-${String(++junctions)}`;
+    const made: Sketch = { id, parent, depth, tap, blocks: 0, slack: 0, children: [] };
+    all.push(made);
+    return made;
+  };
+  const trunks = rng.int(2, 3);
+  for (let i = 0; i < trunks; i++) {
+    const trunk = node('reactor', 1, false);
+    const branches = rng.int(2, 3);
+    for (let b = 0; b < branches; b++) {
+      if (rng.next() < 0.45) {
+        const branch = node(trunk.id, 2, false);
+        trunk.children.push(branch);
+        const leaves = rng.int(2, 3);
+        for (let l = 0; l < leaves; l++) branch.children.push(node(branch.id, 3, true));
+      } else {
+        trunk.children.push(node(trunk.id, 2, true));
+      }
+    }
+  }
+  return all;
+}
 
-const packs = (capacities: number[], order: number[]): boolean => {
-  const room = [...capacities];
-  for (const draw of order) {
-    const at = room.findIndex((left) => left >= draw);
-    if (at < 0) return false;
-    room[at] = (room[at] as number) - draw;
+const blocksUnder = (node: Sketch): number =>
+  node.tap ? node.blocks : node.children.reduce((sum, child) => sum + blocksUnder(child), 0);
+
+const ceilingOf = (node: Sketch): number => BLOCK * blocksUnder(node) + node.slack;
+
+function oversubscribe(rng: Rng, all: Sketch[]): void {
+  const junctions = all.filter((node) => !node.tap).sort((a, b) => b.depth - a.depth);
+  for (let pass = 0; pass < 8; pass++) {
+    let settled = true;
+    for (const junction of junctions) {
+      const below = junction.children.reduce((sum, child) => sum + ceilingOf(child), 0);
+      if (below > ceilingOf(junction)) continue;
+      settled = false;
+      const taps = junction.children.filter((child) => child.tap);
+      const pool = taps.length > 0 ? taps : junction.children;
+      const pick = pool[rng.int(0, pool.length - 1)] as Sketch;
+      pick.slack += BLOCK;
+    }
+    if (settled) return;
+  }
+}
+
+interface Room {
+  parent: Map<string, string>;
+  room: Map<string, number>;
+  taps: string[];
+}
+
+function roomOf(plan: YardPlan): Room {
+  const parent = new Map<string, string>();
+  const room = new Map<string, number>();
+  for (const node of plan.nodes) {
+    parent.set(node.id, node.parent);
+    room.set(node.id, node.ceiling);
+  }
+  return { parent, room, taps: plan.nodes.filter((node) => node.tap).map((node) => node.id) };
+}
+
+function routeRoom(state: Room, tap: string): number {
+  let least = Number.POSITIVE_INFINITY;
+  for (let id: string | undefined = tap; id !== undefined && state.room.has(id);) {
+    least = Math.min(least, state.room.get(id) as number);
+    id = state.parent.get(id);
+  }
+  return least;
+}
+
+function take(state: Room, tap: string, draw: number): void {
+  for (let id: string | undefined = tap; id !== undefined && state.room.has(id);) {
+    state.room.set(id, (state.room.get(id) as number) - draw);
+    id = state.parent.get(id);
+  }
+}
+
+type Pick = 'first' | 'tightest' | 'roomiest';
+
+function heaviestFirst(plan: YardPlan): number[] {
+  return plan.draws
+    .map((_, index) => index)
+    .sort((a, b) => (plan.draws[b] as number) - (plan.draws[a] as number));
+}
+
+function fitByRoute(plan: YardPlan, pick: Pick, reserve: boolean): Room | null {
+  const state = roomOf(plan);
+  if (reserve) take(state, plan.reserveTap, RESERVE);
+  for (const index of heaviestFirst(plan)) {
+    const draw = plan.draws[index] as number;
+    const open = state.taps.filter((tap) => routeRoom(state, tap) >= draw);
+    if (open.length === 0) return null;
+    const rank = (tap: string): number =>
+      pick === 'first' ? 0 : pick === 'tightest' ? routeRoom(state, tap) : -routeRoom(state, tap);
+    const best = open.reduce((a, b) => (rank(b) < rank(a) ? b : a));
+    take(state, best, draw);
+  }
+  return state;
+}
+
+function overloads(plan: YardPlan, placed: readonly string[]): boolean {
+  const state = roomOf(plan);
+  placed.forEach((tap, index) => take(state, tap, plan.draws[index] as number));
+  return [...state.room.values()].some((left) => left < 0);
+}
+
+function ownRoomOnly(plan: YardPlan): boolean {
+  const own = new Map(plan.nodes.filter((node) => node.tap).map((node) => [node.id, node.ceiling]));
+  const placed: string[] = new Array<string>(plan.draws.length).fill('');
+  for (const index of heaviestFirst(plan)) {
+    const draw = plan.draws[index] as number;
+    let best = '';
+    for (const [tap, left] of own)
+      if (left >= draw && (best === '' || left > (own.get(best) ?? 0))) best = tap;
+    if (best === '') return false;
+    own.set(best, (own.get(best) as number) - draw);
+    placed[index] = best;
+  }
+  return !overloads(plan, placed);
+}
+
+function reportOrder(plan: YardPlan): boolean {
+  const state = roomOf(plan);
+  take(state, plan.reserveTap, RESERVE);
+  for (const draw of plan.draws) {
+    const open = state.taps.filter((candidate) => routeRoom(state, candidate) >= draw);
+    if (open.length === 0) return false;
+    const tap = open.reduce((a, b) => (routeRoom(state, b) > routeRoom(state, a) ? b : a));
+    take(state, tap, draw);
   }
   return true;
-};
+}
 
-const orderDecides = ({ capacities, draws }: YardPlan): boolean => {
-  const bins = workingSet(capacities);
-  const heaviestFirst = [...draws].sort((a, b) => b - a);
-  const anyColumnOrder = [
-    bins,
-    [...bins].sort((a, b) => a - b),
-    [...bins].sort((a, b) => b - a),
-  ].every((order) => packs(order, heaviestFirst));
-  return !packs(bins, draws) && anyColumnOrder;
-};
+function nearestTap(plan: YardPlan): boolean {
+  const taps = plan.nodes.filter((node) => node.tap);
+  const placed = plan.consumersAt.map(
+    (spot) =>
+      taps.reduce((best, tap) => (manhattan(tap.at, spot) < manhattan(best.at, spot) ? tap : best))
+        .id,
+  );
+  return !overloads(plan, placed);
+}
 
-function drawPlan(rng: Rng, slack: number): YardPlan {
-  const consumers = rng.int(12, 18);
-  const draws: number[] = [];
-  for (let i = 0; i < consumers; i++) draws.push(rng.int(3, 9));
-  const load = draws.reduce((sum, draw) => sum + draw, 0);
-
-  const feeders = rng.int(5, 7);
-  const working = feeders - 1;
-  const reduced = Math.ceil(load * slack);
-
-  const capacities: number[] = [];
-  let left = reduced;
-  for (let i = 0; i < working - 1; i++) {
-    const share = Math.round(left / (working - i));
-    const capacity = Math.max(10, share + rng.int(-3, 3));
-    capacities.push(capacity);
-    left -= capacity;
+function keepsReserve(plan: YardPlan, state: Room): boolean {
+  for (let id: string | undefined = plan.reserveTap; id !== undefined && state.room.has(id);) {
+    if ((state.room.get(id) as number) < RESERVE) return false;
+    id = state.parent.get(id);
   }
-  capacities.push(Math.max(10, left));
+  return true;
+}
 
-  const largest = capacities.reduce((best, capacity) => Math.max(best, capacity), 0);
-  return { capacities: rng.shuffle([...capacities, largest + rng.int(2, 6)]), draws };
+function decides(plan: YardPlan): boolean {
+  const picks: Pick[] = ['first', 'tightest', 'roomiest'];
+  for (const pick of picks) {
+    const honest = fitByRoute(plan, pick, true);
+    if (honest === null) return false;
+    const careless = fitByRoute(plan, pick, false);
+    if (careless === null || keepsReserve(plan, careless)) return false;
+  }
+  return !ownRoomOnly(plan) && !reportOrder(plan) && !nearestTap(plan);
+}
+
+function drawPlan(rng: Rng): YardPlan | null {
+  const all = sketchTree(rng);
+  const taps = all.filter((node) => node.tap);
+  const deep = taps.filter((node) => node.depth === 3);
+  if (taps.length < 6 || taps.length > 9 || deep.length === 0) return null;
+
+  const blocks = rng.int(6, 8);
+  for (let b = 0; b < blocks; b++) {
+    const open = taps.filter((tap) => tap.blocks < 2);
+    (open[rng.int(0, open.length - 1)] as Sketch).blocks += 1;
+  }
+  const reserve = deep[rng.int(0, deep.length - 1)] as Sketch;
+  reserve.blocks += 1;
+  if (all.some((node) => !node.tap && blocksUnder(node) === 0)) return null;
+
+  for (const node of all) {
+    if (node.tap) node.slack = node.blocks === 0 ? BLOCK * rng.int(1, 2) : BLOCK * rng.int(0, 2);
+    else if (node.depth === 2) node.slack = rng.next() < 0.5 ? 0 : BLOCK;
+  }
+  oversubscribe(rng, all);
+
+  const draws: number[] = [];
+  const planted: string[] = [];
+  for (const tap of taps) {
+    const real = tap.blocks - (tap === reserve ? 1 : 0);
+    for (let b = 0; b < real; b++) {
+      for (const draw of SPLITS[rng.int(0, SPLITS.length - 1)] as number[]) {
+        draws.push(draw);
+        planted.push(tap.id);
+      }
+    }
+  }
+  if (draws.length < 12 || draws.length > 16) return null;
+  if (![2, 4, 8].every((size) => draws.includes(size))) return null;
+
+  const order = rng.shuffle(draws.map((_, index) => index));
+  const rows = (HEIGHT - 1 - (2 * taps.length - 1)) >> 1;
+  const tapY = new Map(taps.map((tap, index) => [tap.id, 1 + rows + index * 2]));
+  const yOf = (node: Sketch): number => {
+    if (node.tap) return tapY.get(node.id) as number;
+    const ys = node.children.map(yOf);
+    return Math.round(ys.reduce((sum, y) => sum + y, 0) / ys.length);
+  };
+  const trunks = all.filter((node) => node.depth === 1);
+  const reactorY = Math.round(trunks.map(yOf).reduce((sum, y) => sum + y, 0) / trunks.length);
+
+  const taken = new Set<string>();
+  const consumersAt: Vec[] = [];
+  while (consumersAt.length < draws.length) {
+    const spot = vec(rng.int(CONSUMER_X[0], CONSUMER_X[1]), rng.int(1, HEIGHT - 2));
+    const key = `${String(spot.x)},${String(spot.y)}`;
+    if (taken.has(key)) continue;
+    taken.add(key);
+    consumersAt.push(spot);
+  }
+
+  return {
+    reactorAt: vec(COLUMN_X[0] as number, reactorY),
+    nodes: all.map((node) => ({
+      id: node.id,
+      parent: node.parent,
+      depth: node.depth,
+      at: vec(node.tap ? TAP_X : (COLUMN_X[node.depth] as number), yOf(node)),
+      ceiling: ceilingOf(node),
+      tap: node.tap,
+    })),
+    reserveTap: reserve.id,
+    draws: order.map((index) => draws[index] as number),
+    consumersAt,
+    planted: order.map((index) => planted[index] as string),
+  };
 }
 
 export function yardPlan(seed: number): YardPlan {
-  const constructed = CONSTRUCTED[seed];
-  if (constructed)
-    return { capacities: [...constructed.capacities], draws: [...constructed.draws] };
-
   const rng = new Rng(seed * 3121 + 449);
   for (;;) {
-    const plan = drawPlan(rng, REDUCED_SLACK[seed] ?? 1.08);
-    if (orderDecides(plan)) return plan;
+    const plan = drawPlan(rng);
+    if (plan !== null && decides(plan)) return plan;
   }
 }
-
-const feeders = (world: World): Machine[] =>
-  world.machines.filter((machine) => machine.id.startsWith('feeder-'));
 
 const consumers = (world: World): Machine[] =>
   world.machines.filter((machine) => machine.id.startsWith('consumer-'));
 
-const feedersOf = (world: World, consumerId: string): Machine[] =>
-  feeders(world).filter((feeder) => feeder.vars[`link:${consumerId}`] === 1);
+const onOneTap = (ends: readonly string[] | undefined): boolean =>
+  ends !== undefined && ends.length === 1 && (ends[0] as string).startsWith('tap-');
 
-const loadOn = (world: World, feeder: Machine): number =>
-  consumers(world).reduce(
-    (sum, consumer) =>
-      feeder.vars[`link:${consumer.id}`] === 1 ? sum + (consumer.vars.draw ?? 0) : sum,
-    0,
-  );
+const placedCount = (world: World): number => {
+  const cables = cabledTo(world);
+  return consumers(world).filter((consumer) => onOneTap(cables.get(consumer.id))).length;
+};
 
-const assignedCount = (world: World): number =>
-  consumers(world).filter((consumer) => feedersOf(world, consumer.id).length === 1).length;
-
-const withinCapacityCount = (world: World): number =>
-  feeders(world).filter((feeder) => loadOn(world, feeder) <= (feeder.vars.capacity ?? 0)).length;
-
-function largestFeeder(world: World): Machine | undefined {
-  let best: Machine | undefined;
-  for (const feeder of feeders(world)) {
-    if (!best || (feeder.vars.capacity ?? 0) > (best.vars.capacity ?? 0)) best = feeder;
+const misplaced = (ctx: ObjectiveContext): Divergence | undefined => {
+  const cables = cabledTo(ctx.world);
+  for (const consumer of consumers(ctx.world)) {
+    const ends = cables.get(consumer.id);
+    if (onOneTap(ends)) continue;
+    return {
+      where: `${consumer.id} · ${at(consumer.at)}`,
+      expected: 'exactly 1 tap',
+      received: ends === undefined ? NOTHING : clipValue(ends.join(', ')),
+    };
   }
-  return best;
+  return undefined;
+};
+
+const withinCount = (world: World): number =>
+  treeSegments(world).filter((segment) => segment.load <= segment.ceiling).length;
+
+function consumersUnder(world: World, id: string): number {
+  const parent = new Map(treeSegments(world).map((segment) => [segment.id, segment.parent]));
+  const cables = cabledTo(world);
+  let count = 0;
+  for (const consumer of consumers(world)) {
+    for (const end of cables.get(consumer.id) ?? []) {
+      for (let node: string | undefined = end; node !== undefined; node = parent.get(node)) {
+        if (node !== id) continue;
+        count++;
+        break;
+      }
+    }
+  }
+  return count;
 }
 
-const cabledTo = (world: World, feeder: Machine): string[] =>
-  consumers(world)
-    .filter((consumer) => feeder.vars[`link:${consumer.id}`] === 1)
-    .map((consumer) => consumer.id);
-
-const misassigned = (ctx: ObjectiveContext): Divergence | undefined => {
-  for (const consumer of consumers(ctx.world)) {
-    const on = feedersOf(ctx.world, consumer.id);
-    if (on.length === 1) continue;
-    return {
-      where: consumer.id,
-      expected: 'exactly 1 feeder',
-      received: on.length === 0 ? NOTHING : clipValue(on.map((feeder) => feeder.id).join(', ')),
-    };
-  }
-  return undefined;
-};
-
-const overCapacity = (ctx: ObjectiveContext): Divergence | undefined => {
-  for (const feeder of feeders(ctx.world)) {
-    const load = loadOn(ctx.world, feeder);
-    if (load <= (feeder.vars.capacity ?? 0)) continue;
-    return {
-      where: feeder.id,
-      expected: `at most ${String(feeder.vars.capacity ?? 0)}`,
-      received: `${String(load)}, from ${String(cabledTo(ctx.world, feeder).length)} consumers`,
-    };
-  }
-  return undefined;
-};
-
-const largestLoaded = (ctx: ObjectiveContext): Divergence | undefined => {
-  const largest = largestFeeder(ctx.world);
-  if (largest === undefined) return undefined;
+const overCeiling = (ctx: ObjectiveContext): Divergence | undefined => {
+  const over = treeSegments(ctx.world).find((segment) => segment.load > segment.ceiling);
+  if (over === undefined) return undefined;
   return {
-    where: `${largest.id}, the largest at ${String(largest.vars.capacity ?? 0)}`,
-    expected: 'no consumers on it',
-    received: `${String(cabledTo(ctx.world, largest).length)}, drawing ${String(
-      loadOn(ctx.world, largest),
-    )}`,
+    where: `${over.parent} → ${over.id}`,
+    expected: `at most ${String(over.ceiling)}`,
+    received: `${String(over.load)}, from ${String(consumersUnder(ctx.world, over.id))} consumers`,
   };
 };
 
-function feederAt(index: number): Vec {
-  return vec(2, 2 + index * 2);
+function reserveRoute(world: World): { reserve: number; route: ReturnType<typeof treeSegments> } {
+  const segments = treeSegments(world);
+  const byId = new Map(segments.map((segment) => [segment.id, segment]));
+  const tap = world.machines.find((machine) => typeof machine.vars.reserve === 'number');
+  const route: ReturnType<typeof treeSegments> = [];
+  for (let node = tap ? byId.get(tap.id) : undefined; node; node = byId.get(node.parent)) {
+    route.unshift(node);
+  }
+  return { reserve: tap?.vars.reserve ?? 0, route };
 }
 
-function consumerAt(rng: Rng, taken: Set<string>): Vec {
-  for (;;) {
-    const at = vec(rng.int(7, WIDTH - 2), rng.int(1, HEIGHT - 2));
-    const key = `${at.x},${at.y}`;
-    if (taken.has(key)) continue;
-    taken.add(key);
-    return at;
-  }
-}
+const reserveKept = (ctx: ObjectiveContext): boolean => {
+  const { reserve, route } = reserveRoute(ctx.world);
+  return route.length > 0 && route.every((segment) => segment.ceiling - segment.load >= reserve);
+};
+
+const reserveSpent = (ctx: ObjectiveContext): Divergence | undefined => {
+  const { reserve, route } = reserveRoute(ctx.world);
+  const short = route.find((segment) => segment.ceiling - segment.load < reserve);
+  if (short === undefined) return undefined;
+  return {
+    where: `${short.parent} → ${short.id}`,
+    expected: `${String(reserve)} spare`,
+    received: `${String(short.load)} of ${String(short.ceiling)} carried`,
+  };
+};
 
 export const w5_04: LevelDef = {
   id: 'w5-04',
@@ -199,27 +406,29 @@ export const w5_04: LevelDef = {
     '**FROM:** Dep. Coordinator M. Vance\\',
     '**RE:** Yard 4 distribution',
     '',
-    'The ceilings are defined in Appendix C. The index entry for Appendix C is a reference',
-    "to Appendix C. I have requested a copy of that. Yard 4's largest feeder is reserved",
-    'for a project that has not arrived and may never.',
+    'Yard 4 was cabled by a contractor who rated every segment, wrote the ratings on the',
+    'segments, and left. Medical has been promised a tap for a unit arriving next week,',
+    'and would like it to switch on.',
     '',
-    'Put every consumer on a feeder. Take no feeder over its ceiling.',
+    'Put every consumer on a tap. Take no segment over its ceiling.',
   ].join('\n'),
   board: {
     fixed: [
       'yard 4 is 26 by 20 of open floor',
-      'the feeders stand in one column at the west wall; the consumers are scattered across the yard',
-      'RIG-01 works from the depot corner — `link` takes both ends by id, so nothing has to be driven to',
-      'the ceilings added together always leave the yard headroom',
-      'exactly one feeder is strictly the largest',
-      'without that feeder the rest can still hold the whole load, though never in the order the consumers are reported in',
+      'the reactor stands at the west wall, and its tree of junctions is already laid and live; it ends in a column of taps',
+      'the consumers stand east of the taps',
+      'RIG-01 works from the reactor — `link` takes both ends by id, so nothing has to be driven to',
+      'every draw is 2, 4 or 8, and every ceiling is a multiple of 8',
+      'every junction is rated for less than the segments below it add up to',
+      'the reserve is 8, on a tap three segments from the reactor',
+      'there is always a way to place every consumer and still leave the reserve its room',
     ],
     redrawn: [
-      'six to eight feeders',
-      "each feeder's ceiling",
-      'twelve to eighteen consumers',
-      'what each one draws, three to nine',
-      'which feeder in the column is the largest',
+      'the shape of the tree: two or three junctions off the reactor, each splitting two or three ways, some once more',
+      'six to nine taps',
+      'every ceiling',
+      'twelve to sixteen consumers, and which one draws what',
+      'which tap carries the reserve',
       'where the consumers stand',
     ],
   },
@@ -227,117 +436,136 @@ export const w5_04: LevelDef = {
     {
       label: 'What reports what',
       value:
-        'Feeders are `feeder-1` upward and report `vars.capacity`. Consumers are `consumer-1` upward and report `vars.draw`. `probe(id)` is free and returns `null` past the last one.',
+        '`reactor`, then `junction-1`, `tap-1` and `consumer-1` upward; `probe(id)` is free and returns `null` past the last. Every junction and tap names the one machine above it with a `fed:<id>` key in `vars` and reports `vars.ceiling`, the rating of the segment between the two. Consumers report `vars.draw`.',
     },
-    { label: '`link(feederId, consumerId)`', value: 'Puts that consumer on that feeder. 2 ticks.' },
+    {
+      label: '`link(tapId, consumerId)`',
+      value:
+        'Puts that consumer on that tap. 2 ticks. A consumer takes cable at a tap, never at a junction or the reactor. The tree itself is laid and live already; `power` is not needed.',
+    },
+    {
+      label: 'Load',
+      value:
+        "A consumer's draw is carried by its tap's segment and by every segment above it, up to the reactor. A segment is over its ceiling when what it carries is more than its `ceiling`.",
+    },
     {
       label: 'Cable is permanent',
       value:
-        '**It cannot be removed once laid.** A consumer cabled to two feeders draws on both, and every consumer must end on exactly one.',
-    },
-    {
-      label: 'Over its ceiling',
-      value: 'A feeder whose cabled consumers add up to more `draw` than its `capacity`.',
+        '**It cannot be removed once laid.** A consumer cabled to two taps draws through both, and every consumer must end on exactly one tap and nothing else.',
     },
     {
       label: 'Room is not a fit',
       value:
-        'The ceilings added together leave the yard headroom, and consumers can still end up with nowhere left to take them. Whether they do depends on the order you cable them in.',
+        'Every segment can still have room left and a consumer find no tap with room all the way up to the reactor. Where the room ends up depends on the order you cable in, as well as where.',
+    },
+    {
+      label: 'The reserve',
+      value:
+        "One tap reports `vars.reserve`, 8: Medical's unit. For the star, leave at least that much spare on every segment between that tap and the reactor once you are done.",
     },
   ],
   seeds: [1, 2, 3, 4, 5],
-  par: { ticks: 36 },
+  par: { ticks: 30 },
   build(seed: number): World {
-    const { capacities, draws } = yardPlan(seed);
-    const rng = new Rng(seed * 8677 + 23);
+    const plan = yardPlan(seed);
     const world = createWorld({
       w: WIDTH,
       h: HEIGHT,
       seed,
       fill: Terrain.Floor,
       vars: {
-        capacity: capacities.reduce((sum, value) => sum + value, 0),
-        load: draws.reduce((sum, value) => sum + value, 0),
+        load: plan.draws.reduce((sum, draw) => sum + draw, 0),
+        taps: plan.nodes.filter((node) => node.tap).length,
       },
     });
 
-    const taken = new Set<string>([`${DEPOT_AT.x},${DEPOT_AT.y}`]);
-    capacities.forEach((capacity, index) => {
-      const at = feederAt(index);
-      taken.add(`${at.x},${at.y}`);
-      setTerrain(world, at, Terrain.Cable);
-      addMachine(world, {
-        id: `feeder-${index + 1}`,
-        kind: MachineKind.Node,
-        at,
-        state: 'on',
-        inventory: [],
-        vars: { capacity },
-      });
+    setTerrain(world, plan.reactorAt, Terrain.Cable);
+    addMachine(world, {
+      id: 'reactor',
+      kind: MachineKind.Node,
+      at: plan.reactorAt,
+      state: 'on',
+      inventory: [],
+      vars: {},
     });
 
-    draws.forEach((draw, index) => {
-      const at = consumerAt(rng, taken);
-      setTerrain(world, at, Terrain.Cable);
+    for (const node of plan.nodes) {
+      setTerrain(world, node.at, Terrain.Cable);
       addMachine(world, {
-        id: `consumer-${index + 1}`,
+        id: node.id,
         kind: MachineKind.Node,
-        at,
+        at: node.at,
+        state: 'on',
+        inventory: [],
+        vars: {
+          [CEILING]: node.ceiling,
+          [`${FED_BY}${node.parent}`]: 1,
+          ...(node.id === plan.reserveTap ? { reserve: RESERVE } : {}),
+        },
+      });
+    }
+
+    plan.draws.forEach((draw, index) => {
+      const spot = plan.consumersAt[index] as Vec;
+      setTerrain(world, spot, Terrain.Cable);
+      addMachine(world, {
+        id: `consumer-${String(index + 1)}`,
+        kind: MachineKind.Node,
+        at: spot,
         state: 'idle',
         inventory: [],
         vars: { draw },
       });
     });
 
-    addBot(world, { at: DEPOT_AT, facing: Dir.East, name: 'RIG-01' });
+    addBot(world, { at: plan.reactorAt, facing: Dir.East, name: 'RIG-01' });
     return world;
   },
   objectives: [
     Objectives.custom(
-      'assigned',
-      'Leave every consumer on exactly one feeder',
-      (ctx) => assignedCount(ctx.world) === consumers(ctx.world).length,
+      'on-a-tap',
+      'Leave every consumer on exactly one tap',
+      (ctx) => placedCount(ctx.world) === consumers(ctx.world).length,
       {
-        progress: (ctx) => [assignedCount(ctx.world), consumers(ctx.world).length],
-        divergence: misassigned,
+        progress: (ctx) => [placedCount(ctx.world), consumers(ctx.world).length],
+        divergence: misplaced,
       },
     ),
     Objectives.custom(
-      'within-capacity',
-      'Keep every feeder at or under its capacity',
-      (ctx) => withinCapacityCount(ctx.world) === feeders(ctx.world).length,
+      'within-ceiling',
+      'Keep every segment at or under its ceiling',
+      (ctx) => withinCount(ctx.world) === treeSegments(ctx.world).length,
       {
-        progress: (ctx) => [withinCapacityCount(ctx.world), feeders(ctx.world).length],
-        divergence: overCapacity,
+        progress: (ctx) => [withinCount(ctx.world), treeSegments(ctx.world).length],
+        divergence: overCeiling,
       },
     ),
   ],
   bonus: [
     Objectives.custom(
-      'largest-idle',
-      'Leave the highest-capacity feeder cold',
-      (ctx) => {
-        const largest = largestFeeder(ctx.world);
-        return largest !== undefined && loadOn(ctx.world, largest) === 0;
-      },
-      { divergence: largestLoaded },
+      'reserve-kept',
+      "Leave 8 spare on every segment above the reserve's tap",
+      reserveKept,
+      { divergence: reserveSpent },
     ),
   ],
   starter: [
-    '// A cable cannot be undone.',
+    '// NOTE(4470): a cable cannot be undone.',
+    '// NOTE(4470): the taps are rated. so is everything above them.',
     '',
-    'const feeders = [];',
+    'const taps = [];',
     'for (let i = 1; ; i++) {',
-    '  const feeder = probe(`feeder-${i}`);',
-    '  if (feeder === null) break;',
-    '  feeders.push(feeder);',
+    '  const tap = probe(`tap-${i}`);',
+    '  if (tap === null) break;',
+    '  taps.push(tap);',
     '}',
     '',
   ].join('\n'),
   hints: [
-    'Reading every capacity and every draw is free. Work the whole assignment out on paper before you lay a single cable, because a cable is permanent.',
-    'A feeder with four units of headroom left is no use to a consumer that draws six. The awkward consumers are the big ones, and they get more awkward the later you get to them.',
-    'The star wants the highest-capacity feeder cold, so work the yard out as though it were not there at all. Every unit you spill onto it is the star gone, and the cable does not come back.',
+    'Every ceiling, every draw and every `fed:` key is free to read. Work out where each consumer goes before you lay a single cable, because a cable is permanent.',
+    'Room at a tap is not room at the reactor. What a tap can still take is the least spare on any segment between it and the reactor, and every consumer you place lowers every one of those.',
+    'Small draws placed early break the room up into pieces an 8 no longer fits. Place the heavy ones while the room is still whole.',
+    "For the star, count Medical's 8 as already sitting on its tap before you place anything else.",
   ],
   docs: ['probe', 'link'],
 };

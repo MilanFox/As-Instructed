@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import type { Machine, Objective, Sim, UseEvent, Vec } from '../../../engine/index.ts';
+import type { Machine, Objective, Sim, UseEvent } from '../../../engine/index.ts';
 import { Dir, machineById, manhattan } from '../../../engine/index.ts';
 import { must } from '../../../engine/__tests__/helpers.ts';
 import { runLevel } from '../../harness.ts';
@@ -8,7 +8,7 @@ import { playerApi } from '../__solutions__/_api.ts';
 import { at } from '../objectives.ts';
 import { w5_01 } from '../w5-01.ts';
 import { w5_02 } from '../w5-02.ts';
-import { w5_03 } from '../w5-03.ts';
+import { gridPlan, lowestIdOrder, stationWaves, w5_03 } from '../w5-03.ts';
 import { w5_04 } from '../w5-04.ts';
 import { w5_05 } from '../w5-05.ts';
 
@@ -118,7 +118,7 @@ describe('w5-02 — the patch report, and what it refuses to say', () => {
   });
 });
 
-describe('w5-03 — the cable, the order and the walk', () => {
+describe('w5-03 — the cable, the order and the waves', () => {
   test('cabled names the prerequisite no cable was run for', () => {
     const { met, divergence } = nowhere(w5_03, 1, 'cabled');
     expect(met).toBe(false);
@@ -184,109 +184,113 @@ describe('w5-03 — the cable, the order and the walk', () => {
     }
   });
 
-  test('tight-order names the leg of the walk that spent the allowance', () => {
-    const stations = withPrefix(w5_03, 1, 'sub-');
-    const reactor = must(machineById(w5_03.build(1), 'reactor'), 'the reactor');
-    const budget = w5_03.build(1).vars.travelBudget ?? 0;
-
-    const order: Machine[] = [];
-    const left = stations.slice();
-    let from: Vec = reactor.at;
-    while (left.length > 0) {
-      let pick = 0;
-      for (let i = 1; i < left.length; i++) {
-        const rival = must(left[i], 'a station');
-        if (manhattan(from, rival.at) > manhattan(from, must(left[pick], 'a station').at)) pick = i;
+  test('one-wave-at-a-time names the station, its tick and the wave left behind', () => {
+    const { stations } = gridPlan(1);
+    const order = lowestIdOrder(stations);
+    const waves = stationWaves(stations);
+    const { met, divergence } = diverge(w5_03, 1, 'one-wave-at-a-time', (sim, botId) => {
+      const { link, power } = playerApi(sim, botId, 'w5-03');
+      for (const station of stations) {
+        for (const upstream of station.prereqs) link(upstream, station.id);
       }
-      const chosen = must(left.splice(pick, 1)[0], 'a station');
-      order.push(chosen);
-      from = chosen.at;
-    }
-
-    const { met, divergence } = diverge(w5_03, 1, 'tight-order', (sim, botId) => {
-      const { power } = playerApi(sim, botId, 'w5-03');
-      for (const station of order) power(station.id, 'on');
+      for (const id of order) power(id, 'on');
     });
 
     expect(met).toBe(false);
     const shown = must(divergence, 'a divergence');
-    expect(shown.where).toMatch(/^(reactor|sub-\d+) → sub-\d+$/);
-    expect(shown.expected).toBe(`${String(budget)} steps in all`);
-    expect(shown.received).toMatch(/^\d+ steps by this leg$/);
-    expect(Number.parseInt(shown.received, 10)).toBeGreaterThan(budget);
+    const match = must(/^tick (\d+) · (sub-\d+), wave (\d+)$/.exec(shown.where), shown.where);
+    const [, , id, wave] = match;
+    expect(Number(wave)).toBe(waves.get(id ?? ''));
+    expect(shown.expected).toMatch(/^wave \d+ all up$/);
+    expect(Number(/\d+/.exec(shown.expected)?.[0])).toBeLessThan(Number(wave));
+    expect(shown.received).toMatch(/^sub-\d+ still off$/);
+    for (const text of [shown.where, shown.expected, shown.received]) {
+      expect(text.length).toBeLessThanOrEqual(44);
+    }
   });
 });
 
-describe('w5-04 — the consumer, the ceiling and the feeder held back', () => {
-  test('assigned names the first consumer left on no feeder at all', () => {
-    const { met, divergence } = nowhere(w5_04, 1, 'assigned');
+describe('w5-04 — the consumer, the segment and the reserve', () => {
+  test('on-a-tap names the first consumer left on nothing, and its tile', () => {
+    const first = must(withPrefix(w5_04, 1, 'consumer-')[0], 'consumer-1');
+    const { met, divergence } = nowhere(w5_04, 1, 'on-a-tap');
     expect(met).toBe(false);
     expect(divergence).toEqual({
-      where: 'consumer-1',
-      expected: 'exactly 1 feeder',
+      where: `consumer-1 · ${at(first.at)}`,
+      expected: 'exactly 1 tap',
       received: '(nothing)',
     });
   });
 
-  test('a consumer cabled twice is told both feeders it ended up on', () => {
-    const { met, divergence } = diverge(w5_04, 1, 'assigned', (sim, botId) => {
+  test('a consumer cabled twice, or to a junction, is told what it ended up on', () => {
+    const first = must(withPrefix(w5_04, 1, 'consumer-')[0], 'consumer-1');
+    const twice = diverge(w5_04, 1, 'on-a-tap', (sim, botId) => {
       const { link } = playerApi(sim, botId, 'w5-04');
-      link('feeder-1', 'consumer-1');
-      link('feeder-2', 'consumer-1');
+      link('tap-1', 'consumer-1');
+      link('tap-2', 'consumer-1');
     });
-    expect(met).toBe(false);
-    expect(divergence).toEqual({
-      where: 'consumer-1',
-      expected: 'exactly 1 feeder',
-      received: 'feeder-1, feeder-2',
+    expect(twice.met).toBe(false);
+    expect(twice.divergence).toEqual({
+      where: `consumer-1 · ${at(first.at)}`,
+      expected: 'exactly 1 tap',
+      received: 'tap-1, tap-2',
     });
+    const junction = diverge(w5_04, 1, 'on-a-tap', (sim, botId) => {
+      playerApi(sim, botId, 'w5-04').link('junction-1', 'consumer-1');
+    });
+    expect(junction.divergence?.received).toBe('junction-1');
   });
 
-  test('within-capacity names the feeder, its ceiling and what it ended up carrying', () => {
-    const world = w5_04.build(1);
-    const feeder = must(
-      world.machines.find((machine) => machine.id === 'feeder-1'),
-      'feeder-1',
+  test('within-ceiling names the segment, its ceiling and what it ended up carrying', () => {
+    const consumers = withPrefix(w5_04, 1, 'consumer-');
+    const load = consumers.reduce((sum, consumer) => sum + (consumer.vars.draw ?? 0), 0);
+    const trunk = must(
+      withPrefix(w5_04, 1, 'junction-').find((machine) => machine.id === 'junction-1'),
+      'junction-1',
     );
-    const load = world.machines
-      .filter((machine) => machine.id.startsWith('consumer-'))
-      .reduce((sum, consumer) => sum + (consumer.vars.draw ?? 0), 0);
-    const count = world.machines.filter((machine) => machine.id.startsWith('consumer-')).length;
 
-    const { met, divergence } = diverge(w5_04, 1, 'within-capacity', (sim, botId) => {
+    const { met, divergence } = diverge(w5_04, 1, 'within-ceiling', (sim, botId) => {
       const { link } = playerApi(sim, botId, 'w5-04');
-      for (let i = 1; i <= count; i++) link('feeder-1', `consumer-${String(i)}`);
-    });
-    expect(met).toBe(false);
-    expect(divergence).toEqual({
-      where: 'feeder-1',
-      expected: `at most ${String(feeder.vars.capacity ?? 0)}`,
-      received: `${String(load)}, from ${String(count)} consumers`,
-    });
-  });
-
-  test('largest-idle names the largest feeder, its ceiling and the load left on it', () => {
-    const world = w5_04.build(1);
-    const feeders = world.machines.filter((machine) => machine.id.startsWith('feeder-'));
-    const largest = feeders.reduce((best, feeder) =>
-      (feeder.vars.capacity ?? 0) > (best.vars.capacity ?? 0) ? feeder : best,
-    );
-    const draw = must(
-      world.machines.find((machine) => machine.id === 'consumer-1'),
-      'consumer-1',
-    ).vars.draw;
-
-    const { met, divergence } = diverge(w5_04, 1, 'largest-idle', (sim, botId) => {
-      playerApi(sim, botId, 'w5-04').link(largest.id, 'consumer-1');
+      for (const consumer of consumers) link('tap-1', consumer.id);
     });
     expect(met).toBe(false);
     const shown = must(divergence, 'a divergence');
     expect(shown).toEqual({
-      where: `${largest.id}, the largest at ${String(largest.vars.capacity ?? 0)}`,
-      expected: 'no consumers on it',
-      received: `1, drawing ${String(draw ?? 0)}`,
+      where: `reactor → ${trunk.id}`,
+      expected: `at most ${String(trunk.vars.ceiling ?? 0)}`,
+      received: `${String(load)}, from ${String(consumers.length)} consumers`,
     });
-    expect(`${shown.where} ${shown.expected} ${shown.received}`).not.toContain('consumer-');
+    for (const text of [shown.where, shown.expected, shown.received]) {
+      expect(text.length).toBeLessThanOrEqual(44);
+    }
+  });
+
+  test('reserve-kept names the segment above the reserve that ran short, and its load', () => {
+    const world = w5_04.build(1);
+    const reserved = must(
+      world.machines.find((machine) => machine.vars.reserve !== undefined),
+      'the reserve',
+    );
+    const ceiling = reserved.vars.ceiling ?? 0;
+    const eights = world.machines.filter(
+      (machine) => machine.id.startsWith('consumer-') && machine.vars.draw === 8,
+    );
+    const parent = must(
+      Object.keys(reserved.vars).find((name) => name.startsWith('fed:')),
+      'fed:',
+    ).slice('fed:'.length);
+
+    const { met, divergence } = diverge(w5_04, 1, 'reserve-kept', (sim, botId) => {
+      playerApi(sim, botId, 'w5-04').link(reserved.id, must(eights[0], 'an 8').id);
+    });
+    expect(met).toBe(false);
+    const shown = must(divergence, 'a divergence');
+    expect(shown.where).toBe(`${parent} → ${reserved.id}`);
+    expect(shown.expected).toBe('8 spare');
+    expect(shown.received).toBe(`8 of ${String(ceiling)} carried`);
+    for (const text of [shown.where, shown.expected, shown.received]) {
+      expect(text.length).toBeLessThanOrEqual(44);
+    }
   });
 });
 

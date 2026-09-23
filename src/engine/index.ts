@@ -22,6 +22,9 @@ export {
 
 export { BROKEN, LIVE, continuityReadings, settleContinuity } from './continuity.ts';
 
+export type { TreeSegment } from './load.ts';
+export { CEILING, cabledTo, treeSegments } from './load.ts';
+
 export type { RngState } from './rng.ts';
 export { Rng } from './rng.ts';
 

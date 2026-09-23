@@ -14,6 +14,7 @@ import { Camera } from './camera.ts';
 import type { CameraInset, ViewRange } from './camera.ts';
 import { ParticleSystem, FX_LAYER_OVER, FX_LAYER_UNDER } from './fx.ts';
 import type { FxName, FxOptions } from './fx.ts';
+import { drawLoadTree } from './load.ts';
 import {
   badgeVarKey,
   bandCursor,
@@ -21,6 +22,8 @@ import {
   drawBuffer,
   drawCelebration,
   drawCrank,
+  drawEarlyRing,
+  drawPrereqCable,
   drawTether,
   drawVarBadge,
   drawGoals,
@@ -47,6 +50,7 @@ import {
 } from './sprites.ts';
 import type { BotDrawOptions } from './sprites.ts';
 import { TerrainLayer } from './terrain.ts';
+import { latchedUp, prereqCables, switchedEarly } from './conduit.ts';
 import { applyArtDirection, artDirection, botAccent, palette } from './theme.ts';
 import type { ArtId } from './theme.ts';
 import type { CropPaint, ItemPaint, MachinePaint, PostPaint } from './art/types.ts';
@@ -150,6 +154,9 @@ export class Renderer {
   private workingIndex = 0;
   private snapshotUsesFuel = false;
   private indexedWorld: World | null = null;
+  private latched: Set<string> = new Set();
+  private latchedFor: World | null = null;
+  private latchedTick = -1;
   private readonly cropCells: number[] = [];
   private readonly markCells: number[] = [];
 
@@ -1116,12 +1123,16 @@ export class Renderer {
     paint.time = this.elapsed;
     paint.dpr = this.camera.dpr;
     paint.reduced = this.reducedMotion;
+    const latched = this.latchUp(world);
+    this.drawPrereqCables(ctx, world, tilePx, latched);
     this.drawMachineTethers(ctx, world, tilePx);
+    drawLoadTree(ctx, world, tilePx, this.camera.dpr);
     for (let m = 0; m < world.machines.length; m++) {
       const machine = world.machines[m] as Machine;
       if (!this.inRange(machine.at.x, machine.at.y)) continue;
+      const early = switchedEarly(machine, latched);
       const powered =
-        machine.state === 'on' || machine.state === 'open' || machine.state === 'busy';
+        !early && (machine.state === 'on' || machine.state === 'open' || machine.state === 'busy');
       if (painter) {
         paint.x = machine.at.x;
         paint.y = machine.at.y;
@@ -1143,7 +1154,36 @@ export class Renderer {
           this.camera.dpr,
         );
       }
+      if (early) drawEarlyRing(ctx, machine.at.x, machine.at.y, tilePx, this.camera.dpr);
       this.drawMachineReadout(ctx, world, machine, tilePx);
+    }
+  }
+
+  private latchUp(world: World): Set<string> {
+    const trace = this.trace;
+    const tick = trace ? this.snapshotTick : 0;
+    if (this.latchedFor !== world || this.latchedTick !== tick) {
+      this.latched = trace
+        ? latchedUp(trace.initialWorld, trace.events, tick)
+        : latchedUp(world, [], tick);
+      this.latchedFor = world;
+      this.latchedTick = tick;
+    }
+    return this.latched;
+  }
+
+  private drawPrereqCables(
+    ctx: CanvasRenderingContext2D,
+    world: World,
+    tilePx: number,
+    latched: ReadonlySet<string>,
+  ): void {
+    const dpr = this.camera.dpr;
+    for (const cable of prereqCables(world, latched)) {
+      if (!this.inRange(cable.from.x, cable.from.y) && !this.inRange(cable.to.x, cable.to.y)) {
+        continue;
+      }
+      drawPrereqCable(ctx, cable.from, cable.to, tilePx, cable.laid, cable.live, dpr);
     }
   }
 

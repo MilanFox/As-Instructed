@@ -17,27 +17,50 @@ export const solution: ReferenceSolution = {
       return out;
     };
 
-    const feeders = readAll('feeder');
+    const junctions = readAll('junction');
+    const taps = readAll('tap');
     const consumers = readAll('consumer');
 
-    let spare = feeders[0] as MachineView;
-    for (const feeder of feeders) {
-      if ((feeder.vars['capacity'] ?? 0) > (spare.vars['capacity'] ?? 0)) spare = feeder;
+    const parent = new Map<string, string>();
+    const room = new Map<string, number>();
+    for (const node of [...junctions, ...taps]) {
+      const fed = Object.keys(node.vars).find((name) => name.startsWith('fed:'));
+      parent.set(node.id, (fed ?? 'fed:reactor').slice('fed:'.length));
+      room.set(node.id, node.vars['ceiling'] ?? 0);
     }
 
-    const bins = feeders
-      .filter((feeder) => feeder.id !== spare.id)
-      .map((feeder) => ({ id: feeder.id, room: feeder.vars['capacity'] ?? 0 }));
-    bins.push({ id: spare.id, room: spare.vars['capacity'] ?? 0 });
+    const route = (tap: string): string[] => {
+      const out: string[] = [];
+      for (
+        let id: string | undefined = tap;
+        id !== undefined && room.has(id);
+        id = parent.get(id)
+      ) {
+        out.push(id);
+      }
+      return out;
+    };
+    const spare = (tap: string): number => Math.min(...route(tap).map((id) => room.get(id) ?? 0));
+    const take = (tap: string, draw: number): void => {
+      for (const id of route(tap)) room.set(id, (room.get(id) ?? 0) - draw);
+    };
 
-    const order = consumers.slice().sort((a, b) => (b.vars['draw'] ?? 0) - (a.vars['draw'] ?? 0));
+    const reserved = taps.find((tap) => tap.vars['reserve'] !== undefined);
+    if (reserved) take(reserved.id, reserved.vars['reserve'] ?? 0);
 
-    for (const consumer of order) {
+    const heaviest = consumers
+      .slice()
+      .sort((a, b) => (b.vars['draw'] ?? 0) - (a.vars['draw'] ?? 0));
+    for (const consumer of heaviest) {
       const draw = consumer.vars['draw'] ?? 0;
-      const bin = bins.find((candidate) => candidate.room >= draw);
-      if (!bin) continue;
-      bin.room -= draw;
-      link(bin.id, consumer.id);
+      let best: MachineView | undefined;
+      for (const tap of taps) {
+        if (spare(tap.id) < draw) continue;
+        if (!best || spare(tap.id) > spare(best.id)) best = tap;
+      }
+      if (!best) continue;
+      take(best.id, draw);
+      link(best.id, consumer.id);
     }
   },
   source: [
@@ -46,20 +69,27 @@ export const solution: ReferenceSolution = {
     '  for (let m; (m = probe(`${p}-${o.length + 1}`)); ) o.push(m);',
     '  return o;',
     '};',
-    "const feeds = all('feeder');",
-    "const draws = all('consumer');",
-    'let big = feeds[0];',
-    'for (const f of feeds) if (f.vars.capacity > big.vars.capacity) big = f;',
-    'const rank = (f) => (f.id === big.id ? 1 : 0);',
-    'const bins = feeds',
-    '  .sort((a, b) => rank(a) - rank(b))',
-    '  .map((f) => ({ id: f.id, room: f.vars.capacity }));',
-    'for (const c of draws.sort((a, b) => b.vars.draw - a.vars.draw)) {',
-    '  const bin = bins.find((b) => b.room >= c.vars.draw);',
-    '  if (bin) {',
-    '    bin.room -= c.vars.draw;',
-    '    link(bin.id, c.id);',
-    '  }',
+    "const taps = all('tap');",
+    'const up = {};',
+    'const room = {};',
+    "for (const n of [...all('junction'), ...taps]) {",
+    "  up[n.id] = Object.keys(n.vars).find((k) => k.startsWith('fed:')).slice(4);",
+    '  room[n.id] = n.vars.ceiling;',
+    '}',
+    'const route = (id) => {',
+    '  const r = [];',
+    '  for (; id in room; id = up[id]) r.push(id);',
+    '  return r;',
+    '};',
+    'const spare = (t) => Math.min(...route(t.id).map((id) => room[id]));',
+    'const take = (t, d) => route(t.id).forEach((id) => (room[id] -= d));',
+    'const medical = taps.find((t) => t.vars.reserve);',
+    'take(medical, medical.vars.reserve);',
+    "for (const c of all('consumer').sort((a, b) => b.vars.draw - a.vars.draw)) {",
+    '  const fits = taps.filter((t) => spare(t) >= c.vars.draw);',
+    '  const best = fits.sort((a, b) => spare(b) - spare(a))[0];',
+    '  take(best, c.vars.draw);',
+    '  link(best.id, c.id);',
     '}',
   ].join('\n'),
 };

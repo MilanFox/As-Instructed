@@ -553,6 +553,82 @@ export function drawTether(
   ctx.restore();
 }
 
+const CABLE_DASH: number[] = [0, 0];
+const CABLE_BOW = 0.12;
+
+export function drawPrereqCable(
+  ctx: CanvasRenderingContext2D,
+  from: Vec,
+  to: Vec,
+  tilePx: number,
+  laid: boolean,
+  live: boolean,
+  dpr = 1,
+): void {
+  const ax = (from.x + 0.5) * tilePx;
+  const ay = (from.y + 0.5) * tilePx;
+  const bx = (to.x + 0.5) * tilePx;
+  const by = (to.y + 0.5) * tilePx;
+  const length = Math.hypot(bx - ax, by - ay) || 1;
+  const ux = (bx - ax) / length;
+  const uy = (by - ay) / length;
+  const cx = (ax + bx) / 2 - uy * length * CABLE_BOW;
+  const cy = (ay + by) / 2 + ux * length * CABLE_BOW;
+  CABLE_DASH[0] = tilePx * 0.14;
+  CABLE_DASH[1] = tilePx * 0.12;
+
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = live
+    ? alpha(palette.accent, 0.95)
+    : laid
+      ? alpha(palette.ink, 0.7)
+      : alpha(palette.inkDim, 0.7);
+  ctx.lineWidth = Math.max(1, tilePx * (live ? 0.09 : laid ? 0.06 : 0.04), dpr);
+  ctx.setLineDash(laid ? TETHER_SOLID : CABLE_DASH);
+  ctx.beginPath();
+  ctx.moveTo(ax, ay);
+  ctx.quadraticCurveTo(cx, cy, bx, by);
+  ctx.stroke();
+  ctx.setLineDash(TETHER_SOLID);
+
+  const inward = Math.hypot(bx - cx, by - cy) || 1;
+  const tx = (bx - cx) / inward;
+  const ty = (by - cy) / inward;
+  const tipX = bx - tx * tilePx * 0.5;
+  const tipY = by - ty * tilePx * 0.5;
+  const s = Math.max(2 * dpr, tilePx * 0.14);
+  ctx.fillStyle = ctx.strokeStyle;
+  ctx.beginPath();
+  ctx.moveTo(tipX, tipY);
+  ctx.lineTo(tipX - tx * s - ty * s * 0.7, tipY - ty * s + tx * s * 0.7);
+  ctx.lineTo(tipX - tx * s + ty * s * 0.7, tipY - ty * s - tx * s * 0.7);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+export function drawEarlyRing(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  tilePx: number,
+  dpr = 1,
+): void {
+  const cx = (x + 0.5) * tilePx;
+  const cy = (y + 0.5) * tilePx;
+  CABLE_DASH[0] = tilePx * 0.12;
+  CABLE_DASH[1] = tilePx * 0.08;
+  ctx.save();
+  ctx.strokeStyle = palette.danger;
+  ctx.lineWidth = Math.max(1.5 * dpr, tilePx * 0.07);
+  ctx.setLineDash(CABLE_DASH);
+  ctx.beginPath();
+  ctx.arc(cx, cy, tilePx * 0.56, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
 export function drawMark(
   ctx: CanvasRenderingContext2D,
   text: string,

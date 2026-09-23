@@ -19,13 +19,17 @@ import { at, firstNotIn } from './objectives.ts';
 
 const WIDTH = 24;
 const HEIGHT = 18;
-const REACTOR_AT = vec(2, 9);
+const REACTOR_AT = vec(12, 9);
 const PREREQ_PREFIX = 'prereq:';
+const REACTOR = -1;
 
-const STRANDS = 3;
-const WALK_CUSHION = 1.05;
-const BY_NUMBER_MARGIN = 1.15;
-const PLACEMENT_TRIES = 200;
+const REACH_X = 10.5;
+const REACH_Y = 7.6;
+const JITTER = 0.3;
+const CLEARANCE = 2;
+const RELAX_PASSES = 60;
+const LAYOUT_TRIES = 200;
+const NUMBERING_TRIES = 64;
 
 export type GraphShape = 'mixed' | 'chain' | 'wide' | 'split';
 
@@ -40,212 +44,326 @@ export function shapeFor(seed: number): GraphShape {
   return SHAPES[seed] ?? 'mixed';
 }
 
-const STATION_COUNT: Readonly<Record<GraphShape, number>> = Object.freeze({
-  mixed: 10,
-  chain: 12,
-  wide: 14,
-  split: 16,
-});
-
 export interface StationPlan {
   id: string;
   at: Vec;
   prereqs: string[];
+  wave: number;
 }
 
 export interface GridPlan {
   shape: GraphShape;
   stations: StationPlan[];
-  travelBudget: number;
 }
 
-function pickDistinct(rng: Rng, pool: readonly string[], n: number): string[] {
+interface Draft {
+  prereqs: number[];
+  wave: number;
+  group: number;
+}
+
+interface Branch {
+  sizes: readonly number[];
+  rooted: boolean;
+  parents: readonly [number, number];
+  joinChance: number;
+  strands?: boolean;
+}
+
+const BRANCHES: Readonly<Record<GraphShape, readonly Branch[]>> = Object.freeze({
+  mixed: [{ sizes: [3, 3, 2, 2], rooted: true, parents: [1, 2], joinChance: 0.5 }],
+  chain: [{ sizes: [3, 3, 3, 3], rooted: true, parents: [1, 1], joinChance: 0.25, strands: true }],
+  wide: [{ sizes: [3, 11], rooted: true, parents: [1, 2], joinChance: 0.3 }],
+  split: [
+    { sizes: [2, 3, 3], rooted: true, parents: [1, 2], joinChance: 0.4 },
+    { sizes: [1, 3, 2, 2], rooted: false, parents: [1, 2], joinChance: 0.4 },
+  ],
+});
+
+function pickDistinct<T>(rng: Rng, pool: readonly T[], n: number): T[] {
   return rng.shuffle(pool).slice(0, Math.min(n, pool.length));
 }
 
-function dependencies(rng: Rng, shape: GraphShape, count: number): string[][] {
-  const prereqs: string[][] = [];
-  const half = Math.floor(count / 2);
-
-  for (let k = 0; k < count; k++) {
-    const earlier = Array.from({ length: k }, (_, i) => `sub-${i + 1}`);
-    switch (shape) {
-      case 'chain':
-        prereqs.push(k < STRANDS ? ['reactor'] : [`sub-${String(k - STRANDS + 1)}`]);
-        break;
-      case 'wide':
-        if (k < 3) prereqs.push(['reactor']);
-        else if (k === 3) prereqs.push(['sub-1', 'sub-2', 'sub-3']);
-        else prereqs.push(pickDistinct(rng, ['sub-1', 'sub-2', 'sub-3'], rng.int(1, 2)));
-        break;
-      case 'split':
-        if (k === 0) prereqs.push(['reactor']);
-        else if (k < half) prereqs.push(pickDistinct(rng, ['reactor', ...earlier], rng.int(1, 2)));
-        else if (k === half) prereqs.push([]);
+function grow(rng: Rng, shape: GraphShape): Draft[] {
+  const drafts: Draft[] = [];
+  BRANCHES[shape].forEach((branch, group) => {
+    const byWave: number[][] = [];
+    branch.sizes.forEach((size, depth) => {
+      const wave = depth + 1;
+      const previous = byWave[depth - 1] ?? [];
+      const shallower = [...(branch.rooted ? [REACTOR] : []), ...byWave.slice(0, -1).flat()];
+      const members: number[] = [];
+      for (let j = 0; j < size; j++) {
+        let prereqs: number[];
+        if (wave === 1) prereqs = branch.rooted ? [REACTOR] : [];
         else {
-          const island = earlier.slice(half);
-          prereqs.push(pickDistinct(rng, island, rng.int(1, 2)));
+          const [least, most] = branch.parents;
+          prereqs = branch.strands
+            ? [previous[j % previous.length] as number]
+            : pickDistinct(
+                rng,
+                previous,
+                j === 0 && shape === 'wide' ? previous.length : rng.int(least, most),
+              );
+          if (shallower.length > 0 && rng.chance(branch.joinChance))
+            prereqs.push(rng.pick(shallower));
         }
-        break;
-      case 'mixed':
-        prereqs.push(
-          k === 0 ? ['reactor'] : pickDistinct(rng, ['reactor', ...earlier], rng.int(1, 2)),
-        );
-        break;
-    }
-  }
-  return prereqs;
+        members.push(drafts.length);
+        drafts.push({ prereqs, wave, group });
+      }
+      byWave.push(members);
+    });
+  });
+  return drafts;
 }
 
-function relabel(rng: Rng, prereqs: readonly string[][]): string[][] {
-  const count = prereqs.length;
-  const dealt = (slot: readonly number[]): string[][] => {
-    const out: string[][] = Array.from({ length: count }, () => []);
-    for (let k = 0; k < count; k++) {
-      out[slot[k] ?? k] = (prereqs[k] ?? []).map((id) =>
-        id === 'reactor'
-          ? id
-          : `sub-${String((slot[Number(id.slice('sub-'.length)) - 1] ?? 0) + 1)}`,
+function rings(drafts: readonly Draft[]): number[] {
+  const ring: number[] = drafts.map(() => 0);
+  drafts.forEach((draft, index) => {
+    const inner = draft.prereqs.map((id) => (id === REACTOR ? 0 : (ring[id] ?? 0)));
+    ring[index] = 1 + (inner.length === 0 ? 0 : Math.min(...inner));
+  });
+  return ring;
+}
+
+const turn = (angle: number): number => {
+  const full = Math.PI * 2;
+  return ((angle % full) + full) % full;
+};
+
+function spread(targets: readonly number[], gap: number): number[] {
+  const order = targets.map((angle, index) => ({ angle: turn(angle), index }));
+  order.sort((a, b) => a.angle - b.angle);
+  for (let pass = 0; pass < RELAX_PASSES && order.length > 1; pass++) {
+    for (let i = 0; i < order.length; i++) {
+      const here = order[i] as { angle: number };
+      const next = order[(i + 1) % order.length] as { angle: number };
+      const apart = turn(next.angle - here.angle);
+      if (apart >= gap) continue;
+      const push = (gap - apart) / 2;
+      here.angle -= push;
+      next.angle += push;
+    }
+  }
+  const angles: number[] = targets.map(() => 0);
+  for (const { angle, index } of order) angles[index] = angle;
+  return angles;
+}
+
+function layout(rng: Rng, drafts: readonly Draft[]): Vec[] | null {
+  const ring = rings(drafts);
+  const deepest = Math.max(...ring);
+  const reach = (level: number): number => (level + 1) / (deepest + 1);
+  const angle: number[] = drafts.map(() => 0);
+  const spots: Vec[] = drafts.map(() => REACTOR_AT);
+  const offset = rng.next() * Math.PI * 2;
+
+  for (let level = 1; level <= deepest; level++) {
+    const onRing = drafts.map((_, index) => index).filter((index) => ring[index] === level);
+    const members = level === 1 ? rng.shuffle(onRing) : onRing;
+    const targets = members.map((index, slot) => {
+      const inner = (drafts[index] as Draft).prereqs.filter(
+        (id) => id !== REACTOR && ring[id] === level - 1,
       );
-    }
-    return out;
-  };
-  const ascendingWorks = (lists: readonly string[][]): boolean =>
-    lists.every((list, index) =>
-      list.every((id) => id === 'reactor' || Number(id.slice('sub-'.length)) - 1 < index),
-    );
-
-  for (let attempt = 0; attempt < 64; attempt++) {
-    const out = dealt([0, ...rng.shuffle(Array.from({ length: count - 1 }, (_, i) => i + 1))]);
-    if (!ascendingWorks(out)) return out;
+      if (inner.length === 0)
+        return offset + ((slot + rng.next() * 0.5) * Math.PI * 2) / members.length;
+      const x = inner.reduce((sum, id) => sum + Math.cos(angle[id] ?? 0), 0);
+      const y = inner.reduce((sum, id) => sum + Math.sin(angle[id] ?? 0), 0);
+      return Math.atan2(y, x) + (rng.next() - 0.5) * 0.4;
+    });
+    const arc = Math.PI * reach(level) * (REACH_X + REACH_Y);
+    const gap = Math.min((Math.PI * 2) / members.length, (Math.PI * 2 * CLEARANCE * 1.4) / arc);
+    spread(targets, gap).forEach((theta, slot) => {
+      const index = members[slot] as number;
+      angle[index] = theta;
+      const r = reach(level) + ((rng.next() * 2 - 1) * JITTER) / (deepest + 1);
+      spots[index] = vec(
+        Math.round(REACTOR_AT.x + Math.cos(theta) * REACH_X * r),
+        Math.round(REACTOR_AT.y + Math.sin(theta) * REACH_Y * r),
+      );
+    });
   }
-  return prereqs.map((list) => list.slice());
+
+  const placed = [REACTOR_AT, ...spots];
+  for (let i = 0; i < placed.length; i++) {
+    const here = placed[i] as Vec;
+    if (here.x < 1 || here.y < 1 || here.x > WIDTH - 2 || here.y > HEIGHT - 2) return null;
+    for (let j = i + 1; j < placed.length; j++) {
+      const there = placed[j] as Vec;
+      if (Math.max(Math.abs(here.x - there.x), Math.abs(here.y - there.y)) < CLEARANCE) return null;
+    }
+  }
+  return spots;
 }
 
-const stationNumber = (station: StationPlan): number => Number(station.id.slice('sub-'.length));
+function numbered(rng: Rng, drafts: readonly Draft[], spots: readonly Vec[]): StationPlan[] {
+  const first = drafts.findIndex(
+    (draft) => draft.prereqs.length === 1 && draft.prereqs[0] === REACTOR,
+  );
+  const rest = rng.shuffle(drafts.map((_, index) => index).filter((index) => index !== first));
+  const order = [first, ...rest];
+  const idOf = (index: number): string =>
+    index === REACTOR ? 'reactor' : `sub-${String(order.indexOf(index) + 1)}`;
+  return order.map((index) => {
+    const draft = drafts[index] as Draft;
+    return {
+      id: idOf(index),
+      at: spots[index] as Vec,
+      prereqs: draft.prereqs.map(idOf),
+      wave: draft.wave,
+    };
+  });
+}
 
-function waveDepths(stations: readonly StationPlan[]): Map<string, number> {
+const stationNumber = (id: string): number => Number(id.slice('sub-'.length));
+
+export function stationWaves(
+  stations: readonly { id: string; prereqs: readonly string[] }[],
+): Map<string, number> {
+  const wave = new Map<string, number>([['reactor', 0]]);
+  const left = stations.slice();
+  while (left.length > 0) {
+    const ready = left.filter((station) => station.prereqs.every((id) => wave.has(id)));
+    if (ready.length === 0) break;
+    for (const station of ready) {
+      wave.set(station.id, 1 + Math.max(0, ...station.prereqs.map((id) => wave.get(id) ?? 0)));
+      left.splice(left.indexOf(station), 1);
+    }
+  }
+  return wave;
+}
+
+export function shortestDepths(stations: readonly StationPlan[]): Map<string, number> {
   const depth = new Map<string, number>([['reactor', 0]]);
   const left = stations.slice();
   while (left.length > 0) {
     const ready = left.filter((station) => station.prereqs.every((id) => depth.has(id)));
     if (ready.length === 0) break;
     for (const station of ready) {
-      depth.set(station.id, 1 + Math.max(0, ...station.prereqs.map((id) => depth.get(id) ?? 0)));
+      const reached = station.prereqs.map((id) => depth.get(id) ?? 0);
+      depth.set(station.id, 1 + (reached.length === 0 ? 0 : Math.min(...reached)));
       left.splice(left.indexOf(station), 1);
     }
   }
   return depth;
 }
 
-const earliestWave = (
-  ready: readonly StationPlan[],
-  waves: ReadonlyMap<string, number>,
-): StationPlan[] => {
-  const first = Math.min(...ready.map((station) => waves.get(station.id) ?? 0));
-  return ready.filter((station) => (waves.get(station.id) ?? 0) === first);
-};
+type Choose = (ready: readonly StationPlan[], at: Vec) => StationPlan;
 
-type Choose = (pool: readonly StationPlan[], at: Vec) => StationPlan;
-
-function walkWith(
-  from: Vec,
-  stations: readonly StationPlan[],
-  choose: Choose,
-  waves?: ReadonlyMap<string, number>,
-): number {
+function oneAtATime(stations: readonly StationPlan[], choose: Choose): string[] {
   const done = new Set<string>(['reactor']);
   const left = stations.slice();
-  let at = from;
-  let total = 0;
-
+  const order: string[] = [];
+  let at = REACTOR_AT;
   while (left.length > 0) {
     const ready = left.filter((station) => station.prereqs.every((id) => done.has(id)));
     if (ready.length === 0) break;
-    const chosen = choose(waves === undefined ? ready : earliestWave(ready, waves), at);
-    total += manhattan(at, chosen.at);
-    at = chosen.at;
+    const chosen = choose(ready, at);
+    order.push(chosen.id);
     done.add(chosen.id);
+    at = chosen.at;
     left.splice(left.indexOf(chosen), 1);
   }
-  return total;
+  return order;
 }
+
+const lowestId: Choose = (ready) =>
+  ready.reduce((best, station) =>
+    stationNumber(station.id) < stationNumber(best.id) ? station : best,
+  );
 
 const nearest =
   (preferHigher: boolean): Choose =>
-  (pool, at) => {
-    let chosen = pool[0] as StationPlan;
-    for (const station of pool) {
-      const gap = manhattan(at, station.at) - manhattan(at, chosen.at);
-      const beatsTie = preferHigher && stationNumber(station) > stationNumber(chosen);
-      if (gap < 0 || (gap === 0 && beatsTie)) chosen = station;
-    }
-    return chosen;
-  };
-
-const inNumberOrder =
-  (preferHigher: boolean): Choose =>
-  (pool) =>
-    pool.reduce((best, station) =>
-      stationNumber(station) > stationNumber(best) === preferHigher ? station : best,
-    );
-
-export function honestWalk(from: Vec, stations: readonly StationPlan[]): number {
-  const waves = waveDepths(stations);
-  return Math.max(
-    walkWith(from, stations, nearest(false)),
-    walkWith(from, stations, nearest(true)),
-    walkWith(from, stations, nearest(false), waves),
-    walkWith(from, stations, nearest(true), waves),
-  );
-}
-
-export function byNumberWalk(from: Vec, stations: readonly StationPlan[]): number {
-  return Math.min(
-    walkWith(from, stations, inNumberOrder(false)),
-    walkWith(from, stations, inNumberOrder(true)),
-  );
-}
-
-function placeStations(rng: Rng, prereqs: readonly string[][]): StationPlan[] {
-  const taken = new Set<string>([`${String(REACTOR_AT.x)},${String(REACTOR_AT.y)}`]);
-  const stations: StationPlan[] = [];
-  while (stations.length < prereqs.length) {
-    const at = vec(rng.int(5, WIDTH - 2), rng.int(1, HEIGHT - 2));
-    const key = `${String(at.x)},${String(at.y)}`;
-    if (taken.has(key)) continue;
-    taken.add(key);
-    stations.push({
-      id: `sub-${String(stations.length + 1)}`,
-      at,
-      prereqs: prereqs[stations.length] ?? [],
+  (ready, at) =>
+    ready.reduce((best, station) => {
+      const gap = manhattan(at, station.at) - manhattan(at, best.at);
+      if (gap !== 0) return gap < 0 ? station : best;
+      return stationNumber(station.id) > stationNumber(best.id) === preferHigher ? station : best;
     });
+
+export const lowestIdOrder = (stations: readonly StationPlan[]): string[] =>
+  oneAtATime(stations, lowestId);
+
+export const nearestReadyOrder = (
+  stations: readonly StationPlan[],
+  preferHigher = false,
+): string[] => oneAtATime(stations, nearest(preferHigher));
+
+export type Measure = 'euclidean' | 'manhattan' | 'x';
+
+const MEASURES: readonly Measure[] = ['euclidean', 'manhattan', 'x'];
+
+const measured = (measure: Measure, at: Vec): number => {
+  const dx = at.x - REACTOR_AT.x;
+  const dy = at.y - REACTOR_AT.y;
+  if (measure === 'x') return at.x;
+  return measure === 'euclidean' ? Math.hypot(dx, dy) : Math.abs(dx) + Math.abs(dy);
+};
+
+export function sortedOrder(
+  stations: readonly StationPlan[],
+  measure: Measure,
+  preferHigher = false,
+): string[] {
+  const tie = preferHigher ? -1 : 1;
+  return stations
+    .slice()
+    .sort(
+      (a, b) =>
+        measured(measure, a.at) - measured(measure, b.at) ||
+        tie * (stationNumber(a.id) - stationNumber(b.id)),
+    )
+    .map((station) => station.id);
+}
+
+export function keepsWaves(order: readonly string[], waves: ReadonlyMap<string, number>): boolean {
+  for (let i = 1; i < order.length; i++) {
+    if ((waves.get(order[i - 1] as string) ?? 0) > (waves.get(order[i] as string) ?? 0))
+      return false;
   }
-  return stations;
+  return true;
 }
 
-function laidOut(rng: Rng, shape: GraphShape, prereqs: readonly string[][]): GridPlan {
-  const stations = placeStations(rng, prereqs);
-  return {
-    shape,
-    stations,
-    travelBudget: Math.ceil(honestWalk(REACTOR_AT, stations) * WALK_CUSHION),
-  };
-}
+const ascendingIsLegal = (stations: readonly StationPlan[]): boolean =>
+  stations.every((station) =>
+    station.prereqs.every(
+      (id) => id === 'reactor' || stationNumber(id) < stationNumber(station.id),
+    ),
+  );
 
-const numberOrderOverruns = (plan: GridPlan): boolean =>
-  byNumberWalk(REACTOR_AT, plan.stations) > plan.travelBudget * BY_NUMBER_MARGIN;
+const hasJoin = (stations: readonly StationPlan[]): boolean => {
+  const shortest = shortestDepths(stations);
+  return stations.some((station) => (shortest.get(station.id) ?? 0) < station.wave);
+};
+
+function forcesWaves(stations: readonly StationPlan[]): boolean {
+  const waves = stationWaves(stations);
+  if (ascendingIsLegal(stations)) return false;
+  if (keepsWaves(lowestIdOrder(stations), waves)) return false;
+  if (keepsWaves(nearestReadyOrder(stations, false), waves)) return false;
+  if (keepsWaves(nearestReadyOrder(stations, true), waves)) return false;
+  for (const measure of MEASURES) {
+    for (const preferHigher of [false, true]) {
+      if (keepsWaves(sortedOrder(stations, measure, preferHigher), waves)) return false;
+    }
+  }
+  return hasJoin(stations);
+}
 
 export function gridPlan(seed: number): GridPlan {
   const rng = new Rng(seed * 6151 + 907);
   const shape = shapeFor(seed);
-  const prereqs = relabel(rng, dependencies(rng, shape, STATION_COUNT[shape]));
-
-  let plan = laidOut(rng, shape, prereqs);
-  for (let attempt = 0; attempt < PLACEMENT_TRIES && !numberOrderOverruns(plan); attempt++) {
-    plan = laidOut(rng, shape, prereqs);
+  let stations: StationPlan[] = [];
+  for (let attempt = 0; attempt < LAYOUT_TRIES; attempt++) {
+    const drafts = grow(rng, shape);
+    const spots = layout(rng, drafts);
+    if (spots === null) continue;
+    for (let tries = 0; tries < NUMBERING_TRIES; tries++) {
+      stations = numbered(rng, drafts, spots);
+      if (forcesWaves(stations)) return { shape, stations };
+    }
   }
-  return plan;
+  return { shape, stations };
 }
 
 const prereqsOf = (machine: Machine): string[] =>
@@ -296,18 +414,6 @@ function orderedCount(ctx: ObjectiveContext): number {
   return valid.size;
 }
 
-function travelled(ctx: ObjectiveContext): number {
-  let from = machineById(ctx.initialWorld, 'reactor')?.at ?? REACTOR_AT;
-  let total = 0;
-  for (const { id } of energisations(ctx)) {
-    const machine = machineById(ctx.initialWorld, id);
-    if (!machine) continue;
-    total += manhattan(from, machine.at);
-    from = machine.at;
-  }
-  return total;
-}
-
 const missingCable = (ctx: ObjectiveContext): Divergence | undefined => {
   for (const station of substations(ctx.world)) {
     for (const prereq of prereqsOf(station)) {
@@ -351,29 +457,60 @@ const poweredEarly = (ctx: ObjectiveContext): Divergence | undefined => {
   };
 };
 
-const walkOverran = (ctx: ObjectiveContext): Divergence => {
-  const budget = ctx.world.vars.travelBudget ?? 0;
-  let from = machineById(ctx.initialWorld, 'reactor')?.at ?? REACTOR_AT;
-  let fromId = 'reactor';
-  let total = 0;
+function waveBreach(ctx: ObjectiveContext): { id: string; t: number; behind: Machine } | undefined {
+  const stations = substations(ctx.initialWorld);
+  const waves = stationWaves(
+    stations.map((machine) => ({ id: machine.id, prereqs: prereqsOf(machine) })),
+  );
+  const waveOf = (id: string): number => waves.get(id) ?? 0;
+  const shallowFirst = stations
+    .slice()
+    .sort((a, b) => waveOf(a.id) - waveOf(b.id) || stationNumber(a.id) - stationNumber(b.id));
+  const up = new Set<string>(['reactor']);
+  for (const { id, t } of energisations(ctx)) {
+    const machine = machineById(ctx.initialWorld, id);
+    if (!machine || !machine.id.startsWith('sub-')) continue;
+    const behind = shallowFirst.find(
+      (station) => waveOf(station.id) < waveOf(id) && !up.has(station.id),
+    );
+    if (behind !== undefined) return { id, t, behind };
+    if (prereqsOf(machine).every((prereq) => up.has(prereq))) up.add(id);
+  }
+  return undefined;
+}
+
+function upInWaves(ctx: ObjectiveContext): Set<string> {
+  const up = new Set<string>(['reactor']);
   for (const { id } of energisations(ctx)) {
     const machine = machineById(ctx.initialWorld, id);
-    if (!machine) continue;
-    total += manhattan(from, machine.at);
-    from = machine.at;
-    if (total > budget) {
-      return {
-        where: `${fromId} → ${id}`,
-        expected: `${String(budget)} steps in all`,
-        received: `${String(total)} steps by this leg`,
-      };
-    }
-    fromId = id;
+    if (!machine || !machine.id.startsWith('sub-')) continue;
+    if (prereqsOf(machine).every((prereq) => up.has(prereq))) up.add(id);
   }
+  return up;
+}
+
+const outOfWave = (ctx: ObjectiveContext): Divergence | undefined => {
+  const waves = stationWaves(
+    substations(ctx.initialWorld).map((machine) => ({
+      id: machine.id,
+      prereqs: prereqsOf(machine),
+    })),
+  );
+  const breach = waveBreach(ctx);
+  if (breach !== undefined) {
+    return {
+      where: `tick ${String(breach.t)} · ${breach.id}, wave ${String(waves.get(breach.id) ?? 0)}`,
+      expected: `wave ${String(waves.get(breach.behind.id) ?? 0)} all up`,
+      received: `${breach.behind.id} still off`,
+    };
+  }
+  const up = upInWaves(ctx);
+  const missed = substations(ctx.world).find((machine) => !up.has(machine.id));
+  if (missed === undefined) return undefined;
   return {
-    where: 'the crew walk',
-    expected: `${String(budget)} steps`,
-    received: `${String(total)} steps`,
+    where: `${missed.id} · ${at(missed.at)}`,
+    expected: `up in wave ${String(waves.get(missed.id) ?? 0)}`,
+    received: 'never brought up',
   };
 };
 
@@ -389,26 +526,28 @@ export const w5_03: LevelDef = {
     '**RE:** Energisation order',
     '',
     'A substation brought up early is not dangerous, merely futile, and futility is',
-    'reportable under the site metrics framework, which I am measured on. So is the',
-    'distance the crew walks, on a separate form.',
+    'reportable under the site metrics framework, which I am measured on. The crew rota',
+    'also goes out by wave, and a crew called before its wave bills standing time.',
     '',
     'Cable the district, then bring every substation up.',
   ].join('\n'),
   board: {
     fixed: [
-      'the district is 24 by 18 of open floor — the crew walk between two stations is the difference in `x` plus the difference in `y`',
-      'the reactor stands at (2, 9), already on, and RIG-01 starts on it',
-      '`sub-1` is the station the reactor feeds',
+      'the district is 24 by 18 of open floor',
+      'the reactor stands at the centre, (12, 9), already on, and RIG-01 starts on it',
+      '`sub-1` waits on the reactor alone',
       'the upstream lists never close a circle',
+      'each station stands on a rough ring around the reactor — the fewer cables on its shortest way in, the closer the ring; a station that lists nothing stands on the first',
+      'every listed prerequisite is drawn on the board as a cable from the start',
       'ascending station number is never a legal order to bring the district up in',
     ],
     redrawn: [
       'ten to sixteen stations',
-      'where each one stands',
-      'the shape of the upstream lists — three deep chains side by side on one shift, one wide flat layer on another, two halves that never touch on another',
+      'the shape of the upstream lists — three strands side by side on one shift, one wide flat layer on another, two halves that never touch on another',
+      'how many waves deep the district runs, and how many stations each wave holds',
       'which station number sits where in that shape',
+      'where on its ring each station stands, and how far off the ring line',
       'whether any station lists no upstream at all',
-      'the crew-walk allowance',
     ],
   },
   facts: [
@@ -424,35 +563,36 @@ export const w5_03: LevelDef = {
     },
     {
       label: 'The cable',
-      value: 'For **every** listed prerequisite, run `link(prereqId, stationId)`. 2 ticks each.',
+      value:
+        'For **every** listed prerequisite, run `link(prereqId, stationId)`. 2 ticks each. The board draws every listed cable from the start, dim; it turns solid once laid, and lights once both ends are up.',
     },
     {
       label: 'Bringing one up',
       value:
-        '`power(stationId, "on")`, 2 ticks. The switch always throws — nothing refuses a call made too early, and the station reads `on` afterwards either way. What is graded is the tick you called it at, not the state you read back. A futile call costs the same as a useful one and does no lasting harm: call the station again once its upstream is up and that second call counts.',
+        '`power(stationId, "on")`, 2 ticks. The switch always throws — nothing refuses a call made too early, and the station reads `on` afterwards either way. What is graded is the tick you called it at, not the state you read back. A futile call costs the same as a useful one and does no lasting harm: call the station again once its upstream is up and that second call counts. On the board a station switched on too early stays dark inside a red ring.',
     },
     {
-      label: 'The crew walk',
+      label: 'Waves',
       value:
-        'The crew starts at the reactor and walks between stations in the order you energise them, and every `power` call is a visit — a futile one and a second call on the same station each add their leg. The reactor reports the allowance in `vars.travelBudget`. It is tight: which ready station you take next is what decides whether you fit.',
+        'Wave 1 is every station that is ready at the start: it lists only the reactor, or nothing at all. Every other station is one wave past the **deepest** thing it lists, so a station listing the reactor and a wave 2 station is wave 3, not wave 1. The ring a station stands on is not its wave. One wave at a time means no `power` call on a station while any station of an earlier wave is not yet up. The order inside a wave is free.',
     },
     {
       label: 'The Repository',
       value:
-        'Nothing here needs it. But keep whatever turns that list into a workable order — later briefs call it `waves`, and expect the groups back.',
+        'Keep whatever turns those lists into waves — later briefs call it `waves`, and expect the groups back, wave 1 first.',
     },
   ],
   seeds: [1, 2, 3, 4],
-  par: { ticks: 76 },
+  par: { ticks: 80 },
   build(seed: number): World {
-    const { stations, travelBudget } = gridPlan(seed);
+    const { stations } = gridPlan(seed);
     const edges = stations.reduce((sum, station) => sum + station.prereqs.length, 0);
     const world = createWorld({
       w: WIDTH,
       h: HEIGHT,
       seed,
       fill: Terrain.Floor,
-      vars: { travelBudget, stations: stations.length, edges },
+      vars: { stations: stations.length, edges },
     });
 
     setTerrain(world, REACTOR_AT, Terrain.Cable);
@@ -462,7 +602,7 @@ export const w5_03: LevelDef = {
       at: REACTOR_AT,
       state: 'on',
       inventory: [],
-      vars: { travelBudget },
+      vars: {},
     });
 
     for (const station of stations) {
@@ -519,13 +659,14 @@ export const w5_03: LevelDef = {
   ],
   bonus: [
     Objectives.custom(
-      'tight-order',
-      'Keep the crew walk inside the reported allowance, in steps',
-      (ctx) => travelled(ctx) <= (ctx.world.vars.travelBudget ?? 0),
-      {
-        progress: (ctx) => [travelled(ctx), ctx.world.vars.travelBudget ?? 0],
-        divergence: walkOverran,
+      'one-wave-at-a-time',
+      'Bring the district up one wave at a time',
+      (ctx) => {
+        if (waveBreach(ctx) !== undefined) return false;
+        const up = upInWaves(ctx);
+        return substations(ctx.world).every((machine) => up.has(machine.id));
       },
+      { divergence: outOfWave },
     ),
   ],
   starter: [
@@ -537,9 +678,9 @@ export const w5_03: LevelDef = {
   ].join('\n'),
   hints: [
     'Reading the whole district costs nothing. Read all of it before you spend a single tick, and you will know what depends on what.',
-    'A station is ready when every machine it lists is already on. At the start, only the reactor is on, so ask which stations are ready right now.',
-    'Bringing one station up can make several others ready. Work out what became ready, not what comes next in the list.',
-    'Several stations are usually ready at the same moment. Which of them you take next changes nothing about the order being legal, and everything about how far the crew walks.',
+    'A station is ready when every machine it lists is already on. At the start only the reactor is on, so gather every station that is ready right now, not just the first one you find.',
+    'Bring up everything you gathered before you look again. Then gather whatever is ready now. Each gathering is one wave.',
+    'A station that lists something shallow and something deep waits for the deep one. How close it stands to the reactor says nothing about which wave it is in.',
   ],
   docs: ['probe', 'link', 'power'],
 };

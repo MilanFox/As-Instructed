@@ -64,7 +64,6 @@ const UNDECLARED_SLACK: readonly string[] = [
   'w2-03/tile-footprint',
   'w4-01/reading-allowance',
   'w4-01/tight-reading-bound',
-  'w5-03/tight-order',
   'w5-05/budget',
 ];
 

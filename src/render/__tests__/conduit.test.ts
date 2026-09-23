@@ -10,8 +10,17 @@ import {
   settleContinuity,
   vec,
 } from '../../engine/index.ts';
-import type { World } from '../../engine/index.ts';
-import { drawRepair, drawRuns, isRepaired, machineRuns, runRevision } from '../conduit.ts';
+import type { TraceEvent, World } from '../../engine/index.ts';
+import {
+  drawRepair,
+  drawRuns,
+  isRepaired,
+  latchedUp,
+  machineRuns,
+  prereqCables,
+  runRevision,
+  switchedEarly,
+} from '../conduit.ts';
 import type { RunCell, RunStyle } from '../conduit.ts';
 
 const TILE = 40;
@@ -221,5 +230,83 @@ describe('a repair', () => {
       expect(fill.y).toBeGreaterThan(2 * TILE);
       expect(fill.y + fill.h).toBeLessThan(3 * TILE);
     }
+  });
+});
+
+describe('prerequisite cables', () => {
+  function district(): World {
+    const world = createWorld({ w: 8, h: 4, seed: 1 });
+    addMachine(world, {
+      id: 'reactor',
+      kind: MachineKind.Node,
+      at: vec(0, 1),
+      state: 'on',
+      inventory: [],
+      vars: {},
+    });
+    addMachine(world, {
+      id: 'sub-1',
+      kind: MachineKind.Node,
+      at: vec(3, 1),
+      state: 'off',
+      inventory: [],
+      vars: { 'prereq:reactor': 1 },
+    });
+    addMachine(world, {
+      id: 'sub-2',
+      kind: MachineKind.Node,
+      at: vec(6, 1),
+      state: 'off',
+      inventory: [],
+      vars: { 'prereq:sub-1': 1 },
+    });
+    return world;
+  }
+
+  const powerOn = (t: number, at: { x: number; y: number }): TraceEvent => ({
+    t,
+    botId: 0,
+    dt: 2,
+    kind: 'act',
+    name: 'power',
+    at,
+    ok: true,
+    detail: 'on',
+  });
+
+  it('draws every listed prerequisite before any is laid, none of them live', () => {
+    const world = district();
+    const cables = prereqCables(world, latchedUp(world, [], 0));
+    expect(cables.map((cable) => [cable.from, cable.to, cable.laid, cable.live])).toEqual([
+      [vec(0, 1), vec(3, 1), false, false],
+      [vec(3, 1), vec(6, 1), false, false],
+    ]);
+  });
+
+  it('a station switched on before its upstream is on, not up', () => {
+    const initial = district();
+    const world = district();
+    const early = world.machines.find((machine) => machine.id === 'sub-2');
+    if (!early) throw new Error('sub-2');
+    early.state = 'on';
+    const latched = latchedUp(initial, [powerOn(0, vec(6, 1))], 0);
+    expect(latched.has('sub-2')).toBe(false);
+    expect(switchedEarly(early, latched)).toBe(true);
+  });
+
+  it('a laid cable lights once both ends are truly up', () => {
+    const initial = district();
+    const world = district();
+    for (const machine of world.machines) machine.state = 'on';
+    const reactor = world.machines.find((machine) => machine.id === 'reactor');
+    const first = world.machines.find((machine) => machine.id === 'sub-1');
+    if (!reactor || !first) throw new Error('district');
+    reactor.vars['link:sub-1'] = 1;
+    first.vars['link:sub-2'] = 1;
+    const latched = latchedUp(initial, [powerOn(0, vec(3, 1)), powerOn(2, vec(6, 1))], 2);
+    expect(prereqCables(world, latched).map((cable) => cable.live)).toEqual([true, true]);
+    expect(prereqCables(world, latchedUp(initial, [powerOn(0, vec(3, 1))], 2))[1]?.live).toBe(
+      false,
+    );
   });
 });

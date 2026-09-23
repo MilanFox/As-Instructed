@@ -1,11 +1,14 @@
 import { LIVE, manhattan } from '../engine/index.ts';
-import type { Machine, Vec, World } from '../engine/index.ts';
+import type { Machine, TraceEvent, Vec, World } from '../engine/index.ts';
 
 const INDEXED_ID = /^(.+)-(\d+)$/;
 
 const SHORTEST_RUN = 6;
 
 const REPAIRED = 'patched';
+
+const PREREQ = 'prereq:';
+const LINKED = 'link:';
 
 const CLAMP_SPAN = 0.62;
 const CLAMP_DEPTH = 0.26;
@@ -19,6 +22,13 @@ export interface RunStyle {
   railWidth: number;
   deckWidth: number;
   coreWidth: number;
+}
+
+export interface PrereqCable {
+  from: Vec;
+  to: Vec;
+  laid: boolean;
+  live: boolean;
 }
 
 export interface RunCell {
@@ -220,4 +230,61 @@ export function drawRepair(
   ctx.fillRect(left, top, jaw, depth);
   ctx.fillRect(left + span - jaw, top, jaw, depth);
   ctx.restore();
+}
+
+function prereqsOf(machine: Machine): string[] {
+  const found: string[] = [];
+  for (const [name, value] of Object.entries(machine.vars)) {
+    if (value === 1 && name.startsWith(PREREQ)) found.push(name.slice(PREREQ.length));
+  }
+  return found;
+}
+
+export function latchedUp(
+  initial: World,
+  events: readonly TraceEvent[],
+  tick: number,
+): Set<string> {
+  const up = new Set<string>();
+  const byCell = new Map<string, Machine>();
+  for (const machine of initial.machines) {
+    byCell.set(`${String(machine.at.x)},${String(machine.at.y)}`, machine);
+    if (machine.state === 'on' && prereqsOf(machine).length === 0) up.add(machine.id);
+  }
+  for (const event of events) {
+    if (event.t > tick) break;
+    if (event.kind !== 'act' || event.name !== 'power' || !event.ok || event.at === undefined) {
+      continue;
+    }
+    const machine = byCell.get(`${String(event.at.x)},${String(event.at.y)}`);
+    if (!machine) continue;
+    if (event.detail !== 'on') up.delete(machine.id);
+    else if (prereqsOf(machine).every((id) => up.has(id))) up.add(machine.id);
+  }
+  return up;
+}
+
+export function prereqCables(world: World, latched: ReadonlySet<string>): PrereqCable[] {
+  const cables: PrereqCable[] = [];
+  const byId = new Map<string, Machine>();
+  for (const machine of world.machines) byId.set(machine.id, machine);
+  const isUp = (machine: Machine): boolean => machine.state === 'on' && latched.has(machine.id);
+  for (const station of world.machines) {
+    for (const id of prereqsOf(station)) {
+      const feeder = byId.get(id);
+      if (!feeder) continue;
+      const laid = feeder.vars[`${LINKED}${station.id}`] === 1;
+      cables.push({
+        from: feeder.at,
+        to: station.at,
+        laid,
+        live: laid && isUp(feeder) && isUp(station),
+      });
+    }
+  }
+  return cables;
+}
+
+export function switchedEarly(machine: Machine, latched: ReadonlySet<string>): boolean {
+  return machine.state === 'on' && !latched.has(machine.id) && prereqsOf(machine).length > 0;
 }
