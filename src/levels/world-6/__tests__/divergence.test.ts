@@ -267,7 +267,7 @@ describe('w6-04 names the packet the relay sent in the wrong alphabet', () => {
 
     expect(report.met).toBe(false);
     expect(shown.where).toBe('the straggler');
-    expect(shown.expected).toBe('the shift that reads as English');
+    expect(shown.expected).toBe('the one shift in the stated alphabet');
     expect(shown.received).toMatch(/^shift \d+$/);
   });
 

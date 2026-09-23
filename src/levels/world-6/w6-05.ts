@@ -18,6 +18,7 @@ import type { LevelDef } from '../types.ts';
 import {
   additive,
   charCodes,
+  driveTheRoute,
   encipher,
   installPost,
   point,
@@ -388,6 +389,7 @@ export const w6_05: LevelDef = {
       { divergence: parked },
     ),
     stayOnRoute(),
+    driveTheRoute((world) => telemetryFor(world.vars.seed ?? 1).moves),
   ],
   bonus: [
     Objectives.custom(

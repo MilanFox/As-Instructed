@@ -13,7 +13,15 @@ import {
   vec,
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
-import { decipher, installPost, postVar, queued, stayOnRoute, transmitted } from './signal.ts';
+import {
+  decipher,
+  driveTheRoute,
+  installPost,
+  postVar,
+  queued,
+  stayOnRoute,
+  transmitted,
+} from './signal.ts';
 
 const FIELD = 20;
 const START = vec(1, 5);
@@ -236,6 +244,7 @@ export const w6_03: LevelDef = {
   objectives: [
     Objectives.botAt(PAD, { id: 'reach-pad', label: 'Park the bot on the landing pad' }),
     stayOnRoute(),
+    driveTheRoute((world) => expand(inbound(world))),
   ],
   bonus: [
     Objectives.custom(

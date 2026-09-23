@@ -1,6 +1,15 @@
-import type { DieEvent, Machine, Objective, Vec, World } from '../../engine/index.ts';
+import type {
+  DieEvent,
+  Machine,
+  MoveEvent,
+  Objective,
+  ObjectiveContext,
+  Vec,
+  World,
+} from '../../engine/index.ts';
 import {
   MachineKind,
+  NOTHING,
   Objectives,
   Terrain,
   addMachine,
@@ -119,6 +128,42 @@ export function stayOnRoute(): Objective {
           where: `tick ${String(fall.t)} · ${point(fall.at)}`,
           expected: Terrain.Floor,
           received: terrain,
+        };
+      },
+    },
+  );
+}
+
+const HEADINGS = 'NESW';
+
+const driven = (ctx: ObjectiveContext): string[] =>
+  ctx.trace.events
+    .filter((event): event is MoveEvent => event.kind === 'move' && event.botId === 0 && event.ok)
+    .map((event) => HEADINGS[event.dir] ?? '?');
+
+export function driveTheRoute(routeOf: (world: World) => readonly string[]): Objective {
+  return Objectives.custom(
+    'drive-the-route',
+    'Drive the route as sent, move for move',
+    (ctx) => {
+      const route = routeOf(ctx.initialWorld);
+      const moves = driven(ctx);
+      return moves.length === route.length && matchingPrefix(moves, route) === route.length;
+    },
+    {
+      progress: (ctx) => {
+        const route = routeOf(ctx.initialWorld);
+        return [matchingPrefix(driven(ctx), route), route.length];
+      },
+      divergence: (ctx) => {
+        const route = routeOf(ctx.initialWorld);
+        const moves = driven(ctx);
+        const i = matchingPrefix(moves, route);
+        if (i === route.length && i === moves.length) return undefined;
+        return {
+          where: `move ${String(i + 1)} of the route`,
+          expected: route[i] ?? 'no more moves',
+          received: moves[i] ?? NOTHING,
         };
       },
     },

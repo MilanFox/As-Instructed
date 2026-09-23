@@ -163,7 +163,7 @@ function firstStraggler(ctx: ObjectiveContext): Divergence | undefined {
     if (decipher(cipher, key) !== got) continue;
     return {
       where: 'the straggler',
-      expected: 'the shift that reads as English',
+      expected: 'the one shift in the stated alphabet',
       received: `shift ${String(key)}`,
     };
   }
@@ -223,7 +223,7 @@ export const w6_04: LevelDef = {
     {
       label: 'The straggler',
       value:
-        'The last packet has no header and a **different** shift in the same range. Its plain text is ordinary readable English, like every other packet once decoded. Send it straight after the others.',
+        'The last packet has no header and a **different** shift in the same range. Its plain text is lowercase letters, digits, spaces and commas, and nothing else; exactly one shift in the space gives that. Send it straight after the others.',
     },
     {
       label: '`buffered()`',
@@ -299,7 +299,7 @@ export const w6_04: LevelDef = {
     'There are not many keys. There is exactly one way to know when you have the right one.',
     'You are not looking for the key. You are looking for a packet that starts with the four characters you were promised, and the key is whatever produced it.',
     'One shift in the space changes nothing at all, and it is still a shift. Either the headed packets or the straggler can be the one that arrived under it.',
-    'The straggler has no header, so nothing can confirm a candidate outright. Something else about English text is true of the plain version and untrue of the other ninety-four.',
+    'The straggler has no header, so no prefix can confirm a candidate. Its alphabet can: the right shift is the only one that leaves nothing outside it.',
   ],
   docs: ['decode', 'receive', 'buffered', 'transmit'],
 };
