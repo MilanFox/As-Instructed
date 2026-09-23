@@ -769,6 +769,12 @@
   color: var(--bronze);
 }
 
+.order-row__medal[data-medal='closed'] {
+  border-color: var(--gold);
+  background: var(--gold);
+  color: #000;
+}
+
 .order-row__points {
   width: 54px;
   font-family: var(--font-mono);

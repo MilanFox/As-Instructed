@@ -35,11 +35,16 @@ const CRATERS: readonly { x: number; y: number; r: number }[] = [
 ];
 
 const MEDAL_MARK: Record<string, string> = {
-  gold: 'G',
+  gold: '✓',
   silver: 'S',
   bronze: 'B',
   none: '·',
+  closed: '✓',
 };
+
+function medalMark(order: CampaignOrder): string {
+  return order.medal ?? (order.progress.completed ? 'closed' : 'none');
+}
 
 const NARROW = 1040;
 
@@ -936,8 +941,14 @@ export function LevelSelect(): JSX.Element {
                     </span>
                   </span>
                   <span className="order-row__score">
-                    <span className="order-row__medal" data-medal={order.medal ?? 'none'}>
-                      {order.medal ? (MEDAL_MARK[order.medal] ?? '·') : '·'}
+                    <span
+                      className="order-row__medal"
+                      data-medal={medalMark(order)}
+                      title={
+                        medalMark(order) === 'closed' ? 'closed, no par on this order' : undefined
+                      }
+                    >
+                      {MEDAL_MARK[medalMark(order)] ?? '·'}
                     </span>
                     <span className="order-row__points">
                       {order.points}
