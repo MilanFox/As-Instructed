@@ -11,11 +11,11 @@ every order runs several seeds that must all pass.
 | World | Teaches |
 |---|---|
 | 1 — Boot Sector | Loops, conditionals, coordinates |
-| 2 — Regolith Fields | State machines and resource cycles |
+| 2 — Regolith Fields | Tracking state across passes, timing, and a hopper that fills |
 | 3 — The Sorting Yards | Data structures, filtering, maps |
 | 4 — Cave Systems | Search, and remembering where you have been |
-| 5 — The Grid | Ordering and dependencies: what has to happen first |
-| 6 — Deep Signal | Parsing, checksums, number crunching |
+| 5 — The Grid | Graphs: dependencies, load on a tree, spanning cables |
+| 6 — Deep Signal | Encoding: queues, checksums, compression, ciphers |
 | 7 — Swarm | Many bots at once, dividing work, a clock that stops with the last of them |
 | 8 — The Kessler Contract | All of the above, under budget |
 

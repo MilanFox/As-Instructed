@@ -22,6 +22,7 @@ Vitest collects only `src/**/*.test.ts`, so `__tests__/` also holds fixtures and
 
 ## Levels
 
+- A level's place in its site's arc is in `CAMPAIGN.md`; keep it in step when a level changes.
 - Everything a level grades is stated up front, which means in `facts` and the objective labels — never in brief prose. A mechanic that only surfaces on failure is a level bug.
 - The brief is vibe: the memo gives the lore and the idea of the shift, then one line of what the job is. It is not where the level is explained. If a brief is growing, the words belong in `facts`.
 - Seed 1 is representative, not degenerate: the honest general solution passes it.
