@@ -27,7 +27,8 @@ export const LIBRARY_REQUIREMENTS: Readonly<Record<string, readonly LibraryRequi
       {
         name: 'waves',
         signature: 'waves(deps: number[][]): number[][]',
-        assumes: 'Groups a dependency graph so nothing in a group waits on anything else in it.',
+        assumes:
+          'Groups a dependency graph into waves, wave 1 first: each lands one past the deepest thing it waits on.',
       },
     ],
     'w6-05': [
@@ -91,7 +92,8 @@ export const LIBRARY_REQUIREMENTS: Readonly<Record<string, readonly LibraryRequi
       {
         name: 'waves',
         signature: 'waves(deps: number[][]): number[][]',
-        assumes: 'Groups a dependency graph so nothing in a group waits on anything else in it.',
+        assumes:
+          'Groups a dependency graph into waves, wave 1 first: each lands one past the deepest thing it waits on.',
       },
       {
         name: 'deal',
