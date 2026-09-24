@@ -1262,10 +1262,6 @@ function post(paint: PostPaint): void {
     }
   }
 
-  if (preview && !reducedMotion) {
-    ctx.fillStyle = alpha(PALETTE.accent2, 0.014 + 0.01 * Math.sin(time * 0.55));
-    ctx.fillRect(0, 0, width, height);
-  }
   ctx.imageSmoothingEnabled = smooth;
 }
 
