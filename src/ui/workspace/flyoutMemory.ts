@@ -32,13 +32,8 @@ export function rememberFlyoutOpen(levelId: string | null, open: boolean): void 
   }
 }
 
-// Arriving with nothing to watch means the job is to write; arriving with a trace means the
-// job is to look at it. That guess is only ever the opening offer — once the player has put
-// the flyout somewhere on this level by hand, their answer stands.
-export function flyoutOpensOnArrival(
-  levelId: string | null,
-  hasTrace: boolean,
-  compact: boolean,
-): boolean {
-  return storedFlyoutOpen(levelId) ?? (!compact && !hasTrace);
+// Shut until the player opens it; once they have put the flyout somewhere on this level by
+// hand, their answer stands.
+export function flyoutOpensOnArrival(levelId: string | null): boolean {
+  return storedFlyoutOpen(levelId) ?? false;
 }

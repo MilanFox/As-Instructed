@@ -65,6 +65,11 @@ function blocksIn(css: string): Block[] {
     const open = bare.indexOf('{', at);
     const end = closingBrace(bare, open);
     const prelude = bare.slice(at, open);
+    // Short-screen tweaks sit outside the width model this suite measures.
+    if (/height/.test(prelude)) {
+      i = end + 1;
+      continue;
+    }
     const width = /width\s*<=\s*(\d+)px|max-width:\s*(\d+)px/.exec(prelude);
     if (!width) throw new Error(`unreadable media query: ${prelude.trim()}`);
     media.push({ ceiling: Number(width[1] ?? width[2]), body: bare.slice(open + 1, end) });
@@ -319,7 +324,6 @@ const FOLDED_AWAY_AT_COMPACT = [
   "reflow @900 .work-order[data-open='false'] .work-order__head",
   "reflow @900 .work-order[data-open='false'] .work-order__objectives",
   "reflow @900 .work-order[data-open='false'] .stat-grid",
-  "reflow @900 .work-order[data-open='false'] .work-order__foot",
 ] as const;
 
 const carriesTheMap = (selector: string): boolean => {

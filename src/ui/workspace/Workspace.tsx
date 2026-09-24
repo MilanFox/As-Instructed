@@ -43,6 +43,12 @@ function drawerWidth(): number {
   return drawer ? drawer.getBoundingClientRect().width : 0;
 }
 
+const FLAPS: readonly { id: DrawerTab; label: string }[] = [
+  { id: 'dossier', label: 'Brief' },
+  { id: 'program', label: 'Program' },
+  { id: 'manual', label: 'Manual' },
+];
+
 function useMedia(query: string): boolean {
   const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
   useEffect(() => {
@@ -65,13 +71,7 @@ export function Workspace(): React.ReactElement {
   const compact = useMedia(COMPACT_QUERY);
 
   const levelId = workspace.level?.id ?? null;
-  const [open, setOpen] = useState(() =>
-    flyoutOpensOnArrival(
-      levelId,
-      workspace.trace !== null,
-      window.matchMedia(COMPACT_QUERY).matches,
-    ),
-  );
+  const [open, setOpen] = useState(() => flyoutOpensOnArrival(levelId));
   const [tab, setTab] = useState<DrawerTab>('dossier');
   const [orderOpen, setOrderOpen] = useState(false);
   const [telemetryOpen, setTelemetryOpen] = useState(false);
@@ -95,7 +95,7 @@ export function Workspace(): React.ReactElement {
   const workbenchOn = flyoutOpen && !libraryOpen;
 
   // The flyout draws over the board rather than pushes it aside, but its measured width is
-  // still what the deck folds on and what the Site map button is parked beside.
+  // still what the deck folds on.
   useEffect(() => {
     const measure = (): void => {
       setMeasured(drawerWidth());
@@ -164,6 +164,14 @@ export function Workspace(): React.ReactElement {
       openDrawer();
     },
     [openDrawer],
+  );
+
+  const flap = useCallback(
+    (next: DrawerTab): void => {
+      if (open && tab === next) toggle();
+      else openTo(next);
+    },
+    [open, tab, toggle, openTo],
   );
 
   const toggleTelemetry = useCallback((): void => {
@@ -248,8 +256,8 @@ export function Workspace(): React.ReactElement {
   useEffect(() => {
     if (arrivedAt.current === levelId) return;
     arrivedAt.current = levelId;
-    setOpen(flyoutOpensOnArrival(levelId, workspace.trace !== null, compact));
-  }, [levelId, workspace.trace, compact]);
+    setOpen(flyoutOpensOnArrival(levelId));
+  }, [levelId]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
@@ -257,21 +265,20 @@ export function Workspace(): React.ReactElement {
       // lib.ts and the workbench are never open together, so escape has one of them to dismiss.
       if (overlayState().open === 'library') {
         closeOverlay();
+        event.preventDefault();
         return;
       }
-      setOpen((was) => {
-        if (was) {
-          handleRef.current?.focus();
-          rememberFlyoutOpen(levelId, false);
-        }
-        return false;
-      });
+      if (!open) return;
+      event.preventDefault();
+      handleRef.current?.focus();
+      rememberFlyoutOpen(levelId, false);
+      setOpen(false);
     };
-    window.addEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, { capture: true });
     return () => {
-      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keydown', onKey, { capture: true });
     };
-  }, [levelId]);
+  }, [levelId, open]);
 
   const dismissSheet = useCallback((): void => {
     setSheetOpen(false);
@@ -300,19 +307,18 @@ export function Workspace(): React.ReactElement {
         <FeedCanvas onReadout={setReadout} />
       </div>
 
-      <PanelBoundary label="The work order">
-        <WorkOrderCard
-          workspace={workspace}
-          compact={compact}
-          open={!compact || orderOpen}
-          statusOpen={telemetryOpen}
-          onToggle={toggleOrder}
-          onStatus={toggleTelemetry}
-          onRead={() => openTo('dossier')}
-        />
-      </PanelBoundary>
-
       <div className="hud-right">
+        <PanelBoundary label="The work order">
+          <WorkOrderCard
+            workspace={workspace}
+            compact={compact}
+            open={!compact || orderOpen}
+            statusOpen={telemetryOpen}
+            onToggle={toggleOrder}
+            onStatus={toggleTelemetry}
+          />
+        </PanelBoundary>
+
         <PanelBoundary label="Telemetry">
           <TelemetryPanel
             workspace={workspace}
@@ -344,7 +350,6 @@ export function Workspace(): React.ReactElement {
           workspace={workspace}
           on={workbenchOn}
           tab={tab}
-          onTab={setTab}
           onToggle={toggle}
           onRun={dispatch}
           onProblems={setProblems}
@@ -368,31 +373,19 @@ export function Workspace(): React.ReactElement {
         />
       )}
 
-      {/* The flyout stands over the work order card and takes its Site map button with it.
-          Same action, parked in the strip of board the flyout leaves — and once that strip is
-          down to the telemetry column there is no room for it, the same as at compact. */}
-      {flyoutOpen && !compact && !crowded ? (
+      {FLAPS.map((entry) => (
         <button
+          key={entry.id}
           type="button"
-          className="control control--tight drawer-escape"
-          style={{ '--ws-escape-x': `${String(measured)}px` } as React.CSSProperties}
-          onClick={() => workspace.goto('levels')}
+          className={`drawer-handle drawer-handle--${entry.id}`}
+          ref={entry.id === tab ? handleRef : undefined}
+          aria-expanded={workbenchOn && tab === entry.id}
+          aria-controls="workspace-drawer"
+          onClick={() => flap(entry.id)}
         >
-          Site map
+          <span className="drawer-handle__text">{entry.label}</span>
         </button>
-      ) : null}
-
-      <button
-        type="button"
-        className="drawer-handle"
-        ref={handleRef}
-        aria-expanded={open && !libraryOpen}
-        aria-controls="workspace-drawer"
-        aria-label="Workbench drawer"
-        onClick={toggle}
-      >
-        <span className="drawer-handle__text">Workbench</span>
-      </button>
+      ))}
 
       {report ? (
         <PanelBoundary label="The run report">

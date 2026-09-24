@@ -148,12 +148,10 @@
 .postings {
   position: fixed;
   top: -2px;
-  left: calc(var(--ws-order) + 26px);
   z-index: 8;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  width: min(500px, calc(100vw - var(--ws-order) - var(--ws-telemetry) - 60px));
   transition:
     left var(--ws-slide),
     transform var(--ws-slide);

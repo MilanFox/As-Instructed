@@ -76,6 +76,10 @@ export function useKeyboard(): void {
           if (typing || modified) return;
           if (state.screen !== 'workspace') return;
         }
+        // The workspace claims an escape that shut its flyout, so the same press does not also
+        // leave the level. The editor has its own escapes and never leaves the level anyway.
+        if (binding.id === 'escape' && event.defaultPrevented && !isEditorTarget(event.target))
+          return;
         event.preventDefault();
         actions[binding.id]();
         return;

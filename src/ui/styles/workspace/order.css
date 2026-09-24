@@ -1,17 +1,8 @@
-/* ---- work order: top-left corner of the HUD frame ---- */
+/* ---- work order: head of the right column ---- */
 
 .work-order {
-  --ws-clip: polygon(
-    0 0,
-    100% 0,
-    100% calc(100% - var(--ws-cut)),
-    calc(100% - var(--ws-cut)) 100%,
-    0 100%
-  );
+  --ws-clip: polygon(0 0, 100% 0, 100% 100%, var(--ws-cut) 100%, 0 calc(100% - var(--ws-cut)));
 
-  top: var(--ws-inset);
-  left: var(--ws-inset);
-  width: var(--ws-order);
   max-height: calc(100vh - var(--ws-inset) * 2 - 330px);
   transition: transform var(--ws-slide);
 }
@@ -24,7 +15,8 @@
 }
 
 .work-order__seeds {
-  align-self: center;
+  display: block;
+  margin-top: 6px;
 }
 
 .work-order__head {
@@ -56,14 +48,6 @@
   text-transform: uppercase;
 }
 
-.work-order__foot {
-  display: flex;
-  flex: none;
-  gap: 8px;
-  padding: 10px 12px calc(10px + var(--ws-cut) * 0.45);
-  border-top: 2px solid var(--border-strong);
-}
-
 .work-order__headline {
   margin: 0;
   padding: 11px 12px;
@@ -72,4 +56,14 @@
   letter-spacing: 0.02em;
   line-height: 1.2;
   text-transform: uppercase;
+}
+
+/* Squeezed by the column, the list scrolls, but always shows that there is a list to scroll. */
+.work-order__objectives {
+  min-height: 72px;
+}
+
+/* The card's last row would otherwise run into the cut on the bottom left corner. */
+.work-order .stat-grid {
+  padding-bottom: calc(var(--ws-cut) * 0.45);
 }

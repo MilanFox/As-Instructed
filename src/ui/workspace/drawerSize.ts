@@ -3,12 +3,12 @@ const WIDTH_KEY = 'as-instructed.drawer-width';
 export const MIN_DRAWER = 420;
 
 // The board is the other half of the job, so the widest the player may pull still leaves it
-// the telemetry column and a strip to read. Named --ws-board-keep in workspace.css.
+// the right column and a strip to read. Named --ws-board-keep in workspace.css.
 export const BOARD_KEEP = 380;
 
 // The narrowest deck the layout already ships — what a 1200px screen leaves it at its own
-// default width — and the gutters it sits in between the drawer's edge and the telemetry
-// column (--ws-deck-left, --ws-deck-right).
+// default width — and the gutters it sits in between the drawer's edge and the viewport's
+// right edge, under the column (--ws-deck-left, --ws-deck-right).
 const DECK_FLOOR = 500;
 const DECK_GUTTERS = 138;
 

@@ -10,7 +10,7 @@
     0 100%
   );
 
-  right: calc(var(--ws-telemetry) + 22px);
+  right: calc(var(--ws-column) + 22px);
   bottom: -2px;
   left: calc(var(--ws-shift) + 66px);
   transition:

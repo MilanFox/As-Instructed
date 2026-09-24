@@ -8,7 +8,6 @@ export interface WorkOrderCardProps {
   open?: boolean;
   statusOpen?: boolean;
   onToggle?: () => void;
-  onRead?: () => void;
   onStatus?: () => void;
 }
 
@@ -18,7 +17,6 @@ export function WorkOrderCard({
   open = true,
   statusOpen = false,
   onToggle,
-  onRead,
   onStatus,
 }: WorkOrderCardProps): React.ReactElement | null {
   const brief = workspace.brief;
@@ -83,7 +81,12 @@ export function WorkOrderCard({
           >
             {brief.head[1]}
           </span>
-          <h1 className="work-order__title">{brief.title}</h1>
+          <div>
+            <h1 className="work-order__title">{brief.title}</h1>
+            <span className="kicker work-order__seeds">
+              {String(seeds)} seed{seeds === 1 ? '' : 's'}
+            </span>
+          </div>
         </div>
 
         <ul className="work-order__objectives scroll-pane">
@@ -119,15 +122,6 @@ export function WorkOrderCard({
                 : undefined
             }
           />
-        </div>
-
-        <div className="work-order__foot">
-          <button type="button" className="control" onClick={onRead}>
-            Read the brief
-          </button>
-          <span className="kicker work-order__seeds">
-            {String(seeds)} seed{seeds === 1 ? '' : 's'}
-          </span>
         </div>
       </div>
     </OverlayPanel>

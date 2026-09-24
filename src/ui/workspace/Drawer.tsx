@@ -5,17 +5,10 @@ import type { WorkspaceData } from './useWorkspace.ts';
 
 export type DrawerTab = 'program' | 'dossier' | 'manual';
 
-const TABS: readonly { id: DrawerTab; label: string }[] = [
-  { id: 'dossier', label: 'Dossier' },
-  { id: 'program', label: 'Program' },
-  { id: 'manual', label: 'Manual' },
-];
-
 export interface DrawerProps {
   workspace: WorkspaceData;
   on: boolean;
   tab: DrawerTab;
-  onTab: (tab: DrawerTab) => void;
   onToggle: () => void;
   onRun: () => void;
   onProblems: (count: number) => void;
@@ -26,7 +19,6 @@ export function Drawer({
   workspace,
   on,
   tab,
-  onTab,
   onToggle,
   onRun,
   onProblems,
@@ -34,17 +26,6 @@ export function Drawer({
 }: DrawerProps): React.ReactElement {
   const running = workspace.runState === 'running';
   const last = workspace.console.at(-1);
-
-  const onTabKey = (event: React.KeyboardEvent<HTMLDivElement>): void => {
-    const step = event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0;
-    if (step === 0) return;
-    event.preventDefault();
-    const at = TABS.findIndex((entry) => entry.id === tab);
-    const next = TABS[(at + step + TABS.length) % TABS.length];
-    if (!next) return;
-    onTab(next.id);
-    document.getElementById(`workspace-tab-${next.id}`)?.focus();
-  };
 
   return (
     <section
@@ -54,22 +35,7 @@ export function Drawer({
       data-on={String(on)}
       {...(on ? {} : { inert: true })}
     >
-      <div className="drawer-tabs" role="tablist" aria-label="Drawer pages" onKeyDown={onTabKey}>
-        {TABS.map((entry) => (
-          <button
-            key={entry.id}
-            type="button"
-            role="tab"
-            id={`workspace-tab-${entry.id}`}
-            className="control"
-            aria-selected={tab === entry.id}
-            aria-controls={`workspace-page-${entry.id}`}
-            tabIndex={tab === entry.id ? 0 : -1}
-            onClick={() => onTab(entry.id)}
-          >
-            {entry.label}
-          </button>
-        ))}
+      <div className="drawer-tabs">
         <span className="drawer-tabs__spacer" />
         {tab === 'program' ? (
           <button type="button" className="control" onClick={workspace.resetCode}>
@@ -85,18 +51,18 @@ export function Drawer({
       <div className="drawer__stack">
         <div
           className="drawer-page drawer-page--code"
-          role="tabpanel"
+          role="region"
           id="workspace-page-program"
-          aria-labelledby="workspace-tab-program"
+          aria-label="Program"
           {...(tab === 'program' ? {} : { inert: true })}
         >
           <CodeEditor onProblems={onProblems} />
         </div>
         <div
           className="drawer-page drawer-page--read"
-          role="tabpanel"
+          role="region"
           id="workspace-page-dossier"
-          aria-labelledby="workspace-tab-dossier"
+          aria-label="Brief"
           data-on={String(tab === 'dossier')}
           {...(tab === 'dossier' ? {} : { inert: true })}
         >
@@ -104,9 +70,9 @@ export function Drawer({
         </div>
         <div
           className="drawer-page drawer-page--read"
-          role="tabpanel"
+          role="region"
           id="workspace-page-manual"
-          aria-labelledby="workspace-tab-manual"
+          aria-label="Manual"
           data-on={String(tab === 'manual')}
           {...(tab === 'manual' ? {} : { inert: true })}
         >

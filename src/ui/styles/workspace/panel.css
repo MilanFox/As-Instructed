@@ -23,27 +23,35 @@
 }
 
 /* The HUD is one frame: every surface hangs off --ws-inset rather than its own viewport edge,
-   and the right column stacks the telemetry over the postings. The deck and the postings are
-   anchored from here because their own sheets pin them to the edge, and a postings panel that
-   no longer stands over the flyout no longer has to dodge it. */
+   and the right column stacks the work order over the telemetry over the postings, on the side
+   the flyout never reaches, so the objectives stay readable while the program is open. The deck
+   and the postings are anchored from here because their own sheets pin them to the edge.
+   Its panels keep their own height and the column scrolls instead, because a panel squeezed
+   by the column clips whatever does not fit; the work order's list gives under its own cap.
+   The gutter it carries past --ws-inset is the panels' 9px shadow, which the scroll would clip. */
 .hud-right {
   position: fixed;
   top: var(--ws-inset);
-  right: var(--ws-inset);
+  right: calc(var(--ws-inset) - 9px);
   z-index: 8;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  width: var(--ws-telemetry);
+  width: calc(var(--ws-column) + 9px);
   max-height: calc(100vh - var(--ws-inset) * 2);
+  padding: 0 9px 9px 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
   transition: transform var(--ws-slide);
 }
 
+.hud-right > .work-order,
 .hud-right > .telemetry,
 .hud-right > .postings {
   position: static;
+  flex: none;
   width: auto;
-  min-height: 0;
 }
 
 .workspace[data-sheet='open'] .hud-right {
@@ -55,7 +63,7 @@
 }
 
 .workspace .transport-deck {
-  right: calc(var(--ws-telemetry) + var(--ws-inset) + 22px);
+  right: calc(var(--ws-column) + var(--ws-inset) + 22px);
   left: calc(var(--ws-shift) + var(--ws-deck-left));
 }
 
@@ -78,6 +86,12 @@
 
 .workspace[data-flyout='open'] .hud-right {
   max-height: calc(100vh - var(--ws-inset) - var(--ws-deck-band) - 12px);
+}
+
+/* Short of the column's own shadow gutter, so the card always fits whole in the scrolled
+   column and its list is what scrolls, not its figures. */
+.workspace[data-flyout='open'] .hud-right > .work-order {
+  max-height: calc(100vh - var(--ws-inset) - var(--ws-deck-band) - 21px);
 }
 
 .panel-bar {

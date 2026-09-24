@@ -68,12 +68,12 @@ describe('a width the player picks still leaves the screen usable', () => {
     expect(deckIsCrowded(1051, 1920)).toBe(false);
   });
 
-  test('the widest drawer still fits the telemetry column beside it', () => {
-    const telemetry = Number(/--ws-telemetry:\s*(\d+)px/.exec(SHEET)?.[1] ?? 0);
+  test('the widest drawer still fits the right column beside it', () => {
+    const column = Number(/--ws-column:\s*(\d+)px/.exec(SHEET)?.[1] ?? 0);
 
-    expect(['telemetry width', telemetry > 0]).toEqual(['telemetry width', true]);
+    expect(['column width', column > 0]).toEqual(['column width', true]);
     for (const viewport of RESIZABLE) {
-      expect([viewport, maxDrawer(viewport) + telemetry <= viewport]).toEqual([viewport, true]);
+      expect([viewport, maxDrawer(viewport) + column <= viewport]).toEqual([viewport, true]);
     }
   });
 });

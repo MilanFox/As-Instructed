@@ -84,16 +84,6 @@
   transition-duration: var(--ws-slam);
 }
 
-/* Level with the drawer's own tab bar, clear of the flyout's 12px shadow. Below the flyout
-   and both flaps in the stack, so it is never the thing on top of an open panel. */
-.drawer-escape {
-  position: fixed;
-  top: 8px;
-  left: calc(var(--ws-escape-x, 0px) + 22px);
-  z-index: 5;
-  background: var(--ws-fill);
-}
-
 .drawer-handle {
   position: fixed;
   bottom: 132px;
@@ -104,7 +94,7 @@
   transform: translateX(var(--ws-handle-x));
   transition: transform var(--ws-slide);
   width: 46px;
-  height: 178px;
+  height: 112px;
   padding: 0;
   border: 0;
   background: var(--ws-edge);
@@ -112,11 +102,19 @@
   font-family: var(--font-prose);
   font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.3em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   cursor: pointer;
   clip-path: polygon(0 0, 100% 16px, 100% calc(100% - 16px), 0 100%);
   filter: drop-shadow(8px 8px 0 rgb(0 0 0 / 78%));
+}
+
+.drawer-handle--dossier {
+  bottom: 380px;
+}
+
+.drawer-handle--program {
+  bottom: 256px;
 }
 
 .workspace[data-flyout='shut'] .drawer-handle {

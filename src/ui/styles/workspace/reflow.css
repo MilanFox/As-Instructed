@@ -2,16 +2,14 @@
 
 @media (width <= 1440px) {
   .workspace {
-    --ws-order: 348px;
-    --ws-telemetry: 300px;
+    --ws-column: 300px;
     --ws-flyout-user: 600px;
   }
 }
 
 @media (width <= 1200px) {
   .workspace {
-    --ws-order: 318px;
-    --ws-telemetry: 274px;
+    --ws-column: 280px;
     --ws-flyout-user: 548px;
     --ws-cut: 18px;
   }
@@ -23,13 +21,28 @@
 
 @media (width <= 900px) {
   .workspace {
-    --ws-telemetry: min(400px, calc(100vw - var(--ws-inset) * 2));
+    --ws-column: min(400px, calc(100vw - var(--ws-inset) * 2));
     --ws-flyout: 100vw;
     --ws-cut: 16px;
     --ws-inset: 12px;
   }
 
-  .work-order {
+  /* Too narrow for a column: its surfaces take the screen on their own again. */
+  .hud-right {
+    display: contents;
+  }
+
+  .hud-right > .work-order {
+    --ws-clip: polygon(
+      0 0,
+      100% 0,
+      100% calc(100% - var(--ws-cut)),
+      calc(100% - var(--ws-cut)) 100%,
+      0 100%
+    );
+
+    position: fixed;
+    top: var(--ws-inset);
     right: var(--ws-inset);
     left: var(--ws-inset);
     width: auto;
@@ -39,21 +52,15 @@
 
   .work-order[data-open='false'] .work-order__head,
   .work-order[data-open='false'] .work-order__objectives,
-  .work-order[data-open='false'] .stat-grid,
-  .work-order[data-open='false'] .work-order__foot {
+  .work-order[data-open='false'] .stat-grid {
     display: none;
-  }
-
-  /* Too narrow for a column: the two surfaces take the screen on their own again. */
-  .hud-right {
-    display: contents;
   }
 
   .hud-right > .telemetry {
     position: fixed;
     top: calc(var(--ws-inset) + 54px);
     right: var(--ws-inset);
-    width: var(--ws-telemetry);
+    width: var(--ws-column);
     max-height: calc(100vh - var(--ws-inset) - 110px);
     transform: translateX(calc(100% + var(--ws-inset) + 12px));
     transition: transform var(--ws-slide);
@@ -106,12 +113,23 @@
   }
 
   .drawer-handle {
-    top: calc(50% - 89px);
     bottom: auto;
   }
 
+  .drawer-handle--dossier {
+    top: 211px;
+  }
+
+  .drawer-handle--program {
+    top: 335px;
+  }
+
+  .drawer-handle--manual {
+    top: 459px;
+  }
+
   .library-handle {
-    top: calc(50% + 101px);
+    top: 71px;
     bottom: auto;
   }
 
@@ -124,7 +142,7 @@
 
 @media (width <= 600px) {
   .workspace {
-    --ws-telemetry: calc(100vw - var(--ws-inset) * 2);
+    --ws-column: calc(100vw - var(--ws-inset) * 2);
     --ws-cut: 12px;
     font-size: 12px;
   }
@@ -156,14 +174,25 @@
   }
 
   .drawer-handle {
-    top: calc(50% - 74px);
     width: 38px;
-    height: 148px;
-    letter-spacing: 0.22em;
+    height: 96px;
+    letter-spacing: 0.12em;
+  }
+
+  .drawer-handle--dossier {
+    top: 189px;
+  }
+
+  .drawer-handle--program {
+    top: 295px;
+  }
+
+  .drawer-handle--manual {
+    top: 401px;
   }
 
   .library-handle {
-    top: calc(50% + 86px);
+    top: 71px;
     width: 38px;
     height: 108px;
     letter-spacing: 0.16em;
@@ -177,5 +206,29 @@
   .closed-banner__acknowledge {
     width: 100%;
     font-size: 15px;
+  }
+}
+
+@media (width <= 600px) and (height <= 760px) {
+  .drawer-handle {
+    height: 80px;
+    letter-spacing: 0.04em;
+    clip-path: polygon(0 0, 100% 10px, 100% calc(100% - 10px), 0 100%);
+  }
+
+  .drawer-handle--dossier {
+    top: 165px;
+  }
+
+  .drawer-handle--program {
+    top: 251px;
+  }
+
+  .drawer-handle--manual {
+    top: 337px;
+  }
+
+  .library-handle {
+    height: 88px;
   }
 }

@@ -24,35 +24,27 @@ beforeEach(() => {
   written.clear();
 });
 
-describe('the first visit is a guess and every visit after it is an answer', () => {
-  test('a level nobody has touched opens to the workbench', () => {
-    expect(flyoutOpensOnArrival('w1-01', false, false)).toBe(true);
+describe('shut until opened, and every visit after it is an answer', () => {
+  test('a level nobody has touched arrives shut', () => {
+    expect(flyoutOpensOnArrival('w1-01')).toBe(false);
   });
 
-  test('a trace to watch keeps it shut, still only on the first visit', () => {
-    expect(flyoutOpensOnArrival('w1-01', true, false)).toBe(false);
-  });
-
-  test('compact never opens it unasked', () => {
-    expect(flyoutOpensOnArrival('w1-01', false, true)).toBe(false);
-  });
-
-  test('a shut flyout stays shut on the way back, trace or no trace', () => {
+  test('a shut flyout stays shut on the way back', () => {
     rememberFlyoutOpen('w1-01', false);
 
-    expect(flyoutOpensOnArrival('w1-01', false, false)).toBe(false);
+    expect(flyoutOpensOnArrival('w1-01')).toBe(false);
   });
 
-  test('an open flyout is still open on the way back, trace and all', () => {
+  test('an open flyout is still open on the way back', () => {
     rememberFlyoutOpen('w1-01', true);
 
-    expect(flyoutOpensOnArrival('w1-01', true, false)).toBe(true);
+    expect(flyoutOpensOnArrival('w1-01')).toBe(true);
   });
 
   test('the answer belongs to the level that was given it', () => {
-    rememberFlyoutOpen('w1-01', false);
+    rememberFlyoutOpen('w1-01', true);
 
-    expect(flyoutOpensOnArrival('w1-02', false, false)).toBe(true);
+    expect(flyoutOpensOnArrival('w1-02')).toBe(false);
   });
 
   test('the levels menu, which is no level, is asked nothing and told nothing', () => {
@@ -78,7 +70,7 @@ const WORKSPACE = readFileSync(new URL('../Workspace.tsx', import.meta.url), 'ut
 
 const WIRED = [
   ['the arrival rule decides the opening state', /useState\(\(\) =>\s*flyoutOpensOnArrival\(/],
-  ['the flap records whichever way it went', /rememberFlyoutOpen\(levelId, !was\)/],
+  ['a flap records whichever way it went', /rememberFlyoutOpen\(levelId, !was\)/],
   ['a deliberate open is recorded', /rememberFlyoutOpen\(levelId, true\)/],
   ['escape records the dismissal', /rememberFlyoutOpen\(levelId, false\)/],
   [

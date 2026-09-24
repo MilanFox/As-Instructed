@@ -1,6 +1,5 @@
 .workspace {
-  --ws-order: 384px;
-  --ws-telemetry: 322px;
+  --ws-column: 360px;
   --ws-board-keep: 380px;
   --ws-flyout-user: 684px;
   --ws-flyout: min(var(--ws-flyout-user), calc(100vw - var(--ws-board-keep)));
@@ -10,7 +9,7 @@
   --ws-fill: #05080c;
   --ws-cut: 22px;
   --ws-inset: 16px;
-  --ws-deck-left: calc(var(--ws-telemetry) + var(--ws-inset) + 22px);
+  --ws-deck-left: calc(var(--ws-column) + var(--ws-inset) + 22px);
   --ws-deck-band: 384px;
   /* .settings-trigger is a 28px flap pinned to the viewport's own corner, outside this frame,
      so a deck run out to the frame edge stops 12px short of it rather than at --ws-inset. */
