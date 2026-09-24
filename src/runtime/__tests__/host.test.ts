@@ -240,9 +240,7 @@ describe('the watchdog', () => {
     expect(worker.terminated).toBe(true);
     expect(response.ok).toBe(false);
     if (response.ok) return;
-    expect(response.error.message).toBe(
-      'Board 4 ran past 5 s. A loop may never end.',
-    );
+    expect(response.error.message).toBe('Board 4 ran past 5 s. A loop may never end.');
     runner.dispose();
   });
 
@@ -255,9 +253,7 @@ describe('the watchdog', () => {
     const response = await pending;
     expect(response.ok).toBe(false);
     if (response.ok) return;
-    expect(response.error.message).toBe(
-      'Board 1 ran past 5 s. A loop may never end.',
-    );
+    expect(response.error.message).toBe('Board 1 ran past 5 s. A loop may never end.');
     runner.dispose();
   });
 

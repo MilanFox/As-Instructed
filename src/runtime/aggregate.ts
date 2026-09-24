@@ -86,8 +86,7 @@ export function aggregate(runs: SeedRun[]): RunResponse {
   };
 
   if (reported.verdict.failure) {
-    const prefix =
-      failedIndex === -1 ? '' : seedPrefix(reported.result.seed, runs.length);
+    const prefix = failedIndex === -1 ? '' : seedPrefix(reported.result.seed, runs.length);
     verdict.failure = {
       ...reported.verdict.failure,
       message: `${prefix}${reported.verdict.failure.message}`,
