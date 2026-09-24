@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { World } from '../../engine/index.ts';
+import type { Vec, World } from '../../engine/index.ts';
 import { activeTrack, highlightsAt, playbackFor } from '../../game/playback.ts';
 import { currentLevel, useGame } from '../../game/store.ts';
 import type { TileReadout } from '../../render/index.ts';
@@ -9,8 +9,9 @@ import type { BoardView } from '../adapters.ts';
 import { divergenceCells } from '../feed/divergence.ts';
 import { LEGIBLE_DEVICE_TILE_PX } from '../feed/geometry.ts';
 import type { FeedRenderer } from '../feed/renderer.ts';
-import { readoutLine } from '../feed/renderer.ts';
+import { inspectTargetAt, isClick, readoutLine } from '../feed/renderer.ts';
 import { useReport } from '../report.ts';
+import { pick, useInspect } from '../hooks/useInspect.ts';
 import { cameraHeld } from './useFeedZoom.ts';
 
 const VIEW: BoardView = { originX: 0, originY: 0, tilePx: 0, cols: 0, rows: 0 };
@@ -23,6 +24,7 @@ export interface FeedCanvasProps {
 export function FeedCanvas({ onReadout, onView }: FeedCanvasProps): React.ReactElement {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const pointer = useRef<{ x: number; y: number } | null>(null);
+  const pressedAt = useRef<Vec | null>(null);
 
   const renderer = useGame((state) => state.renderer);
   const trace = useGame((state) => state.trace);
@@ -33,6 +35,9 @@ export function FeedCanvas({ onReadout, onView }: FeedCanvasProps): React.ReactE
   const level = useGame(currentLevel);
   const surveySeed = useGame((state) => state.surveySeed);
   const report = useReport((state) => state.report);
+  const inspected = useInspect().target;
+  const inspecting = trace?.calls !== undefined;
+  const pointerCursor = inspecting ? 'crosshair' : undefined;
 
   const [readout, setReadout] = useState<TileReadout | null>(null);
 
@@ -106,9 +111,28 @@ export function FeedCanvas({ onReadout, onView }: FeedCanvasProps): React.ReactE
   }, [renderer, flooredTick]);
 
   useEffect(() => {
-    const line = readoutLine(readout);
+    const line = readoutLine(readout, inspecting);
     readoutRef.current?.(line === '' ? null : line);
-  }, [readout]);
+  }, [readout, inspecting]);
+
+  useEffect(() => {
+    const port = renderer() as FeedRenderer;
+    if (!inspecting || !inspected) {
+      port.setInspected?.(null);
+      return;
+    }
+    switch (inspected.kind) {
+      case 'tile':
+        port.setInspected?.(inspected.at);
+        return;
+      case 'machine':
+        port.setInspected?.(world?.machines.find((m) => m.id === inspected.id)?.at ?? null);
+        return;
+      case 'bot':
+        port.setInspected?.(null, inspected.id);
+        return;
+    }
+  }, [renderer, inspecting, inspected, world]);
 
   useEffect(() => {
     const port = renderer() as FeedRenderer;
@@ -146,6 +170,26 @@ export function FeedCanvas({ onReadout, onView }: FeedCanvasProps): React.ReactE
     pointer.current = null;
   }, []);
 
+  const onPointerDown = useCallback((event: React.PointerEvent<HTMLCanvasElement>): void => {
+    pressedAt.current = event.button === 0 ? { x: event.clientX, y: event.clientY } : null;
+  }, []);
+
+  const onPointerUp = useCallback(
+    (event: React.PointerEvent<HTMLCanvasElement>): void => {
+      const down = pressedAt.current;
+      pressedAt.current = null;
+      if (!inspecting || !down || !isClick(down, { x: event.clientX, y: event.clientY })) return;
+      const rect = event.currentTarget.getBoundingClientRect();
+      const readoutHere = (renderer() as FeedRenderer).readoutAt?.(
+        event.clientX - rect.left,
+        event.clientY - rect.top,
+      );
+      const target = inspectTargetAt(readoutHere ?? null);
+      if (target) pick(target);
+    },
+    [renderer, inspecting],
+  );
+
   const onWheel = useCallback((): void => {
     cameraHeld.current = true;
   }, []);
@@ -156,7 +200,9 @@ export function FeedCanvas({ onReadout, onView }: FeedCanvasProps): React.ReactE
       ref={canvasRef}
       aria-label="Site view"
       role="img"
-      style={{ display: 'block', width: '100%', height: '100%' }}
+      style={{ display: 'block', width: '100%', height: '100%', cursor: pointerCursor }}
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
       onPointerMove={onPointerMove}
       onPointerLeave={onPointerLeave}
       onWheel={onWheel}

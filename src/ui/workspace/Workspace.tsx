@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { PanelBoundary } from '../components/PanelBoundary.tsx';
+import { useInspect } from '../hooks/useInspect.ts';
 import { closeLibrary, closeOverlay, overlayState, useOverlay } from '../hooks/useOverlay.ts';
 import { COMPACT_QUERY } from './breakpoints.ts';
 import { ClosedBanner } from './ClosedBanner.tsx';
@@ -189,6 +190,17 @@ export function Workspace(): React.ReactElement {
     setOpen(false);
     workspace.run();
   }, [workspace]);
+
+  const { reveal } = useInspect();
+  const revealed = useRef(reveal);
+  useEffect(() => {
+    if (revealed.current === reveal) return;
+    revealed.current = reveal;
+    if (!compact) return;
+    setTelemetryOpen(true);
+    setOpen(false);
+    setOrderOpen(false);
+  }, [reveal, compact]);
 
   const running = workspace.runState === 'running';
   useEffect(() => {

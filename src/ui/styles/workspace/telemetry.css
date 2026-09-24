@@ -113,3 +113,60 @@
   padding: 10px 12px calc(10px + var(--ws-cut) * 0.45) calc(12px + var(--ws-cut) * 0.6);
   border-top: 2px solid var(--border-strong);
 }
+
+.telemetry--debug {
+  max-height: min(86vh, calc(100vh - 260px));
+}
+
+button.crew-row {
+  width: 100%;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+button.crew-row:hover {
+  background: var(--bg-raised);
+}
+
+button.crew-row[aria-pressed='true'] {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.inspect {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-top: 2px solid var(--border-strong);
+}
+
+.inspect__body {
+  max-height: 40vh;
+  padding: 8px 12px 10px;
+}
+
+.inspect__call + .inspect__call {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 2px solid #0e141c;
+}
+
+.inspect__name {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.inspect__call .value-tree {
+  display: block;
+}
+
+.inspect__note {
+  margin: 0 0 4px;
+  color: var(--ink-dim);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}

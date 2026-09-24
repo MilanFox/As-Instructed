@@ -14,6 +14,7 @@ import { Camera } from './camera.ts';
 import type { CameraInset, ViewRange } from './camera.ts';
 import { ParticleSystem, FX_LAYER_OVER, FX_LAYER_UNDER } from './fx.ts';
 import type { FxName, FxOptions } from './fx.ts';
+import { drawInspected } from './inspect-mark.ts';
 import { drawLoadTree } from './load.ts';
 import {
   badgeVarKey,
@@ -242,6 +243,8 @@ export class Renderer {
   private cameraHeld = false;
   private leaning = false;
   private hoverCell: Vec | null = null;
+  private inspectedCell: Vec | null = null;
+  private inspectedBot: number | null = null;
   private activeBot: number | null = null;
 
   private readonly frameInfo: FrameInfo = {
@@ -542,6 +545,19 @@ export class Renderer {
 
   setHover(cell: Vec | null): void {
     this.hoverCell = cell;
+  }
+
+  setInspected(cell: Vec | null, botId: number | null = null): void {
+    this.inspectedCell = cell;
+    this.inspectedBot = botId;
+  }
+
+  private drawInspectedMark(ctx: CanvasRenderingContext2D, tilePx: number, dpr: number): void {
+    const pose = this.inspectedBot === null ? undefined : this.poses.get(this.inspectedBot);
+    if (pose?.present) drawInspected(ctx, pose.x, pose.y, tilePx, dpr);
+    else if (this.inspectedCell) {
+      drawInspected(ctx, this.inspectedCell.x, this.inspectedCell.y, tilePx, dpr);
+    }
   }
 
   get world(): World | null {
@@ -1007,6 +1023,7 @@ export class Renderer {
 
     this.particles.draw(ctx, FX_LAYER_OVER, tilePx);
 
+    this.drawInspectedMark(ctx, tilePx, dpr);
     if (this.hoverCell) drawHover(ctx, this.hoverCell, tilePx, dpr);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     drawVignette(ctx, deviceW, deviceH);
