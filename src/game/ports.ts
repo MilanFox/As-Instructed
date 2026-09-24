@@ -160,7 +160,7 @@ function evaluatePlayerSource(code: string, sim: Sim, botId: number): void {
     pos: () => sim.pos(botId),
     canMove: (dir: 0 | 1 | 2 | 3) => sim.canMove(botId, dir),
     wait: (n?: number) => sim.wait(botId, n ?? 1),
-    print: (text: unknown) => sim.print(botId, String(text)),
+    print: (...values: unknown[]) => sim.print(botId, values.map(String).join(' ')),
     scan: (dir?: 0 | 1 | 2 | 3) => sim.scan(botId, dir),
   };
   const names = Object.keys(api);

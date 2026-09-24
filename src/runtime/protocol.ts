@@ -122,6 +122,7 @@ export interface ApiParamSpec {
   name: string;
   type: string;
   optional?: boolean;
+  rest?: boolean;
   defaultValue?: string;
   doc: string;
 }

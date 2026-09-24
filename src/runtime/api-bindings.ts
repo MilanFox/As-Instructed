@@ -206,8 +206,13 @@ const BINDERS: Record<string, Binder> = {
   pos: (sim, botId) => (): Vec => sim.pos(botId),
   print:
     (sim, botId) =>
-    (text): void => {
-      sim.print(botId, stringify(text), undefined, sim.recordsCalls ? [text] : undefined);
+    (...values): void => {
+      sim.print(
+        botId,
+        values.map(stringify).join(' '),
+        undefined,
+        sim.recordsCalls ? values : undefined,
+      );
     },
   canMove:
     (sim, botId) =>

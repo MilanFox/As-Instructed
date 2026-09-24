@@ -238,7 +238,7 @@ function signatureOf(fn: ApiFunctionSpec): string {
   const params = fn.params.map((param) => {
     const mark = param.optional === true && param.defaultValue === undefined ? '?' : '';
     const fallback = param.defaultValue === undefined ? '' : ` = ${param.defaultValue}`;
-    return `${param.name}${mark}: ${param.type}${fallback}`;
+    return `${param.rest === true ? '...' : ''}${param.name}${mark}: ${param.type}${fallback}`;
   });
   return `${fn.name}(${params.join(', ')}): ${fn.returns}`;
 }
