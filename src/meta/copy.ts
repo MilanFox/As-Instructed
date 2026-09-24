@@ -1,275 +1,190 @@
 import type { Medal } from '../engine/index.ts';
 
-export const REPOSITORY_NAME = 'Shared Subroutines';
+export const REPOSITORY_NAME = 'Library';
 
 export const REPOSITORY_ISSUE = {
-  title: 'REPOSITORY — PROVISIONED',
-  from: 'Site Systems, via Dep. Coordinator M. Vance',
-  intro: 'Filed as a capability rather than as an asset. Nobody has to sign for a folder.',
-  file: 'lib.ts',
-  spec: 'A second file, kept between work orders. It is not reset when one closes.',
-  perCall: 'A subroutine is charged at the point of use, in full, on every call.',
-  importLabel: 'Anything exported from it can be imported by any work order after this one.',
-  asksLabel: (count: number): string =>
-    `${count} later work ${count === 1 ? 'order names a subroutine it expects' : 'orders name a subroutine they expect'} to find in it. The first is`,
-  dot:
-    "it's a folder. that's the entire feature. you put a function in it and every work order " +
-    'after this one can read it',
-  open: 'Open it',
-  dismiss: 'Sign for it',
+  title: 'LIBRARY UNLOCKED',
+  intro: 'You now have a second file, lib.ts. It stays the same in every level.',
+  dot: "put a function in it and every later level can use it",
 } as const;
 
 export const UNLOCK_MEMO = {
   ref: 'MEMO KD-2338',
-  from: 'Dep. Coordinator M. Vance',
+  from: 'M. Vance',
   cc: 'Contractor #4470',
-  re: 'Shared Subroutines — provisioned',
+  re: 'Library unlocked',
   body:
-    'Your engagement has been provisioned with Shared Subroutines. Code published ' +
-    'to it is available to every work order that follows.\n\n' +
-    'Shared Subroutines is maintained by the contractor who publishes to it. That is you. There is ' +
-    'no second party.\n\n' +
-    'Please note that a subroutine is charged at the point of use, in full, on every call.',
-  legal: [
-    'Published subroutines remain attributable to the publishing contractor for the duration of the engagement, and after.',
-  ],
+    'You now have a Library: the file lib.ts. Every later level can import what you export from it.\n\n' +
+    'A Library function costs its full ticks on every call.',
+  legal: ['You own what you publish. Nobody else fixes it.'],
 } as const;
 
 export const UNLOCK_NOTE =
-  "it's a folder. that's the entire feature. you put a function in it and every work order after " +
-  'this one can read it.\n\n' +
-  '4470 kept a pathfinder in his and then spent four months making it two ticks cheaper. sounds ' +
-  'mad until you count how many work orders were calling it.\n\n' +
-  "so: don't put anything in there you aren't willing to";
+  '4470 kept a pathfinder in his. he spent four months making it two ticks faster. ' +
+  'it sounds mad, until you count how many levels called it.';
 
 export const LIBRARY_PANEL_HINT =
-  "Everything exported from lib.ts can be imported by any work order: import { pathTo } from 'lib';";
+  "Any level can import what lib.ts exports: import { pathTo } from 'lib';";
 
 export const LIBRARY_EMPTY_STARTER =
-  '// Shared Subroutines.\n' +
-  '// Anything exported here can be imported by any work order.\n' +
+  '// Library.\n' +
+  '// Any level can import what you export here.\n' +
   '//\n' +
-  '// NOTE(4470): whatever you put here, you will be reading it in eleven months\n' +
+  '// NOTE(4470): you will read this again in eleven months\n' +
   '\n' +
   'export {};\n';
 
 export const PUBLISH = {
-  title: 'PUBLISH TO REPOSITORY',
-  lede: 'Select what moves into lib.ts. It stays available to every work order after this one.',
+  title: 'PUBLISH TO LIBRARY',
+  lede: 'Choose what moves into lib.ts. Every later level can use it.',
   confirm: 'PUBLISH',
-  skip: 'Not this time',
-  never: 'Stop offering',
-  neverConfirmed: 'Noted. The offer is off. You can turn it back on from lib.ts at any time.',
+  skip: 'Not now',
+  never: 'Stop asking',
   renameLabel: 'Publish as',
   nameTaken: (name: string): string =>
-    `\`${name}\` is already published. Shared Subroutines keeps one subroutine per name.`,
-  nameInvalid: 'A subroutine name is a plain identifier. Letters, digits, underscores.',
-  nothingToPublish:
-    'There is nothing here that can be lifted out on its own. A subroutine has to be a top-level ' +
-    'function, class or const.',
-  noticeLabel: 'repository',
-  noticeNothing:
-    'Nothing in this work order is shaped like a subroutine, so there was nothing to file. A ' +
-    'subroutine is a named function at the top level of the file, and a later work order can ' +
-    'import it and call it.',
-  noticeNested: (names: readonly string[]): string =>
-    `${names.map((name) => `\`${name}\``).join(', ')} ` +
-    `${names.length === 1 ? 'is a subroutine, but it is' : 'are subroutines, but they are'} ` +
-    `nested inside something else. Move ${names.length === 1 ? 'it' : 'them'} out to the top ` +
-    'level of the file and Shared Subroutines can file it.',
+    `\`${name}\` is already published. Each name can be used once.`,
+  nameInvalid: 'Use only letters, digits and underscores.',
+  nothingToPublish: 'Nothing here can be published. Only a function, class or const that is not inside another can.',
   dependencyWarning: (missing: readonly string[]): string =>
-    `This also uses ${missing.map((name) => `\`${name}\``).join(', ')}, which would stay behind. ` +
-    'Publish those too, or the subroutine will not run.',
+    `This also uses ${missing.map((name) => `\`${name}\``).join(', ')}. ` +
+    'Publish those too, or it will not run.',
   brings: (names: readonly string[]): string =>
-    `Brings ${names.map((name) => `\`${name}\``).join(', ')} with it.`,
+    `Also moves ${names.map((name) => `\`${name}\``).join(', ')}.`,
   refusedDeclaration: (name: string): string =>
-    `\`${name}\` cannot be lifted out whole, so nothing was published. lib.ts is unchanged.`,
+    `\`${name}\` cannot be moved on its own. Nothing was published.`,
   refusedLibrary: (line: number): string =>
-    `lib.ts does not close what it opens on line ${line}, so nothing was appended to it. ` +
-    'lib.ts is unchanged.',
-  refusedRemoval:
-    'Taking this out would leave the work order unreadable, so nothing was moved. Both files are ' +
-    'unchanged.',
+    `lib.ts has an unclosed bracket on line ${line}. Nothing was added.`,
+  refusedRemoval: 'Moving this would break the level. Nothing was moved.',
   hardwareWarning: (names: readonly string[], level: string): string =>
-    `This calls ${names.map((name) => `\`${name}()\``).join(', ')}. A work order before ${level} ` +
-    'has no such hardware installed, and the call will fail there.',
-  footnote: 'you can publish it later. it stays in the work order either way',
+    `This calls ${names.map((name) => `\`${name}()\``).join(', ')}. ` +
+    `Levels before ${level} do not have that command, so it fails there.`,
+  footnote: 'you can publish it later. it stays in this level either way',
 } as const;
 
 export const REFACTOR = {
-  title: 'REPOSITORY — COST ANALYSIS',
-  lede:
-    'Attribution below is measured from your own closed work orders, not estimated. ' +
-    'Finance have asked. It is measured.',
-  empty:
-    'Shared Subroutines is empty. This is a supported configuration and no memo will be raised ' +
-    'about it.',
-  nothingToCost:
-    'Publish a subroutine and this tab shows what it costs, per work order that calls it.',
+  lede: 'What each Library function costs in the levels you closed.',
+  empty: 'The Library is empty.',
+  nothingToCost: 'Publish a function to see what it costs in each level.',
   nothingMeasured:
-    'Nothing is measured yet. A work order is measured when you close it with code that imports ' +
-    'a subroutine. Publishing to lib.ts or editing it re-measures every closed work order.',
-  neverMeasured: 'No closed work order imports it yet, so it has no measured cost.',
+    'Nothing measured yet. Finish a level that imports from lib.ts.',
+  neverMeasured: 'No closed level imports it yet.',
   neverCalled: (levels: readonly string[]): string =>
-    `Imported by ${levels.join(', ')}, and called zero times there.`,
+    `Imported by ${levels.join(', ')}, but never called.`,
   varies: (low: number, lowLevel: string, high: number, highLevel: string): string =>
-    `Cost depends on the arguments: ${low} ticks per call in ${lowLevel}, ${high} in ${highLevel}.`,
-  stale:
-    'Not measured yet. Re-run the work orders that use it and the numbers arrive on their own.',
+    `${low} ticks per call in ${lowLevel}, ${high} in ${highLevel}.`,
+  stale: 'Not measured yet. Run the levels that use it.',
   columns: {
-    name: 'Subroutine',
-    callers: 'Work orders',
+    name: 'Function',
+    callers: 'Levels',
     calls: 'Calls',
-    ticks: 'Ticks charged',
+    ticks: 'Ticks',
     perCall: 'Per call',
   },
-  perCall: (ticks: number, calls: number): string =>
-    `${ticks} ticks per call, across ${calls} ${calls === 1 ? 'call' : 'calls'}.`,
   projection: (delta: number, name: string, levels: number, upgrades: number): string => {
-    const saving = `${delta} ${delta === 1 ? 'tick' : 'ticks'} off \`${name}\``;
-    const orders = `${levels} work ${levels === 1 ? 'order' : 'orders'}`;
+    const saving = `Making \`${name}\` ${delta} ${delta === 1 ? 'tick' : 'ticks'} faster`;
+    const orders = `${levels} ${levels === 1 ? 'level' : 'levels'}`;
     if (upgrades === 0) return `${saving} improves ${orders}.`;
-    if (levels === 1) return `${saving} improves ${orders}, and moves it to a better medal.`;
+    if (levels === 1) return `${saving} improves ${orders} and gives it a better medal.`;
     return `${saving} improves ${orders}, ${upgrades} of them to a better medal.`;
   },
   projectionMedals: (from: Medal, to: Medal, count: number): string =>
-    `${count} ${count === 1 ? 'work order goes' : 'work orders go'} from ${from} to ${to}.`,
+    `${count} ${count === 1 ? 'level goes' : 'levels go'} from ${from} to ${to}.`,
   noProjection: (name: string): string =>
-    `Nothing changes bracket, however cheap \`${name}\` gets. The cost is somewhere else.`,
+    `A faster \`${name}\` changes no medal. The ticks are spent somewhere else.`,
   perCallNote:
-    'Per call is measured separately in each work order. A range means the cost depends on the ' +
-    'arguments, not on the subroutine alone.',
-  footnote: 'par is a planning figure. it goes down when someone beats it. that is not a warning',
+    'Per call is measured in each level. A range means the cost depends on the arguments.',
+  footnote: 'par goes down when someone beats it. that is not a warning',
 } as const;
 
 export const STRUCTURE = {
-  title: 'REPOSITORY — STRUCTURE',
-  lede: 'Every published subroutine, what it is built out of, and the ticks each one was charged.',
-  nested: 'An indented line is called by the line above it, and carries its ticks with it.',
-  empty:
-    'Nothing is published yet, so there is nothing to draw. Shared Subroutines is filed as empty ' +
-    'rather than as missing.',
-  single:
-    'One subroutine published. This tab draws the calls between subroutines, so it stays a single ' +
-    'line until one of them calls another.',
-  flat:
-    'Nothing in Shared Subroutines calls anything else in it. Filed as a parts list rather than an ' +
-    'assembly.',
+  lede: 'Each Library function, the functions it calls, and their ticks.',
+  nested: 'An indented line is called by the line above. Its ticks count in both lines.',
+  empty: 'Nothing is published yet.',
+  single: 'One function published. With more, this tab shows which functions call each other.',
+  flat: 'No Library function calls another one.',
   columns: {
-    name: 'Subroutine',
-    orders: 'Work orders',
+    name: 'Function',
+    orders: 'Levels',
     calls: 'Calls',
     ticks: 'Ticks',
     self: 'Its own',
     share: 'Share',
   },
   usedBy: (levels: readonly string[]): string =>
-    `Imported by ${levels.length} work ${levels.length === 1 ? 'order' : 'orders'}: ${levels.join(', ')}.`,
-  unused: 'Imported by no work order yet.',
-  internalOnly: 'Imported by no work order. It exists for the subroutines that call it.',
-  unmeasured: 'No run has been through it yet, so it carries no numbers.',
-  recursive: 'calls itself — the branch stops here',
-  shared: 'called from more than one place; these ticks are not this branch’s alone',
-  depth: (levels: number): string => (levels <= 1 ? 'One level deep.' : `${levels} levels deep.`),
-  footnote:
-    'ticks include everything a subroutine calls. "its own" is what is left when the ones under ' +
-    'it are taken out',
+    `Imported by ${levels.length} ${levels.length === 1 ? 'level' : 'levels'}: ${levels.join(', ')}.`,
+  unused: 'Not imported yet.',
+  internalOnly: 'Not imported. Other Library functions call it.',
+  unmeasured: 'Not run yet.',
+  recursive: 'calls itself — stops here',
+  shared: 'called from more than one place',
+  depth: (levels: number): string => (levels <= 1 ? 'One call deep.' : `${levels} calls deep.`),
+  footnote: 'ticks include every function it calls. "its own" leaves those out',
 } as const;
 
 export const REGRESSION = {
-  title: 'REGRESSION',
   lede:
-    'Every closed work order that imports from lib.ts is re-run whenever lib.ts changes. ' +
-    'Nothing on your record moves unless you accept the new result.',
-  running: (done: number, total: number): string =>
-    `Re-running closed work orders. ${done}/${total}.`,
-  readsNothing: 'Nothing imports from lib.ts. There is nothing to re-run.',
+    'When lib.ts changes, every closed level that imports it runs again. ' +
+    'Your medals only change if you accept.',
+  running: (done: number, total: number): string => `Running closed levels. ${done}/${total}.`,
+  readsNothing: 'Nothing imports from lib.ts.',
   readsClosed: (count: number): string =>
-    `${count} closed work ${count === 1 ? 'order imports' : 'orders import'} from lib.ts.`,
+    `${count} closed ${count === 1 ? 'level imports' : 'levels import'} from lib.ts.`,
   readsInHand: (levelId: string): string =>
-    `${levelId} imports from lib.ts. It is re-run here once it closes.`,
-  clean: 'Every work order that reads Shared Subroutines still closes. Nothing has been raised.',
-  nothingToCheck: 'No closed work order reads Shared Subroutines. There is nothing to re-run.',
-  degraded: (levelId: string): string => `${levelId} has entered a degraded state.`,
-  broken: (levelId: string): string => `${levelId} no longer closes.`,
+    `${levelId} imports from lib.ts. It runs here once you finish it.`,
+  clean: 'Every level that uses the Library still passes.',
+  nothingToCheck: 'No closed level uses the Library.',
+  degraded: (levelId: string): string => `${levelId} got slower.`,
+  broken: (levelId: string): string => `${levelId} now fails.`,
   improved: (levelId: string, ticks: number): string =>
-    `${levelId} improved by ${ticks} ${ticks === 1 ? 'tick' : 'ticks'}.`,
-  nominal: (levelId: string): string => `${levelId} nominal.`,
-  medalKept:
-    'Your record is unchanged. It will stay unchanged until you say otherwise — a result is not ' +
-    'withdrawn because a later edit disagreed with it.',
-  revert: 'RESTORE LAST KNOWN GOOD',
+    `${levelId} is ${ticks} ${ticks === 1 ? 'tick' : 'ticks'} faster.`,
+  nominal: (levelId: string): string => `${levelId} unchanged.`,
+  medalKept: 'Your medals stay the same until you accept the new result.',
+  revert: 'UNDO TO LAST GOOD VERSION',
   revertConfirm: (count: number): string =>
-    `Restores lib.ts to the last revision that closed every work order. ` +
-    `${count} ${count === 1 ? 'revision is' : 'revisions are'} kept either way; nothing is deleted.`,
+    'Puts lib.ts back to the last version that passed every level. ' +
+    `${count} ${count === 1 ? 'version is' : 'versions are'} kept. Nothing is deleted.`,
   accept: 'ACCEPT THE NEW RESULT',
-  acceptConfirm:
-    'Records the new tick counts, medals included. This is the only way a medal goes down, and ' +
-    'you are the one doing it.',
-  cachedNote: 'Unchanged since the last check, so it was not re-run.',
-  footnote: 'a degraded state is still a state. the form has a box for it',
+  acceptConfirm: 'Saves the new ticks and medals. This is the only way a medal can go down.',
+  cachedNote: 'Not changed since the last check, so not run again.',
+  footnote: 'slower is still a result. we write it down too',
 } as const;
 
 export const DISCREPANCY = {
-  badge: 'DISCREPANCY RAISED',
-  lede:
-    'Shipping re-runs one closed work order against a layout that was never on its schedule. ' +
-    'If it does not close on that layout, it is raised here.',
+  lede: 'Sometimes a closed level is run on a new board. If it fails, it shows up here.',
   schedule: (closed: number, every: number): string =>
-    `The first is raised at ${closed} closed work orders, then one every ${every}. Only work ` +
-    'orders that import from lib.ts are picked, and only one is open at a time.',
-  todo:
-    'Open the work order and run it. The layout stays on its schedule until it passes. Your ' +
-    'medal and your closure do not move either way.',
-  empty: 'Nothing has been raised.',
+    `The first check comes after ${closed} closed levels, then one every ${every}. ` +
+    'Only levels that import from lib.ts are checked, one at a time.',
+  todo: 'Open the level and run it. The new board stays until it passes. Your medal does not change.',
+  empty: 'No failed checks.',
   ref: (levelId: string): string => `DISCREPANCY 4471-${levelId.replace('-', '')}`,
-  title: (levelId: string): string => `${levelId} — one layout it has not met`,
-  layout: (seed: number): string => `LAYOUT ${seed}`,
+  title: (levelId: string): string => `${levelId} fails on a new board`,
+  layout: (seed: number): string => `BOARD ${seed}`,
   body: (levelId: string, seed: number): string =>
-    `The yard was relaid overnight. Shipping ran ${levelId} against layout ${seed}, which has ` +
-    'never been on its schedule, and it did not close.\n\n' +
-    `Layout ${seed} is on that work order's schedule now. Open it, press Run, and you are ` +
-    'looking at exactly what Shipping were looking at.',
-  note:
-    'the yards get relaid. they have always got relaid. your code just never had to watch it ' +
-    'happen before',
-  kept:
-    'Your result stands. The work order is closed, the medal is recorded, and a failed run costs ' +
-    'nothing — this is a layout to go and look at, not a mark against you.',
-  open: 'OPEN IT AND RUN IT',
-  close: 'CLOSE THE DISCREPANCY',
-  closeNote: (seed: number): string =>
-    `Closed is a different field from resolved. Both are available to you. Closing also takes ` +
-    `layout ${seed} back off the schedule.`,
+    `${levelId} was run on board ${seed} and failed.\n\n` +
+    `Board ${seed} is now part of that level. Open it and press Run to see what happened.`,
+  note: 'sites change sometimes. your code just never saw this one before',
+  kept: 'Your result stays. The medal is kept, and a failed run costs nothing.',
+  open: 'OPEN AND RUN',
+  close: 'DISMISS',
+  closeNote: (seed: number): string => `Dismissing also removes board ${seed} from the level.`,
   scheduleNote: (seed: number, ref: string): string =>
-    `layout ${seed} is on this run — ${ref} is open against it. it comes off the schedule the ` +
-    'moment it passes',
-  mute: 'Stop raising these',
-  muted: 'Noted. Nothing further will be raised. Reversible from Shared Subroutines panel.',
-  resolved: (levelId: string): string =>
-    `${levelId} closes on that layout now. It is off the schedule and nothing was filed.`,
-  legal: ['Closure of a discrepancy does not constitute resolution of the discrepancy.'],
+    `board ${seed} is added by ${ref}. it goes away when it passes`,
+  mute: 'Stop these checks',
+  muted: 'Checks are off. Turn them back on here.',
+  resolved: (levelId: string): string => `${levelId} passes on that board now.`,
+  legal: ['Dismissed does not mean fixed.'],
 } as const;
 
 export const LIBRARY_FAILURE = {
-  notCompiled:
-    'lib.ts does not build, so nothing could be imported from it. The work order was not run.',
-  missing: (names: readonly string[]): string =>
-    `${names.map((name) => `\`${name}\``).join(', ')} is not published. Shared Subroutines has no ` +
-    'entry under that name.',
-  threwOnLoad:
-    'Shared Subroutines failed while loading, before the work order started. Nothing was attempted.',
-  requiredNote: (names: readonly string[]): string =>
-    `This work order expects ${names.map((name) => `\`${name}\``).join(', ')} to exist. You can ` +
-    'write it here instead; it will work exactly the same.',
+  notCompiled: 'lib.ts has an error, so nothing could be imported. The level did not run.',
 } as const;
 
 export const NO_EXPORTS_WARNING =
-  'lib.ts exports nothing. Add `export` to a declaration and any work order can import it.';
+  'lib.ts exports nothing. Add `export` in front of a function so levels can import it.';
 
 export const MEDAL_WORDS: Readonly<Record<Medal, string>> = {
   gold: 'gold',
   silver: 'silver',
   bronze: 'bronze',
-  none: 'unclosed',
+  none: 'no medal',
 };

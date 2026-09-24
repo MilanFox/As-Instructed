@@ -72,7 +72,6 @@ const WIRED = [
   ['the arrival rule decides the opening state', /useState\(\(\) =>\s*flyoutOpensOnArrival\(/],
   ['a flap records whichever way it went', /rememberFlyoutOpen\(levelId, !was\)/],
   ['a deliberate open is recorded', /rememberFlyoutOpen\(levelId, true\)/],
-  ['escape records the dismissal', /rememberFlyoutOpen\(levelId, false\)/],
   [
     'the next level gets the rule rather than the last level leftovers',
     /arrivedAt\.current = levelId;\s*setOpen\(flyoutOpensOnArrival\(/,

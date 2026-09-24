@@ -24,7 +24,7 @@ Vitest collects only `src/**/*.test.ts`, so `__tests__/` also holds fixtures and
 
 - A level's place in its site's arc is in `CAMPAIGN.md`; keep it in step when a level changes.
 - Everything a level grades is stated up front, which means in `facts` and the objective labels — never in brief prose. A mechanic that only surfaces on failure is a level bug.
-- The brief is vibe: the memo gives the lore and the idea of the shift, then one line of what the job is. It is not where the level is explained. If a brief is growing, the words belong in `facts`.
+- The brief is vibe: a lore line (1–2 sentences, ≤ 30 words, a deadpan note from whoever handed over the task, optional `— Name` sign-off), then one bold line of what the job is. It is not where the level is explained. If a brief is growing, the words belong in `facts`.
 - Seed 1 is representative, not degenerate: the honest general solution passes it.
 - `board.redrawn` names the axes the generator rolls; randomization never introduces a rule seed 1 gave no reason to expect.
 - `__solutions__/` are Vitest fixtures; nothing reachable from the client bundle may import one.
@@ -37,7 +37,7 @@ Vitest collects only `src/**/*.test.ts`, so `__tests__/` also holds fixtures and
 - Grade an artifact the run leaves behind — a printed line, a final state. A call count is a star only when the level is about the economy of that call; then cap its synonyms too, or it grades nothing.
 - A star that differs from `par.ticks` only in its units is `par.ticks`.
 - Achievable on every seed by an honest general strategy, and missed by one that ignores the mechanic. Verify both, per seed.
-- Each star has a reason in the fiction — half a sentence in the brief memo, saying why anyone on site would ask for it. The label stays factual; the memo carries the why.
+- Each star has a reason in the fiction — half a sentence in the lore line, saying why anyone on site would ask for it. The label stays factual; the memo carries the why.
 
 Shapes that work: a figure the run declares, checked against what it then did; a property of the run the bot must hold to; an artifact left behind in the final state.
 

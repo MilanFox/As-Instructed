@@ -162,7 +162,7 @@ function shortClass(ctx: ObjectiveContext): Divergence | undefined {
     return {
       where: depotId(kind),
       expected: `${String(wanted)} ${kind} on the bay`,
-      received: held > 0 ? `${there}, ${String(held)} still in the arms` : there,
+      received: held > 0 ? `${there}, ${String(held)} still carried` : there,
     };
   }
   return undefined;
@@ -258,8 +258,8 @@ function misfiledBays(ctx: ObjectiveContext): Divergence | undefined {
   if (late) {
     return {
       where: clipValue(late.text),
-      expected: 'filed before the bot moved',
-      received: 'filed after it set off',
+      expected: 'printed before the first move',
+      received: 'printed after the bot moved',
     };
   }
   if (said.length !== bays.length) {
@@ -285,7 +285,7 @@ function misfiledBays(ctx: ObjectiveContext): Divergence | undefined {
       return { where: bay.id, expected: point(bay.at), received: point(claim.at) };
     }
     if (!tookDelivery(ctx, bay.id, bay.at)) {
-      return { where: bay.id, expected: 'its class delivered to it', received: 'nothing dropped' };
+      return { where: bay.id, expected: 'a crate of its class', received: 'nothing dropped' };
     }
   }
   return undefined;
@@ -300,87 +300,46 @@ export const w8_02: LevelDef = {
   title: 'Full Stack',
   hardware: [],
   brief: [
-    '**FROM:** Dep. Coordinator M. Vance',
+    'Nobody has mapped this depot since 2206. Print the bays for the next shift, and carry crates while you look, because we do not pay for sightseeing. — M. Vance',
     '',
-    'A subsurface depot, last inventoried in 2206. Shipping hold a manifest for it: quantities,',
-    'no locations, which they have described as sufficient.',
-    '',
-    'File the bay addresses before you set off, so the next shift is not sent down blind. Keep',
-    'crates moving while you look; nobody upstairs is paying for a survey.',
-    '',
-    'Sort every crate onto the bay for its class.',
+    '**Sort every crate onto the bay for its class, in a depot with no map.**',
   ].join('\n'),
   board: {
-    fixed: [
-      'the depot is 34 by 26 of rock with caves cut through it, and none of it is mapped',
-      'one bot, and it starts in one of the cave rooms rather than at a bay',
-      'every crate and every bay is reachable on foot from where the bot starts',
-      'one bay per class on site, and no two bays in the same room',
-      'the arms hold the same number of crates all shift, with no gauge on them',
-    ],
     redrawn: [
-      'which classes the shift draws, and which bay takes each of them',
-      'the cave layout, and where the bays and the crates sit in it',
-      'how many crates are on the floor',
-      'how many crates the arms hold',
-      'whether the crates lie among the bays or off in the far quarter of the depot',
+      'which classes appear, and which bay takes each',
+      'the cave layout, and where the bays and crates are',
+      'how many crates there are',
+      'how many crates the bot carries',
+      'whether the bays lie near the start and the crates far from it',
     ],
   },
   facts: [
+    { label: 'Rock', value: 'Blocks `look`.' },
     {
-      label: 'The depot',
-      value: `${String(DEPOT_W)} by ${String(DEPOT_H)}, none of it mapped. The rock is opaque, so \`look\` stops at the first wall.`,
-    },
-    {
-      label: 'A crate',
+      label: 'Crates',
       value:
-        "An item, not terrain. A tile's `items` gives each stack's `kind`, and that kind is the crate's class — the word its bay id ends in.",
+        'One crate per floor tile. Its `kind` is its class. Every crate and bay can be reached. The number of crates is not given.',
     },
     {
-      label: 'A bay',
+      label: 'Bays',
       value:
-        'Shows up as a `machineId` on any tile you can see, and `probe("depot-ore")` reports one from anywhere whether you have seen it or not. Knowing where a bay is does not map the rock in between.',
+        '`depot-<class>` takes only that class. Classes: ore, ice, scrap, part, cell, chip; each board uses some. `probe("depot-ore")` finds a bay from anywhere, or nothing if the class is absent. It shows no rock. A crate counts as delivered once it lies on its bay.',
     },
     {
-      label: 'The manifest',
-      value:
-        'You do not have a copy. Nothing tells the bot how many crates are on the floor until it has looked at the floor.',
+      label: 'Bot capacity (hidden)',
+      value: 'Fixed per board. A `pickup()` that takes nothing means the bot is full.',
     },
-    {
-      label: 'Bay ids',
-      value:
-        '`depot-<class>`. `depot-ore` takes ore and nothing else. A shift draws its classes from ore, ice, scrap, part, cell and chip, and the draw changes every shift.',
-    },
-    {
-      label: 'The job',
-      value:
-        'Every crate on the floor belongs to a class, and every class on the shift has exactly one bay.',
-    },
-    {
-      label: 'The arms',
-      value:
-        'Hold a fixed number of crates, with no gauge. A `pickup` that takes fewer than the tile offered means full.',
-    },
-    { label: 'Delivered', value: 'Lying on the right bay tile when the shift ends.' },
     {
       label: 'Sighted',
       value:
-        'A crate or a bay counts as sighted the moment it stands in a straight, unblocked line — same row or column — from a tile the bot is on. Beam or no beam.',
+        'A crate or bay is sighted when it is in the same row or column as the bot, with no rock between. No `look` needed. A probe does not count.',
     },
     {
-      label: 'The survey',
+      label: 'Bay list',
       value:
-        'It is done on the tick the last crate and the last bay have been sighted. A crate ships early if it is lying on its bay by then, and half the floor has to.',
+        'Print `bay <id> <x> <y>` once per bay, all before the first move. No other line may start with `bay`. The star also needs a crate on each listed bay.',
     },
-    {
-      label: 'The bay list',
-      value:
-        'One line per bay, `bay <id> <x> <y>`, every one of them printed before the bot makes its first move, and nothing else filed under that word.',
-    },
-    {
-      label: 'The budget',
-      value: `Par is ${String(PAR_TICKS)} ticks for the whole shift. Nothing else is metered: looking, probing and printing cost no ticks.`,
-    },
+    { label: 'Free calls', value: 'Looking, probing and printing cost no ticks.' },
   ],
   seeds: [1, 2, 3, 4, 5],
   par: { ticks: PAR_TICKS },
@@ -388,7 +347,7 @@ export const w8_02: LevelDef = {
   objectives: [
     Objectives.custom(
       'depot-sorted',
-      'Every crate is lying on the bay for its class',
+      'Every crate on the bay for its class',
       (ctx) => {
         const [done, total] = sorted(ctx);
         return done >= total;
@@ -414,8 +373,8 @@ export const w8_02: LevelDef = {
           if (!Number.isFinite(complete)) {
             return {
               where: 'the last crate or bay',
-              expected: 'in view at some point in the shift',
-              received: 'never came into view',
+              expected: 'sighted at some point',
+              received: 'never sighted',
             };
           }
           const half = Math.ceil(sorted(ctx)[1] / 2);
@@ -429,28 +388,29 @@ export const w8_02: LevelDef = {
     ),
     Objectives.custom(
       'name-the-bays',
-      "Report every bay, its id and its tile, before the bot's first move",
+      'Print the bay list before the first move; put a crate on each listed bay',
       bayListFiled,
-      { progress: baysFiled, divergence: misfiledBays },
+      {
+        progress: baysFiled,
+        divergence: misfiledBays,
+      },
     ),
   ],
   starter: [
+    '// If you published these to lib.ts, you can import them:',
     "// import { survey, pathTo } from 'lib';",
-    '// TODO(4470): depot 0 has a manifest and no address. this one is the',
-    '// other way round: an address, no manifest. the crates down here are',
-    '// not on any list, so do not trust a count you did not take yourself',
+    '// TODO(4470): this depot has addresses but no crate list. count the crates yourself',
     '',
     'print(scan().terrain);',
     'for (const view of look(Dir.East, 40)) if (view.machineId) print(view.machineId);',
     '',
   ].join('\n'),
   hints: [
-    'Nothing here is known before the shift starts. The bot learns by looking, and it keeps only what your program writes down.',
-    'You can route through a tile you have seen. Asking for one the record does not know yet is normal here: look around, then ask again.',
-    'A bay answers to its id from anywhere, and every id on site is the word depot- followed by one of six classes. An id that is not on this shift answers with nothing, and asking costs nothing either.',
-    'Walking the depot once for looking and once for carrying loses the star: by the time the last crate is in view, half of them have to be on their bays already.',
-    'Full arms are wasted arms. A bay you walk past with the right crate on board is much cheaper than a bay you come back to.',
-    'The bot cannot know how many crates exist until it has seen the whole floor. That is a reason to keep looking, not a reason to stop carrying.',
+    'The map starts empty. The bot only knows what your program stores.',
+    'Routes use only tiles you have seen. If a route fails, look around and try again.',
+    'Probe all six depot ids at the start. Probing is free.',
+    'Do not explore first and carry later. Half the crates must be on their bays before the last crate or bay is sighted.',
+    'Drop a crate when you pass its bay. Coming back later costs more.',
   ],
   docs: ['look', 'probe', 'pickup', 'drop'],
 };

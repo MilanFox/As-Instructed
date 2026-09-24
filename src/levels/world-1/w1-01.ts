@@ -40,32 +40,26 @@ export const w1_01: LevelDef = {
   title: 'Cold Start',
   hardware: ['move', 'pos', 'print', 'wait'],
   brief: [
-    '**FROM:** Onboarding, Kessler & Daughters\\',
-    '**TO:** Contractor #4471',
+    'Welcome, Contractor #4471! We booked the pad for a short slot, and nobody knows who built the pillar, so please do not ask. — Kessler & Daughters',
     '',
-    'Welcome aboard. Test Hangar 3 has a support pillar in the service route: Facilities',
-    'insist it is load-bearing, Legal insist it was always there.',
-    '',
-    'Drive the bot to the pad.',
-    '',
-    '> WELCOME, NEW HIRE! TIP ONE OF THREE: REPETITION IS THE FOUNDATION OF ALL SAFE—',
-    '> `[EVALUATION LICENCE — 0 SEATS REMAINING]`',
+    '**Drive your bot, RIG-01, along the fixed route to the landing pad.**',
   ].join('\n'),
   board: {
-    fixed: [
-      'Test Hangar 3 is solid wall apart from the service route',
-      'the route is one tile wide, with no branches and no dead ends',
-      'the pillar is two tiles East, and the gap above it is the only way round',
-      'the pad is the far tile of the last leg',
-      'RIG-01 starts at the west end of the route, facing East',
-    ],
-    redrawn: ['nothing — this order runs on one seed, and the hangar is the same on every attempt'],
+    redrawn: ['nothing — the board is the same every time'],
   },
   facts: [
-    { label: 'The pillar', value: 'Two tiles East. The gap above it is the only way round.' },
-    { label: 'Route after it', value: '**19 East, 5 South, 22 West, 5 South, 22 East.**' },
-    { label: 'Directions', value: '`x` grows East, `y` grows South. North is `y - 1`.' },
-    { label: 'One move', value: 'One tick — even a move into a wall.' },
+    {
+      label: 'The run must end on the pad',
+      value:
+        'The pad is the last tile of the route. The bot must stand on it when your program ends.',
+    },
+    {
+      label: 'The route: a pillar, then 5 straight parts',
+      value:
+        'Everything else is wall. A pillar stands 2 tiles East of the start. The way round it: 1 East, 1 North, 2 East, 1 South. Then **19 East, 5 South, 22 West, 5 South, 22 East.**',
+    },
+    { label: 'One move is one tick', value: 'A blocked move costs a tick too.' },
+    { label: 'x grows East, y grows South', value: 'North is `y - 1`. West is `x - 1`.' },
   ],
   seeds: [1],
   par: { ticks: PAR_TICKS },
@@ -80,18 +74,14 @@ export const w1_01: LevelDef = {
     parkedOnPad(),
     Objectives.withinTicks(BOOKED_TICKS, {
       id: 'bay-booking',
-      label: `Clear the bay within ${String(BOOKED_TICKS)} ticks`,
+      label: `Finish within ${String(BOOKED_TICKS)} ticks`,
     }),
   ],
-  starter: ['// x grows East, y grows South. Dir.North is y - 1.', '', 'move(Dir.East);', ''].join(
-    '\n',
-  ),
+  starter: ['move(Dir.East);', ''].join('\n'),
   hints: [
-    'The gap is above the pillar. North is y - 1.',
-    'move() gives back false when something blocks it. The tick is spent either way.',
-    'Five legs. Only two things change between them: how far, and which way.',
-    'Write 19 once. Write 22 once. Write 5 once. That should be enough.',
-    'Driving until a wall stops you does reach the corner, and every blocked move costs a tick. Counting the legs instead spends none of them.',
+    'Dir has North, East, South and West.',
+    'move() returns false when blocked. The bot stays where it was.',
+    'A loop per part keeps the program short.',
   ],
   docs: ['coordinates', 'move', 'print'],
 };

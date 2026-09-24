@@ -51,7 +51,7 @@ describe('w7-01 names the bot rather than counting them', () => {
     expect(report.met).toBe(false);
     expect(report.divergence).toEqual({
       where: 'bot #0',
-      expected: '(7, 1)',
+      expected: '(8, 1)',
       received: `(${String(start.x)}, ${String(start.y)})`,
     });
   });
@@ -82,13 +82,28 @@ describe('w7-01 names the bot rather than counting them', () => {
     });
   });
 
+  test('a message sent before the walk is told where it was sent from', () => {
+    const { report } = diverge(w7_01, 1, 'both-heard', (sim) => {
+      sim.send(1, 0, 'early');
+      for (const id of sim.botIds()) while (sim.canMove(id, Dir.East)) sim.move(id, Dir.East);
+      sim.recv(0);
+    });
+
+    expect(report.met).toBe(false);
+    expect(report.divergence).toEqual({
+      where: 'bot #0',
+      expected: "a message sent from bot #1's pad",
+      received: 'one sent from (1, 3)',
+    });
+  });
+
   test('a fleet that filed no idle report is told which bot is missing from it', () => {
     const { report } = diverge(w7_01, 1, 'name-the-idle', () => undefined);
 
     expect(report.met).toBe(false);
     expect(report.divergence).toEqual({
       where: 'bot #0',
-      expected: 'a line saying how long it stood still',
+      expected: 'a line saying how long it waited',
       received: '(nothing)',
     });
   });
@@ -103,7 +118,7 @@ describe('w7-01 names the bot rather than counting them', () => {
 
     expect(report.met).toBe(false);
     expect(shown.where).toBe('bot #0');
-    expect(shown.expected).toBe('its wait ticks plus what sync() cost it');
+    expect(shown.expected).toBe('ticks past its walk and one send');
     expect(shown.received).toBe('idle 0 0');
   });
 });
@@ -203,7 +218,7 @@ describe('w7-04 names the job and how far into it the fleet got', () => {
     expect(report.met).toBe(false);
     expect(report.divergence).toEqual({
       where: 'the shift report',
-      expected: 'a line naming the job that finished last',
+      expected: 'a line naming the last job to finish',
       received: '(nothing)',
     });
   });
@@ -272,7 +287,7 @@ describe('w7-05 names the site and the bot that jumped its orders', () => {
     expect(objective.divergence?.(ctx)).toEqual({
       where: 'bot #2 · tick 12',
       expected: 'an order read before this',
-      received: 'no order all shift',
+      received: 'no order in the run',
     });
   });
 

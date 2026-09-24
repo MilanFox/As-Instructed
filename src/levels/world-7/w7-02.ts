@@ -115,58 +115,43 @@ export const w7_02: LevelDef = {
   hardware: ['spawn'],
   costs: { spawn: SPAWN_COST },
   brief: [
-    '**MEMO KD-2711**',
-    '**FROM:** Dep. Coordinator M. Vance\\',
-    '**RE:**   Fleet requisition, north apron',
+    'Finance sets your fleet size, and Finance changes its mind every day. No bot should do more than its share. — M. Vance',
     '',
-    'Finance approved a requisition this week. It will be a different one on Monday.',
-    'Please do not write it down. Every unit earns its requisition. We do not itemise.',
-    '',
-    'Harvest every crop in the field.',
+    '**Harvest every crop. Start with one bot; spawn more. The depot gives the fleet size.**',
   ].join('\n'),
   board: {
-    fixed: [
-      'the field is 22 by 14 inside its wall, open floor except where a crop stands on soil',
-      'one bot on the north apron at the start; the rest of the fleet is whatever it raises',
-      'the depot publishes the requisition and every crop position before anything moves',
-      'every crop is ripe when the shift opens, and none of it ripens during it',
-      'every bot holds 99 crops, so nothing has to be hauled anywhere',
-    ],
     redrawn: [
-      'the requisition — two to eight bots, counting the one already on the apron',
-      'how many crops the field carries',
-      'where the patch sits and what shape it is',
-      'whether an equal-area cut is also an equal-work cut',
+      'the fleet size, two to eight bots',
+      'the crop count',
+      'where the crop patch is, and its shape',
+      'whether equal areas also hold equal crops',
     ],
   },
   facts: [
-    { label: 'Your score', value: 'The clock stops when the **last** bot stops.' },
+    { label: 'Score', value: 'The tick when the **last** bot stops.' },
     {
-      label: 'The depot',
-      value: '`probe("depot")` is free, and reaches it from anywhere on site.',
-    },
-    {
-      label: 'Fleet size',
-      value: '`vars.requisition` — how many bots you may have, counting the one already here.',
-    },
-    {
-      label: 'The crops',
+      label: 'Depot (field data)',
       value:
-        '`vars.crops` is how many. `vars.c0` … `vars.c{n-1}` are where, packed as `y * 24 + x`.',
+        '`probe("depot")` is free, from anywhere. `vars.requisition` is the fleet size, including the first bot. `vars.crops` is the crop count. `vars.c0` … `vars.c{n-1}` are the positions, packed as `y * 24 + x`.',
     },
     {
-      label: '`spawn(dir)`',
-      value: `Puts a new bot on the next tile in \`dir\` and gives back its id. Costs ${String(SPAWN_COST)} ticks on this order, charged to the parent. A bot can spawn a bot. The fleet does not queue: a tile another bot is standing on refuses the spawn, giving back \`-1\` and charging the ${String(SPAWN_COST)} ticks anyway.`,
+      label: 'Fleet size (any bot count passes)',
+      value:
+        'You may spawn fewer or more bots than the fleet size. Fair share is counted as if you have at least the fleet size.',
     },
     {
-      label: 'A new bot',
-      value: `Starts with its own clock at the parent's clock plus ${String(SPAWN_COST)}.`,
+      label: 'Spawn',
+      value: `Returns the new bot's id, for \`bot(id)\`. Costs the parent ${String(SPAWN_COST)} ticks, even when it fails. The new bot's clock starts at the parent's clock plus ${String(SPAWN_COST)}. Any bot can spawn.`,
     },
-    { label: 'Carrying', value: 'Every bot holds up to 99 crops. No hauling on this order.' },
+    {
+      label: 'Crops',
+      value:
+        'All are ripe at the start; none grow later. A bot carries 99, so it never needs to unload.',
+    },
     {
       label: 'Fair share',
       value:
-        '`Math.ceil(vars.crops / n)` crops per bot, where `n` is however many bots you raised — never counted below `vars.requisition`.',
+        '`Math.ceil(vars.crops / n)` crops. `n` is your bot count, or `vars.requisition` if that is larger.',
     },
   ],
   seeds: [1, 2, 3, 4],
@@ -205,42 +190,36 @@ export const w7_02: LevelDef = {
     return world;
   },
   objectives: [
-    Objectives.custom(
-      'field-cleared',
-      'Harvest every crop in the field',
-      (ctx) => ripeCrops(ctx.world) === 0,
-      {
-        progress: (ctx) => {
-          const total = ripeCrops(ctx.initialWorld);
-          return [total - ripeCrops(ctx.world), total];
-        },
-        divergence: standingCrop,
+    Objectives.custom('field-cleared', 'Harvest every crop', (ctx) => ripeCrops(ctx.world) === 0, {
+      progress: (ctx) => {
+        const total = ripeCrops(ctx.initialWorld);
+        return [total - ripeCrops(ctx.world), total];
       },
-    ),
+      divergence: standingCrop,
+    }),
   ],
   bonus: [
     Objectives.custom(
       'even-share',
-      'Split the crop evenly across the requisitioned fleet',
+      'No bot harvests more than a fair share',
       (ctx) => heaviestShare(ctx) <= fairShare(ctx),
       { divergence: overShare },
     ),
   ],
   starter: [
     "// import { pathTo } from 'lib';",
-    '// NOTE(4470): a routine that drives "the bot" stops being useful here',
     '',
     'const depot = probe("depot");',
     'const fleet = depot.vars.requisition;',
     'const total = depot.vars.crops;',
-    '// Positions come back packed: x = p % 24, y = Math.floor(p / 24).',
+    '// Positions are packed: x = p % 24, y = Math.floor(p / 24).',
     '',
   ].join('\n'),
   hints: [
-    'You cannot know the fleet size while you are writing the program. So the number of pieces you cut the field into cannot be written down either. Read it, then cut.',
-    'The shift ends when the last bot stops. Ask what that bot was holding that the others were not.',
-    'You are given the crop positions before anything moves. That means you can count them per piece before you commit to the pieces. Count what you are actually paying for.',
-    'On one of these fields, equal area and equal work are the same split. On the others they are not. The difference is where the crops are, not how big the field is.',
+    'The fleet size changes from board to board. Read it, then split the field into that many parts.',
+    'The shift ends when the last bot stops. What did it do that the others did not?',
+    'You know all crop positions at the start. Count the crops per part before you choose the parts.',
+    'On one of the boards you are graded on, equal areas hold equal crops. On the others they do not.',
   ],
   docs: ['spawn', 'probe', 'harvest'],
 };

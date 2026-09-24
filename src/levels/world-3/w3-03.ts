@@ -131,7 +131,7 @@ const strandedCrate = (ctx: ObjectiveContext): Divergence => {
   }
   return {
     where: `arrival ${String(missing.index)}, from ${at(missing.at)}`,
-    expected: 'on the outbound bay',
+    expected: 'on the bay',
     received: 'still in the yard',
   };
 };
@@ -169,63 +169,32 @@ export const w3_03: LevelDef = {
   title: 'First In, First Out',
   hardware: [],
   brief: [
-    '```',
-    'MEMO KD-2318',
-    'FROM: Dep. Coordinator M. Vance',
-    'RE:   Depot audit',
+    'Empty rack slots bend under a bot, and so did the last bot. Please keep off them. — M. Vance',
     '',
-    'The audit of Depot 0 has been deprioritised. It was requested by',
-    'Contractor #4470, then withdrawn by Contractor #4470 eleven days',
-    'later, with no note.',
-    '',
-    'I have kept the ticket. I am not sure why.',
-    '',
-    'Racking holds a bot only where a crate sits.',
-    '```',
-    '',
-    'Move every crate onto the outbound bay, lowest arrival number first.',
+    "**Each crate's slot has a painted arrival number. Carry the crates to the loading bay one at a time: 1 first, then 2, and so on.**",
   ].join('\n'),
   board: {
-    fixed: [
-      'the yard is 16 wide and 8 deep inside its wall',
-      'the racking stands in rows `y` 2, 3, 6 and 7 on every shift',
-      'the aisles are rows `y` 1, 4, 5 and 8 and columns `x` 1, 6, 11 and 16, on every shift',
-      'one outbound bay, always standing in an aisle',
-      'on any shift holding more than one crate, arrival 1 is not the first crate a sweep of the racks would reach',
-      'no step into an empty slot is allowed, however many crates arrive',
-      'RIG-04 starts in an aisle, one crate to the clamp',
-    ],
     redrawn: [
-      'how many crates the shift holds — as many as sixteen, as few as one',
-      'which rack slots they stand in',
-      'which arrival number is stencilled on which slot',
-      'where the outbound bay stands, and where RIG-04 starts',
+      'how many crates: one to sixteen',
+      'which rack slots hold them',
+      'which arrival number is on which slot',
+      'where the bay is and where the bot starts',
     ],
   },
   facts: [
     {
       label: 'Arrival number',
       value:
-        'Stencilled on the slot, not on the crate. Counts up from 1 with no gaps. When the shift opens, every slot holding a crate is stencilled and no other tile in the yard is.',
+        'A number painted on the slot, not the crate; `scan(dir).mark` reads it as a string. Counts up from 1, no gaps. Every slot with a crate starts painted, and no other tile.',
     },
     {
-      label: '`scan(dir).mark`',
-      value: 'Reads the stencil back as a string, or `null` on an unpainted tile.',
-    },
-    {
-      label: 'The layout',
-      value: 'The order the crates are numbered is not the order they are laid out.',
-    },
-    {
-      label: 'Racks and aisles',
+      label: 'Rack slot',
       value:
-        'Racking fills rows `y` 2, 3, 6 and 7 except where an aisle column cuts through it, and every crate stands in one of those slots. Aisle runs along rows `y` 1, 4, 5 and 8 and down columns `x` 1, 6, 11 and 16, so every slot has an aisle tile directly above or below it. The outbound bay is the one pad tile in the yard, and it stands in an aisle.',
+        'Racks fill rows `y` 2, 3, 6 and 7. Aisles are rows 1, 4, 5 and 8, and columns 1, 6, 11 and 16. `scan(dir).terrain` reads `rack`, `floor` or `pad`. Every crate is in a slot. Any tile can be walked on. Slots that started with a crate are safe to step on.',
     },
-    { label: 'The clamp', value: 'One crate at a time.' },
     {
-      label: 'Empty rack slots',
-      value:
-        'Not a walkway. `scan(dir).terrain` reads `rack` on a slot and `floor` on an aisle. One step into a slot that started the shift empty loses the star. Aisles are free, and so are slots that started the shift full.',
+      label: 'Loading bay',
+      value: 'The only pad, always in an aisle. The bot carries one crate at a time.',
     },
   ],
   seeds: [1, 2, 3, 4],
@@ -261,7 +230,7 @@ export const w3_03: LevelDef = {
   objectives: [
     Objectives.custom(
       'bay-cleared',
-      'Move every crate onto the outbound bay',
+      'Move every crate onto the loading bay',
       (ctx) =>
         countItemsAt(ctx.world, bayOf(ctx.initialWorld), 'crate') >= arrivalCount(ctx.initialWorld),
       {
@@ -277,7 +246,7 @@ export const w3_03: LevelDef = {
     ),
     Objectives.custom(
       'bay-in-order',
-      'Set the crates down in ascending arrival order',
+      'Deliver the crates in number order, 1 first',
       (ctx) => inOrder(ctx) === arrivalCount(ctx.initialWorld),
       {
         progress: (ctx) => [inOrder(ctx), arrivalCount(ctx.initialWorld)],
@@ -288,7 +257,7 @@ export const w3_03: LevelDef = {
   bonus: [
     Objectives.custom(
       'aisle-discipline',
-      'Enter a rack slot only if it started the shift full',
+      'Never step on a rack slot that had no crate at the start',
       (ctx) => slotsTrodden(ctx) === 0,
       {
         progress: (ctx) => [slotsTrodden(ctx), 0],
@@ -298,18 +267,17 @@ export const w3_03: LevelDef = {
   ],
   budget: { maxTicks: 5000 },
   starter: [
-    '// The arrival number is stencilled on the slot, not on the crate.',
-    '// Read it with scan, and remember it.',
+    '// The arrival number is on the slot, not the crate. Read it with scan.',
     '',
     'while (canMove(Dir.West)) move(Dir.West);',
     'while (canMove(Dir.North)) move(Dir.North);',
     '',
   ].join('\n'),
   hints: [
-    'The nearest crate and the next crate are hardly ever the same crate.',
-    'A bot in an aisle can read the rack row above it and the rack row below it without leaving the aisle.',
-    'Nothing stops you learning the whole yard before you lift anything.',
-    'Read the yard into a list first: each number, and the tile it was painted on. Then work the list from 1 upward.',
+    'The nearest crate is rarely the next crate.',
+    'From an aisle, you can scan the rack row above and the rack row below.',
+    'You can read the whole yard before you pick anything up.',
+    'As strings, "10" comes before "2".',
   ],
   docs: ['scan', 'pickup', 'drop'],
 };

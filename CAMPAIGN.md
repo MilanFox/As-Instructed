@@ -60,5 +60,5 @@ Passing is the lesson; `par.ticks` and the bonus stars grade optimisation across
 - **w8-01 Efficiency Audit** — no grant; sites 02 and 04: survey once under rationed senses, then plan full loads.
 - **w8-02 Full Stack** — no grant; sites 03 and 04: sort crates in an unmapped cave, interleaving survey and haul.
 - **w8-03 The Grid Goes Down** — no grant; sites 05 and 07: schedule a feeder graph onto a fleet.
-- **w8-04 Signal from 4470** — no grant; sites 06 and 04: crack the cipher, follow a stale route, repair blocked legs.
+- **w8-04 Signal from 4470** — no grant; sites 06 and 04: find the key, follow an old route, repair blocked legs.
 - **w8-05 The Kessler Contract** (climax) — no grant; sites 02–07 at once, fleet and fuel, ending on the charter choice.

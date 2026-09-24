@@ -20,26 +20,10 @@ export function blockedMoves(events: readonly TraceEvent[]): number {
   return events.filter((event) => event.kind === 'move' && !event.ok).length;
 }
 
-export function idleTicks(events: readonly TraceEvent[], botIds: ReadonlySet<number>): number {
-  let idle = 0;
-  for (const event of events) {
-    if (event.kind !== 'wait' && event.kind !== 'sync') continue;
-    if (botIds.has(event.botId)) idle += event.dt;
-  }
-  return idle;
-}
-
 export function botsOnPads(ctx: ObjectiveContext): number {
   return ctx.world.bots.filter(
     (bot) => bot.alive && tileAt(ctx.world, bot.at)?.terrain === Terrain.Pad,
   ).length;
-}
-
-export function heardFromAnother(events: readonly TraceEvent[], botId: number): boolean {
-  return events.some(
-    (event) =>
-      event.kind === 'recv' && event.botId === botId && event.from !== null && event.from !== botId,
-  );
 }
 
 export function at(pos: Vec): string {
@@ -51,12 +35,6 @@ export function reportedLines(events: readonly TraceEvent[], keyword: string): s
   return events
     .filter((event) => event.kind === 'print' && event.text.startsWith(prefix))
     .map((event) => (event.kind === 'print' ? event.text : ''));
-}
-
-export function matchingPrefix(actual: readonly string[], expected: readonly string[]): number {
-  let i = 0;
-  while (i < actual.length && i < expected.length && actual[i] === expected[i]) i++;
-  return i;
 }
 
 const BLOCKED_BY: Readonly<Record<string, string>> = Object.freeze({

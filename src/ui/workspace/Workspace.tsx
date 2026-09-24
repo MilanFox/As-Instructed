@@ -2,12 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { PanelBoundary } from '../components/PanelBoundary.tsx';
 import { useInspect } from '../hooks/useInspect.ts';
-import { closeLibrary, closeOverlay, overlayState, useOverlay } from '../hooks/useOverlay.ts';
+import { closeLibrary, closeOverlay, useOverlay } from '../hooks/useOverlay.ts';
+import { pathFor } from '../router.ts';
 import { COMPACT_QUERY } from './breakpoints.ts';
 import { ClosedBanner } from './ClosedBanner.tsx';
 import type { DrawerTab } from './Drawer.tsx';
 import { Drawer } from './Drawer.tsx';
 import {
+  backIsCrowded,
   clampDrawer,
   deckIsCrowded,
   rememberDrawerWidth,
@@ -16,6 +18,7 @@ import {
 import { FeedCanvas } from './FeedCanvas.tsx';
 import { flyoutOpensOnArrival, rememberFlyoutOpen, storedFlyoutOpen } from './flyoutMemory.ts';
 import { Postings } from './Postings.tsx';
+import { focusedFact, subscribeFactFocus } from './factFocus.ts';
 import { ReportSheet } from './ReportSheet.tsx';
 import { Subroutines } from './Subroutines.tsx';
 import { TelemetryPanel } from './TelemetryPanel.tsx';
@@ -122,6 +125,7 @@ export function Workspace(): React.ReactElement {
     };
   }, []);
   const crowded = flyoutOpen && !compact && measured > 0 && deckIsCrowded(measured, viewport);
+  const backCrowded = flyoutOpen && !compact && measured > 0 && backIsCrowded(measured, viewport);
 
   // A stored width outlives the viewport it was chosen on, so it is pulled back inside the
   // one in front of us rather than left to overhang it.
@@ -168,6 +172,14 @@ export function Workspace(): React.ReactElement {
       openDrawer();
     },
     [openDrawer],
+  );
+
+  useEffect(
+    () =>
+      subscribeFactFocus(() => {
+        if (focusedFact() !== null) openTo('dossier');
+      }),
+    [openTo],
   );
 
   const flap = useCallback(
@@ -264,31 +276,16 @@ export function Workspace(): React.ReactElement {
     setFound(storedFlyoutOpen(levelId) !== null);
   }, [levelId]);
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key !== 'Escape') return;
-      // lib.ts and the workbench are never open together, so escape has one of them to dismiss.
-      if (overlayState().open === 'library') {
-        closeOverlay();
-        event.preventDefault();
-        return;
-      }
-      if (!open) return;
-      event.preventDefault();
-      handleRef.current?.focus();
-      rememberFlyoutOpen(levelId, false);
-      setOpen(false);
-    };
-    window.addEventListener('keydown', onKey, { capture: true });
-    return () => {
-      window.removeEventListener('keydown', onKey, { capture: true });
-    };
-  }, [levelId, open]);
-
   const dismissSheet = useCallback((): void => {
     setSheetOpen(false);
     workspace.dismissResults();
   }, [workspace]);
+
+  const toSiteMap = (event: React.MouseEvent): void => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+    event.preventDefault();
+    workspace.goto('levels');
+  };
 
   const watching = running || workspace.playing;
   const report = sheetOpen && !workspace.closePending ? workspace.report : null;
@@ -306,6 +303,18 @@ export function Workspace(): React.ReactElement {
           : ({ '--ws-flyout-user': `${String(width)}px` } as React.CSSProperties)
       }
     >
+      <a
+        className="site-map-link"
+        href={pathFor(null)}
+        onClick={toSiteMap}
+        data-words={backCrowded ? 'hidden' : 'shown'}
+      >
+        <span className="site-map-link__arrow" aria-hidden="true">
+          ←
+        </span>
+        <span className="site-map-link__text">Site map</span>
+      </a>
+
       {/* Renderer is one canvas for the whole app (src/ui/adapters.ts), so the feed is
           hidden rather than unmounted and stays outside every boundary. */}
       <div className="workspace__map">
@@ -313,7 +322,7 @@ export function Workspace(): React.ReactElement {
       </div>
 
       <div className="hud-right">
-        <PanelBoundary label="The work order">
+        <PanelBoundary label="Level">
           <WorkOrderCard
             workspace={workspace}
             compact={compact}
@@ -321,10 +330,11 @@ export function Workspace(): React.ReactElement {
             statusOpen={telemetryOpen}
             onToggle={toggleOrder}
             onStatus={toggleTelemetry}
+            onManual={() => openTo('manual')}
           />
         </PanelBoundary>
 
-        <PanelBoundary label="Telemetry">
+        <PanelBoundary label="Status">
           <TelemetryPanel
             workspace={workspace}
             compact={compact}
@@ -335,12 +345,12 @@ export function Workspace(): React.ReactElement {
           />
         </PanelBoundary>
 
-        <PanelBoundary label="The postings">
-          <Postings workspace={workspace} onManual={() => openTo('manual')} />
+        <PanelBoundary label="New commands">
+          <Postings workspace={workspace} compact={compact} onManual={() => openTo('manual')} />
         </PanelBoundary>
       </div>
 
-      <PanelBoundary label="The transport deck">
+      <PanelBoundary label="Playback">
         <TransportDeck
           workspace={workspace}
           zoom={zoom}
@@ -350,7 +360,7 @@ export function Workspace(): React.ReactElement {
         />
       </PanelBoundary>
 
-      <PanelBoundary label="The workbench">
+      <PanelBoundary label="Side panel">
         <Drawer
           workspace={workspace}
           on={workbenchOn}
@@ -362,7 +372,7 @@ export function Workspace(): React.ReactElement {
         />
       </PanelBoundary>
 
-      <PanelBoundary label="Shared Subroutines">
+      <PanelBoundary label="Library">
         <Subroutines />
       </PanelBoundary>
 
@@ -370,7 +380,7 @@ export function Workspace(): React.ReactElement {
           same strip is the grab whichever face the flyout is showing. */}
       {compact ? null : (
         <WidthGrip
-          label={libraryOpen ? 'lib.ts width' : 'Workbench width'}
+          label={libraryOpen ? 'lib.ts width' : 'Side panel width'}
           controls={libraryOpen ? 'workspace-library' : 'workspace-drawer'}
           open={flyoutOpen}
           width={width ?? measured}
@@ -394,7 +404,7 @@ export function Workspace(): React.ReactElement {
       ))}
 
       {report ? (
-        <PanelBoundary label="The run report">
+        <PanelBoundary label="Run report">
           <ReportSheet
             report={report}
             onDismiss={dismissSheet}
@@ -404,7 +414,7 @@ export function Workspace(): React.ReactElement {
       ) : null}
 
       {workspace.closePending ? (
-        <PanelBoundary label="The closing banner">
+        <PanelBoundary label="Level closed">
           <ClosedBanner workspace={workspace} />
         </PanelBoundary>
       ) : null}

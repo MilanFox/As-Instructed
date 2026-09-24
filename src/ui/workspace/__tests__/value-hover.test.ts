@@ -37,7 +37,7 @@ describe('the stepped line carries its call as ghost text', () => {
   });
 
   test('past the log cap the line says so; before it there is nothing', () => {
-    expect(ghostText([], true)).toBe('not recorded — call log full');
+    expect(ghostText([], true)).toBe('not recorded, log full');
     expect(ghostText([], false)).toBeNull();
   });
 });
@@ -100,10 +100,8 @@ describe('hovering a line lists every call from it', () => {
   });
 
   test('a line past the cap says its later calls went unrecorded', () => {
-    expect(lineHover([], true, link)).toBe('_not recorded — call log full_');
-    expect(lineHover([call({})], true, link)?.endsWith('  \n_not recorded — call log full_')).toBe(
-      true,
-    );
+    expect(lineHover([], true, link)).toBe('_not recorded, log full_');
+    expect(lineHover([call({})], true, link)?.endsWith('  \n_not recorded, log full_')).toBe(true);
     expect(lineHover([], false, link)).toBeNull();
   });
 });

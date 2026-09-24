@@ -45,74 +45,38 @@ export const w2_02: LevelDef = {
   title: 'Capacity',
   hardware: ['inventory'],
   brief: [
-    '**FROM:** Dep. Coordinator M. Vance\\',
-    '**RE:** Hopper allocation, north plot',
+    'The hopper leaves full of seed and nobody will fix it. Ripe crops lose value every tick they wait, and nobody will fix that either. — M. Vance',
     '',
-    'The hopper leaves the depot full of seed. It does not open at the other end; Legal have',
-    'confirmed this is a feature and have declined to say of what.',
-    '',
-    'The buyer grades on arrival and docks the load for every tick a ripe crop stood waiting.',
-    '',
-    'Clear the north plot and leave it planted.',
+    '**The hopper starts full of seed. Harvest every crop the plot starts with and leave every tile planted. A ripe crop spoils for every tick it waits.**',
   ].join('\n'),
   board: {
-    fixed: [
-      'the plot is 3 across and 2 deep — six tiles of soil, walled on every side',
-      'every tile is soil, so a bare tile is empty rather than blocked',
-      'one or two tiles come up bare — never none',
-      'the hopper leaves the depot full, whatever full is this shift',
-      'the crops come ready spread across the shift, never all at once',
-      'FIELD-02 starts in the north-west corner, facing East',
-    ],
     redrawn: [
-      'how much the hopper holds, six to ten',
-      'which tiles came up bare, and whether it is one or two',
-      'how long each crop has left before it is ready',
-      'which crops have not started their clock, and what `sproutsIn` reports for them',
+      'the hopper size, 6 to 10',
+      'which tiles are bare, and how many',
+      'how long each crop needs to be ready',
+      'which crops have not started growing, and their `sproutsIn`',
     ],
   },
   facts: [
-    { label: 'The plot', value: 'Six tiles. Three across, two deep.' },
     {
-      label: 'The two checks',
+      label: 'Plot',
+      value: '3 by 2. One or two tiles start bare: nothing to harvest, but they need planting.',
+    },
+    {
+      label: 'Hopper',
       value:
-        'Every tile that started with a crop must be harvested at some point. Every tile in the ' +
-        'plot must be planted at the end of the shift. A tile that started bare has nothing to ' +
-        'harvest, and still has to be planted.',
+        'What the bot carries. Starts full of seed. `plant()` uses 1 seed. `harvest()` adds 1 crop. A full hopper takes no crop, and `harvest()` still costs 2 ticks. `inventory()` counts the seed too.',
     },
     {
-      label: 'The bare patch',
+      label: 'Growth',
       value:
-        'One or two tiles came up empty this shift. Maintenance blames the night crew, the night ' +
-        'crew blames the schedule, the schedule blames Legal.',
-    },
-    {
-      label: 'The hopper',
-      value: 'Starts the shift full. A full hopper takes nothing and the arm swings anyway.',
-    },
-    {
-      label: '`inventory()`',
-      value: 'What the bot is carrying right now. The only reading of the hopper there is.',
-    },
-    {
-      label: 'Ripening',
-      value:
-        'Growth climbs by one every tick, driving or not. A tile at 5 of 8 is ready in three ticks.',
-    },
-    {
-      label: '`sproutsIn`',
-      value:
-        'Growth stuck at 0 is not always a bare tile — some crops on this shift have not started ' +
-        'their clock. `scan()` reports `sproutsIn`, the ticks left before growth moves at all.',
+        '+1 every tick, moving or not. A crop at growth 5 of 8 is ready in 3 ticks. A crop at growth 0 may not have started: `sproutsIn` is the ticks until it starts.',
     },
     {
       label: 'Spoilage',
       value:
-        'One against the sheet for every tick between a crop coming ready and the swing that takes ' +
-        'it. Standing on the tile does not stop the count; only the harvest does. Only the crops ' +
-        'that were in the ground at the start of the shift are counted.',
+        '1 for every tick a ripe crop waits to be harvested. Only crops there at the start count.',
     },
-    { label: 'At `maxGrowth`', value: 'Growth stops. The docking does not.' },
   ],
   seeds: [1, 2, 3, 4],
   par: { ticks: 52 },
@@ -130,32 +94,22 @@ export const w2_02: LevelDef = {
     return world;
   },
   objectives: [
-    harvestedEvery(croppedAtStart, 'Harvest every crop in the plot', 'harvested-crops'),
+    harvestedEvery(croppedAtStart, 'Harvest every crop the plot starts with', 'harvested-crops'),
     everyTilePlanted(),
   ],
-  bonus: [
-    withinSpoilage(
-      SPOILAGE_ALLOWANCE,
-      `Come back with no more than ${String(SPOILAGE_ALLOWANCE)} spoilage on the sheet`,
-    ),
-  ],
+  bonus: [withinSpoilage(SPOILAGE_ALLOWANCE, `At most ${String(SPOILAGE_ALLOWANCE)} spoilage`)],
   starter: [
-    '// NOTE(4470): the hopper comes out full. that is the schedule, not a fault',
-    '// NOTE(4470): you cannot pick anything up until you have put something down',
+    '// NOTE(4470): hopper comes out full. put something down before you pick anything up.',
     '',
-    '// inventory() counts everything the bot is carrying, seed included.',
     'print(`carrying ${inventory()}`);',
     '',
   ].join('\n'),
   hints: [
-    'The hopper starts full, so the first inventory reading is also its size.',
-    'A swing at a full hopper costs the same two ticks as one that works.',
-    'The plot always has one or two bare tiles. Plant those first — that is the only room the',
-    'hopper has to empty into before anything can be harvested.',
-    'One pass cannot finish the plot. The crops do not all come ready at the same time.',
-    'Growth climbs by one per tick, so a tile says exactly how long it needs. The clock runs whether the bot drives or stands still.',
-    'A tile reading 0 growth is not always freshly planted. Some crops on this ladder have not started yet, and sproutsIn says how many ticks until they do.',
-    'Waiting on a tile until it comes ready and harvesting it then costs no spoilage. Once a crop is ready the count runs whether the bot stands on it or not, so driving a lap first arrives late and pays for it.',
+    'A harvest needs one free place in the hopper.',
+    'Plant the bare tiles first. That makes room for a harvest.',
+    'The crops come ready at different times, some of them late in the run.',
+    'A crop with growth 0 is not bare. sproutsIn says when it starts.',
+    'A crop harvested on the tick it comes ready adds no spoilage.',
   ],
   docs: ['inventory', 'harvest', 'plant', 'wait'],
 };

@@ -126,7 +126,7 @@ function firstRelayed(ctx: ObjectiveContext): Divergence | undefined {
   if (got === undefined || !got.startsWith(MAGIC)) {
     return {
       where: `packet ${String(i)}`,
-      expected: `plain text opening "${MAGIC}"`,
+      expected: `decoded text starting "${MAGIC}"`,
       received: got === undefined ? NOTHING : clipValue(got),
     };
   }
@@ -145,16 +145,16 @@ function firstStraggler(ctx: ObjectiveContext): Divergence | undefined {
   const matched = matchingPrefix(sent, expected);
   if (matched < expected.length) {
     return {
-      where: 'the headed packets',
-      expected: `all ${String(expected.length)} in plain text first`,
+      where: 'the packets with a header',
+      expected: `all ${String(expected.length)} decoded first`,
       received: `${String(matched)} of ${String(expected.length)}`,
     };
   }
   const got = sent[expected.length];
   if (got === undefined) {
     return {
-      where: 'after the last headed packet',
-      expected: 'the straggler in plain text',
+      where: 'after the packets with a header',
+      expected: 'the last packet, decoded',
       received: NOTHING,
     };
   }
@@ -162,14 +162,14 @@ function firstStraggler(ctx: ObjectiveContext): Divergence | undefined {
   for (let key = 0; key < KEYSPACE; key++) {
     if (decipher(cipher, key) !== got) continue;
     return {
-      where: 'the straggler',
-      expected: 'the one shift in the stated alphabet',
-      received: `shift ${String(key)}`,
+      where: 'the last packet',
+      expected: 'a key giving only allowed characters',
+      received: `key ${String(key)}`,
     };
   }
   return {
-    where: 'the straggler',
-    expected: 'the last packet, shifted back',
+    where: 'the last packet',
+    expected: 'the last packet, decoded',
     received: clipValue(got),
   };
 }
@@ -181,54 +181,32 @@ export const w6_04: LevelDef = {
   title: 'The Cipher',
   hardware: [],
   brief: [
-    '**FROM:** Dep. Coordinator M. Vance',
+    'Nobody sold us the key with the radios. The last packet has no header, which is rude, but read it anyway. — M. Vance',
     '',
-    'The band is enciphered and nobody has the key. Procurement bought the radios on a',
-    'framework that priced the cipher separately, and we did not buy the cipher. There is no',
-    'key anywhere on this site.',
-    '',
-    'Transmit the plain text of every headed packet, whole and in order. The last one arrives',
-    'without a header; read it anyway.',
+    '**Every packet is encrypted with a key you are not given. Decode each packet and send it.**',
   ].join('\n'),
   board: {
-    fixed: [
-      'the post is a 12 by 6 shack; RIG-06 stays on the antenna',
-      'the whole band is queued before the shift starts, and it is drained once, in arrival order',
-      `every headed packet opens with \`${MAGIC}\` at position 0 of its plain text`,
-      'one shift covers every headed packet; the straggler carries its own',
-      'the straggler is the last packet on the band',
-      'nothing on the site reports either shift — no `probe` will hand one over',
-    ],
     redrawn: [
-      'the shift, anywhere in the space from 0 to 94',
-      "the straggler's own shift, and which of the two is the one that changes nothing",
-      'eight to thirteen headed packets',
-      'what the packets say, and how long they run',
+      'the key, 0 to 94',
+      "the last packet's key; either key can be 0",
+      '8 to 13 packets with a header',
+      'the text and length of each packet',
     ],
   },
   facts: [
     {
-      label: 'The cipher',
+      label: 'Shared key',
       value:
-        'Every packet is shifted by the **same whole number from 0 to 94**. That is the whole space.',
+        'All packets with a header use the same key, a whole number from 0 to 94. Nothing on the site tells you the key.',
     },
     {
-      label: 'The header',
-      value: `Every headed packet begins with \`${MAGIC}\` at position 0, in the plain text. It never changes.`,
+      label: 'Header',
+      value: `Decoded, every packet except the last starts with \`${MAGIC}\`. Send them first.`,
     },
     {
-      label: 'Order on the wire',
-      value: 'The headed packets, in arrival order, are the first thing you transmit.',
-    },
-    {
-      label: 'The straggler',
+      label: 'Last packet',
       value:
-        'The last packet has no header and a **different** shift in the same range. Its plain text is lowercase letters, digits, spaces and commas, and nothing else; exactly one shift in the space gives that. Send it straight after the others.',
-    },
-    {
-      label: '`buffered()`',
-      value:
-        'How many packets are still unread, without taking one. Free. The straggler is the last on the band, so it is the packet after which `buffered()` reads 0.',
+        'The last in the queue. No header, and a **different** key. Send it right after the others. Decoded, it has only lowercase letters, digits, spaces and commas. Only one key gives that.',
     },
   ],
   seeds: [1, 2, 3, 4],
@@ -254,7 +232,7 @@ export const w6_04: LevelDef = {
   objectives: [
     Objectives.custom(
       'relay-plain',
-      'Relay every headed packet in plain text, in order',
+      'Send every packet except the last, decoded, in arrival order',
       (ctx) => {
         const expected = wanted(ctx.initialWorld);
         return matchingPrefix(relayed(ctx), expected) === expected.length;
@@ -271,7 +249,7 @@ export const w6_04: LevelDef = {
   bonus: [
     Objectives.custom(
       'straggler',
-      'Recover the unheaded packet as well',
+      'Also send the last packet, decoded, right after the others',
       (ctx) => {
         const expected = wanted(ctx.initialWorld);
         const sent = relayed(ctx);
@@ -284,10 +262,8 @@ export const w6_04: LevelDef = {
     ),
   ],
   starter: [
-    '// NOTE(4470): there is no key on this site. i looked. i looked for a week',
-    '// NOTE(4470): the header is the only thing on the band that never changes',
-    '',
-    `// Every headed packet starts with "${MAGIC}". The shift is 0 to ${String(KEYSPACE - 1)}.`,
+    '// NOTE(4470): there is no key on this site. i looked for a week',
+    `// Packets with a header start with "${MAGIC}". The key is 0 to ${String(KEYSPACE - 1)}.`,
     '',
     'let packet = receive();',
     'while (packet !== null) {',
@@ -296,10 +272,9 @@ export const w6_04: LevelDef = {
     '',
   ].join('\n'),
   hints: [
-    'There are not many keys. There is exactly one way to know when you have the right one.',
-    'You are not looking for the key. You are looking for a packet that starts with the four characters you were promised, and the key is whatever produced it.',
-    'One shift in the space changes nothing at all, and it is still a shift. Either the headed packets or the straggler can be the one that arrived under it.',
-    'The straggler has no header, so no prefix can confirm a candidate. Its alphabet can: the right shift is the only one that leaves nothing outside it.',
+    'There are only 95 keys. The right one makes a packet start with the header.',
+    'Key 0 changes nothing, but it is still a valid key.',
+    'The last packet has no header. Test each key against its allowed characters instead.',
   ],
   docs: ['decode', 'receive', 'buffered', 'transmit'],
 };

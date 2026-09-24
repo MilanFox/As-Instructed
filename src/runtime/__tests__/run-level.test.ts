@@ -72,7 +72,7 @@ describe('running the reference solution', () => {
       { id: 'reach-pad', label: 'Park the bot on the landing pad', met: true },
       {
         id: 'bay-booking',
-        label: 'Clear the bay within 90 ticks',
+        label: 'Finish within 90 ticks',
         met: true,
         progress: [78, 90],
         meter: { kind: 'ticks' },
@@ -95,7 +95,7 @@ describe('locked hardware', () => {
     const { result } = run('scan();');
     expect(result.passed).toBe(false);
     expect(result.failure?.kind).toBe('runtime');
-    expect(result.failure?.message).toContain('`scan()` is not installed');
+    expect(result.failure?.message).toContain('`scan()` is not available yet');
     expect(result.failure?.message).toContain('w2-01');
     expect(result.failure?.line).toBe(1);
   });
@@ -220,7 +220,7 @@ describe('power() on a hand-operated machine', () => {
       const message = verdict.failure?.message ?? '';
       expect(message).toContain(`power("${machine.id}")`);
       expect(message).toContain(`(${String(machine.at.x)}, ${String(machine.at.y)})`);
-      expect(message).toContain('hand-operated');
+      expect(message).toContain('manual. Only use()');
       expect(message).toContain('use()');
 
       expect(verdict.failure?.at).toEqual(machine.at);

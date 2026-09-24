@@ -36,7 +36,7 @@ export function DiscrepancyList(): React.JSX.Element {
             className="lib__btn"
             onClick={() => setMuted({ discrepancies: false })}
           >
-            Start raising these again
+            Turn checks back on
           </button>
         ) : null}
       </div>
@@ -84,7 +84,7 @@ export function DiscrepancyList(): React.JSX.Element {
           className="lib__btn"
           onClick={() => setMuted({ discrepancies: !save.discrepanciesMuted })}
         >
-          {save.discrepanciesMuted ? 'Start raising these again' : DISCREPANCY.mute}
+          {save.discrepanciesMuted ? 'Turn checks back on' : DISCREPANCY.mute}
         </button>
       </div>
       <p className="lib-modal__footnote">{DISCREPANCY.legal[0]}</p>

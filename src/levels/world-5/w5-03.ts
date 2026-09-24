@@ -452,8 +452,8 @@ const poweredEarly = (ctx: ObjectiveContext): Divergence | undefined => {
   const waits = prereqsOf(missed)[0];
   return {
     where: `${missed.id} · ${at(missed.at)}`,
-    expected: waits === undefined ? 'brought up' : `brought up after ${waits}`,
-    received: 'never brought up',
+    expected: waits === undefined ? 'switched on' : `switched on after ${waits}`,
+    received: 'never switched on',
   };
 };
 
@@ -500,7 +500,7 @@ const outOfWave = (ctx: ObjectiveContext): Divergence | undefined => {
   if (breach !== undefined) {
     return {
       where: `tick ${String(breach.t)} · ${breach.id}, wave ${String(waves.get(breach.id) ?? 0)}`,
-      expected: `wave ${String(waves.get(breach.behind.id) ?? 0)} all up`,
+      expected: `wave ${String(waves.get(breach.behind.id) ?? 0)} all on`,
       received: `${breach.behind.id} still off`,
     };
   }
@@ -509,8 +509,8 @@ const outOfWave = (ctx: ObjectiveContext): Divergence | undefined => {
   if (missed === undefined) return undefined;
   return {
     where: `${missed.id} · ${at(missed.at)}`,
-    expected: `up in wave ${String(waves.get(missed.id) ?? 0)}`,
-    received: 'never brought up',
+    expected: `on in wave ${String(waves.get(missed.id) ?? 0)}`,
+    received: 'never switched on',
   };
 };
 
@@ -521,65 +521,48 @@ export const w5_03: LevelDef = {
   title: 'Order of Operations',
   hardware: ['link'],
   brief: [
-    '**MEMO KD-2506**',
-    '**FROM:** Dep. Coordinator M. Vance\\',
-    '**RE:** Energisation order',
+    'Crews go out one wave at a time. A crew called early is paid to wait, and they are very good at waiting. — M. Vance',
     '',
-    'A substation brought up early is not dangerous, merely futile, and futility is',
-    'reportable under the site metrics framework, which I am measured on. The crew rota',
-    'also goes out by wave, and a crew called before its wave bills standing time.',
-    '',
-    'Cable the district, then bring every substation up.',
+    '**Lay a cable for every link, and switch every substation on after all its feeders.**',
   ].join('\n'),
   board: {
-    fixed: [
-      'the district is 24 by 18 of open floor',
-      'the reactor stands at the centre, (12, 9), already on, and RIG-01 starts on it',
-      '`sub-1` waits on the reactor alone',
-      'the upstream lists never close a circle',
-      'each station stands on a rough ring around the reactor — the fewer cables on its shortest way in, the closer the ring; a station that lists nothing stands on the first',
-      'every listed prerequisite is drawn on the board as a cable from the start',
-      'ascending station number is never a legal order to bring the district up in',
-    ],
     redrawn: [
-      'ten to sixteen stations',
-      'the shape of the upstream lists — three strands side by side on one shift, one wide flat layer on another, two halves that never touch on another',
-      'how many waves deep the district runs, and how many stations each wave holds',
-      'which station number sits where in that shape',
-      'where on its ring each station stands, and how far off the ring line',
-      'whether any station lists no upstream at all',
+      'ten to sixteen substations',
+      'the shape of the links: three chains, one wide layer, or two halves',
+      'how many waves, and how many substations in each',
+      'which id is where on the board',
+      'whether any substation has no feeders',
     ],
   },
   facts: [
     {
-      label: '`probe(id)`',
+      label: 'Substations',
       value:
-        'Free. Substations are `sub-1` upward; past the last one it returns `null`. Nothing rewires itself while you work.',
+        'Ids are `sub-1`, `sub-2`, …; `probe` returns `null` after the last. Probing is free. Id numbers say nothing about order. All start off.',
     },
     {
-      label: 'Upstream',
-      value:
-        'Each station lists what it waits on as `vars` keys of the form `prereq:<id>`. That may be the reactor or another station. Some list none. The numbering says nothing about the order — `sub-2` can wait on `sub-12`.',
+      label: 'Reactor',
+      value: 'At the centre, (12, 9), already on. RIG-01 starts on it.',
     },
     {
-      label: 'The cable',
+      label: 'Feeders',
       value:
-        'For **every** listed prerequisite, run `link(prereqId, stationId)`. 2 ticks each. The board draws every listed cable from the start, dim; it turns solid once laid, and lights once both ends are up.',
+        'Each substation lists its feeders as `vars` keys `prereq:<id>`: the reactor or other substations. Some have none. `power(id, "on")` (2 ticks, from anywhere) counts only if all its feeders already count as on. An early call does no harm; call again later. It still reads `on`, but does not count, and is marked red.',
     },
     {
-      label: 'Bringing one up',
+      label: 'Links',
       value:
-        '`power(stationId, "on")`, 2 ticks. The switch always throws — nothing refuses a call made too early, and the station reads `on` afterwards either way. What is graded is the tick you called it at, not the state you read back. A futile call costs the same as a useful one and does no lasting harm: call the station again once its upstream is up and that second call counts. On the board a station switched on too early stays dark inside a red ring.',
+        'One per feeder. Call `link(feederId, id)`, feeder first, for **every** link, 2 ticks each. A link carries nothing: `power` does not need it. Links never form a circle. Each shows as a dim cable.',
     },
     {
-      label: 'Waves',
+      label: 'Wave',
       value:
-        'Wave 1 is every station that is ready at the start: it lists only the reactor, or nothing at all. Every other station is one wave past the **deepest** thing it lists, so a station listing the reactor and a wave 2 station is wave 3, not wave 1. The ring a station stands on is not its wave. One wave at a time means no `power` call on a station while any station of an earlier wave is not yet up. The order inside a wave is free.',
+        'Wave 1: substations fed only by the reactor, or by nothing. Any other is one wave after its feeder with the **highest** wave. For the star, never call `power(id, "on")` while an earlier wave has one that does not count as on yet. The circles of substations on the board are not waves.',
     },
     {
-      label: 'The Repository',
+      label: 'Library',
       value:
-        'Keep whatever turns those lists into waves — later briefs call it `waves`, and expect the groups back, wave 1 first.',
+        'Not graded here. Later levels import a `waves` function from `lib.ts` that returns the waves, wave 1 first.',
     },
   ],
   seeds: [1, 2, 3, 4],
@@ -625,7 +608,7 @@ export const w5_03: LevelDef = {
   objectives: [
     Objectives.custom(
       'cabled',
-      'Run a cable for every prerequisite',
+      'Lay a cable for every link',
       (ctx) => {
         const [laid, total] = cabledCount(ctx.world);
         return laid === total;
@@ -649,7 +632,7 @@ export const w5_03: LevelDef = {
     ),
     Objectives.custom(
       'in-order',
-      'Energise each station only after its upstream is on',
+      'Switch each substation on after all its feeders are on',
       (ctx) => orderedCount(ctx) === substations(ctx.world).length,
       {
         progress: (ctx) => [orderedCount(ctx), substations(ctx.world).length],
@@ -660,7 +643,7 @@ export const w5_03: LevelDef = {
   bonus: [
     Objectives.custom(
       'one-wave-at-a-time',
-      'Bring the district up one wave at a time',
+      'Switch substations on one wave at a time',
       (ctx) => {
         if (waveBreach(ctx) !== undefined) return false;
         const up = upInWaves(ctx);
@@ -670,17 +653,16 @@ export const w5_03: LevelDef = {
     ),
   ],
   starter: [
-    '// NOTE(4470): the cable does not care what order you lay it in. the power does',
-    '// NOTE(4470): some stations list no upstream at all. that is not a fault',
+    '// NOTE(4470): cables can go in any order. power cannot',
+    '// NOTE(4470): some substations have no feeders. that is fine',
     '',
     "const reactor = probe('reactor');",
     '',
   ].join('\n'),
   hints: [
-    'Reading the whole district costs nothing. Read all of it before you spend a single tick, and you will know what depends on what.',
-    'A station is ready when every machine it lists is already on. At the start only the reactor is on, so gather every station that is ready right now, not just the first one you find.',
-    'Bring up everything you gathered before you look again. Then gather whatever is ready now. Each gathering is one wave.',
-    'A station that lists something shallow and something deep waits for the deep one. How close it stands to the reactor says nothing about which wave it is in.',
+    'Probing is free. Read every substation before you spend a tick.',
+    'A substation is ready when all its feeders are on. At the start, only the reactor is on. Collect every substation that is ready now.',
+    'Switch on all of them. Then collect what is ready next. Each collection is one wave.',
   ],
   docs: ['probe', 'link', 'power'],
 };

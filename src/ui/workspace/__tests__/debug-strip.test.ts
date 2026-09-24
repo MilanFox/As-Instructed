@@ -32,23 +32,23 @@ describe('three different reasons for having no line read as three different sen
   test('a run that recorded no attribution blames the run', () => {
     const text = describeDebug(view({ attributed: false }));
 
-    expect(text).toContain('this run was not a debug run');
-    expect(text).not.toContain('coalesced');
+    expect(text).toContain('run Debug to see lines');
+    expect(text).not.toContain('merged');
   });
 
   test('a coalesced sense call says there is more than one line, not none', () => {
     const text = describeDebug(view({ kind: 'sense' }));
 
     expect(text).toContain('no single line');
-    expect(text).not.toContain('not a debug run');
+    expect(text).not.toContain('run Debug');
   });
 
   test('an event the engine raised says the engine raised it', () => {
     const text = describeDebug(view({ kind: 'objective' }));
 
-    expect(text).toContain('the engine raised this');
-    expect(text).not.toContain('not a debug run');
-    expect(text).not.toContain('coalesced');
+    expect(text).toContain('game event');
+    expect(text).not.toContain('run Debug');
+    expect(text).not.toContain('merged');
   });
 
   test('the three are not interchangeable', () => {

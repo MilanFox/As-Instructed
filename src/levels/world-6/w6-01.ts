@@ -59,7 +59,7 @@ const pingLines = (ctx: ObjectiveContext): string[] =>
 function pingReport(ctx: ObjectiveContext): Divergence | undefined {
   const said = pingLines(ctx);
   if (said.length === 0) {
-    return { where: 'the ping line', expected: 'one line naming the ping', received: NOTHING };
+    return { where: 'the ping line', expected: 'one ping line', received: NOTHING };
   }
   if (said.length > 1) {
     return {
@@ -72,7 +72,7 @@ function pingReport(ctx: ObjectiveContext): Divergence | undefined {
   if (got === wantedPing(ctx.initialWorld)) return undefined;
   return {
     where: 'the ping line',
-    expected: pingAt(ctx.initialWorld) < 0 ? 'ping none' : 'the arrival number of the ping',
+    expected: pingAt(ctx.initialWorld) < 0 ? 'ping none' : 'the position of the ping',
     received: clipValue(got),
   };
 }
@@ -84,47 +84,31 @@ export const w6_01: LevelDef = {
   title: 'Carrier Wave',
   hardware: ['receive', 'buffered'],
   brief: [
-    '**FROM:** Field Engineer D. Halloran',
+    'This radio hut has listened for thirteen years and nobody ever read the queue. One packet is not ours, so tell me where it sits. — D. Halloran',
     '',
-    'the post has been listening on this band for thirteen years. nobody has read the queue.',
-    'some shifts there is nothing on it, and nothing is still a reading. a ping in the traffic',
-    'is not ours. say where it sat.',
-    '',
-    'Print every packet on the band, in order, exactly as it arrived.',
+    '**Print every packet in the queue, in order. The queue can be empty.**',
   ].join('\n'),
   board: {
-    fixed: [
-      'the post is a 10 by 6 shack; RIG-06 is parked on the antenna and nothing here needs it to move',
-      'the whole band is queued before the shift starts — nothing arrives while you read it',
-      'every packet is one line of text, handed over in arrival order',
-      "a status ping that is not the post's sits somewhere on every band that has traffic",
-    ],
     redrawn: [
-      'how long the queue is — five to fifteen packets, or none at all',
-      'what each packet says',
-      'where the ping sits in the queue',
+      'queue length: 5 to 15 packets, or empty',
+      'the text of each packet',
+      'the position of the ping',
     ],
   },
   facts: [
     {
-      label: '`receive()`',
-      value: 'The next packet as a string, or `null` once the queue is empty. Free.',
+      label: 'Packets',
+      value:
+        'All packets are in the queue at the start. `receive()` returns `null` when it is empty.',
     },
     {
-      label: '`buffered()`',
-      value:
-        'How many packets are still unread, without taking one. Free, and reading it takes nothing off the queue, so `buffered() === 0` is an empty queue.',
-    },
-    { label: 'The queue', value: 'A different length every shift. Some shifts it is empty.' },
-    {
-      label: 'The ping',
-      value:
-        "One packet on every band that has traffic reads `SESS 4470 ACTIVE`. It is not the post's.",
+      label: 'Ping',
+      value: 'The packet `SESS 4470 ACTIVE`. Every queue that has packets has one.',
     },
     {
-      label: 'Ping report',
+      label: 'Ping line',
       value:
-        'One line: `ping ` then its arrival number, counted from 0. `ping none` when the band is empty.',
+        "Print one line: `ping ` and the ping's position in the queue, counting from 0. If the queue is empty, print `ping none`.",
     },
   ],
   seeds: [1, 2, 3],
@@ -147,7 +131,7 @@ export const w6_01: LevelDef = {
   objectives: [
     Objectives.custom(
       'log-the-band',
-      'Print every queued packet, in order',
+      'Print every packet in the queue, in order',
       (ctx) => expected(ctx).evaluate(withoutPingLines(ctx)),
       {
         progress: (ctx) => expected(ctx).progress?.(withoutPingLines(ctx)) ?? [0, 0],
@@ -158,7 +142,7 @@ export const w6_01: LevelDef = {
   bonus: [
     Objectives.custom(
       'name-the-ping',
-      'Report where the ping sat on the band',
+      "Print the ping line: the ping's position in the queue",
       (ctx) => {
         const said = pingLines(ctx);
         return said.length === 1 && said[0] === wantedPing(ctx.initialWorld);
@@ -167,19 +151,13 @@ export const w6_01: LevelDef = {
     ),
   ],
   starter: [
-    '// The bot is parked on the antenna. Nothing on this level needs to move.',
-    '',
-    '// NOTE(4470): the queue is short and some shifts it is empty',
-    '// NOTE(4470): if there is traffic there is a ping in it. it is not ours',
+    '// The bot stands on the antenna. It does not need to move.',
+    '// NOTE(4470): sometimes the queue is empty',
     '',
     'const packet = receive();',
     'print(packet);',
     '',
   ].join('\n'),
-  hints: [
-    'You do not know how many packets are waiting. Ask the band, rather than deciding in advance.',
-    'The queue tells you when it is finished by handing you something that is not a packet.',
-    'A shift with no traffic is a normal shift. Your program has to survive arriving at one.',
-  ],
+  hints: ['You do not know how many packets there are. Read until the queue is empty.'],
   docs: ['receive', 'buffered', 'print'],
 };

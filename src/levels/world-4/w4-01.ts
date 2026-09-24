@@ -91,68 +91,31 @@ export const w4_01: LevelDef = {
   title: 'Headlamp',
   hardware: ['look'],
   brief: [
-    '```',
-    'MEMO KD-2401',
-    'FROM: Dep. Coordinator M. Vance',
-    'RE:   Subsurface access',
+    'Each lamp reading in the dark tunnels costs money. Finance says you should "feel your way", but Finance has never been down there. — M. Vance',
     '',
-    'The tunnels are not lit, not surveyed, and not, strictly, ours.',
-    'The Charter grants us surface rights. Legal advise that "surface"',
-    'is defined in Appendix C.',
-    '',
-    'The lamp is metered by the reading, and Procurement have already',
-    'booked the saving from the lower count.',
-    '```',
-    '',
-    'Drive RIG-04 down the tunnel and park it on the pad.',
+    '**Drive the bot along the dark tunnel to the pad, with few readings. Every sensing call, like `look` or `pos`, is one reading.**',
   ].join('\n'),
   board: {
-    fixed: [
-      'the map is 23 tiles square, and rock everywhere the tunnel is not',
-      'one tunnel and nothing else — every floor tile belongs to it',
-      'the tunnel is one tile wide and never runs alongside itself, so no tile on it has more than two openings',
-      `it runs straight ${String(RUNS)} times, so it bends ${String(RUNS - 1)} times, every shift`,
-      `both allowances are the same every shift — ${String(LAMP)} readings, ${String(STAR)} for the star`,
-      'a tile with an even `x` and an even `y` is always rock',
-      'RIG-04 starts at one end of the tunnel and the pad is at the other',
-    ],
     redrawn: [
-      'the shape of the tunnel, bend for bend',
-      'its length — 41 to 59 tiles of floor',
-      `the step allowance with it — one step per tile between RIG-04 and the pad, plus ${String(STEP_SLACK)}`,
-      'where in the rock it is carved',
-      'which end of it RIG-04 starts from',
+      'the shape and place of the tunnel',
+      'its length: 41 to 59 tiles, so also the step limit',
+      'which end the bot starts at',
     ],
   },
   facts: [
-    { label: 'The tunnel', value: 'A different shape every shift, and a different length.' },
     {
-      label: 'The rock',
+      label: 'Tunnel',
+      value: `One tile wide, with rock all around. Rock stops both moves and looks. No branches, and no two parts of it touch, so each tile has at most two open sides. ${String(RUNS)} straight parts, ${String(RUNS - 1)} bends. the bot starts at one end.`,
+    },
+    { label: 'Pad', value: 'At the other end of the tunnel. `look` shows it like any tile.' },
+    {
+      label: 'Readings',
       value:
-        'Rock (a terrain) fills everything the tunnel is not. It cannot be walked on and a ray cannot see through it.',
+        'Every sensing call (`look`, `scan`, `pos`, …) is one reading, however far it sees. Readings cost no ticks.',
     },
     {
-      label: '`look(dir)`',
-      value:
-        'Returns the tiles along that direction, nearest first. It stops at the first thing it cannot see through, and reports that tile last. The second argument limits how far to look; left out, the ray runs until something stops it.',
-    },
-    {
-      label: 'Looking',
-      value:
-        'Costs no ticks. Every question the bot asks is one reading — `look`, `scan`, `pos`, any of them, whatever range it was given — and both allowances below count all of them.',
-    },
-    { label: 'The pad', value: 'The only tile in the tunnel that is not plain floor.' },
-    {
-      label: 'The lamp',
-      value: `${String(LAMP)} readings for the shift.`,
-    },
-    {
-      label: 'The steps',
-      value: `The shift allows one step for every tile of tunnel between RIG-04 and the pad, plus ${String(STEP_SLACK)}. A move into rock takes a tick and counts as a step, so finding the way by walking into walls does not fit either.`,
-    },
-    {
-      label: 'The star',
-      value: `${String(STAR)} readings for the shift.`,
+      label: 'Steps',
+      value: `Limit: the steps along the tunnel from the bot to the pad, plus ${String(STEP_SLACK)}. A move into rock counts as a step.`,
     },
   ],
   seeds: [1, 2, 46],
@@ -161,7 +124,7 @@ export const w4_01: LevelDef = {
   objectives: [
     Objectives.custom(
       'reach-tunnel-end',
-      'Park the bot on the pad at the far end',
+      'End the run on the pad',
       (ctx) => {
         const bot = ctx.world.bots[0];
         if (!bot || !bot.alive) return false;
@@ -171,7 +134,7 @@ export const w4_01: LevelDef = {
     ),
     Objectives.custom(
       'reading-allowance',
-      `Reach the pad in ${String(LAMP)} readings`,
+      `Reach the pad with at most ${String(LAMP)} readings`,
       (ctx) => botEndsOn(ctx, Terrain.Pad) && readingsTaken(ctx) <= LAMP,
       {
         progress: (ctx) => [Math.min(readingsTaken(ctx), LAMP), LAMP],
@@ -187,7 +150,7 @@ export const w4_01: LevelDef = {
     ),
     Objectives.custom(
       'no-wasted-steps',
-      'Walk the tunnel and nothing else',
+      `Take at most ${String(STEP_SLACK)} steps more than the tunnel needs`,
       (ctx) => stepsTaken(ctx) <= stepAllowance(ctx),
       {
         meter: { kind: 'events', event: 'move' },
@@ -204,7 +167,7 @@ export const w4_01: LevelDef = {
   bonus: [
     Objectives.custom(
       'tight-reading-bound',
-      `Reach the pad in ${String(STAR)} readings`,
+      `Reach the pad with at most ${String(STAR)} readings`,
       (ctx) => botEndsOn(ctx, Terrain.Pad) && readingsTaken(ctx) <= STAR,
       {
         progress: (ctx) => [Math.min(readingsTaken(ctx), STAR), STAR],
@@ -220,19 +183,17 @@ export const w4_01: LevelDef = {
     ),
   ],
   starter: [
-    '// look(dir, 1) and look(dir) cost one reading each. Only one of them is a survey.',
+    '// Each look is one reading, however far it sees.',
     '',
     'const east = look(Dir.East);',
     'print(east.length + " tiles east, ending in " + east[east.length - 1].terrain);',
     '',
   ].join('\n'),
   hints: [
-    'The bot cannot see the tunnel. It can see along each of four directions, and looking costs no ticks.',
-    'A move into rock still takes a tick, and the step allowance counts it. The way through has to be known before it is walked, not found by bumping.',
-    'Standing anywhere in the middle of the tunnel there are exactly two openings, and you arrived through one of them.',
-    'So you already know one direction you do not want. Hold on to it across the loop, rather than working it out again.',
-    'The pad is the only tile in the tunnel that is not plain floor. A ray reports the terrain of every tile it crosses, so the pad arrives in the same reading that reports the corridor.',
-    'A ray is not a feeler. `look(dir)` hands back the whole straight run of corridor at once, so one call is worth as many steps as the corridor is long — and the next call is only needed where it bends.',
+    'Each tunnel tile has two open sides. You came in through one of them.',
+    'Remember the direction you came from, so you never need to check it.',
+    'One look shows a whole straight part. Walk all of it, then look again at the bend.',
+    'The pad shows up in a look like any other tile. Check the terrain of each tile.',
   ],
   docs: ['look', 'coordinates', 'memory'],
 };

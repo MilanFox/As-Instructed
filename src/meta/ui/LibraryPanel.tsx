@@ -15,8 +15,8 @@ const TABS: { id: MetaPanel; label: string }[] = [
   { id: 'library', label: 'lib.ts' },
   { id: 'refactor', label: 'Cost' },
   { id: 'structure', label: 'Structure' },
-  { id: 'regression', label: 'Regression' },
-  { id: 'discrepancies', label: 'Discrepancies' },
+  { id: 'regression', label: 'Re-runs' },
+  { id: 'discrepancies', label: 'Checks' },
 ];
 
 export function UnlockMemo(): React.JSX.Element {
@@ -41,7 +41,7 @@ export function UnlockMemo(): React.JSX.Element {
       <p className="lib-memo__legal">{UNLOCK_MEMO.legal[0]}</p>
       <div className="lib-modal__actions">
         <button type="button" className="lib__btn lib__btn--primary" onClick={markBriefed}>
-          Acknowledge
+          OK
         </button>
       </div>
     </div>
@@ -117,5 +117,5 @@ export function libraryStatusLine(state: {
   }
   if (state.save.published.length === 0) return REFACTOR.empty;
   const count = state.save.published.length;
-  return `${count} ${count === 1 ? 'subroutine' : 'subroutines'} published.`;
+  return `${count} ${count === 1 ? 'function' : 'functions'} published.`;
 }

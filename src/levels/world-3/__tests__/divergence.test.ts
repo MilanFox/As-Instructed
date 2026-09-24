@@ -58,7 +58,7 @@ describe('w3-01 — the pad the shift walked past', () => {
     expect(met).toBe(false);
     expect(divergence).toEqual({
       where: 'the shift report',
-      expected: 'a line saying how many pairs share a row',
+      expected: 'one line: straight <n>',
       received: '(nothing)',
     });
   });
@@ -71,7 +71,7 @@ describe('w3-01 — the pad the shift walked past', () => {
     const shown = must(divergence, 'a divergence');
     expect(shown).toEqual({
       where: 'the shift report',
-      expected: 'a different figure',
+      expected: 'a different pair count',
       received: 'straight 0',
     });
     expect(shown.expected).not.toMatch(/\d/);
@@ -84,8 +84,8 @@ describe('w3-01 — the pad the shift walked past', () => {
     expect(met).toBe(false);
     expect(divergence).toEqual({
       where: 'the shift report',
-      expected: 'one line about the shift',
-      received: '7 of them',
+      expected: 'one line',
+      received: '7 lines',
     });
   });
 });
@@ -179,7 +179,7 @@ describe('w3-03 — the crate, the place in the stack and the step', () => {
     expect(met).toBe(false);
     expect(divergence).toEqual({
       where: `arrival ${String(first.index)}, from ${at(first.at)}`,
-      expected: 'on the outbound bay',
+      expected: 'on the bay',
       received: 'still in the yard',
     });
   });

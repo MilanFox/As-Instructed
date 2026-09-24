@@ -30,5 +30,5 @@ export function callLine(call: ApiCall, max: number): string {
 }
 
 export function unrecordedNote(dropped: number): string {
-  return `log full · ${String(dropped)} unrecorded`;
+  return `log full, ${String(dropped)} not recorded`;
 }

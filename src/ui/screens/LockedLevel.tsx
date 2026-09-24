@@ -10,29 +10,26 @@ import '../styles/locked.css';
 
 export function blockedHeading(blocked: BlockedLevel): string {
   return blocked.reason === 'unknown'
-    ? `NO WORK ORDER ${blocked.levelId.toUpperCase()}`
-    : `WORK ORDER ${blocked.levelId.toUpperCase()} — ON HOLD`;
+    ? `NO LEVEL ${blocked.levelId.toUpperCase()}`
+    : `LEVEL ${blocked.levelId.toUpperCase()} — ON HOLD`;
 }
 
 export function blockedLines(save: SaveFile, blocked: BlockedLevel): string[] {
   if (blocked.reason === 'unknown') {
-    return [
-      `The campaign has no work order ${blocked.levelId}.`,
-      'The site map lists every work order that exists.',
-    ];
+    return [`There is no level ${blocked.levelId}.`, 'The site map shows every level.'];
   }
 
-  const lines = [`Work order ${blocked.levelId} is not open yet.`];
+  const lines = [`Level ${blocked.levelId} is on hold.`];
   const reason = lockReason(save, blocked.levelId);
   if (!reason) return lines;
 
-  if (reason.opensOnClosing) lines.push(`Closing ${reason.opensOnClosing} opens it.`);
+  if (reason.opensOnClosing) lines.push(`Finish ${reason.opensOnClosing} to open it.`);
   if (reason.previousWorld !== null) {
     const left = reason.outstanding.length;
     lines.push(
       left === 1
-        ? `Closing the last open work order in world ${reason.previousWorld} opens it as well.`
-        : `Closing the ${left} open work orders in world ${reason.previousWorld} opens it as well.`,
+        ? `Or finish the last open level in Site ${reason.previousWorld}.`
+        : `Or finish all ${left} open levels in Site ${reason.previousWorld}.`,
     );
   }
   return lines;
@@ -96,8 +93,8 @@ export function Interlock({
     <section className="survey-frame survey-interlock" aria-label={blockedHeading(blocked)}>
       <div className="survey-frame__body">
         <div className="survey-bar survey-bar--stop">
-          <span>Interlock</span>
-          <span className="survey-bar__tools">Refused</span>
+          <span>Level</span>
+          <span className="survey-bar__tools">On hold</span>
         </div>
         <div className="survey-interlock__pad">
           <h2 className="survey-interlock__head" ref={plate} tabIndex={-1}>
@@ -115,7 +112,7 @@ export function Interlock({
               <p className="survey-interlock__kicker">
                 Site {pad(site.world.id)} — {site.world.name}
               </p>
-              <ul className="survey-interlock__orders" aria-label="Work orders on this site">
+              <ul className="survey-interlock__orders" aria-label="Levels on this site">
                 {site.orders.map((order) => (
                   <li key={order.id}>
                     <a
@@ -139,7 +136,7 @@ export function Interlock({
         </div>
         <div className="survey-interlock__foot">
           <button type="button" className="survey-ctl" onClick={onDismiss}>
-            Back to the plan
+            Back to the site map
           </button>
           <span className="survey-interlock__hint">Or pick any site.</span>
         </div>

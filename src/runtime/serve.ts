@@ -29,8 +29,7 @@ export function serveRunRequest(request: RunRequest): RunResponse {
   const level = getLevel(request.levelId);
   if (!level) {
     return fatal(
-      `There is no level "${request.levelId}" in this build. The campaign registry and the save ` +
-        'file have got out of step.',
+      `There is no level "${request.levelId}" in this version of the game. Your save may be from another version.`,
     );
   }
 

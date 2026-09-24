@@ -89,18 +89,22 @@ const misfiled = (ctx: ObjectiveContext): Divergence | undefined => {
   if (said === undefined) {
     return {
       where: 'the shift report',
-      expected: 'a line saying how many pairs share a row',
+      expected: 'one line: straight <n>',
       received: NOTHING,
     };
   }
   if (lines.length > 1) {
     return {
       where: 'the shift report',
-      expected: 'one line about the shift',
-      received: `${String(lines.length)} of them`,
+      expected: 'one line',
+      received: `${String(lines.length)} lines`,
     };
   }
-  return { where: 'the shift report', expected: 'a different figure', received: clipValue(said) };
+  return {
+    where: 'the shift report',
+    expected: 'a different pair count',
+    received: clipValue(said),
+  };
 };
 
 export const w3_01: LevelDef = {
@@ -110,52 +114,28 @@ export const w3_01: LevelDef = {
   title: 'Pick and Place',
   hardware: ['pickup', 'drop'],
   brief: [
-    '**FROM:** Field Engineer D. Halloran',
+    'Planning wants to know how many crates could go straight across, with no row change. The number goes on a chart that nobody reads. — D. Halloran',
     '',
-    'the arm on RIG-04 has one clamp. the log still shows you tried for a second.',
-    '',
-    'planning prices the row changes. count the straight runs.',
-    '',
-    'Every pad on the east side must end the shift holding a crate.',
+    '**Carry the crates to the pads, one at a time, until every pad has a crate.**',
   ].join('\n'),
   board: {
-    fixed: [
-      'the shed is 12 wide and 3 deep inside its wall',
-      'the west siding is the two columns at the west wall, the pads the two at the east',
-      'one crate for every pad',
-      'RIG-04 starts mid-shed with a one-crate clamp',
-      'the crate rows and the pad rows never agree row for row',
-    ],
     redrawn: [
       'three, four or five crates',
-      'which siding tiles hold them',
+      'which west tiles hold crates',
       'which east tiles are pads',
-      'the row RIG-04 starts in',
+      'the row the bot starts in',
     ],
   },
   facts: [
     {
-      label: 'The crates',
-      value: 'Crates (an item) lying on the west siding. As many crates as there are pads.',
+      label: 'Crate',
+      value:
+        'Crates lie in the two west columns, pads in the two east columns. One crate for every pad. The bot carries one crate at a time. `pickup()` while holding one takes nothing and still costs a tick.',
     },
     {
-      label: 'The pads',
+      label: 'Straight pairs',
       value:
-        'Pad (a terrain) on the east side of the shed. A loaded pad is a pad with a crate lying on it.',
-    },
-    {
-      label: 'Between shifts',
-      value:
-        'The two sidings are stacked separately, and both restack between shifts. A row holding two crates may have no pad at all.',
-    },
-    { label: '`pickup()`', value: 'Takes what is lying on the tile the bot is standing on.' },
-    { label: '`drop()`', value: 'Puts it back down on the tile the bot is standing on.' },
-    { label: 'A full bot', value: '`pickup()` takes nothing and still costs a tick.' },
-    { label: 'The clamp', value: 'One crate at a time.' },
-    {
-      label: 'The shift report',
-      value:
-        'For the star: print one line, `straight <n>`. Pair up as many crates as you can with pads in their own row, one crate to one pad. `n` is the total across all three rows. Where the bot drives does not change it.',
+        'A crate and a pad in the same row, each used in one pair only. For the star, print one line: `straight <n>`, where `n` is the most straight pairs you can make in all three rows. Your route does not change it.',
     },
   ],
   seeds: [1, 2, 3],
@@ -177,7 +157,7 @@ export const w3_01: LevelDef = {
   objectives: [
     Objectives.custom(
       'pads-loaded',
-      'Leave a crate on every pad',
+      'Put a crate on every pad',
       (ctx) => loadedPads(ctx) === pads(ctx.initialWorld).length,
       {
         progress: (ctx) => [loadedPads(ctx), pads(ctx.initialWorld).length],
@@ -188,7 +168,7 @@ export const w3_01: LevelDef = {
   bonus: [
     Objectives.custom(
       'straight-runs',
-      'Report how many crates can be paired with a pad in their own row',
+      'Print the most straight pairs the board allows (crate and pad in one row)',
       (ctx) => {
         const lines = filed(ctx);
         return (
@@ -200,17 +180,16 @@ export const w3_01: LevelDef = {
   ],
   budget: { maxTicks: 2500 },
   starter: [
-    '// The crates are on the west siding. The pads are on the east side.',
+    '// Crates are west. Pads are east.',
     '',
     'while (canMove(Dir.West)) move(Dir.West);',
     '',
   ].join('\n'),
   hints: [
-    'The clamp holds one crate. Set it down before you reach for another.',
-    'The crate rows and the pad rows are not the same rows, and they change between shifts.',
-    'A pickup that takes nothing still costs a tick, and the log shows it as a failure.',
-    'One trip across the shed moves one crate. Fetch, carry, set down, go back for the next.',
-    'Count the crates in each row and the pads in each row. A row offers as many pairs as the smaller of those two numbers.',
+    'The bot holds one crate. Drop it before you pick up the next one.',
+    'Crates and pads move between shifts. Find them first, then plan.',
+    'Each trip moves one crate: fetch it, carry it, drop it, go back.',
+    'For the star: a crate or a pad can be in one pair only.',
   ],
   docs: ['pickup', 'drop'],
 };

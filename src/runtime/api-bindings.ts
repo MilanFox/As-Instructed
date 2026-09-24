@@ -126,9 +126,7 @@ function transmitPayload(sim: Sim, botId: number, text: string, cost: number): b
   if (!antenna) {
     sim.refuseMachineAct(botId, '', cost);
     throw new IllegalActionError(
-      'transmit(): this work order has no antenna, so there is nothing here that can send. ' +
-        'Drop the call — no command installs one, and the listening-post work orders that do ' +
-        'carry one say so in the brief.',
+      'transmit(): this level has no antenna. Remove the call.',
       { botId },
     );
   }
@@ -178,9 +176,8 @@ function linkMachines(
     const missing = from ? toId : fromId;
     sim.refuseMachineAct(botId, missing, cost);
     throw new IllegalActionError(
-      `link("${fromId}", "${toId}"): no machine on this work order has the id "${missing}". ` +
-        `probe("${missing}") returns null for an id that does not exist, and costs nothing — ` +
-        'check it before you lay cable to it.',
+      `link("${fromId}", "${toId}"): no machine here has the id "${missing}". ` +
+        `probe("${missing}") checks an id for free.`,
       { botId },
     );
   }

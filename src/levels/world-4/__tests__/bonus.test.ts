@@ -488,7 +488,7 @@ describe('w4-04 deep-face', () => {
       const star = starOf(seed, 'deep-face', prospecting({ chaseDeep: false, readAhead: true }));
       const shown = must(star.divergence, 'a divergence');
 
-      expect(shown.where, `seed ${String(seed)}`).toBe('the deepest face');
+      expect(shown.where, `seed ${String(seed)}`).toBe('the furthest ore');
       expect(shown.expected, `seed ${String(seed)}`).toMatch(/^\d+ tiles from the lift$/);
       expect(shown.received, `seed ${String(seed)}`).toMatch(/^\d+ tiles from the lift$/);
       expect(shown.received, `seed ${String(seed)}`).not.toBe(shown.expected);
@@ -502,7 +502,7 @@ describe('w4-04 deep-face', () => {
 
       expect(run.passed, `seed ${String(seed)}`).toBe(false);
       expect(run.met('deep-face'), `seed ${String(seed)}`).toBe(false);
-      expect(star.divergence?.received, `seed ${String(seed)}`).toBe('no face was cut');
+      expect(star.divergence?.received, `seed ${String(seed)}`).toBe('none mined');
     }
   });
 });
@@ -523,12 +523,16 @@ describe('w4-04 no-dry-holes', () => {
 
   test('the empty passage is quoted back with the tile the bot stood on', () => {
     for (const seed of w4_04.seeds) {
-      const star = starOf(seed, 'no-dry-holes', prospecting({ chaseDeep: false, readAhead: false }));
+      const star = starOf(
+        seed,
+        'no-dry-holes',
+        prospecting({ chaseDeep: false, readAhead: false }),
+      );
       const shown = must(star.divergence, 'a divergence');
 
       expect(shown.where, `seed ${String(seed)}`).toMatch(/^\(\d+, \d+\)$/);
-      expect(shown.expected, `seed ${String(seed)}`).toBe('a face at the blind end');
-      expect(shown.received, `seed ${String(seed)}`).toBe('spoil');
+      expect(shown.expected, `seed ${String(seed)}`).toBe('ore at the end');
+      expect(shown.received, `seed ${String(seed)}`).toBe('rubble');
     }
   });
 

@@ -65,7 +65,9 @@ function tunnelReversals(events: ObjectiveContext['trace']['events'], width: num
         event.to.x <= lastTunnelX,
     )
     .map((event) =>
-      event.kind === 'move' ? { t: event.t, botId: event.botId, dx: event.to.x - event.from.x } : null,
+      event.kind === 'move'
+        ? { t: event.t, botId: event.botId, dx: event.to.x - event.from.x }
+        : null,
     )
     .filter((step): step is { t: number; botId: number; dx: number } => step !== null)
     .sort((a, b) => a.t - b.t || a.botId - b.botId);

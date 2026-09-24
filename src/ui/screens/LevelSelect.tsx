@@ -491,13 +491,13 @@ export function pad(value: number): string {
 
 export function siteLabel(site: CampaignSite): string {
   if (!site.unlocked) {
-    return `Site ${pad(site.world.id)}, ${site.world.name}, unsurveyed, ${String(site.issued)} work orders on hold`;
+    return `Site ${pad(site.world.id)}, ${site.world.name}, locked, ${String(site.issued)} levels`;
   }
-  const walked = `Site ${pad(site.world.id)}, ${site.world.name}, ${String(site.closed)} of ${String(site.issued)} work orders closed`;
+  const walked = `Site ${pad(site.world.id)}, ${site.world.name}, ${String(site.closed)} of ${String(site.issued)} levels closed`;
   if (!site.complete) return walked;
   const tiers = [
     'site complete',
-    ...(site.perfect ? ['every work order at par'] : []),
+    ...(site.perfect ? ['every level at par'] : []),
     ...(site.starred ? ['every bonus objective met'] : []),
   ];
   return `${walked}, ${tiers.join(', ')}`;
@@ -506,7 +506,7 @@ export function siteLabel(site: CampaignSite): string {
 export function orderLabel(order: CampaignOrder): string {
   const medal = order.medal && order.medal !== 'none' ? `, ${order.medal}` : '';
   const bonus = allBonusMet(order) ? ', all bonus objectives met' : '';
-  return `Work order ${order.id}, ${order.level.title}, ${order.status.toLowerCase()}${medal}${bonus}`;
+  return `Level ${order.id}, ${order.level.title}, ${order.status.toLowerCase()}${medal}${bonus}`;
 }
 
 // The row is a real link; the router owns the URL, so the click only has to skip the reload.
@@ -775,18 +775,18 @@ export function LevelSelect(): JSX.Element {
         <button
           type="button"
           className="survey-ctl survey-ctl--tight"
-          title={`Back to the station — ${open.id.toUpperCase()}`}
-          aria-label={paged ? 'Back to the station' : undefined}
+          title={`Back to level ${open.id.toUpperCase()}`}
+          aria-label={paged ? 'Back to level' : undefined}
           onClick={() => goto('workspace')}
         >
           <IconMap />
-          <span>{paged ? 'station' : 'back to the station'}</span>
+          <span>{paged ? 'back' : 'back to level'}</span>
         </button>
       ) : null}
       <button
         type="button"
         className="survey-ctl survey-ctl--tight"
-        title="Export progress and shared subroutines"
+        title="Export progress and library"
         onClick={onExport}
       >
         export
@@ -794,7 +794,7 @@ export function LevelSelect(): JSX.Element {
       <button
         type="button"
         className="survey-ctl survey-ctl--tight"
-        title="Import progress and shared subroutines"
+        title="Import progress and library"
         onClick={() => file.current?.click()}
       >
         import
@@ -926,7 +926,7 @@ export function LevelSelect(): JSX.Element {
         </h1>
       ) : null}
 
-      <ul className="survey__pins" aria-label="Survey sites" onKeyDown={onPinKeys}>
+      <ul className="survey__pins" aria-label="Sites" onKeyDown={onPinKeys}>
         {campaign.sites.map((entry, i) => {
           const plot = plan.plots[i];
           if (!plot) return null;
@@ -967,7 +967,7 @@ export function LevelSelect(): JSX.Element {
                   <span className="pin__name">{entry.world.name}</span>
                   <span className="pin__tally">
                     {!entry.unlocked
-                      ? 'plan not walked'
+                      ? 'locked'
                       : narrow
                         ? `${String(entry.closed)}/${String(entry.issued)} closed`
                         : `${String(entry.closed)}/${String(entry.issued)} closed · ${String(entry.points)} pts`}
@@ -1006,14 +1006,10 @@ export function LevelSelect(): JSX.Element {
         </nav>
       ) : null}
 
-      <section
-        className="survey-frame survey__tally"
-        aria-label="Campaign survey totals"
-        ref={tally}
-      >
+      <section className="survey-frame survey__tally" aria-label="Campaign totals" ref={tally}>
         <div className="survey-frame__body">
           <div className="survey-bar">
-            <span>Orbital survey</span>
+            <span>Site map</span>
             <span className="survey-bar__tools">
               <span>
                 {campaign.closed}/{campaign.issued}
@@ -1057,7 +1053,7 @@ export function LevelSelect(): JSX.Element {
 
       <section
         className="survey-frame dossier"
-        aria-label="Site dossier"
+        aria-label="Site details"
         ref={dossier}
         style={{ '--world': `var(--world-${String(chosen + 1)})` } as Vars}
         {...(blocked ? { inert: true } : {})}
@@ -1074,8 +1070,8 @@ export function LevelSelect(): JSX.Element {
             <span>{site ? `${String(site.points)}/${String(site.maxPoints)} pts` : ''}</span>
           </div>
           <div className="site-brief" data-open={String(site?.unlocked ?? false)}>
-            <span className="site-brief__kicker">Briefing</span>
-            <p className="site-brief__body">{site ? site.world.blurb : 'No briefing filed.'}</p>
+            <span className="site-brief__kicker">About</span>
+            <p className="site-brief__body">{site ? site.world.blurb : 'No site chosen.'}</p>
             {site && site.world.concepts.length > 0 ? (
               <ul className="site-brief__concepts" aria-label="Concepts on this site">
                 {site.world.concepts.map((concept) => (
@@ -1086,7 +1082,7 @@ export function LevelSelect(): JSX.Element {
               </ul>
             ) : null}
           </div>
-          <ul className="dossier__rows" aria-label="Work orders on this site" onKeyDown={onRowKeys}>
+          <ul className="dossier__rows" aria-label="Levels on this site" onKeyDown={onRowKeys}>
             {orders.map((order, i) => (
               <li key={order.id}>
                 <a
@@ -1116,9 +1112,7 @@ export function LevelSelect(): JSX.Element {
                     <span
                       className="order-row__medal"
                       data-medal={medalMark(order)}
-                      title={
-                        medalMark(order) === 'closed' ? 'closed, no par on this order' : undefined
-                      }
+                      title={medalMark(order) === 'closed' ? 'closed, no par' : undefined}
                     >
                       {MEDAL_MARK[medalMark(order)] ?? '·'}
                     </span>
@@ -1133,8 +1127,8 @@ export function LevelSelect(): JSX.Element {
           </ul>
           <p className="dossier__foot">
             {site?.unlocked
-              ? 'Every marker on the plan is one work order.'
-              : 'Close the route behind this site and the plan fills in.'}
+              ? 'Each square is one level.'
+              : 'Finish the previous site to open it.'}
           </p>
         </div>
       </section>

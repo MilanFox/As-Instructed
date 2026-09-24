@@ -64,9 +64,9 @@ export function buildVerdict(input: VerdictInput): Verdict {
 }
 
 function unmetMessage(labels: readonly string[]): string {
-  if (labels.length === 0) return 'The contract was not fulfilled.';
-  if (labels.length === 1) return `Contract not fulfilled: ${labels[0]}.`;
-  return `Contract not fulfilled. Outstanding: ${labels.join('; ')}.`;
+  if (labels.length === 0) return 'Not every objective was met.';
+  if (labels.length === 1) return `Objective not met: ${labels[0]}.`;
+  return `Objectives not met: ${labels.join('; ')}.`;
 }
 
 export const MEDAL_WEIGHT: Readonly<Record<Medal, number>> = Object.freeze({

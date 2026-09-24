@@ -7,9 +7,9 @@ import { IconSliders, IconSound } from '../components/Icons.tsx';
 
 const BUSES: { key: 'master' | 'sfx' | 'ui' | 'ambience'; label: string; note: string }[] = [
   { key: 'master', label: 'master', note: 'everything' },
-  { key: 'sfx', label: 'site', note: 'moves, tools, machinery' },
-  { key: 'ui', label: 'console', note: 'buttons and reports' },
-  { key: 'ambience', label: 'ambience', note: 'the room tone of the biome' },
+  { key: 'sfx', label: 'board', note: 'bots and machines' },
+  { key: 'ui', label: 'interface', note: 'buttons and reports' },
+  { key: 'ambience', label: 'background', note: 'site sounds' },
 ];
 
 let open = false;
@@ -89,11 +89,6 @@ function SettingsFlyout(): React.JSX.Element {
       className="overlay overlay--corner"
       role="presentation"
       onClick={closeSettings}
-      onKeyDown={(event) => {
-        if (event.key !== 'Escape') return;
-        event.stopPropagation();
-        closeSettings();
-      }}
     >
       <div
         className="modal modal--narrow settings-flyout"
@@ -107,17 +102,15 @@ function SettingsFlyout(): React.JSX.Element {
         <header className="modal__head">
           <div style={{ minWidth: 0 }}>
             <h2 className="modal__verdict">SETTINGS</h2>
-            <p className="modal__line">Kept in this browser, alongside your progress.</p>
+            <p className="modal__line">Saved in this browser.</p>
           </div>
         </header>
 
         <div className="modal__body">
           <div className="settings">
             <fieldset className="settings__group">
-              <legend className="settings__legend">Art direction</legend>
-              <p className="settings__note">
-                Applies to the board at once. Standard is palette only, with no site painters.
-              </p>
+              <legend className="settings__legend">Art style</legend>
+              <p className="settings__note">Changes the board right away.</p>
               {ART_OPTIONS.map((option) => (
                 <label className="settings__toggle" key={option.id}>
                   <input
@@ -137,9 +130,7 @@ function SettingsFlyout(): React.JSX.Element {
                 <IconSound />
                 Sound
               </legend>
-              <p className="settings__note">
-                Synthesized on site. There are no audio files and there is no budget for any.
-              </p>
+              <p className="settings__note">Set the volume for each kind of sound.</p>
 
               <label className="settings__toggle">
                 <input
@@ -148,7 +139,7 @@ function SettingsFlyout(): React.JSX.Element {
                   onChange={(event) => apply({ enabled: event.target.checked, muted: false })}
                 />
                 <span>sound</span>
-                <span className="settings__note">off builds no audio graph at all</span>
+                <span className="settings__note">all sound on or off</span>
               </label>
 
               {BUSES.map((bus) => (
@@ -179,8 +170,8 @@ function SettingsFlyout(): React.JSX.Element {
                   disabled={!settings.enabled}
                   onChange={(event) => apply({ ambienceEnabled: event.target.checked })}
                 />
-                <span>ambience bed</span>
-                <span className="settings__note">off by default; a drone, at length</span>
+                <span>background drone</span>
+                <span className="settings__note">off by default</span>
               </label>
 
               <label className="settings__toggle">
@@ -190,8 +181,8 @@ function SettingsFlyout(): React.JSX.Element {
                   disabled={!settings.enabled}
                   onChange={(event) => apply({ scrubTicks: event.target.checked })}
                 />
-                <span>scrub ticks</span>
-                <span className="settings__note">a quiet tick while dragging the timeline</span>
+                <span>timeline clicks</span>
+                <span className="settings__note">clicks while dragging the timeline</span>
               </label>
             </fieldset>
           </div>

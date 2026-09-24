@@ -174,10 +174,7 @@ function lockedApiAdvice(
   const spec = apiFunction(name);
   if (!spec) return undefined;
   if (unlocked && unlocked.includes(name)) return undefined;
-  return (
-    `\`${name}()\` is not installed on this bot yet. That hardware arrives in level ` +
-    `${spec.unlockedBy}; until then the bot has no way to perform it.`
-  );
+  return `\`${name}()\` is not available yet. You get it in level ${spec.unlockedBy}.`;
 }
 
 export function rewriteMessage(
@@ -192,8 +189,7 @@ export function rewriteMessage(
     const identifier = missing[1] ?? missing[2] ?? '';
     return (
       lockedApiAdvice(identifier, context.unlocked) ??
-      `There is nothing called \`${identifier}\` in your program. Check the spelling, and check ` +
-        'that it is declared before the line that uses it.'
+      `\`${identifier}\` does not exist. Check the spelling, and declare it before you use it.`
     );
   }
 
@@ -204,8 +200,8 @@ export function rewriteMessage(
     const locked = lockedApiAdvice(identifier, context.unlocked);
     if (locked) return locked;
     return (
-      `\`${identifier}\` is not a function. You called it with \`()\`, but at that moment it held ` +
-      'something else — often `undefined`, because the value was never assigned.'
+      `\`${identifier}\` is not a function. You called it with \`()\`, but it held something else, ` +
+      'often `undefined`.'
     );
   }
 
@@ -216,46 +212,32 @@ export function rewriteMessage(
     const accessed = property === undefined ? undefined : lastSegment(match[property]);
     const what = accessed ? `\`.${accessed}\`` : 'a property';
     return (
-      `You read ${what} from a value that is ${nullish}. The usual causes are an array index past ` +
-      'the end of the array, a lookup that found nothing, or a variable that was never given a value.'
+      `You read ${what} from a value that is ${nullish}. Often this is an array index past the end, ` +
+      'a lookup that found nothing, or a variable with no value.'
     );
   }
 
   if (/Maximum call stack size exceeded|call stack size exceeded|too much recursion/i.test(text)) {
-    return (
-      'Your program called itself until it ran out of room. A function is calling itself with no ' +
-      'condition that ever stops it.'
-    );
+    return 'A function called itself too many times. Add a condition that stops it.';
   }
 
   if (/Assignment to constant variable|Attempted to assign to readonly property/i.test(text)) {
-    return (
-      'You assigned to a variable declared with `const`. Declare it with `let` if it needs to ' +
-      'change.'
-    );
+    return 'You changed a `const` variable. Use `let` for a value that changes.';
   }
 
   if (name === 'SyntaxError' && /\b(import|export)\b/.test(text)) {
-    return (
-      'Your program cannot use `import` or `export`. Every function the bot offers is already ' +
-      'available as a global — just call it.'
-    );
+    return 'You cannot use `import` or `export` here. All bot commands are already available: just call them.';
   }
 
   if (/out of memory|Array buffer allocation failed|Invalid (?:array|string) length/i.test(text)) {
-    return (
-      'Your program ran out of memory. Something is growing without limit — usually an array or ' +
-      'string that is appended to inside a loop that never ends.'
-    );
+    return 'Your program ran out of memory. Usually an array or string grows inside a loop that never ends.';
   }
 
   return text.length > 0 ? text : `${name} (no message)`;
 }
 
 const TIMEOUT_MESSAGE =
-  'Your program did not halt. It was still running after the time limit and had to be shut down. ' +
-  'The usual cause is a loop whose condition never becomes false — check that every `while` has ' +
-  'something inside it that eventually stops it.';
+  'Your program did not stop before the time limit. Check that every loop can end.';
 
 export function timeoutFailure(timeoutMs: number): RuntimeFailure {
   return {
@@ -295,7 +277,7 @@ function describe(error: unknown): { name: string; message: string; stack?: stri
   if (typeof error === 'string') return { name: 'Error', message: error };
   return {
     name: 'Error',
-    message: `Your program threw a value that is not an Error: ${label(error)}.`,
+    message: `Your program threw something that is not an Error: ${label(error)}.`,
   };
 }
 

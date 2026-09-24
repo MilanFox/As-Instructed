@@ -116,6 +116,31 @@ describe('registry', () => {
     expect(total / LEVELS.length).toBeLessThanOrEqual(72);
   });
 
+  test('a brief is a short lore line, then the one bold job line', () => {
+    const words = (text: string): number => text.trim().split(/\s+/).filter(Boolean).length;
+    const unsigned = (text: string): string =>
+      text.replace(/\s*—\s*[^—\n]{0,29}[^—\n\s.!?,;:]$/, '');
+    const sentences = (text: string): number => (text.match(/[.!?]+(?=\s|$)/g) ?? []).length;
+    for (const level of LEVELS) {
+      const paragraphs = level.brief
+        .trim()
+        .split(/\n[ \t]*\n/)
+        .map((paragraph) => paragraph.trim());
+      const job = paragraphs.at(-1) ?? '';
+      const lore = paragraphs.slice(0, -1).join(' ');
+
+      expect(level.brief, level.id).not.toContain('**FROM:**');
+      expect(
+        paragraphs.filter((paragraph) => paragraph.startsWith('**')),
+        level.id,
+      ).toEqual([job]);
+      expect(job, level.id).toMatch(/^\*\*[^\n]+\*\*$/);
+      expect(words(lore), level.id).toBeGreaterThan(0);
+      expect(words(lore), level.id).toBeLessThanOrEqual(30);
+      expect(sentences(unsigned(lore)), level.id).toBeLessThanOrEqual(2);
+    }
+  });
+
   test('no hint is written in code', () => {
     for (const level of LEVELS) {
       for (const hint of level.hints) {

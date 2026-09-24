@@ -126,7 +126,7 @@ const trailBroke = (ctx: ObjectiveContext): Divergence | undefined => {
   if (stuck === undefined) return undefined;
   const ends = veinAndStart(ctx.initialWorld);
   if (ends !== null && stuck.x === ends.vein.x && stuck.y === ends.vein.y) {
-    return { where: at(stuck), expected: 'a breadcrumb beside it', received: NOTHING };
+    return { where: at(stuck), expected: 'a mark beside it', received: NOTHING };
   }
   return {
     where: at(stuck),
@@ -142,51 +142,36 @@ export const w4_02: LevelDef = {
   title: 'Breadcrumbs',
   hardware: ['mark', 'readMark'],
   brief: [
-    '> dot: survey have a map of this one. it is a photograph of a whiteboard, and',
-    '> the whiteboard has since been cleaned.',
+    'survey had a map of this cave, on a whiteboard, and someone cleaned the whiteboard. please mark the way back so the next bot does not cry. — dot',
     '',
-    'Reach the ore vein.',
+    '**Search the unmapped cave for the ore and end the run on it.**',
   ].join('\n'),
   board: {
-    fixed: [
-      'the map is 20 tiles square',
-      'passages are one tile wide, and a tile with an even `x` and an even `y` is always rock',
-      'the cave is carved throughout — every passage is reachable from every other, and nothing is sealed off',
-      'RIG-04 starts at a dead end',
-      'the vein is at the dead end furthest from that start',
-      'one pad tile in the cave, and it is the vein',
-    ],
     redrawn: [
-      'the layout of the passages',
-      'how many forks rejoin further in — four at most, and on some shifts none at all',
-      'where the dead ends fall, and which one holds the vein',
-      'which dead end RIG-04 starts in',
+      'the passages',
+      'how many loops the cave has: none to four',
+      'the dead ends, and which one the bot starts in',
     ],
   },
   facts: [
     {
-      label: 'The cave',
+      label: 'Cave',
       value:
-        'It forks. On most shifts some of the forks rejoin further in, so a passage can hand the bot back to a junction it has already stood at.',
+        'Passages are one tile wide and all connected. There can be loops. The bot starts at a dead end (a tile with one open side).',
     },
     {
-      label: 'The ore vein',
-      value: 'The one pad tile in the cave, set into the rock at the vein face.',
+      label: 'Ore',
+      value: 'The only pad tile. It is at the dead end furthest from the start, counted in steps.',
     },
     {
-      label: '`mark(text)`',
-      value: 'Writes a **string** onto the tile under the bot. Costs 1 tick.',
-    },
-    { label: '`readMark()`', value: 'Returns the string under the bot. Free.' },
-    {
-      label: 'Neighbours',
+      label: 'Marks',
       value:
-        "A tile's mark also shows up in what `look` returns, so you can check one without stepping on it.",
+        'A mark is a string on a tile. Writing one costs 1 tick. Reading one is free, and `look` shows them too.',
     },
     {
-      label: 'A trail home',
+      label: 'Trail',
       value:
-        'For the star: every breadcrumb names the tile the bot arrived from, as `"x,y"`, so that following them from beside the vein arrives back at the start.',
+        'It starts on a marked tile next to the ore. Each mark on it is the `"x,y"` of the next tile toward the start. Following the marks must reach the start. Only the last mark on a tile counts. Marks off the trail do not matter.',
     },
   ],
   seeds: [1, 2, 3, 4],
@@ -196,7 +181,7 @@ export const w4_02: LevelDef = {
   objectives: [
     Objectives.custom(
       'reach-vein',
-      'Park the bot on the ore vein',
+      'End the run on the ore',
       (ctx) => botEndsOn(ctx, Terrain.Pad),
       { divergence: (ctx) => endedOn(ctx, Terrain.Pad) },
     ),
@@ -204,26 +189,24 @@ export const w4_02: LevelDef = {
   bonus: [
     Objectives.custom(
       'breadcrumb-trail',
-      'Leave breadcrumbs a bot at the vein could follow home',
+      'Leave a trail of marks from the ore to the start, each the `"x,y"` of the next tile back',
       (ctx) => trailHome(ctx).ok,
       { divergence: trailBroke },
     ),
   ],
   starter: [
-    '// NOTE(4470): the tunnel joins back onto itself. more than once',
-    '// NOTE(4470): the junctions all look the same from inside',
+    '// NOTE(4470): some caves have loops',
     '',
-    '// mark() writes on the tile under the bot. look() reports a neighbour mark.',
+    '// mark() writes on the tile under the bot. look() shows the marks it sees.',
     'mark("start");',
     'print(readMark());',
     '',
   ].join('\n'),
   hints: [
-    'The bot is not lost because it cannot see. It is lost because two junctions look identical from inside.',
-    'Something has to be different about a tile you have already stood on. Either the tile changes, or your program remembers it did.',
-    'Once every opening out of a tile leads somewhere already accounted for, the tile is finished and the only useful move is backwards.',
-    'Backwards is a specific direction, not a general idea. Keep the ones you would need, in order, and the way out is the reverse of the way in.',
-    'A breadcrumb can say more than "somebody was here". If it says where that somebody came from, the crumbs are a route and not just a record.',
+    'Mark each tile you stand on. Then a mark tells you that you were already there.',
+    'When every way out of a tile is marked or blocked, go back the way you came.',
+    'Keep a list of the directions you walked. To go back, reverse the last one.',
+    'For the star, write the tile you came from in each mark. Then the marks lead home.',
   ],
   docs: ['mark', 'look', 'memory'],
 };

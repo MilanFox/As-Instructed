@@ -417,12 +417,9 @@ export class Sim {
   wait(botId: number, n = 1): void {
     const bot = this.requireActiveBot(botId);
     if (!Number.isFinite(n) || n < 0) {
-      throw new IllegalActionError(
-        `wait(${String(n)}): the argument must be a non-negative number.`,
-        {
-          botId,
-        },
-      );
+      throw new IllegalActionError(`wait(${String(n)}): n must be 0 or more.`, {
+        botId,
+      });
     }
     const ticks = Math.floor(n);
     const t = bot.clock;
@@ -539,7 +536,7 @@ export class Sim {
   pickup(botId: number, kind?: ItemKind, count = 1): number {
     const bot = this.requireActiveBot(botId);
     if (!Number.isFinite(count) || count < 0) {
-      throw new IllegalActionError(`pickup(count = ${String(count)}): count must be >= 0.`, {
+      throw new IllegalActionError(`pickup(count = ${String(count)}): count must be 0 or more.`, {
         botId,
       });
     }
@@ -582,7 +579,7 @@ export class Sim {
   drop(botId: number, kind?: ItemKind, count = 1): number {
     const bot = this.requireActiveBot(botId);
     if (!Number.isFinite(count) || count < 0) {
-      throw new IllegalActionError(`drop(count = ${String(count)}): count must be >= 0.`, {
+      throw new IllegalActionError(`drop(count = ${String(count)}): count must be 0 or more.`, {
         botId,
       });
     }
@@ -669,9 +666,8 @@ export class Sim {
       this.builder.push({ t, botId, dt, kind: 'act', name: 'power', ok: false, detail: machineId });
       this.charge(bot, dt);
       throw new IllegalActionError(
-        `power("${machineId}"): no machine on this work order has that id. ` +
-          `probe("${machineId}") returns null for an id that does not exist, and costs nothing — ` +
-          'check it before you act on it.',
+        `power("${machineId}"): no machine here has that id. ` +
+          `probe("${machineId}") checks an id for free.`,
         { botId },
       );
     }
@@ -689,8 +685,8 @@ export class Sim {
       this.charge(bot, dt);
       throw new IllegalActionError(
         `power("${machineId}"): the machine at (${machine.at.x}, ${machine.at.y}) is ` +
-          `hand-operated, so only a use() at that tile moves it. ` +
-          `probe("${machineId}").vars.manual is 1 on every machine like it.`,
+          `manual. Only use() on its tile switches it. ` +
+          `Such machines have probe("${machineId}").vars.manual = 1.`,
         { botId, at: machine.at },
       );
     }
@@ -777,14 +773,13 @@ export class Sim {
       this.charge(bot, dt);
       if (!target) {
         throw new IllegalActionError(
-          `send(${to}): there is no bot #${to} on this contract, so the message has nowhere ` +
-            'to go. bots() returns every id that exists.',
+          `send(${to}): there is no bot #${to}. bots() lists every id.`,
           { botId },
         );
       }
       throw new IllegalActionError(
         `send(${to}): bot #${to} ("${target.name}") was lost at (${target.at.x}, ${target.at.y}) ` +
-          'and cannot receive messages. bots() lists only the bots still running.',
+          'and cannot receive messages. bots() lists only living bots.',
         { botId, at: target.at },
       );
     }
@@ -914,9 +909,8 @@ export class Sim {
     if (!machine) {
       this.charge(bot, cost);
       throw new IllegalActionError(
-        `No machine on this work order has the id "${machineId}". ` +
-          `probe("${machineId}") returns null for an id that does not exist, and costs nothing — ` +
-          'check it before you act on it.',
+        `No machine here has the id "${machineId}". ` +
+          `probe("${machineId}") checks an id for free.`,
         { botId },
       );
     }
@@ -1114,9 +1108,7 @@ export class Sim {
     this.op();
     const bot = botById(this.world, botId);
     if (!bot) {
-      throw new IllegalActionError(
-        `There is no bot #${botId} on this contract. Check the ids returned by bots().`,
-      );
+      throw new IllegalActionError(`There is no bot #${botId}. bots() lists every id.`);
     }
     return bot;
   }
@@ -1125,8 +1117,7 @@ export class Sim {
     const bot = this.requireBot(botId);
     if (!bot.alive) {
       throw new IllegalActionError(
-        `Bot #${botId} ("${bot.name}") is no longer operational and cannot accept commands. ` +
-          'Kessler & Daughters thanks it for its service.',
+        `Bot #${botId} ("${bot.name}") is lost and cannot take commands.`,
         { botId, at: bot.at },
       );
     }
@@ -1157,11 +1148,11 @@ function dropBlockReason(requested: number, carrying: number): string {
 export function describeBlock(reason: string, dir: Dir): string {
   switch (reason) {
     case 'bounds':
-      return `There is nothing to the ${dirName(dir)} — that is the edge of the site.`;
+      return `The edge of the grid is to the ${dirName(dir)}.`;
     case 'terrain':
-      return `Something solid is blocking the way ${dirName(dir)}.`;
+      return `Something solid blocks the way ${dirName(dir)}.`;
     case 'bot':
-      return `Another bot is occupying the tile to the ${dirName(dir)}.`;
+      return `Another bot is on the tile to the ${dirName(dir)}.`;
     default:
       return `The move ${dirName(dir)} failed.`;
   }

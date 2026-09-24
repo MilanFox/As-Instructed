@@ -55,13 +55,14 @@ function blindEnds(grid: CellGrid, lift: Vec): Vein[] {
 
 function chooseVeins(rng: Rng, world: World, sites: Vein[], lift: Vec): Vein[] {
   const fromLift = distancesFrom(world, lift);
-  const depthOf = (vein: Vein): number => fromLift.get(keyOf(vein.stand)) ?? Number.MAX_SAFE_INTEGER;
+  const depthOf = (vein: Vein): number =>
+    fromLift.get(keyOf(vein.stand)) ?? Number.MAX_SAFE_INTEGER;
   const ranked = sites.slice().sort((a, b) => depthOf(a) - depthOf(b));
   const first = ranked[0];
   if (first === undefined) return [];
   const rank = Math.min(ranked.length - 1, DEEP_RANK + rng.int(0, DEEP_SPREAD));
   const floor = Math.max(depthOf(ranked[rank] ?? first), DEEP_FLOOR);
-  const deep = ranked.find((site) => depthOf(site) >= floor) ?? (ranked[rank] ?? first);
+  const deep = ranked.find((site) => depthOf(site) >= floor) ?? ranked[rank] ?? first;
   const within = ranked.filter((site) => site !== deep && depthOf(site) <= depthOf(deep));
   const split = Math.max(ORE_QUOTA + 3, Math.ceil(within.length / 2));
   const near = rng.shuffle(within.slice(0, split));
@@ -149,7 +150,7 @@ function walkedInDry(ctx: ObjectiveContext): Vec | undefined {
 }
 
 const shortOfQuota = (ctx: ObjectiveContext): Divergence => ({
-  where: 'the faces cut',
+  where: 'ore mined',
   expected: `${String(ORE_QUOTA)} ore`,
   received: `${String(haul(ctx))} ore`,
 });
@@ -157,9 +158,9 @@ const shortOfQuota = (ctx: ObjectiveContext): Divergence => ({
 const shallow = (ctx: ObjectiveContext): Divergence => {
   const { deepest, cut } = depths(ctx);
   return {
-    where: 'the deepest face',
+    where: 'the furthest ore',
     expected: `${String(deepest)} tiles from the lift`,
-    received: cut < 0 ? 'no face was cut' : `${String(cut)} tiles from the lift`,
+    received: cut < 0 ? 'none mined' : `${String(cut)} tiles from the lift`,
   };
 };
 
@@ -167,7 +168,7 @@ const dryHole = (ctx: ObjectiveContext): Divergence => {
   const spot = walkedInDry(ctx);
   return spot === undefined
     ? shortOfQuota(ctx)
-    : { where: at(spot), expected: 'a face at the blind end', received: 'spoil' };
+    : { where: at(spot), expected: 'ore at the end', received: 'rubble' };
 };
 
 export const w4_04: LevelDef = {
@@ -177,66 +178,42 @@ export const w4_04: LevelDef = {
   title: 'The Deep Shaft',
   hardware: ['mine', 'fuel', 'refuel'],
   brief: [
-    '> dot: the shaft runs deeper than survey admit. there is ore in the walls and the',
-    '> cutting head will take it. the tank is not what you asked for.',
-    '> dot: procurement want a sample off the deepest face, to settle an argument they',
-    '> started. and i am tired of paying fuel for empty holes.',
+    'the cave is deeper than survey said, and the lab wants ore from the furthest point. no fuel wasted on rubble, no pressure, some pressure. — dot',
     '',
-    `Bring back ${ORE_QUOTA} ore and end the run standing on the lift.`,
+    `**Mine ${ORE_QUOTA} ore and end the run on the lift. The fuel tank is small and fills only on the lift. With too little fuel, the run ends.**`,
   ].join('\n'),
   board: {
-    fixed: [
-      'the map is 40 tiles square; corridors are one tile wide, and a tile with an even `x` and an even `y` is always solid',
-      'the cave is carved throughout — every corridor is reachable from every other',
-      'RIG-04 starts on the lift, and the lift stands well inside the cave rather than against its outer wall',
-      'every ore face is set square into the blind end of a side passage, so a ray down that passage ends on it',
-      'a blind end with no face is packed with spoil, so one ray tells a face, an empty passage and a corner apart',
-      'six of the ore faces are among those nearest the lift, so the quota never asks for the far end of the cave',
-      'the tank holds exactly a round trip to the deepest face, the cut, and twelve tiles over',
-    ],
     redrawn: [
-      'the layout of the corridors',
-      'four to eight corridors that rejoin further in',
-      'seven to ten ore faces, and which passages they end',
-      'where in the middle of the cave the lift stands',
+      'the passages, with four to eight loops',
+      'seven to ten ore tiles, and where they are',
+      'where the lift is',
       'the size of the tank',
     ],
   },
   facts: [
-    { label: 'The lift', value: 'Depot (a terrain). The one tile of it, and where the bot starts.' },
     {
-      label: 'The veins',
+      label: 'Lift',
       value:
-        'Ore (a terrain) filling the blind end of a side passage. One tile faces it, the last floor tile of that passage; stand there and call `mine(dir)`. Cutting a face clears it to floor and puts ore (an item) in the hold.',
+        'The one depot tile, near the middle of the cave. The bot starts on it. The tank refills only here.',
     },
     {
-      label: 'Spoil',
+      label: 'Cave',
       value:
-        'Rubble (a terrain), filling the blind end of every side passage that holds no face. Cutting it yields scrap, not ore, at the same price as cutting a face.',
+        'Passages are one tile wide and all connected. The walls cannot be mined. Every dead end holds ore or rubble. A look down the passage shows which.',
+    },
+    {
+      label: 'Ore',
+      value:
+        'Ore is only at dead ends. Mine it from the tile next to it for 1 ore. Six of the nearer half of the dead ends hold ore. Distance is counted in steps from the lift; on a tie, either counts.',
+    },
+    {
+      label: 'Rubble',
+      value:
+        'Mining it gives scrap, not ore. For the star, never stand on the floor tile next to it.',
     },
     {
       label: 'Fuel',
-      value:
-        'Acting spends fuel equal to the ticks it costs. Looking, reading and waiting spend none. An action the tank cannot pay for does not happen: the shift ends where the bot is standing.',
-    },
-    {
-      label: 'The tank',
-      value:
-        'A different size every shift, and not arbitrary: it holds the drive out to the deepest face, the cut, the drive back, and twelve tiles over. `fuel()` reads it; `refuel()` fills it, but only on the lift.',
-    },
-    {
-      label: 'A `look` ray',
-      value: 'Stops at the first thing it cannot see through, and tells you what that thing was.',
-    },
-    {
-      label: 'The deepest face',
-      value:
-        'For the star: cut the ore face furthest from the lift, counted in corridor tiles walked rather than straight-line distance. If two faces are equally far out, either one earns it.',
-    },
-    {
-      label: 'Empty passages',
-      value:
-        'For the star: never stand on a tile that has spoil beside it. A ray down the passage names the blind end before the bot spends a step on it, and no route ever needs such a tile — only the passage itself ends there.',
+      value: `Each action uses 1 fuel per tick. Looking and reading are free: no fuel, no ticks. Waiting uses no fuel. If the tank is too low for an action, the run ends. A full tank is the trip to the furthest ore and back, plus ${String(CUT_COST)} for mining it, plus ${String(TANK_SLACK)}.`,
     },
   ],
   seeds: [1, 2, 3, 4, 5],
@@ -246,11 +223,11 @@ export const w4_04: LevelDef = {
   objectives: [
     Objectives.inventoryAtLeast(ItemKind.Ore, ORE_QUOTA, {
       id: 'ore-quota',
-      label: `Carry ${ORE_QUOTA} ore out of the shaft`,
+      label: `Mine ${ORE_QUOTA} ore`,
     }),
     Objectives.custom(
       'end-on-lift',
-      'End the run standing on the lift',
+      'End the run on the lift',
       (ctx) => botEndsOn(ctx, Terrain.Depot),
       { divergence: (ctx) => endedOn(ctx, Terrain.Depot) },
     ),
@@ -258,7 +235,7 @@ export const w4_04: LevelDef = {
   bonus: [
     Objectives.custom(
       'deep-face',
-      'Cut the ore face furthest from the lift',
+      'Mine the ore that is the most steps from the lift',
       (ctx) => {
         const { deepest, cut } = depths(ctx);
         return deepest > 0 && cut === deepest;
@@ -267,26 +244,25 @@ export const w4_04: LevelDef = {
     ),
     Objectives.custom(
       'no-dry-holes',
-      'Never stand in a side passage that ends in spoil',
+      'Never stand on a tile next to rubble',
       (ctx) => haul(ctx) >= ORE_QUOTA && walkedInDry(ctx) === undefined,
       { divergence: dryHole },
     ),
   ],
   starter: [
     "// import { survey, pathTo } from 'lib';",
-    '// The tank is a different size every shift. Read it, do not assume it.',
+    '// The tank size changes between boards. Read it.',
     '',
     'print(`tank: ${fuel()}`);',
     '',
   ].join('\n'),
   hints: [
-    'A ray costs nothing and a step costs one. Read every passage out of a junction before walking any of them.',
-    'The blind end of a side passage says which kind it is: a face still in the wall, or the spoil packed into an empty one. A corner says neither, because the passage carries on.',
-    'The quota is near work. Six of the faces sit among the closest ones, and the shift only asks for five.',
-    'The deepest face is not near work. It is a trip of its own, and the tank is sized for exactly that trip and almost nothing else.',
-    'A full tank is therefore a measurement. It says how far out the deepest face is, which also says where it is pointless to look.',
-    'The tank only fills on the lift. Every tile of fuel spent going out has to still be there to come back.',
-    'Before each step, ask what it would take to get home from where that step lands. When the answer is more than the tank holds, you went too far one step ago.',
+    'Looking is free. At a junction, look down every passage before you walk into one.',
+    'Six ore tiles are near the lift, and you need five. Mine those first.',
+    'The furthest ore is a trip of its own. The tank is just big enough for it.',
+    'So a full tank tells you how far away the furthest ore is.',
+    'The tank fills only on the lift. Keep enough fuel to get back.',
+    'Before each step, check the fuel needed to get home from the next tile.',
   ],
   docs: ['look', 'mine', 'fuel', 'refuel', 'memory'],
 };

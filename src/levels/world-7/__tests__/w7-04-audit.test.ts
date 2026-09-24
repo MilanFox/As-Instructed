@@ -312,11 +312,11 @@ describe('w7-04 long-jobs-first wants one bot per opening job', () => {
       });
       const shown = must(objectiveIn('long-jobs-first').divergence?.(run.ctx), 'a divergence');
       const label = `seed ${String(seed)}`;
-      expect(shown.where, label).toBe('the first wave');
+      expect(shown.where, label).toBe('the first jobs');
       expect(shown.expected, label).toBe(
         `${String(run.ctx.initialWorld.bots.length)} bots on a job of their own`,
       );
-      expect(shown.received, label).toBe('1 ever began one');
+      expect(shown.received, label).toBe('1 started one');
       expect([shown.where, shown.expected, shown.received].every(short), label).toBe(true);
     }
   });
@@ -406,7 +406,7 @@ describe('w7-04 divergences name a place and a value', () => {
       const label = `seed ${String(seed)}`;
       expect(shown.where, label).toMatch(/^job-\d+$/);
       expect(shown.expected, label).toMatch(/^a job costing \d+ or more$/);
-      expect(shown.received, label).toMatch(/^cost \d+, begun at tick \d+$/);
+      expect(shown.received, label).toMatch(/^cost \d+, started at tick \d+$/);
       expect([shown.where, shown.expected, shown.received].every(short), label).toBe(true);
     }
   });
@@ -417,9 +417,9 @@ describe('w7-04 divergences name a place and a value', () => {
       const shown = must(objectiveIn('long-jobs-first').divergence?.(run.ctx), 'a divergence');
       const label = `seed ${String(seed)}`;
       expect(run.met('long-jobs-first'), label).toBe(false);
-      expect(shown.where, label).toBe('the first wave');
+      expect(shown.where, label).toBe('the first jobs');
       expect(shown.expected, label).toMatch(/^\d+ bots on a job of their own$/);
-      expect(shown.received, label).toBe('0 ever began one');
+      expect(shown.received, label).toBe('0 started one');
       expect([shown.where, shown.expected, shown.received].every(short), label).toBe(true);
     }
   });

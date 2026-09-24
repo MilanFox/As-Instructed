@@ -296,7 +296,7 @@ describe('an audit layout gates the close but never grades it', () => {
 
     const closed = useGame.getState().console.filter((line) => line.kind === 'success');
     expect(closed.map((line) => line.text)).toEqual([
-      `work order closed — ${String(SLOWEST_ON_SCHEDULE)} ticks`,
+      `level closed — ${String(SLOWEST_ON_SCHEDULE)} ticks`,
     ]);
   });
 

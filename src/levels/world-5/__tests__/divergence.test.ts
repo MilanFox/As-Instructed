@@ -167,8 +167,8 @@ describe('w5-03 — the cable, the order and the waves', () => {
     const first = must(withPrefix(w5_03, 1, 'sub-')[0], 'sub-1');
     expect(nowhere(w5_03, 1, 'in-order').divergence).toEqual({
       where: `sub-1 · ${at(first.at)}`,
-      expected: 'brought up after reactor',
-      received: 'never brought up',
+      expected: 'switched on after reactor',
+      received: 'never switched on',
     });
   });
 
@@ -201,7 +201,7 @@ describe('w5-03 — the cable, the order and the waves', () => {
     const match = must(/^tick (\d+) · (sub-\d+), wave (\d+)$/.exec(shown.where), shown.where);
     const [, , id, wave] = match;
     expect(Number(wave)).toBe(waves.get(id ?? ''));
-    expect(shown.expected).toMatch(/^wave \d+ all up$/);
+    expect(shown.expected).toMatch(/^wave \d+ all on$/);
     expect(Number(/\d+/.exec(shown.expected)?.[0])).toBeLessThan(Number(wave));
     expect(shown.received).toMatch(/^sub-\d+ still off$/);
     for (const text of [shown.where, shown.expected, shown.received]) {
@@ -353,8 +353,8 @@ describe('w5-05 — the island, the drum and the dead cable', () => {
     expect(met).toBe(false);
     expect(divergence).toEqual({
       where: 'tick 0 · sub-1',
-      expected: 'a live cable already reaching it',
-      received: 'nothing live was joined to it',
+      expected: 'a cable to a substation already on',
+      received: 'no cable to a substation that was on',
     });
   });
 
@@ -380,7 +380,7 @@ describe('w5-05 — the island, the drum and the dead cable', () => {
     });
     expect(met).toBe(false);
     expect(divergence).toEqual({
-      where: 'the outage report',
+      where: 'the weak line',
       expected: 'a line reading `weak <id> <n>`',
       received: 'weak sub-1',
     });
@@ -397,8 +397,8 @@ describe('w5-05 — the island, the drum and the dead cable', () => {
     );
     expect(met).toBe(false);
     expect(divergence).toEqual({
-      where: 'the outage report',
-      expected: 'a line naming what the district hangs off',
+      where: 'the weak line',
+      expected: 'a line: weak <id> <n>',
       received: '(nothing)',
     });
   });
@@ -416,8 +416,8 @@ describe('w5-05 — the island, the drum and the dead cable', () => {
     expect(met).toBe(false);
     expect(divergence).toEqual({
       where: `sub-1 · ${at(leaf.at)}`,
-      expected: 'the station the district most hangs off',
-      received: '1 dark with it',
+      expected: 'the substation that cuts off the most',
+      received: 'it cuts off 1',
     });
   });
 
@@ -427,7 +427,7 @@ describe('w5-05 — the island, the drum and the dead cable', () => {
     });
     expect(met).toBe(false);
     expect(divergence).toEqual({
-      where: 'the outage report',
+      where: 'the weak line',
       expected: 'a substation in the district',
       received: 'reactor',
     });
@@ -446,7 +446,7 @@ describe('w5-05 — the island, the drum and the dead cable', () => {
     expect(met).toBe(false);
     expect(divergence).toEqual({
       where: `sub-${String(count)} · ${at(last.at)}`,
-      expected: 'the count of what goes dark with it',
+      expected: 'how many it cuts off',
       received: '1',
     });
   });

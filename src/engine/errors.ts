@@ -37,8 +37,7 @@ export class HaltError extends SimError {
   constructor(maxTicks: number, botId?: number) {
     super(
       FailureCode.Halt,
-      `Shift over. Your program burned through its ${maxTicks}-tick allowance and was powered down mid-task. ` +
-        'Kessler & Daughters bills by the tick; consider a shorter route.',
+      `Your program used its ${maxTicks}-tick limit and was stopped. Try a shorter route.`,
       { botId },
     );
     this.maxTicks = maxTicks;
@@ -51,8 +50,7 @@ export class OpLimitError extends SimError {
   constructor(maxOps: number, botId?: number) {
     super(
       FailureCode.OpLimit,
-      `Your program issued more than ${maxOps} instructions without accomplishing much. ` +
-        'This usually means a loop that senses forever but never acts.',
+      `Your program ran more than ${maxOps} instructions. Usually a loop keeps sensing and never acts.`,
       { botId },
     );
     this.maxOps = maxOps;
@@ -73,9 +71,8 @@ export class OutOfFuelError extends SimError {
   constructor(botId: number, botName: string, action: string, required: number, remaining: number) {
     super(
       FailureCode.OutOfFuel,
-      `Bot #${botId} ("${botName}") ran out of fuel attempting ${action}: it needs ${required} ` +
-        `and has ${remaining}. Fuel is restored by refuel() while parked on a depot tile. ` +
-        'Kessler & Daughters does not operate a recovery service.',
+      `Bot #${botId} ("${botName}") has no fuel for ${action}: it needs ${required} ` +
+        `and has ${remaining}. Use refuel() on a depot tile.`,
       { botId },
     );
     this.action = action;
@@ -92,9 +89,8 @@ export class LivelockError extends SimError {
     const names = botIds.map((id) => `#${id}`).join(', ');
     super(
       FailureCode.BlockedLivelock,
-      `Livelock: every active bot (${names}) had its move blocked for ${rounds} consecutive ` +
-        'rounds with nothing getting through. They are politely deadlocking each other. ' +
-        'Stagger their routes, or use sync() and wait() to break the symmetry.',
+      `Stuck: every bot (${names}) was blocked for ${rounds} rounds in a row. ` +
+        'They are waiting for each other. Give them different routes, or use sync() and wait().',
     );
     this.botIds = botIds.slice();
     this.rounds = rounds;

@@ -265,7 +265,7 @@ describe('the boundary keeps the fault inside the dialog', () => {
     expect(alerts).toHaveLength(1);
     expect(nameOfNode(alerts[0] as HostNode)).toContain('The run report');
     expect(String(alerts[0]?.props['aria-modal'])).toBe('true');
-    expect(textOf(tree)).toContain('The run report stopped responding');
+    expect(textOf(tree)).toContain('The run report stopped working');
   });
 
   test('the fault is logged with the label and the component stack', () => {
@@ -391,7 +391,7 @@ describe('the dismissed modal stays gone for the session', () => {
 
     const after = driver.render();
     expect(byRole(after, 'alertdialog')).toHaveLength(0);
-    expect(textOf(after)).not.toContain('stopped responding');
+    expect(textOf(after)).not.toContain('stopped working');
   });
 
   test('and nothing takes its place, even once the child would draw cleanly again', () => {

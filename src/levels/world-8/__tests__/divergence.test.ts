@@ -101,7 +101,7 @@ describe('w8-01 separates a crop left in the ground from a crop left in the arms
     expect(objective.divergence?.(ctx)).toEqual({
       where: `the silo at ${point(must(machineById(initialWorld, 'silo'), 'the silo').at)}`,
       expected: `${String(ripe)} crops`,
-      received: '0 crops, 3 still in the arms',
+      received: '0 crops, 3 still carried',
     });
   });
 
@@ -112,8 +112,8 @@ describe('w8-01 separates a crop left in the ground from a crop left in the arms
 
     expect(met).toBe(false);
     expect(divergence).toEqual({
-      where: 'the audit note',
-      expected: 'a line naming the row that carried the most',
+      where: 'the row report',
+      expected: 'a line `row <y> <n>`',
       received: NOTHING,
     });
   });
@@ -176,8 +176,8 @@ describe('w8-02 names the class that came up short, and the bay that took the wr
     expect(met).toBe(false);
     expect(divergence).toEqual({
       where: 'the last crate or bay',
-      expected: 'in view at some point in the shift',
-      received: 'never came into view',
+      expected: 'sighted at some point',
+      received: 'never sighted',
     });
   });
 
@@ -275,8 +275,8 @@ describe('w8-04 says whether the run reached the locker, and never says where it
     expect(met).toBe(false);
     const shown = must(divergence, 'a divergence');
     expect(shown.where).toMatch(/^tick \d+ · \(\d+, \d+\)$/);
-    expect(shown.expected).toBe('a tile the filed route covers');
-    expect(shown.received).toMatch(/^\d+ tiles in the old workings$/);
+    expect(shown.expected).toBe('a tile on the route');
+    expect(shown.received).toMatch(/^\d+ tiles off the route$/);
   });
 
   test('walk-the-plan tells a run that strayed nowhere but stopped short', () => {
@@ -284,7 +284,7 @@ describe('w8-04 says whether the run reached the locker, and never says where it
 
     expect(met).toBe(false);
     expect(divergence).toEqual({
-      where: 'the far end of the filed route',
+      where: 'the locker at the end of the route',
       expected: 'the bot standing on it',
       received: 'the run stopped short',
     });
@@ -329,8 +329,8 @@ describe('w8-04 charges the re-survey to the run’s own footprints', () => {
 
     expect(met).toBe(false);
     expect(divergence).toEqual({
-      where: 'the reading',
-      expected: 'a line reading `plan <cipher> <legs>`',
+      where: 'the plan line',
+      expected: 'a line `plan <key> <legs>`',
       received: NOTHING,
     });
   });
@@ -342,7 +342,7 @@ describe('w8-04 charges the re-survey to the run’s own footprints', () => {
     });
     expect(wrongShift.met).toBe(false);
     const cipher = must(wrongShift.divergence, 'a divergence');
-    expect(cipher.where).toBe('the cipher');
+    expect(cipher.where).toBe('the key');
     expect(`${cipher.expected} ${cipher.received}`).not.toContain(String(survey.cipherKey));
 
     const wrongLegs = report(w8_04, seed, 'read-the-plan', (sim, botId) => {
@@ -393,7 +393,7 @@ describe('w8-05 reports the finale without driving the finale', () => {
     const shown = must(divergence, 'a divergence');
     expect(shown.where).toBe(`airlock at ${point(airlock.at)}`);
     expect(shown.expected).toMatch(/^every turn with sub-\d+ on$/);
-    expect(shown.received).toBe('4 of 4 at a dark gate');
+    expect(shown.received).toBe('4 of 4 with no power');
   });
 
   test('a gate nobody reached for is told that, and not a figure it missed', () => {
@@ -428,8 +428,8 @@ describe('w8-05 reports the finale without driving the finale', () => {
     expect(objective.evaluate(ctx)).toBe(false);
     expect(objective.divergence?.(ctx)).toEqual({
       where: 'the airlock',
-      expected: `a gate moved after ${feeder} was thrown`,
-      received: 'moved at tick 41, thrown at tick 689',
+      expected: `a move after ${feeder} was on`,
+      received: 'moved at tick 41, on at 689',
     });
   });
 

@@ -144,7 +144,7 @@ const driven = (ctx: ObjectiveContext): string[] =>
 export function driveTheRoute(routeOf: (world: World) => readonly string[]): Objective {
   return Objectives.custom(
     'drive-the-route',
-    'Drive the route as sent, move for move',
+    'Make exactly the moves in the route',
     (ctx) => {
       const route = routeOf(ctx.initialWorld);
       const moves = driven(ctx);

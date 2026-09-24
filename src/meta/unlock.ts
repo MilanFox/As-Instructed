@@ -14,125 +14,120 @@ export const LIBRARY_REQUIREMENTS: Readonly<Record<string, readonly LibraryRequi
       {
         name: 'survey',
         signature: 'survey(): void',
-        assumes: 'Looks every way from where the bot stands and records what it saw.',
+        assumes: 'Looks around and saves what it sees.',
       },
       {
         name: 'pathTo',
         signature: 'pathTo(x: number, y: number): boolean',
-        assumes:
-          'Walks the bot to a tile the record already knows, and reports whether it arrived.',
+        assumes: 'Walks to a known tile. Returns true if it arrives.',
       },
     ],
     'w5-05': [
       {
         name: 'waves',
         signature: 'waves(deps: number[][]): number[][]',
-        assumes:
-          'Groups a dependency graph into waves, wave 1 first: each lands one past the deepest thing it waits on.',
+        assumes: 'Sorts tasks into waves. Each goes one wave after the tasks it waits for.',
       },
     ],
     'w6-05': [
       {
         name: 'findKey',
         signature: 'findKey(packets: string[]): number',
-        assumes: 'Takes the traffic on the band and returns the shift it was sent with.',
+        assumes: 'Returns the key the packets were encrypted with.',
       },
       {
         name: 'unpack',
         signature: 'unpack(route: string): Dir[]',
-        assumes: 'Turns a run of move groups like `4E12S1W` into the moves they stand for.',
+        assumes: 'Turns a route like `4E12S1W` into a list of moves.',
       },
     ],
     'w7-02': [
       {
         name: 'pathTo',
         signature: 'pathTo(x: number, y: number, b?: Bot): boolean',
-        assumes: 'Walks a bot to a tile the record already knows, and reports whether it arrived.',
+        assumes: 'Walks to a known tile. Returns true if it arrives.',
       },
     ],
     'w7-05': [
       {
         name: 'survey',
         signature: 'survey(b?: Bot): void',
-        assumes: 'Looks every way from where a bot stands and records what it saw.',
+        assumes: 'Looks around and saves what it sees.',
       },
       {
         name: 'pathTo',
         signature: 'pathTo(x: number, y: number, b?: Bot): boolean',
-        assumes: 'Walks a bot to a tile the record already knows, and reports whether it arrived.',
+        assumes: 'Walks to a known tile. Returns true if it arrives.',
       },
       {
         name: 'deal',
         signature: 'deal(costs: number[], fleet: number): number[]',
-        assumes: 'Hands each job to whichever worker has the least on it so far, heaviest first.',
+        assumes: 'Gives each job, heaviest first, to the least busy worker.',
       },
     ],
     'w8-01': [
       {
         name: 'pathTo',
         signature: 'pathTo(x: number, y: number): boolean',
-        assumes:
-          'Walks the bot to a tile the record already knows, and reports whether it arrived.',
+        assumes: 'Walks to a known tile. Returns true if it arrives.',
       },
     ],
     'w8-02': [
       {
         name: 'survey',
         signature: 'survey(b?: Bot): void',
-        assumes: 'Looks every way from where the bot stands and records what it saw.',
+        assumes: 'Looks around and saves what it sees.',
       },
       {
         name: 'pathTo',
         signature: 'pathTo(x: number, y: number, b?: Bot): boolean',
-        assumes:
-          'Walks the bot to a tile the record already knows, and reports whether it arrived.',
+        assumes: 'Walks to a known tile. Returns true if it arrives.',
       },
     ],
     'w8-03': [
       {
         name: 'waves',
         signature: 'waves(deps: number[][]): number[][]',
-        assumes:
-          'Groups a dependency graph into waves, wave 1 first: each lands one past the deepest thing it waits on.',
+        assumes: 'Sorts tasks into waves. Each goes one wave after the tasks it waits for.',
       },
       {
         name: 'deal',
         signature: 'deal(costs: number[], fleet: number): number[]',
-        assumes: 'Hands each job to whichever worker has the least on it so far, heaviest first.',
+        assumes: 'Gives each job, heaviest first, to the least busy worker.',
       },
       {
         name: 'pathTo',
         signature: 'pathTo(x: number, y: number, b?: Bot): boolean',
-        assumes: 'Walks a bot to a tile the record already knows, and reports whether it arrived.',
+        assumes: 'Walks to a known tile. Returns true if it arrives.',
       },
     ],
     'w8-04': [
       {
         name: 'findKey',
         signature: 'findKey(packets: string[]): number',
-        assumes: 'Takes the traffic on the band and returns the shift it was sent with.',
+        assumes: 'Returns the key the packets were encrypted with.',
       },
       {
         name: 'unpack',
         signature: 'unpack(route: string): Dir[]',
-        assumes: 'Turns a run of move groups like `4E12S1W` into the moves they stand for.',
+        assumes: 'Turns a route like `4E12S1W` into a list of moves.',
       },
       {
         name: 'reach',
         signature: 'reach(x: number, y: number, b?: Bot): boolean',
-        assumes: 'Routes to a tile, surveying first when the record does not know it yet.',
+        assumes: 'Walks to a tile. Looks around first if the tile is unknown.',
       },
     ],
     'w8-05': [
       {
         name: 'reach',
         signature: 'reach(x: number, y: number, b?: Bot): boolean',
-        assumes: 'Routes a bot to a tile, surveying first when the record does not know it yet.',
+        assumes: 'Walks to a tile. Looks around first if the tile is unknown.',
       },
       {
         name: 'dispatch',
         signature: 'dispatch(deps: number[][], costs: number[], fleet: number): number[]',
-        assumes: 'Groups the work into waves and deals each wave out across the fleet.',
+        assumes: 'Sorts the work into waves and shares each wave among the bots.',
       },
     ],
   });

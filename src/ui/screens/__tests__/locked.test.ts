@@ -18,16 +18,14 @@ function closing(...ids: string[]): SaveFile {
 describe('a work order the save has not opened', () => {
   it('says so, and names the close that opens it', () => {
     const lines = blockedLines(emptySave(), { levelId: SECOND, reason: 'locked' });
-    expect(lines[0]).toBe(`Work order ${SECOND} is not open yet.`);
-    expect(lines[1]).toBe(`Closing ${FIRST} opens it.`);
+    expect(lines[0]).toBe(`Level ${SECOND} is on hold.`);
+    expect(lines[1]).toBe(`Finish ${FIRST} to open it.`);
   });
 
   it('names the other way in, where a world stands between the player and it', () => {
     const lines = blockedLines(emptySave(), { levelId: WORLD_TWO, reason: 'locked' });
     const outstanding = order.filter((level) => level.world === 1).length;
-    expect(lines.at(-1)).toBe(
-      `Closing the ${String(outstanding)} open work orders in world 1 opens it as well.`,
-    );
+    expect(lines.at(-1)).toBe(`Or finish all ${String(outstanding)} open levels in Site 1.`);
   });
 
   it('counts down as the world it waits on is closed', () => {
@@ -35,7 +33,7 @@ describe('a work order the save has not opened', () => {
     const worldTwo = order.filter((level) => level.world === 2).map((level) => level.id);
     const save = closing(...worldTwo.slice(0, -1));
     const lines = blockedLines(save, { levelId: held, reason: 'locked' });
-    expect(lines.at(-1)).toBe('Closing the last open work order in world 2 opens it as well.');
+    expect(lines.at(-1)).toBe('Or finish the last open level in Site 2.');
   });
 
   it('offers no second route out of the first world', () => {
@@ -45,7 +43,7 @@ describe('a work order the save has not opened', () => {
 
   it('is headed as held, not as missing', () => {
     expect(blockedHeading({ levelId: SECOND, reason: 'locked' })).toBe(
-      `WORK ORDER ${SECOND.toUpperCase()} — ON HOLD`,
+      `LEVEL ${SECOND.toUpperCase()} — ON HOLD`,
     );
   });
 });
@@ -53,8 +51,8 @@ describe('a work order the save has not opened', () => {
 describe('a work order the campaign never issued', () => {
   it('reads as absent rather than as held', () => {
     const blocked = { levelId: 'w9-99', reason: 'unknown' } as const;
-    expect(blockedHeading(blocked)).toBe('NO WORK ORDER W9-99');
-    expect(blockedLines(emptySave(), blocked)[0]).toBe('The campaign has no work order w9-99.');
+    expect(blockedHeading(blocked)).toBe('NO LEVEL W9-99');
+    expect(blockedLines(emptySave(), blocked)[0]).toBe('There is no level w9-99.');
     expect(blockedLines(emptySave(), blocked).join(' ')).not.toContain('opens');
   });
 });
@@ -62,6 +60,6 @@ describe('a work order the campaign never issued', () => {
 describe('the explanation never outlives the rule it states', () => {
   it('drops to the bare line once the save has opened the order', () => {
     const lines = blockedLines(closing(FIRST), { levelId: SECOND, reason: 'locked' });
-    expect(lines).toEqual([`Work order ${SECOND} is not open yet.`]);
+    expect(lines).toEqual([`Level ${SECOND} is on hold.`]);
   });
 });

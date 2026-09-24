@@ -134,15 +134,15 @@ describe('projection', () => {
 
   test('the headline names the count of work orders and the count of upgrades', () => {
     const projection = projectSavings(report!, 3);
-    expect(projection.headline).toContain('3 ticks off `pathTo`');
-    expect(projection.headline).toContain('2 work orders');
+    expect(projection.headline).toContain('`pathTo` 3 ticks faster');
+    expect(projection.headline).toContain('2 levels');
     expect(projection.headline).toContain('1 of them to a better medal');
   });
 
   test('the suggested saving is the cheapest one that changes a bracket', () => {
     const best = bestProjection(report!);
     expect(best?.delta).toBe(3);
-    expect(upgradeSummary(best!)).toEqual(['1 work order goes from silver to gold.']);
+    expect(upgradeSummary(best!)).toEqual(['1 level goes from silver to gold.']);
   });
 
   test('a subroutine that can never change a bracket suggests nothing', () => {

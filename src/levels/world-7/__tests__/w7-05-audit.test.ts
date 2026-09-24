@@ -1,11 +1,19 @@
 import { describe, expect, test } from 'vitest';
-import type { ObjectiveContext, Sim, Vec } from '../../../engine/index.ts';
+import type { ObjectiveContext, Sim, TraceEvent, Vec } from '../../../engine/index.ts';
 import { ALL_DIRS, Dir, evaluateObjectives, manhattan, step } from '../../../engine/index.ts';
 import { must } from '../../../engine/__tests__/helpers.ts';
 import { runLevel } from '../../harness.ts';
 import { solution } from '../__solutions__/w7-05.ts';
-import { idleTicks } from '../shared.ts';
 import { w7_05, workerIds } from '../w7-05.ts';
+
+function idleTicks(events: readonly TraceEvent[], botIds: ReadonlySet<number>): number {
+  let idle = 0;
+  for (const event of events) {
+    if (event.kind !== 'wait' && event.kind !== 'sync') continue;
+    if (botIds.has(event.botId)) idle += event.dt;
+  }
+  return idle;
+}
 
 const key = (at: Vec): string => `${String(at.x)},${String(at.y)}`;
 
@@ -524,7 +532,7 @@ describe('w7-05 divergences name a place and a value', () => {
       const label = `seed ${String(seed)}`;
       expect(shown.where, label).toBe('the orders');
       expect(shown.expected, label).toBe(`${String(siteCount(seed))} sent, one for each site`);
-      expect(shown.received, label).toBe('0 sent all shift');
+      expect(shown.received, label).toBe('0 sent in the run');
       expect([shown.where, shown.expected, shown.received].every(short), label).toBe(true);
     }
   });
@@ -538,7 +546,7 @@ describe('w7-05 divergences name a place and a value', () => {
       const label = `seed ${String(seed)}`;
       expect(shown.where, label).toMatch(/^bot #\d+ · tick \d+$/);
       expect(shown.expected, label).toBe('an order read before this');
-      expect(shown.received, label).toMatch(/^(no order all shift|only \d+ orders all shift)$/);
+      expect(shown.received, label).toMatch(/^(no order in the run|only \d+ orders in the run)$/);
       expect([shown.where, shown.expected, shown.received].every(short), label).toBe(true);
     }
   });
@@ -693,7 +701,7 @@ describe('w7-05 the crew is raised on site, inside the requisition', () => {
       expect(objectiveIn('inside-requisition').divergence?.(run.ctx), label).toEqual({
         where: `bot #${String(world.bots.length + allowed)}`,
         expected: `${String(allowed)} workers or fewer`,
-        received: `${String(allowed + 1)} raised`,
+        received: `${String(allowed + 1)} spawned`,
       });
     }
   });

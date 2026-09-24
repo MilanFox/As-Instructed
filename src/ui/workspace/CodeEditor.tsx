@@ -18,7 +18,7 @@ export function CodeEditor({
 }: CodeEditorProps): React.ReactElement {
   return (
     <div style={{ width: '100%', height: '100%', minHeight: 0, minWidth: 0 }}>
-      <Suspense fallback={<span>opening the terminal…</span>}>
+      <Suspense fallback={<span>Loading editor…</span>}>
         <MonacoBody
           fontSize={fontSize}
           lineHeight={lineHeight}

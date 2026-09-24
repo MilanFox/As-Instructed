@@ -6,6 +6,7 @@ import { SPEEDS, useGame } from '../../game/store.ts';
 import { showCall } from '../hooks/useInspect.ts';
 import { openOverlay, useOverlay } from '../hooks/useOverlay.ts';
 import { callLine, unrecordedNote } from './call-text.ts';
+import { useDeckGlide } from './deckGlide.ts';
 import { OverlayPanel, PanelBar } from './OverlayPanel.tsx';
 import { RunLogLine } from './RunLogLine.tsx';
 import type { DebugView, WorkspaceData } from './useWorkspace.ts';
@@ -70,6 +71,7 @@ export function TransportDeck({
   const at = Math.min(end, Math.floor(workspace.tick));
   const fault = faultOf(workspace);
 
+  useDeckGlide();
   const overlay = useOverlay().open;
   const surveyed = workspace.surveySeed;
   const surveyBusy = surveyed !== null && workspace.previewState === 'running';
@@ -101,7 +103,7 @@ export function TransportDeck({
   };
 
   return (
-    <OverlayPanel className="transport-deck" label="Transport and run log">
+    <OverlayPanel className="transport-deck" label="Playback and log">
       {fault === null ? null : (
         <p className="fault-strip">
           <span className="fault-strip__text">{fault.text}</span>
@@ -111,7 +113,7 @@ export function TransportDeck({
               className="control control--tight"
               onClick={workspace.jumpToFailure}
             >
-              Go to fault
+              Go to error
             </button>
           ) : null}
         </p>
@@ -145,13 +147,13 @@ export function TransportDeck({
           <span className="debug-strip__text debug-strip__text--call">
             <span className="debug-strip__head">{debugParts.head}</span>
             {token === null ? (
-              <span className="debug-strip__unrecorded">not recorded — call log full</span>
+              <span className="debug-strip__unrecorded">not recorded, log full</span>
             ) : (
               <button
                 type="button"
                 className="debug-strip__call"
                 onClick={showCall}
-                title="Inspect this call"
+                title="Show this call"
               >
                 {token}
               </button>
@@ -184,8 +186,8 @@ export function TransportDeck({
           {running || surveyBusy
             ? 'Cancel'
             : surveyed === null
-              ? 'Dispatch'
-              : `Dispatch seed ${String(surveyed)}`}
+              ? 'Run'
+              : `Run board ${String(surveyed)}`}
         </button>
 
         <button
@@ -194,7 +196,7 @@ export function TransportDeck({
           onClick={workspace.debugRun}
           disabled={running}
         >
-          {debugging ? 'Cancel debug' : 'Debug run'}
+          {debugging ? 'Stop debug' : 'Debug'}
         </button>
 
         <span className="transport__group">
@@ -210,7 +212,7 @@ export function TransportDeck({
             type="button"
             className="control control--tight"
             onClick={workspace.togglePlay}
-            aria-label={workspace.playing ? 'Pause playback' : 'Play the run'}
+            aria-label={workspace.playing ? 'Pause' : 'Play'}
           >
             {workspace.playing ? '❚❚' : '▶'}
           </button>
@@ -232,7 +234,7 @@ export function TransportDeck({
           step={1}
           value={at}
           disabled={end === 0}
-          aria-label="Playback tick"
+          aria-label="Tick"
           aria-valuetext={`tick ${String(at)} of ${String(end)}`}
           onChange={(event) => workspace.seek(Number(event.target.value))}
         />
@@ -324,13 +326,13 @@ export function TransportDeck({
             </>
           }
         >
-          Log{workspace.suppressed > 0 ? ` · ${String(workspace.suppressed)} held` : ''}
+          Log{workspace.suppressed > 0 ? ` · ${String(workspace.suppressed)} not shown` : ''}
           {readout === null ? '' : ` · ${readout}`}
         </PanelBar>
         {logOpen ? (
           <div className="run-log__lines scroll-pane" id="workspace-run-log">
             {workspace.console.length === 0 ? (
-              <p className="empty-note">nothing on the wire</p>
+              <p className="empty-note">No output yet.</p>
             ) : (
               workspace.console.map((line) => <RunLogLine key={line.id} line={line} />)
             )}

@@ -145,6 +145,7 @@ export interface ApiFunctionSpec {
   params: ApiParamSpec[];
   returns: string;
   doc: string;
+  crewDoc?: string;
   example: string;
   cost: number | string;
   unlockedBy: string;

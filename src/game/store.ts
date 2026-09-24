@@ -448,7 +448,7 @@ export const useGame = create<GameState>((set, get) => {
   // star, attempt, best or close-out can come of it. A verdict from one seed is not a verdict:
   // the medal folds worst-seed per objective across the whole schedule.
   function oneSeedRun(seed: number, debug: boolean): void {
-    const word = debug ? 'debug' : 'single-seed';
+    const word = debug ? 'debug' : 'single-board';
     if (get().runState === 'running') return;
     if (get().previewState === 'running') {
       cancelPreview();
@@ -477,7 +477,7 @@ export const useGame = create<GameState>((set, get) => {
       debugNote: null,
     });
     pushLines([
-      { t: 0, kind: 'system', text: `${word} run ${level.id} — seed ${String(seed)}, ungraded` },
+      { t: 0, kind: 'system', text: `${word} run ${level.id} — board ${String(seed)}, ungraded` },
     ]);
 
     clearWatchdog();
@@ -486,12 +486,15 @@ export const useGame = create<GameState>((set, get) => {
         finishPreview(token, {
           failure: {
             kind: 'timeout',
-            message:
-              'Your program did not halt. We stopped it. We would like this noted on the record.',
+            message: 'Your program did not stop, so we stopped it.',
           },
         });
         pushLines([
-          { t: 0, kind: 'error', text: 'HALT notice filed. The host did not answer in time.' },
+          {
+            t: 0,
+            kind: 'error',
+            text: 'We tried to stop your program. It did not answer in time.',
+          },
         ]);
       },
       debug ? DEBUG_WATCHDOG_MS : UI_WATCHDOG_MS,
@@ -541,7 +544,7 @@ export const useGame = create<GameState>((set, get) => {
           {
             t: trace.endTick,
             kind: verdict.passed ? 'success' : 'error',
-            text: `${word} run complete — ${verdict.stats.ticks} ticks on seed ${String(seed)}, ungraded`,
+            text: `${word} run complete — ${verdict.stats.ticks} ticks on board ${String(seed)}, ungraded`,
           },
         ]);
 
@@ -851,7 +854,7 @@ export const useGame = create<GameState>((set, get) => {
         {
           t: 0,
           kind: 'system',
-          text: `run ${level.id} — ${seeds.length} seed${seeds.length === 1 ? '' : 's'}`,
+          text: `run ${level.id} — ${seeds.length} board${seeds.length === 1 ? '' : 's'}`,
         },
         ...(audit && seeds.length > level.seeds.length
           ? [{ t: 0, kind: 'system' as const, text: audit.note }]
@@ -863,13 +866,16 @@ export const useGame = create<GameState>((set, get) => {
         finishRun(token, {
           failure: {
             kind: 'timeout',
-            message:
-              'Your program did not halt. We stopped it. We would like this noted on the record.',
+            message: 'Your program did not stop, so we stopped it.',
           },
           ...failedReport(),
         });
         pushLines([
-          { t: 0, kind: 'error', text: 'HALT notice filed. The host did not answer in time.' },
+          {
+            t: 0,
+            kind: 'error',
+            text: 'We tried to stop your program. It did not answer in time.',
+          },
         ]);
       }, UI_WATCHDOG_MS);
 
@@ -934,8 +940,8 @@ export const useGame = create<GameState>((set, get) => {
             t: trace.endTick,
             kind: verdict.passed ? 'success' : 'error',
             text: verdict.passed
-              ? `work order closed — ${verdict.stats.ticks} ticks`
-              : (verdict.failure?.message ?? 'Run complete. The objective is still open.'),
+              ? `level closed — ${verdict.stats.ticks} ticks`
+              : (verdict.failure?.message ?? 'Run done. An objective is not met yet.'),
           },
         ]);
 
@@ -1226,7 +1232,7 @@ export const useGame = create<GameState>((set, get) => {
         set({
           debugNote: traceIsAttributed(trace)
             ? `No event came from ${where}.`
-            : 'This run recorded no lines. Dispatch a debug run.',
+            : 'This run did not record lines. Start a debug run.',
         });
         return;
       }
@@ -1380,7 +1386,7 @@ export function visibleConsole(
 export function actionNotice(event: TraceEvent): string | null {
   switch (event.kind) {
     case 'harvest':
-      if (event.reason === 'full') return 'No room in the hopper. Swung anyway.';
+      if (event.reason === 'full') return 'The bot is full. The harvest did nothing.';
       return null;
     default:
       return null;

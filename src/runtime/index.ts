@@ -23,6 +23,8 @@ export {
   apiUnlockedAt,
   apiUnlockedBy,
   botHandleDeclaration,
+  docFor,
+  hasCrew,
   perBotApi,
   renderParams,
 } from './api-spec.ts';

@@ -402,66 +402,47 @@ export const w5_04: LevelDef = {
   title: 'Load Balance',
   hardware: [],
   brief: [
-    '**MEMO KD-2517**',
-    '**FROM:** Dep. Coordinator M. Vance\\',
-    '**RE:** Yard 4 distribution',
+    'A new medical machine arrives next week and will plug into the reserve tap. Please leave it room, because the doctors dislike surprises. — M. Vance',
     '',
-    'Yard 4 was cabled by a contractor who rated every segment, wrote the ratings on the',
-    'segments, and left. Medical has been promised a tap for a unit arriving next week,',
-    'and would like it to switch on.',
-    '',
-    'Put every consumer on a tap. Take no segment over its ceiling.',
+    '**Link every consumer to one tap so that no segment carries more than its ceiling. A cable cannot be removed.**',
   ].join('\n'),
   board: {
-    fixed: [
-      'yard 4 is 26 by 20 of open floor',
-      'the reactor stands at the west wall, and its tree of junctions is already laid and live; it ends in a column of taps',
-      'the consumers stand east of the taps',
-      'RIG-01 works from the reactor — `link` takes both ends by id, so nothing has to be driven to',
-      'every draw is 2, 4 or 8, and every ceiling is a multiple of 8',
-      'every junction is rated for less than the segments below it add up to',
-      'the reserve is 8, on a tap three segments from the reactor',
-      'there is always a way to place every consumer and still leave the reserve its room',
-    ],
     redrawn: [
-      'the shape of the tree: two or three junctions off the reactor, each splitting two or three ways, some once more',
-      'six to nine taps',
-      'every ceiling',
-      'twelve to sixteen consumers, and which one draws what',
-      'which tap carries the reserve',
-      'where the consumers stand',
+      'the tree: 2 or 3 branches from the reactor, each splitting 2 or 3 ways, some again',
+      '6 to 9 taps, and every ceiling',
+      '13 to 15 consumers, and the draw of each',
+      'which tap has the reserve',
     ],
   },
   facts: [
     {
-      label: 'What reports what',
+      label: 'Tree',
       value:
-        '`reactor`, then `junction-1`, `tap-1` and `consumer-1` upward; `probe(id)` is free and returns `null` past the last. Every junction and tap names the one machine above it with a `fed:<id>` key in `vars` and reports `vars.ceiling`, the rating of the segment between the two. Consumers report `vars.draw`.',
+        '`reactor` → `junction-1`… → `tap-1`…. Each junction and tap names the machine above it with a `vars` key like `fed:junction-2`. `probe` is free; each series of ids returns `null` after its last. Every board you are graded on has a way to place every consumer.',
     },
     {
-      label: '`link(tapId, consumerId)`',
+      label: 'Segment',
       value:
-        'Puts that consumer on that tap. 2 ticks. A consumer takes cable at a tap, never at a junction or the reactor. The tree itself is laid and live already; `power` is not needed.',
+        'The line from a junction or tap up to the machine above it. It carries the draw of every consumer below it.',
     },
     {
-      label: 'Load',
+      label: 'Ceiling',
       value:
-        "A consumer's draw is carried by its tap's segment and by every segment above it, up to the reactor. A segment is over its ceiling when what it carries is more than its `ceiling`.",
+        "A junction's or tap's `vars.ceiling`: the most its segment may carry. Always a multiple of 8. A junction's ceiling is less than the ceilings below it added together.",
     },
     {
-      label: 'Cable is permanent',
+      label: 'Consumer',
       value:
-        '**It cannot be removed once laid.** A consumer cabled to two taps draws through both, and every consumer must end on exactly one tap and nothing else.',
+        '`consumer-1`…, each with `vars.draw` (the power it uses): 2, 4 or 8. `link(tapId, consumerId)` joins one to a tap, 2 ticks, from anywhere. **A cable cannot be removed.**',
     },
     {
-      label: 'Room is not a fit',
-      value:
-        'Every segment can still have room left and a consumer find no tap with room all the way up to the reactor. Where the room ends up depends on the order you cable in, as well as where.',
+      label: 'Tap',
+      value: 'An end of the tree. Consumers link only to taps.',
     },
     {
-      label: 'The reserve',
+      label: 'Reserve',
       value:
-        "One tap reports `vars.reserve`, 8: Medical's unit. For the star, leave at least that much spare on every segment between that tap and the reactor once you are done.",
+        'One tap has `vars.reserve` = 8. Its path to the reactor is three segments, its own included. For the star, each of them keeps at least 8 spare (ceiling minus what it carries). Every board you are graded on has a way to do this and place every consumer.',
     },
   ],
   seeds: [1, 2, 3, 4, 5],
@@ -544,14 +525,14 @@ export const w5_04: LevelDef = {
   bonus: [
     Objectives.custom(
       'reserve-kept',
-      "Leave 8 spare on every segment above the reserve's tap",
+      'Leave 8 spare on every segment from the reserve tap to the reactor',
       reserveKept,
       { divergence: reserveSpent },
     ),
   ],
   starter: [
     '// NOTE(4470): a cable cannot be undone.',
-    '// NOTE(4470): the taps are rated. so is everything above them.',
+    '// NOTE(4470): the taps have ceilings. so does everything above them.',
     '',
     'const taps = [];',
     'for (let i = 1; ; i++) {',
@@ -562,10 +543,10 @@ export const w5_04: LevelDef = {
     '',
   ].join('\n'),
   hints: [
-    'Every ceiling, every draw and every `fed:` key is free to read. Work out where each consumer goes before you lay a single cable, because a cable is permanent.',
-    'Room at a tap is not room at the reactor. What a tap can still take is the least spare on any segment between it and the reactor, and every consumer you place lowers every one of those.',
-    'Small draws placed early break the room up into pieces an 8 no longer fits. Place the heavy ones while the room is still whole.',
-    "For the star, count Medical's 8 as already sitting on its tap before you place anything else.",
+    'Read every ceiling and draw first. Plan every connection before the first cable.',
+    'The room at a tap is the smallest spare on any segment between it and the reactor.',
+    'Place the 8s first, while the room is still in big pieces. Small draws placed early break it up.',
+    'For the star, treat the reserve as a consumer of 8 already on its tap.',
   ],
   docs: ['probe', 'link'],
 };

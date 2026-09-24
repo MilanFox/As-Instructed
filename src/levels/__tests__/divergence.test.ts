@@ -194,7 +194,7 @@ describe('w8-05 names the station that jumped its feeder', () => {
     expect(objective.evaluate(ctx)).toBe(false);
     expect(objective.divergence?.(ctx)).toEqual({
       where: `${station.id} · feeder ${feeder.id}`,
-      expected: `feeder ${feeder.id} energised first`,
+      expected: `feeder ${feeder.id} switched on first`,
       received: 'started at tick 10',
     });
   });

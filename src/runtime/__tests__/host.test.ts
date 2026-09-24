@@ -141,7 +141,7 @@ describe('the watchdog', () => {
     expect(response.ok).toBe(false);
     if (response.ok) return;
     expect(response.error.kind).toBe('timeout');
-    expect(response.error.message).toContain('did not halt');
+    expect(response.error.message).toContain('did not stop');
     expect(response.error.message).toContain('100 ms');
     runner.dispose();
   });

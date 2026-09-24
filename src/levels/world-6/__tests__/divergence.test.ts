@@ -59,7 +59,7 @@ describe('w6-01 names the line the log first got wrong', () => {
     expect(report.met).toBe(false);
     expect(shown).toEqual({
       where: 'the ping line',
-      expected: 'one line naming the ping',
+      expected: 'one ping line',
       received: NOTHING,
     });
     expect(band.indexOf('SESS 4470 ACTIVE')).toBeGreaterThanOrEqual(0);
@@ -104,9 +104,9 @@ describe('w6-02 names the packet the relay handled the wrong way', () => {
 
     expect(report.met).toBe(false);
     expect(report.divergence).toEqual({
-      where: `packet ${String(first.index)} on the band`,
+      where: `packet ${String(first.index)} in the queue`,
       expected: 'held back',
-      received: 'relayed',
+      received: 'sent',
     });
   });
 
@@ -115,8 +115,8 @@ describe('w6-02 names the packet the relay handled the wrong way', () => {
 
     expect(report.met).toBe(false);
     expect(report.divergence).toEqual({
-      where: 'packet 0 on the band',
-      expected: 'relayed',
+      where: 'packet 0 in the queue',
+      expected: 'sent',
       received: 'nothing more was sent',
     });
   });
@@ -135,9 +135,9 @@ describe('w6-02 names the packet the relay handled the wrong way', () => {
 
     expect(report.met).toBe(false);
     expect(report.divergence).toEqual({
-      where: 'packet 0 on the band',
-      expected: 'relayed',
-      received: 'not relayed',
+      where: 'packet 0 in the queue',
+      expected: 'sent',
+      received: 'not sent',
     });
   });
 
@@ -154,7 +154,7 @@ describe('w6-02 names the packet the relay handled the wrong way', () => {
 
     expect(report.met).toBe(false);
     expect(report.divergence).toEqual({
-      where: `packet ${String(first.index)} on the band`,
+      where: `packet ${String(first.index)} in the queue`,
       expected: 'the byte that explains both checks',
       received: `byte ${String(guess(first))}`,
     });
@@ -165,7 +165,7 @@ describe('w6-02 names the packet the relay handled the wrong way', () => {
     const report = diverge(w6_02, 1, 'name-the-fault', () => undefined);
     const shown = must(report.divergence, 'a divergence');
 
-    expect(shown.expected).toBe('a line naming its altered byte');
+    expect(shown.expected).toBe('a line naming its changed byte');
     expect(corrupt.length).toBeGreaterThan(0);
     expect(shown.received).toBe(NOTHING);
   });
@@ -194,7 +194,7 @@ describe('w6-03 prices the return packet against the shortest the format allows'
     const characters = (field: string): number => Number(field.split(' ')[0]);
 
     expect(report.met).toBe(false);
-    expect(shown.where).toBe('characters on the wire');
+    expect(shown.where).toBe('length of the return packet');
     expect(shown.expected).toMatch(/^\d+ characters$/);
     expect(shown.received).toMatch(/^\d+ characters$/);
     expect(characters(shown.received)).toBeGreaterThan(characters(shown.expected));
@@ -246,7 +246,7 @@ describe('w6-04 names the packet the relay sent in the wrong alphabet', () => {
 
     expect(report.met).toBe(false);
     expect(shown.where).toBe('packet 0');
-    expect(shown.expected).toBe('plain text opening "KD//"');
+    expect(shown.expected).toBe('decoded text starting "KD//"');
     expect(shown.received).not.toContain('KD//');
   });
 
@@ -266,9 +266,9 @@ describe('w6-04 names the packet the relay sent in the wrong alphabet', () => {
     const shown = must(report.divergence, 'a divergence');
 
     expect(report.met).toBe(false);
-    expect(shown.where).toBe('the straggler');
-    expect(shown.expected).toBe('the one shift in the stated alphabet');
-    expect(shown.received).toMatch(/^shift \d+$/);
+    expect(shown.where).toBe('the last packet');
+    expect(shown.expected).toBe('a key giving only allowed characters');
+    expect(shown.received).toMatch(/^key \d+$/);
   });
 
   test('the straggler report never contains a word of the straggler', () => {
@@ -276,8 +276,8 @@ describe('w6-04 names the packet the relay sent in the wrong alphabet', () => {
     const shown = must(report.divergence, 'a divergence');
 
     expect(shown).toEqual({
-      where: 'the headed packets',
-      expected: 'all 8 in plain text first',
+      where: 'the packets with a header',
+      expected: 'all 8 decoded first',
       received: '0 of 8',
     });
     expect(`${shown.expected} ${shown.received}`).not.toContain('repeater');
@@ -305,7 +305,7 @@ describe('w6-05 names the pad and the block the repair report got wrong', () => 
     const shown = must(report.divergence, 'a divergence');
 
     expect(report.met).toBe(false);
-    expect(shown.where).toMatch(/^block \d+ on the band$/);
+    expect(shown.where).toMatch(/^block \d+ in the queue$/);
     expect(shown.expected).toBe('a repair for it');
     expect(shown.received).toBe(NOTHING);
   });
@@ -317,8 +317,8 @@ describe('w6-05 names the pad and the block the repair report got wrong', () => 
     const shown = must(report.divergence, 'a divergence');
 
     expect(report.met).toBe(false);
-    expect(shown.where).toMatch(/^block \d+ on the band$/);
-    expect(shown.expected).toBe('the line it was sent as, repaired');
+    expect(shown.where).toMatch(/^block \d+ in the queue$/);
+    expect(shown.expected).toBe('the line as it was sent');
     expect(shown.received).toBe('fix main|1E');
   });
 });

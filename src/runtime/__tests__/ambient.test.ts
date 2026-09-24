@@ -78,7 +78,7 @@ describe('buildAmbientDts', () => {
   test('carries the doc text as JSDoc so hover tooltips work', () => {
     const dts = buildAmbientDts(W1_01);
     expect(dts).toContain('Steps one tile in `dir`');
-    expect(dts).toContain('@param dir The cardinal direction to step in.');
+    expect(dts).toContain('@param dir The direction to step in.');
     expect(dts).toContain('@example');
     expect(dts).toContain('Costs 1 tick.');
     expect(dts).toContain('Free: costs no ticks');

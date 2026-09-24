@@ -84,7 +84,7 @@ function strayCrate(ctx: ObjectiveContext): Divergence | undefined {
   if (carrier === undefined) return undefined;
   return {
     where: `bot #${String(carrier.id)} · ${at(carrier.at)}`,
-    expected: 'dropped in the silo bay',
+    expected: 'dropped on the silo',
     received: 'still carrying a crate',
   };
 }
@@ -137,58 +137,48 @@ export const w7_03: LevelDef = {
   title: 'Right of Way',
   hardware: [],
   brief: [
-    '**FROM:** Field Eng. D. Halloran',
+    'The tunnel is narrow and the bots are not polite. The office counts every bump, and every time the traffic turns around. — D. Halloran',
     '',
-    'one tunnel. one bot wide. it has been one bot wide since 2201 and Facilities have listed',
-    'widening it as an option under review. the review is also under review.',
-    '',
-    'two bots that each stand aside for the other stand aside all shift. the framework calls',
-    'that a sustained mutual courtesy. Facilities log every bump and every turnaround in there',
-    'as an incident.',
-    '',
-    'Clear the east yard into the silo.',
+    '**Move every crate from the east yard to the silo.**',
   ].join('\n'),
   board: {
-    fixed: [
-      'one tunnel between the rooms, one bot wide, on row 7 every shift',
-      'both rooms are seven columns wide and the site is seven rows deep inside its wall',
-      'the silo is the whole of column 1 — any tile in it counts as delivered',
-      'one pile of crates per bot, in the row that bot starts in',
-      'no shift is one trip each: at least one pile holds two crates',
-    ],
     redrawn: [
-      'how many bots the shift fields, two to six',
-      'the length of the tunnel, six to twelve tiles',
-      'which column of the east yard each pile stands in',
+      'the bot count, two to six',
+      'the tunnel length, 6 to 12 tiles',
+      'the east-yard column of each pile',
       'whether a pile holds one crate or two',
     ],
   },
   facts: [
-    { label: 'Your score', value: 'The clock stops when the **last** bot stops.' },
-    { label: 'The silo', value: 'The whole west wall. Any tile in **column 1** counts.' },
-    { label: 'Carrying', value: 'One crate at a time.' },
+    { label: 'Score', value: 'The tick when the **last** bot stops.' },
     {
-      label: 'The tunnel',
-      value: 'One bot wide, on row `y = 7`. Two bots going opposite ways cannot pass.',
-    },
-    {
-      label: 'Nose to tail',
+      label: 'Crates',
       value:
-        'A bot that leaves a tile frees it on that same tick, so bots going the same way can run one tick apart.',
+        'Bots start in the west yard, next to the silo. The silo is every tile of column 1. Each bot has one pile in the east yard, in its start row. A pile holds one or two. A bot carries one at a time.',
     },
     {
-      label: 'Held, not standing',
+      label: 'Tunnel',
+      value: 'Row `y = 7`, one bot wide. Bots going opposite ways cannot pass.',
+    },
+    {
+      label: 'Following bots',
       value:
-        'A tile is held for the ticks a bot was on it. A bot behind on its own clock still cannot walk through where another bot stood at that tick, however empty the aisle looks by then.',
+        'A bot frees its tile on the tick it leaves. Bots going the same way can follow one tick apart.',
     },
     {
-      label: '`canMove(dir)`',
+      label: 'Past ticks',
       value:
-        "Free, and it asks `move`'s own question about the tick this bot would arrive on. Only another bot moving can change the answer, so a `canMove` answered by that same `move` never bounces.",
+        'Each bot has its own clock, and your code moves one bot at a time. A tile is taken at every tick a bot stood on it. Another bot cannot enter it at one of those ticks, even if it is empty now.',
     },
     {
-      label: 'Turning the tunnel',
-      value: `A step into the tunnel that goes the opposite way to the step into it before is a reversal. For the star: at most ${String(REVERSAL_BUDGET)} in the shift, every bot's steps counted together in tick order.`,
+      label: 'Blocked moves',
+      value:
+        'Any move that fails, into a bot or a wall. `canMove(dir)` checks first, for free. Its answer holds until your code moves another bot, which may take the tile.',
+    },
+    {
+      label: 'Reversal (tunnel traffic turns around)',
+      value:
+        'A tunnel step in the opposite direction to the tunnel step before it, by any bot, in tick order.',
     },
   ],
   seeds: [1, 2, 3, 4],
@@ -216,7 +206,7 @@ export const w7_03: LevelDef = {
   objectives: [
     Objectives.custom(
       'crates-in-silo',
-      'Deliver every crate to the silo bay in column 1',
+      'Deliver every crate to the silo in column 1',
       (ctx) => cratesHome(ctx.world) === totalCrates(ctx.initialWorld),
       { progress: delivered, divergence: strayCrate },
     ),
@@ -224,13 +214,13 @@ export const w7_03: LevelDef = {
   bonus: [
     Objectives.custom(
       'no-bumps',
-      'Complete the run without a single blocked move',
+      'No blocked moves',
       (ctx) => blockedMoves(ctx.trace.events) === 0,
       { divergence: (ctx) => firstBump(ctx.trace.events) },
     ),
     Objectives.custom(
       'one-way-tunnel',
-      `Reverse the tunnel at most ${String(REVERSAL_BUDGET)} times`,
+      `No more than ${String(REVERSAL_BUDGET)} tunnel reversals`,
       (ctx) => reversals(ctx).length <= REVERSAL_BUDGET,
       {
         progress: (ctx) => [Math.min(reversals(ctx).length, REVERSAL_BUDGET), REVERSAL_BUDGET],
@@ -240,7 +230,7 @@ export const w7_03: LevelDef = {
     ),
   ],
   starter: [
-    '// The tunnel row is y = 7. Everything crosses on it.',
+    '// The tunnel is row y = 7.',
     '',
     'for (const id of bots()) {',
     '  bot(id).move(Dir.East);',
@@ -248,11 +238,11 @@ export const w7_03: LevelDef = {
     '',
   ].join('\n'),
   hints: [
-    'The tunnel is a resource, not an obstacle. Exactly one thing can be using it, and you are the one deciding which thing that is.',
-    'Both bots are being polite. Politeness is symmetric. Something here needs to not be.',
-    'You know every cost before the run starts, so you can work out the tick a bot reaches the tunnel mouth without asking it. The question is not whether the tunnel is free now. It is when.',
-    'A queue that runs one way empties faster than a queue that alternates. Once the tunnel is pointed one way, ask what it costs you to turn it around, and how many bots you should send before you pay that.',
-    'A pile of two crates cannot be cleared on one crossing each way, so the shift needs a second lap. Count the direction changes that whole plan costs before the first bot moves.',
+    'Only one direction can use the tunnel at a time. Your code decides which.',
+    'If each bot waits for the other, both wait forever. One bot must go first.',
+    'You know how many ticks every action takes. Work out when each bot reaches the tunnel.',
+    'Send several bots the same way before you turn the tunnel around.',
+    'A pile of two crates needs a second trip. Plan all direction changes before the first bot moves.',
   ],
   docs: ['ticks', 'wait', 'sync', 'canMove', 'pickup', 'drop'],
 };

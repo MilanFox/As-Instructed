@@ -91,7 +91,7 @@ export class FakeRunner implements RunnerPort {
   private execute(submission: RunSubmission): RunResponse {
     const level = getLevel(submission.levelId);
     if (!level) {
-      return { ok: false, error: { kind: 'runtime', message: 'No such work order.' } };
+      return { ok: false, error: { kind: 'runtime', message: 'No such level.' } };
     }
 
     const seed = submission.seeds[0] ?? level.seeds[0] ?? 1;

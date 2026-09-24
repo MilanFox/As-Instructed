@@ -151,8 +151,8 @@ describe('the survey names a site by how much of it has been walked', () => {
     expect(last.unlocked).toBe(false);
     expect(siteLabel(last)).toContain(last.world.name);
     expect(siteLabel(first)).toContain(first.world.name);
-    expect(siteLabel(last)).toContain('unsurveyed');
-    expect(siteLabel(first)).not.toContain('unsurveyed');
+    expect(siteLabel(last)).toContain('locked');
+    expect(siteLabel(first)).not.toContain('locked');
   });
 
   test('a surveyed site reads its closed count against the orders it issued', () => {
@@ -174,9 +174,9 @@ describe('the survey names a site by how much of it has been walked', () => {
     const atPar = siteLabel(siteFor(bootSectorClosed(Medal.Gold), 1));
     const starred = siteLabel(siteFor(allStarred(Medal.Gold), 1));
 
-    expect(atPar).toContain('every work order at par');
+    expect(atPar).toContain('every level at par');
     expect(atPar).not.toContain('bonus');
-    expect(starred).toContain('every work order at par');
+    expect(starred).toContain('every level at par');
     expect(starred).toContain('every bonus objective met');
   });
 

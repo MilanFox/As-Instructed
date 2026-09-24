@@ -136,11 +136,22 @@ interface Row {
   readout: string;
 }
 
+// A highlighted term is an element inside the running text, so the label is read as written
+// rather than with the space the walk puts between elements.
+function labelText(label: Drawn | undefined): string {
+  if (!label) return '';
+  return label.children
+    .map((child) => (hasClass('objective-row__tag')(child) ? `${child.text} ` : child.text))
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function rowsOf(component: () => unknown): Row[] {
   driver.reset();
   const tree = draw(component());
   return within(tree, hasClass('objective-row')).map((row) => ({
-    label: within([row], hasClass('objective-row__label'))[0]?.text ?? '',
+    label: labelText(within([row], hasClass('objective-row__label'))[0]),
     state: String(row.attrs['data-state'] ?? ''),
     gauge: within([row], hasClass('progress-meter')).length > 0,
     kind: String(within([row], hasClass('progress-meter'))[0]?.attrs['data-kind'] ?? ''),
@@ -406,14 +417,16 @@ describe('one objective list, and it is the run that was graded', () => {
     const bonusLabel = level.bonus?.[0]?.label as string;
 
     expect(lines.find((line) => line.label === 'Bonus')?.value).toBe(
-      `Missed on seed ${String(wasteful)}`,
+      `Missed on board ${String(wasteful)}`,
     );
-    const spent = runs.find((run) => run.result.seed === wasteful)?.result.bonus?.[0]
-      ?.progress as [number, number];
-    expect(lines.find((line) => line.label === `Seed ${String(wasteful)}`)?.value).toBe(
+    const spent = runs.find((run) => run.result.seed === wasteful)?.result.bonus?.[0]?.progress as [
+      number,
+      number,
+    ];
+    expect(lines.find((line) => line.label === `Board ${String(wasteful)}`)?.value).toBe(
       `${bonusLabel} (${String(spent[0])}/${String(spent[1])})`,
     );
-    expect(lines.find((line) => line.label === `Seed ${String(kept)}`)?.value).toBe('closed');
+    expect(lines.find((line) => line.label === `Board ${String(kept)}`)?.value).toBe('passed');
   });
 
   test('and no seed is named when there is no star to account for', () => {
@@ -432,8 +445,8 @@ describe('one objective list, and it is the run that was graded', () => {
     );
     showAggregate(level, onlyWasteful);
     expect(named()).toBe(false);
-    expect(linesOf(Sheet).find((line) => line.label === `Seed ${String(wasteful)}`)?.value).toBe(
-      'closed',
+    expect(linesOf(Sheet).find((line) => line.label === `Board ${String(wasteful)}`)?.value).toBe(
+      'passed',
     );
   });
 });

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { KEY_LIST } from '../keys.ts';
 import { isNativeSaveShortcut } from '../useKeyboard.ts';
 
 describe('isNativeSaveShortcut', () => {
@@ -25,5 +26,12 @@ describe('isNativeSaveShortcut', () => {
   it('leaves an unrelated modified key alone', () => {
     const event = { metaKey: true, ctrlKey: false, key: 'a' } as KeyboardEvent;
     expect(isNativeSaveShortcut(event)).toBe(false);
+  });
+});
+
+describe('escape', () => {
+  it('is bound to nothing, so a stray press never closes a panel or leaves the level', () => {
+    const event = { metaKey: false, ctrlKey: false, key: 'Escape' } as KeyboardEvent;
+    expect(KEY_LIST.filter((binding) => binding.matches(event))).toEqual([]);
   });
 });

@@ -340,7 +340,7 @@ describe('the name plate never disagrees with the parcel', () => {
     const label = attr(bootSectorPin(render()), 'aria-label');
 
     expect(label).toContain('site complete');
-    expect(label).toContain('every work order at par');
+    expect(label).toContain('every level at par');
     expect(label).toContain('every bonus objective met');
   });
 });

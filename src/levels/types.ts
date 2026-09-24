@@ -12,7 +12,7 @@ export interface LevelDef {
   title: string;
   brief: string;
   facts?: LevelFact[];
-  board?: { fixed: string[]; redrawn: string[] };
+  board?: { redrawn: string[] };
   hardware: string[];
   build(seed: number): World;
   objectives: Objective[];

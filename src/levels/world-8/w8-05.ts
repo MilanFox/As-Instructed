@@ -459,7 +459,7 @@ function quotaMiss(ctx: ObjectiveContext): Divergence | undefined {
     return {
       where: `${sink.id} at ${point(sink.at)}`,
       expected: `${String(wanted)} ${kind} on the tile`,
-      received: held > 0 ? `${there}, ${String(held)} still in a hold` : there,
+      received: held > 0 ? `${there}, ${String(held)} still carried` : there,
     };
   }
   return undefined;
@@ -484,7 +484,7 @@ function darkStation(ctx: ObjectiveContext): { id: string; at: Vec; reason: stri
     if (station.state === 'on' && switched.has(station.id)) continue;
     const reason = switched.has(station.id)
       ? `${station.state} — used an even number of times`
-      : 'never used; no bot worked this tile';
+      : 'never used';
     return { id: station.id, at: station.at, reason };
   }
   return undefined;
@@ -510,7 +510,7 @@ function sealedAirlock(ctx: ObjectiveContext): Divergence | undefined {
     where: `airlock at ${point(airlock.at)}`,
     expected: `open — ${String(AIRLOCK_STAGES)} uses, with ${feeder ?? 'its feeder'} on`,
     received: dark
-      ? `${feeder as string} is ${station.state}; the gate took the ticks`
+      ? `${feeder as string} is ${station.state}; turns did nothing`
       : `${airlock.state} after ${String(moved)} uses that moved it`,
   };
 }
@@ -518,7 +518,7 @@ function sealedAirlock(ctx: ObjectiveContext): Divergence | undefined {
 function whereIsTheForm(ctx: ObjectiveContext): string {
   for (const bot of ctx.world.bots) {
     if (bot.inventory.some((stack) => stack.kind === ItemKind.Chip && stack.count > 0)) {
-      return `still in the hold of ${bot.name}`;
+      return `still carried by ${bot.name}`;
     }
   }
   const loose = ctx.world.items.find((stack) => stack.kind === ItemKind.Chip && stack.count > 0);
@@ -630,7 +630,7 @@ function misreadGate(ctx: ObjectiveContext): Divergence {
   if (line === undefined) {
     return {
       where: 'the gate note',
-      expected: 'a line naming the door’s substation',
+      expected: 'a line `gate <sub-N> <n>`',
       received: NOTHING,
     };
   }
@@ -645,7 +645,7 @@ function misreadGate(ctx: ObjectiveContext): Divergence {
   if (claim === null) {
     return {
       where: 'the gate note',
-      expected: 'a line reading `gate <station> <n>`',
+      expected: 'a line `gate <sub-N> <n>`',
       received: clipValue(line),
     };
   }
@@ -654,7 +654,7 @@ function misreadGate(ctx: ObjectiveContext): Divergence {
     return {
       where: claim.id,
       expected: 'the substation the airlock draws from',
-      received: 'a different one on the site',
+      received: 'a different substation',
     };
   }
   if (gateSlack(ctx) === undefined) {
@@ -663,20 +663,22 @@ function misreadGate(ctx: ObjectiveContext): Divergence {
     if (moved !== undefined && thrown !== undefined) {
       return {
         where: 'the airlock',
-        expected: `a gate moved after ${feeder ?? 'its substation'} was thrown`,
-        received: `moved at tick ${String(moved)}, thrown at tick ${String(thrown)}`,
+        expected: `a move after ${feeder ?? 'its substation'} was on`,
+        received: `moved at tick ${String(moved)}, on at ${String(thrown)}`,
       };
     }
     return {
       where: 'the airlock',
-      expected: 'a gate somebody moved this shift',
+      expected: 'the airlock moved this run',
       received:
-        moved === undefined ? 'nobody moved it' : `nobody threw ${feeder ?? 'its substation'}`,
+        moved === undefined
+          ? 'nobody moved it'
+          : `nobody switched on ${feeder ?? 'its substation'}`,
     };
   }
   return {
     where: 'the gate note',
-    expected: 'how long it stood powered and shut',
+    expected: 'ticks from switch-on to first move',
     received: `${String(claim.count)} claimed`,
   };
 }
@@ -707,7 +709,7 @@ function wastedTurns(ctx: ObjectiveContext): Divergence {
     return {
       where,
       expected: `every turn with ${airlockFeeder(ctx.world) ?? 'its substation'} on`,
-      received: `${String(dark)} of ${String(turns)} at a dark gate`,
+      received: `${String(dark)} of ${String(turns)} with no power`,
     };
   }
   return {
@@ -737,88 +739,74 @@ export function filedIn(world: World): 'charter' | 'renewals' | null {
 }
 
 const BRIEF = [
-  'dot: the Yards run this every night, so nothing is where it was yesterday. the airlock',
-  'past them wants the handle turned and turned, and it draws off the grid; nobody wrote',
-  'that down because nobody had to. Maintenance bill us for turns taken at a dark gate,',
-  'and Vance wants the time it stood lit and shut.',
+  'maintenance bills us for every turn at an airlock with no power. Vance wants to know how long it stood powered and shut, because Vance loves numbers. — dot',
   '',
-  'Bring the grid up, clear the crates, and file KD-0001-T. the Charter registry ends the',
-  'engagement; the renewals tray runs the Contract on, with you as signatory.',
+  '**With several bots, switch on the grid, deliver every crate, and put form KD-0001-T in a slot past the airlock.**',
 ].join('\n');
 
 const FACTS = [
   {
-    label: 'The desk',
+    label: 'Desk',
     value:
-      '`probe("desk")` publishes `stations`, `classes` and `crates`. The stations are `sub-0` up to `sub-<stations-1>`.',
+      'Probe it for `vars.stations`, `vars.classes` and `vars.crates`. Substations are `sub-0` to `sub-<stations-1>`.',
   },
   {
     label: 'Feeders',
     value:
-      '`vars.deps` is how many stations feed this one. `vars.dep0`, `vars.dep1` hold their numbers.',
+      '`vars.deps` is how many substations feed this one. `vars.dep0`, `vars.dep1` … are their numbers. A substation may **start** only after all its feeders **finish**. Each bot has its own clock: **after** means a higher tick, not a later line of code. Lower numbers do not always come first.',
   },
   {
-    label: 'The order rule',
+    label: 'Switching on',
     value:
-      'A station may not **start** until every feeder has **finished**. Read off the use log, not the final state. Every record in that log carries the clock of the bot that made it, and each bot keeps its own — **before** here means a lower tick, not an earlier line of your program.',
+      'Stand on or next to a substation (pass the direction) and call `use()`. It takes 1 tick. A second use switches it off again. `power()` does not work here.',
   },
   {
-    label: 'Energising',
+    label: 'Crates',
     value:
-      'Every substation is hand-operated: stand on it, or beside it and pass the direction, and call `use()`. `power()` reaches none of them — `probe(id).vars.manual` is 1 on every one. The cycle is `off`, `on` and it wraps, so using a station twice turns it back off. A `use()` costs one tick here, so a station **finishes** one tick after it is thrown.',
+      'Each class has one sink, `depot-<class>` (ore, ice, scrap, part, cell). Drop each crate on its own sink tile. Sinks are machines, not fuel depot terrain. A bot carries 6 crates.',
   },
   {
-    label: 'The quota',
+    label: 'Radio',
     value:
-      'Each class has one sink, `depot-<class>` — `ore`, `ice`, `scrap`, `part` or `cell`. Deliver by dropping the crate on the sink’s own tile; a crate still in a bot is not delivered, and a crate on the wrong class’s tile is not either. Only the classes the desk counts are on site tonight. These sinks are machines, and nothing to do with the fuel depot **terrain** below.',
+      '`receive()` works anywhere, for free, and returns the next line or `null`. A line is `KD4470|<fields>|<checksum>`; fields are `CRATE|x|y|kind`, `DEPOT|x|y|kind` or `FORM|x|y`. All bots share one queue: a line one bot reads is gone. Lines are not encrypted and none are fake, so the checksum can be ignored.',
   },
   {
-    label: 'The band',
+    label: 'Fuel (a bot at 0 ends the run)',
     value:
-      '`antenna` is live. `receive()` reads it from anywhere on the site, for nothing, and returns the next line or `null`. It is one queue for the whole fleet — a line one bot takes never comes back to another. Nothing on it tonight is enciphered or corrupt.',
+      'Bots start full; `fuel()` before moving gives the full amount. One tank does not last the whole job. `refuel()` works on fuel depot terrain: one on the desk row, others not on the radio; scan and look find them. A bot at 0 ends the run for everyone.',
   },
   {
-    label: 'A line',
+    label: 'Airlock',
     value:
-      '`KD4470|<field>|…|<checksum>`. Split on `|`, drop the header and the checksum, and read `CRATE|x|y|kind`, `DEPOT|x|y|kind`, `FORM|x|y`.',
+      'Starts sealed. Opening takes `vars.stages` (9) uses, 1 tick each. A 10th use seals it again, so read the state. Its `links` are the two gate tiles, the only way into the chamber. Everything outside the chamber can be reached from where the bots start.',
   },
   {
-    label: 'Fuel',
+    label: 'Airlock power',
     value:
-      'Every bot starts full and a full cell has no gauge, so `fuel()` before anybody moves is the number. A full cell is not a night of walking. `refuel()` works on any depot **tile** — the terrain, not a `depot-<class>` sink: the muster bay has one on the row the desk stands on, and the rest are scattered over the site — no packet lists them, so `scan()` and `look()` on the terrain are how you find them. A bot that reaches zero does not stop on its own — it ends the shift for the whole fleet.',
+      "The airlock's `vars` has a key `fed:sub-N`. Until `sub-N` is `on`, a `use()` at the gate costs a tick, does nothing, and still counts as a turn. `sub-N` always has feeders.",
   },
   {
-    label: 'The airlock',
+    label: 'Form',
     value:
-      'Starts sealed, and is hand-operated like the substations. One `use()` advances one stage for one tick, and `probe("airlock")` publishes `vars.stages` — the nine uses it takes to open. The cycle wraps: a tenth `use()` seals it again and walls the chamber back up, so read the state rather than counting. `probe("airlock").links` gives the two gate tiles it walls off, drawn on the board as a tether from the gate to each of them; they are the only way in.',
+      'KD-0001-T is a chip on a marked tile. `pickup()` takes it, like a crate. Leave it on `slot-charter` or `slot-renewals`, both past the airlock. Either one passes. A probe finds them.',
   },
   {
-    label: 'What opens it',
-    value:
-      'The door runs off the grid. `probe("airlock").vars` carries a `fed:sub-N` key: until that substation reads `on`, every `use()` at the gate costs its tick, moves nothing, and is still a turn of the handle. It is the station furthest down the grid, never a root, so the order rule puts its whole ancestry in front of the errand east.',
-  },
-  {
-    label: 'The form',
-    value:
-      'KD-0001-T is a chip on a marked tile in the workings. It is filed by leaving it on the tile of `slot-charter` or `slot-renewals`, both of them past the airlock; either one closes the work order. `probe` gives their positions.',
-  },
-  {
-    label: 'The shift',
-    value:
-      'The work order fails if the last bot stops after tick **3000**. Par is 1050, so the shift is the wall and par is the medal — a slow, honest program closes this inside the shift.',
+    label: 'Slots',
+    value: '`slot-charter` ends the Contract. `slot-renewals` renews it, with your name on it.',
   },
   {
     label: 'Gate note',
     value:
-      'One line, `gate <station> <n>`: the substation the airlock draws from, and the ticks between that substation being **thrown** — the tick of the `use()`, not the tick it finished — and the gate first moving. Both are read off the clock of whichever bot did it. A fleet that never squares its clocks can turn the handle at a lower tick than the throw it was waiting for: that shift has no such interval and the note cannot be filed for it.',
+      "Print one line `gate <sub-N> <n>`. `sub-N` is the airlock's substation. `n` is the ticks from the first `use()` of `sub-N` (it switches it on) to the first `use()` at the gate that moves the airlock. A `use()` at the gate without power does not move it. Take each tick from the clock of the bot that did the use. If the airlock moves at a lower tick than the switch-on, the note cannot pass.",
   },
 ];
 
 const STARTER = [
+  '// If you published these to lib.ts, you can import them:',
   "// import { reach, dispatch } from 'lib';",
   '',
-  '// NOTE(4470): the whole site runs on your code now. mine is all switched off',
-  '// NOTE(4470): the airlock wants a hand on the handle and our power. it needs both',
+  '// NOTE(4470): the whole site runs on your code now. mine is switched off',
+  '// NOTE(4470): the airlock needs a hand on the handle and power from the grid',
   '',
   'const fleet = bots();',
   'print(`fleet: ${fleet.length}`);',
@@ -833,21 +821,13 @@ export const w8_05: LevelDef = {
   hardware: [],
   brief: BRIEF,
   board: {
-    fixed: [
-      'the site is 46 by 38 inside the wall — the muster bay west, the Yards in the middle, the airlock and the chamber east',
-      'the whole fleet musters in the bay on full cells, six crates of hold each, beside a fuel depot tile on the row the desk stands on',
-      'every tile the shift needs is walkable from the bay; the chamber is the only shut part of the site, and the two gate tiles are the only way in',
-      'nine turns of the handle at the airlock, and the substation it draws off always has feeders of its own',
-      'the station numbers are not an energising order: some station is fed by one numbered above it',
-      'the shift is 3000 ticks on all three draws',
-    ],
     redrawn: [
-      'how many bots, six or seven',
-      'how many substations, and the shape of the grid — one draw is a pure chain, the others branch',
-      'how many crates, and which classes the night draws',
-      'which substation the airlock draws from',
-      'how much fuel a full cell holds',
-      'the cave layout, the row the airlock stands on, and where the depots, the sinks, the antenna and the form sit in it',
+      'number of bots, 6 or 7',
+      'number of substations and grid shape: one board is a chain, the others branch',
+      'number of crates, and which classes appear',
+      'which substation powers the airlock',
+      'how much fuel a full bot holds',
+      "the cave layout, the airlock's row, and where the depots, sinks and form are",
     ],
   },
   facts: FACTS,
@@ -871,7 +851,7 @@ export const w8_05: LevelDef = {
           if (!dark) return undefined;
           return {
             where: `${dark.id} at (${String(dark.at.x)}, ${String(dark.at.y)})`,
-            expected: 'on, switched by a use() at the tile',
+            expected: 'on, switched by use() on its tile',
             received: dark.reason,
           };
         },
@@ -879,7 +859,7 @@ export const w8_05: LevelDef = {
     ),
     Objectives.custom(
       'precedence',
-      'Energise each station only after its feeders',
+      'Switch on each substation only after its feeders',
       precedenceHolds,
       {
         progress: precedenceTally,
@@ -890,7 +870,7 @@ export const w8_05: LevelDef = {
             where: `${breach.station} · feeder ${breach.feeder}`,
             expected:
               breach.fedAt === null
-                ? `feeder ${breach.feeder} energised first`
+                ? `feeder ${breach.feeder} switched on first`
                 : `start at tick ${String(breach.fedAt)} or later`,
             received: `started at tick ${String(breach.started)}`,
           };
@@ -899,7 +879,7 @@ export const w8_05: LevelDef = {
     ),
     Objectives.custom(
       'quota',
-      'Deliver every crate to its own class depot',
+      'Deliver every crate to its class sink',
       (ctx) => {
         const [done, total] = quotaTally(ctx);
         return done === total;
@@ -908,7 +888,7 @@ export const w8_05: LevelDef = {
     ),
     Objectives.custom(
       'file-form',
-      'File KD-0001-T in the Charter registry or the renewals tray',
+      'Leave form KD-0001-T on slot-charter or slot-renewals',
       (ctx) => filedIn(ctx.world) !== null,
       {
         divergence: (ctx) =>
@@ -921,7 +901,7 @@ export const w8_05: LevelDef = {
     ),
     Objectives.custom(
       'deadline',
-      'Finish inside the shift',
+      'Finish within 3000 ticks',
       (ctx) => ctx.trace.endTick <= deadlineFor(ctx.initialWorld),
       {
         progress: (ctx) => {
@@ -937,38 +917,25 @@ export const w8_05: LevelDef = {
   bonus: [
     Objectives.custom(
       'nine-turns',
-      `Open the airlock in ${String(AIRLOCK_STAGES)} turns of the handle`,
+      `Open the airlock in exactly ${String(AIRLOCK_STAGES)} uses`,
       gateOpenedCleanly,
       { divergence: wastedTurns },
     ),
     Objectives.custom(
       'mind-the-gate',
-      'Name the substation the airlock draws from and how long it stood powered and shut',
+      "Print the gate note: the airlock's substation and how long it stood powered and shut",
       gateReportFiled,
       { divergence: misreadGate },
     ),
   ],
   starter: STARTER,
   hints: [
-    'Ask the desk and the stations where everything is before anybody walks anywhere. ' +
-      'Machine positions are free. The ground between them is not.',
-    'Nothing on this site is switched from a distance. Work out who is nearest to ' +
-      'what before you work out what order it all has to happen in.',
-    'A bot that is not allowed to switch its station on yet is not a bot that is stuck. ' +
-      'It is a bot that has something else it could be doing first.',
-    'Fuel is not a chore until the second errand. Then it decides which bot should have ' +
-      'taken it.',
-    'Until somebody has stood at the airlock and paid every stage of it, your route ' +
-      'planner sees a wall. The toll is the same size whoever pays it, so let the bot ' +
-      'that was going that way anyway pay it early.',
-    'The gate is on the same grid you were sent here to bring up, and it says which ' +
-      'substation before anybody walks anywhere. That substation is not allowed to come ' +
-      'up before its own feeders, so the errand east has a queue in front of it.',
-    'A turn of the handle taken while the gate is dark costs its tick, moves nothing, ' +
-      'and still counts against you. What the substation reads is free to ask for, and ' +
-      'asking is cheaper than finding out.',
-    'Nothing in the grid records when a station was thrown, only that it was. If you want ' +
-      'the interval the gate stood waiting, you have to read the clock as you throw.',
+    'Probe the desk and substations before anyone moves. Positions are free; walking is not.',
+    'Decide which bot is nearest to what before you decide the order.',
+    'A bot waiting for its feeders can do something else first, like carry crates.',
+    'Until the airlock is open, route planners see a wall. Let a bot that goes east anyway open it.',
+    "Check that the airlock's substation is on before you turn the handle. Checking is free.",
+    'The grid does not record when a substation was switched on. Read the clock when you switch it.',
   ],
   docs: ['fuel', 'refuel', 'power', 'use', 'receive', 'probe', 'clock', 'scan', 'look'],
 };

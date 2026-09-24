@@ -226,8 +226,8 @@ describe('w7-02 even-share grades work, not area', () => {
     const run = scored(3, equalBands);
 
     expect(run.heaviest).toBe(run.fairShare);
-    expect(w7_02.board?.redrawn.join(' ')).toContain('equal-area cut is also an equal-work cut');
-    expect(w7_02.hints.join(' ')).toContain('equal area and equal work are the same split');
+    expect(w7_02.board?.redrawn.join(' ')).toContain('equal areas also hold equal crops');
+    expect(w7_02.hints.join(' ')).toContain('equal areas hold equal crops');
   });
 });
 
@@ -256,7 +256,7 @@ describe('w7-02 says what it rolls and what it grades', () => {
     const words = w7_02.brief.trim().split(/\s+/).filter(Boolean).length;
 
     expect(words).toBeLessThanOrEqual(47);
-    expect(flat).toContain('Every unit earns its requisition. We do not itemise.');
+    expect(flat).toContain('No bot should do more than its share.');
     expect(flat).not.toMatch(/Math\.ceil|fair share/i);
   });
 

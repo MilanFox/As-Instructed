@@ -227,8 +227,8 @@ export function snapshotReport(state: GameState): ReportSnapshot | null {
     onRecord: passed
       ? null
       : progress?.completed
-        ? { word: resultWord(medalOf(level, progress)), note: 'this run changed nothing' }
-        : { word: 'still open', note: 'nothing to lose' },
+        ? { word: resultWord(medalOf(level, progress)), note: 'unchanged' }
+        : { word: 'open', note: 'failing costs nothing' },
     libraryLine: usage && routines > 0 ? libraryUsageLine(routines, usage.ticks) : null,
   };
 }

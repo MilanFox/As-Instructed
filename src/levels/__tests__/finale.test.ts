@@ -227,7 +227,7 @@ describe('the form leg cannot be run without the grid', () => {
     const result = runReference(level, level.seeds[0] as number, formErrandOnly);
     const form = result.verdict.objectives.find((entry) => entry.id === errand);
     expect(form?.divergence?.where).toMatch(/^airlock at \(\d+, \d+\)$/);
-    expect(form?.divergence?.received).toMatch(/^sub-\d+ is off; the gate took the ticks$/);
+    expect(form?.divergence?.received).toMatch(/^sub-\d+ is off; turns did nothing$/);
   });
 
   test('the door says which substation, and it is not one with nothing behind it', () => {

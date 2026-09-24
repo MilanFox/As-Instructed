@@ -77,7 +77,7 @@ function ownWaitsOnly(extraWaits: (index: number) => number) {
 }
 
 const NO_EXTRA = (): number => 0;
-const LOPSIDED = (index: number): number => index * 3;
+const LOPSIDED = (index: number): number => index * 4;
 
 describe('w7-01 required objectives', () => {
   test('the reference clears both of them on every seed', () => {
@@ -134,6 +134,67 @@ describe('w7-01 name-the-idle grades the report, not the walk', () => {
     expect(scored(3, ownWaitsOnly(NO_EXTRA)).star('name-the-idle').met).toBe(true);
   });
 
+  test('sending before walking fails both-heard on every seed', () => {
+    for (const seed of w7_01.seeds) {
+      const run = scored(seed, (sim) => {
+        const ids = sim.botIds();
+        for (const id of ids) sim.send(id, ids[(ids.indexOf(id) + 1) % ids.length] as number, id);
+        for (const id of ids) while (sim.canMove(id, Dir.East)) sim.move(id, Dir.East);
+        for (const id of ids) {
+          sim.recv(id);
+          sim.print(id, `idle ${String(id)} 0`);
+        }
+      });
+      expect(run.required('both-parked').met, `seed ${String(seed)}`).toBe(true);
+      expect(run.required('both-heard').met, `seed ${String(seed)}`).toBe(false);
+      expect(run.passed, `seed ${String(seed)}`).toBe(false);
+    }
+  });
+
+  test('polling with wait() and counting its own clock takes the star on every seed', () => {
+    for (const seed of w7_01.seeds) {
+      const run = scored(seed, (sim) => {
+        const ids = sim.botIds();
+        const walked = ids.map((id) => {
+          let steps = 0;
+          while (sim.canMove(id, Dir.East)) {
+            sim.move(id, Dir.East);
+            steps++;
+          }
+          return steps;
+        });
+        for (const id of ids)
+          sim.send(id, ids[(ids.indexOf(id) + 1) % ids.length] as number, 'here');
+        [...ids].reverse().forEach((id) => {
+          while (sim.recv(id) === null) sim.wait(id);
+          const idle = sim.clock(id) - (walked[ids.indexOf(id)] as number) - 1;
+          sim.print(id, `idle ${String(id)} ${String(idle)}`);
+        });
+      });
+      expect(run.passed, `seed ${String(seed)}`).toBe(true);
+      expect(run.ticks, `seed ${String(seed)}`).toBeLessThanOrEqual(w7_01.par.ticks);
+      expect(run.star('name-the-idle').met, `seed ${String(seed)}`).toBe(true);
+    }
+  });
+
+  test('burning ticks on a wall instead of wait() still counts as waiting', () => {
+    const blind = (sim: Sim): void => {
+      const ids = sim.botIds();
+      for (const id of ids) while (sim.canMove(id, Dir.East)) sim.move(id, Dir.East);
+      for (const id of ids) sim.send(id, ids[(ids.indexOf(id) + 1) % ids.length] as number, id);
+      for (const id of ids) {
+        while (sim.recv(id) === null) sim.move(id, Dir.North);
+        sim.print(id, `idle ${String(id)} 0`);
+      }
+    };
+    const missed = w7_01.seeds.filter((seed) => {
+      const run = scored(seed, blind);
+      expect(run.passed, `seed ${String(seed)}`).toBe(true);
+      return !run.star('name-the-idle').met;
+    });
+    expect(missed).toEqual([1, 2]);
+  });
+
   test('once the two bots are out of step, ignoring sync() misses the star on every seed', () => {
     for (const seed of w7_01.seeds) {
       const run = scored(seed, ownWaitsOnly(LOPSIDED));
@@ -149,7 +210,7 @@ describe('w7-01 says where the report went wrong', () => {
     const shown = must(run.star('name-the-idle').divergence, 'a divergence');
 
     expect(shown.where).toBe('bot #1');
-    expect(shown.expected).toBe('its wait ticks plus what sync() cost it');
+    expect(shown.expected).toBe('ticks past its walk and one send');
     expect(shown.received).toBe('idle 1 0');
   });
 
@@ -189,15 +250,15 @@ describe('w7-01 brief', () => {
     const flat = w7_01.brief.replace(/\s+/g, ' ');
 
     expect(words).toBeLessThanOrEqual(68);
-    expect(flat).toContain('accounts wants the standing-about itemised per bot');
+    expect(flat).toContain('the office wants to know how long each bot waited');
     expect(flat).not.toMatch(/finish time of the last one/i);
   });
 
   test('the scoring rule the brief used to explain lives in facts', () => {
     const facts = w7_01.facts ?? [];
 
-    expect(facts.find((fact) => fact.label === 'Your score')?.value).toMatch(/last/i);
-    expect(facts.find((fact) => fact.label === 'The clocks')?.value).toMatch(/at once/i);
+    expect(facts.find((fact) => fact.label === 'Score')?.value).toMatch(/last/i);
+    expect(facts.find((fact) => fact.label === 'Clocks')?.value).toMatch(/at once/i);
   });
 });
 

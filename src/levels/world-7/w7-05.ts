@@ -147,7 +147,7 @@ function reach(ctx: ObjectiveContext, siteId: string, at: Vec): string {
 function coldSite(ctx: ObjectiveContext): Divergence | undefined {
   const sites = siteMachines(ctx.initialWorld);
   if (sites.length === 0) {
-    return { where: 'the north workings', expected: 'a relay site', received: 'none on the plan' };
+    return { where: 'the north tunnels', expected: 'a relay site', received: 'none on the map' };
   }
   for (const site of sites) {
     if (machineById(ctx.world, site.id)?.state === 'on') continue;
@@ -170,8 +170,8 @@ function firstUnordered(ctx: ObjectiveContext): Divergence {
       received:
         jumped.told === undefined
           ? jumped.nth === 1
-            ? 'no order all shift'
-            : `only ${String(jumped.nth - 1)} orders all shift`
+            ? 'no order in the run'
+            : `only ${String(jumped.nth - 1)} orders in the run`
           : jumped.nth === 1
             ? `first order at tick ${String(jumped.told)}`
             : `order ${String(jumped.nth)} at tick ${String(jumped.told)}`,
@@ -225,7 +225,7 @@ function repeatedOrder(ctx: ObjectiveContext): Divergence {
   return {
     where: 'the orders',
     expected: `${String(total)} sent, one for each site`,
-    received: `${String(orders.sent)} sent all shift`,
+    received: `${String(orders.sent)} sent in the run`,
   };
 }
 
@@ -244,7 +244,7 @@ function overRaised(ctx: ObjectiveContext): Divergence | undefined {
   return {
     where: `bot #${String(ctx.initialWorld.bots.length + allowed)}`,
     expected: `${String(allowed)} workers or fewer`,
-    received: `${String(raised)} raised`,
+    received: `${String(raised)} spawned`,
   };
 }
 
@@ -259,74 +259,50 @@ export const w7_05: LevelDef = {
   title: 'Chain of Command',
   hardware: [],
   brief: [
-    '**MEMO KD-2731**',
-    '**FROM:** Dep. Coordinator M. Vance\\',
-    '**RE:** Conclusion of previous engagement',
+    'Last time two bots got the same order, and that crew is still lost. One order per site, please. — M. Vance',
     '',
-    'The relay sites in the north workings are not on any plan. They were put in by somebody who',
-    'did not file, and they still run. Field Engineering have declined to send a crew and',
-    'have not given a reason. Dot does give reasons. One docket per site, please. That is how',
-    'the last lot got lost.',
-    '',
-    'Bring every relay site up.',
+    '**Find the hidden relay sites in the tunnels and switch each one on. A bot needs an order, a message from another bot, before each site.**',
   ].join('\n'),
   board: {
-    fixed: [
-      'the workings are 34 by 26 inside the wall, with standing rock scattered through them',
-      'only the scouts stand at the muster on the west wall; every worker is raised on site',
-      'every relay site is reachable from the muster — nothing is sealed behind rock',
-      'no site stands within fourteen steps of the muster, and no two within seven tiles of each other',
-      'the muster publishes how many sites, scouts and workers there are before anybody moves',
-    ],
     redrawn: [
-      'how many relay sites there are, six to nine',
-      'where they are — they are on no plan, and finding them is the order',
-      'what each one is called — the six letters after `site-`',
-      'how many scouts, one or two',
-      'how many workers the muster requisitions, four to eight',
-      'where the standing rock lies, and so what a `look` can see past',
+      'the site count, six to nine',
+      'where the sites are',
+      'each site id: `site-` plus six letters',
+      'the scout count, one or two',
+      'the worker limit, four to eight',
+      'where the rock is, and so what `look` can see',
     ],
   },
   facts: [
-    { label: 'Your score', value: 'The clock stops when the **last** bot stops.' },
+    { label: 'Score', value: 'The tick when the **last** bot stops.' },
     {
-      label: 'A site is up',
+      label: 'Relay site',
       value:
-        'When its state is `on`. Stand on it and `use()` once. Twice puts it back to `cold`. The sites are hand-thrown: `power()` reaches none of them — `vars.manual` is 1 on every one.',
+        'Sites start `cold` (off). Stand on one and `use()` once to switch it `on`. A second `use()` turns it `cold` again. `power()` does not work here. Every site can be reached from the muster.',
     },
     {
-      label: 'Finding one',
+      label: 'Site ids',
       value:
-        'The sites are on no plan, and their ids are drawn fresh for the shift: `site-` and six letters. `probe(id)` answers for any id that exists and returns null for one that does not, so there is nothing to guess. A bot finds a site by standing on or in front of it — `probe()` with **no argument** — or by seeing it from a distance.',
+        'Stand on or in front of a site and call `probe()` with **no argument**. Or use `look`: it reports every machine id it passes.',
     },
     {
-      label: 'The muster',
+      label: 'Muster (start area)',
       value:
-        "`probe('muster')` publishes `vars.sites`, `vars.scouts` and `vars.workers` — how many workers you may raise.",
+        "Only the scouts start here, on the west wall. `probe('muster')` gives `vars.sites`, `vars.scouts` and `vars.workers` (your spawn limit).",
     },
     {
-      label: 'Scouts',
-      value:
-        'The bots on site when the shift opens. Every other bot is a worker somebody raised. They are identical machines; the difference is what you do with them.',
+      label: 'Workers',
+      value: `\`spawn(dir)\` makes one. It costs the parent ${String(SPAWN_COST)} ticks, even when it fails. The worker's clock starts at the parent's clock plus ${String(SPAWN_COST)}.`,
     },
     {
-      label: '`spawn(dir)`',
-      value: `Raises a worker on the next tile in \`dir\`, from wherever the parent stands, and gives back its id. Costs ${String(SPAWN_COST)} ticks on this order, charged to the parent; the worker's clock starts at the parent's plus ${String(SPAWN_COST)}. A tile another bot holds refuses it, giving back \`-1\` and charging the ticks anyway. Raise no more than \`vars.workers\`.`,
+      label: 'Orders',
+      value:
+        "Before a bot switches on its **n**th site, it must have read its **n**th message from another bot, with `recv()`. Any text counts. A message carries the sender's clock. A bot whose clock is behind sees no message yet.",
     },
     {
-      label: 'Sent to',
+      label: 'Same order',
       value:
-        "One order for one site: before a bot switches on its **n**th site it must already have read its **n**th message from another bot. `send` stamps the sender's clock, and a bot running behind sees an empty inbox.",
-    },
-    {
-      label: 'Seeing',
-      value:
-        '`look(dir, range)` is free and stops at the first thing it cannot see through. It reports the id of every machine it passes. A bot only knows what it has seen.',
-    },
-    {
-      label: 'The orders',
-      value:
-        'For the star: at least one order per site goes out, and no message body is sent to two different bots. Two bots holding the same body are two bots sent to one site. Bodies sent twice to the same bot are not counted.',
+        'Never send the same message text to two different bots. Repeats to the same bot are fine. Send at least one order per site.',
     },
   ],
   seeds: [1, 2, 3, 4, 5],
@@ -422,7 +398,7 @@ export const w7_05: LevelDef = {
   objectives: [
     Objectives.custom(
       'sites-up',
-      'Bring every relay site up',
+      'Switch on every relay site',
       (ctx) => {
         const total = siteMachines(ctx.initialWorld).length;
         return total > 0 && litCount(ctx.world) === total;
@@ -431,7 +407,7 @@ export const w7_05: LevelDef = {
     ),
     Objectives.custom(
       'told-where-to-go',
-      'Read an order before switching each site on',
+      'Read a new order from another bot before each site',
       (ctx) => {
         const [ordered, total] = underOrders(ctx);
         return total > 0 && ordered === total;
@@ -440,7 +416,7 @@ export const w7_05: LevelDef = {
     ),
     Objectives.custom(
       'inside-requisition',
-      'Raise no more workers than the muster requisitions',
+      'Spawn no more than `vars.workers` workers',
       (ctx) => raisedCount(ctx) <= requisitioned(ctx.initialWorld),
       { divergence: overRaised },
     ),
@@ -448,28 +424,26 @@ export const w7_05: LevelDef = {
   bonus: [
     Objectives.custom(
       'one-order-per-site',
-      'One order for each site, and no two alike',
+      'Never send one order text to two bots; at least one order per site',
       oneEach,
       { divergence: repeatedOrder },
     ),
   ],
   starter: [
     "// import { survey, pathTo, deal } from 'lib';",
-    '// NOTE(4470): the sites are not on the plan. that was the point of them',
-    '// NOTE(4470): whoever finds one has to say so. nothing else finds it for them',
+    '// Only the bot that finds a site knows it. It must tell the others.',
     '',
     'const muster = probe("muster");',
     'const scouts = bots();',
-    'print(`${scouts.length} scouts, ${muster.vars.workers} workers to raise, ${muster.vars.sites} sites`);',
+    'print(`${scouts.length} scouts, ${muster.vars.workers} workers to spawn, ${muster.vars.sites} sites`);',
     '',
   ].join('\n'),
   hints: [
-    'A bot that has walked somewhere knows something. Nothing about that knowledge reaches another bot on its own.',
-    'The scouts do not need to finish before the workers start. The first thing a scout finds is worth telling somebody about immediately.',
-    "A message is stamped with the sender's clock, and a bot that is behind in time has not been handed it yet. The order in which you sync matters more than the order in which you send.",
-    'Two scouts is not one scout twice. Whatever collects the findings has to survive two of them reporting the same thing.',
-    'A worker with nothing to do is the expensive part of this level, not a worker walking a long way.',
-    'A worker starts next to whoever raised it. The muster is only one of the places a worker can start.',
+    'What a bot finds stays with that bot. You must send it to the others.',
+    'Scouts do not need to finish first. Report each site as soon as it is found.',
+    "A message carries the sender's clock. A bot that is behind cannot read it yet. When you sync matters more than when you send.",
+    'Two scouts may find the same site. The code that collects reports must handle that.',
+    'A worker starts next to the bot that spawned it, not only at the muster.',
   ],
   docs: ['bots', 'spawn', 'sync', 'send', 'recv', 'probe', 'look', 'use'],
 };

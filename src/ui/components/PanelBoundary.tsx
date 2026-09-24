@@ -18,9 +18,9 @@ export class PanelBoundary extends Component<
   override render(): ReactNode {
     if (!this.state.failed) return this.props.children;
     return (
-      <section className="panel-boundary" aria-label={`${this.props.label} — unavailable`}>
-        <p>{this.props.label} stopped responding and has been taken offline for this session.</p>
-        <p>Reload the page to bring it back. Your work order is unaffected.</p>
+      <section className="panel-boundary" aria-label={`${this.props.label} — error`}>
+        <p>{this.props.label} stopped working.</p>
+        <p>Reload the page to fix it. Your code and progress are safe.</p>
       </section>
     );
   }

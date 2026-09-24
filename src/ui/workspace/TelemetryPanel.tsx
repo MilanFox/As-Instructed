@@ -126,7 +126,7 @@ function CursorCalls(): React.ReactElement {
   }
   return (
     <p className="inspect__note">
-      {unrecorded ? 'not recorded — call log full' : 'no call at this event'}
+      {unrecorded ? 'not recorded, log full' : 'no call at this event'}
     </p>
   );
 }
@@ -138,7 +138,7 @@ function TargetValues({ target }: { target: InspectTarget }): React.ReactElement
   const before = views?.before ?? null;
   const previous = useMemo(() => (before === null ? undefined : snapshot(before)), [before]);
   if (now === null || current === null) {
-    return <p className="inspect__note">not on the site at this event</p>;
+    return <p className="inspect__note">not on the board at this event</p>;
   }
   const unchanged = previous !== undefined && sameSnapshot(current, previous);
   return (
@@ -172,7 +172,7 @@ function InspectSection({ crew }: { crew: readonly CrewRow[] }): React.ReactElem
               type="button"
               className="control control--tight"
               onClick={showCall}
-              aria-label="Back to the call"
+              aria-label="Close"
             >
               x
             </button>
@@ -218,7 +218,7 @@ export function TelemetryPanel({
       className={debugging ? 'telemetry telemetry--debug' : 'telemetry'}
       id="workspace-telemetry"
       open={open}
-      label="Telemetry"
+      label="Status"
     >
       <>
         <PanelBar
@@ -234,7 +234,7 @@ export function TelemetryPanel({
                   type="button"
                   className="control control--tight"
                   onClick={onClose}
-                  aria-label="Hide telemetry"
+                  aria-label="Hide status"
                 >
                   Hide
                 </button>
@@ -242,7 +242,7 @@ export function TelemetryPanel({
             </>
           }
         >
-          Telemetry
+          Status
         </PanelBar>
 
         <div className="vitals">
@@ -259,7 +259,7 @@ export function TelemetryPanel({
 
         {workspace.crew.length === 0 ? null : (
           <>
-            <PanelBar sub>Crew</PanelBar>
+            <PanelBar sub>{workspace.crew.length === 1 ? 'Your bot' : 'Your bots'}</PanelBar>
             <div className="crew-list scroll-pane">
               {workspace.crew.map((bot) => {
                 const cells = (
@@ -299,7 +299,7 @@ export function TelemetryPanel({
         {debugging ? <InspectSection crew={workspace.crew} /> : null}
 
         <div className="telemetry__foot">
-          <span className="kicker">#4471 · K&amp;D · site feed</span>
+          <span className="kicker">Live view</span>
         </div>
       </>
     </OverlayPanel>

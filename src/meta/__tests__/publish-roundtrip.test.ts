@@ -459,14 +459,9 @@ describe('the offer is routines, not declarations', () => {
 
 describe('the Regression tab is not part of any of this', () => {
   test('its wording is exactly what it was', () => {
-    expect(REGRESSION.medalKept).toBe(
-      'Your record is unchanged. It will stay unchanged until you say otherwise — a result is not ' +
-        'withdrawn because a later edit disagreed with it.',
-    );
-    expect(REGRESSION.revert).toBe('RESTORE LAST KNOWN GOOD');
+    expect(REGRESSION.medalKept).toBe('Your medals stay the same until you accept the new result.');
+    expect(REGRESSION.revert).toBe('UNDO TO LAST GOOD VERSION');
     expect(REGRESSION.accept).toBe('ACCEPT THE NEW RESULT');
-    expect(REGRESSION.footnote).toBe(
-      'a degraded state is still a state. the form has a box for it',
-    );
+    expect(REGRESSION.footnote).toBe('slower is still a result. we write it down too');
   });
 });

@@ -100,7 +100,7 @@ describe('the app layer holds no ceremony that can destroy itself', () => {
     };
     walk(App());
 
-    expect(labels).toEqual(['The publish offer']);
+    expect(labels).toEqual(['The publish window']);
   });
 });
 

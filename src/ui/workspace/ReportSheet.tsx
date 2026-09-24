@@ -26,7 +26,7 @@ export function ReportSheet({ report, onDismiss, onNext }: ReportSheetProps): Re
           <>
             {onNext && report.passed ? (
               <button type="button" className="control control--tight" onClick={onNext}>
-                Next order
+                Next level
               </button>
             ) : null}
             <button
@@ -35,12 +35,12 @@ export function ReportSheet({ report, onDismiss, onNext }: ReportSheetProps): Re
               ref={dismissRef}
               onClick={onDismiss}
             >
-              Dismiss
+              Close
             </button>
           </>
         }
       >
-        {report.passed ? 'Run closed' : 'Run diverged'}
+        {report.passed ? 'Closed' : 'Failed'}
       </PanelBar>
 
       <div className="report-sheet__head">
@@ -80,13 +80,13 @@ export function ReportSheet({ report, onDismiss, onNext }: ReportSheetProps): Re
         )}
         {report.failure === null ? null : (
           <ReportLine
-            label="Fault"
+            label="Error"
             value={`${report.failure}${report.failureLine === null ? '' : ` · line ${String(report.failureLine)}`}`}
             tone="fail"
           />
         )}
         {report.bonusSeed === null ? null : (
-          <ReportLine label="Bonus" value={`Missed on seed ${String(report.bonusSeed)}`} />
+          <ReportLine label="Bonus" value={`Missed on board ${String(report.bonusSeed)}`} />
         )}
 
         {report.causes.length === 0 ? null : (
@@ -110,12 +110,12 @@ export function ReportSheet({ report, onDismiss, onNext }: ReportSheetProps): Re
 
         {report.seedLines.length === 0 ? null : (
           <>
-            <PanelBar sub>Seeds</PanelBar>
+            <PanelBar sub>Boards</PanelBar>
             {report.seedLines.map((line) => (
               <ReportLine
                 key={line.seed}
-                label={`Seed ${String(line.seed)}`}
-                value={line.note || (line.passed ? 'closed' : 'diverged')}
+                label={`Board ${String(line.seed)}`}
+                value={line.note || (line.passed ? 'passed' : 'failed')}
                 tone={line.passed ? 'pass' : 'fail'}
               />
             ))}
@@ -146,12 +146,12 @@ export function ReportSheet({ report, onDismiss, onNext }: ReportSheetProps): Re
 
         {report.onRecord === null && report.libraryLine === null ? null : (
           <>
-            <PanelBar sub>On record</PanelBar>
+            <PanelBar sub>Saved result</PanelBar>
             {report.onRecord ? (
               <ReportLine label={report.onRecord.word} value={report.onRecord.note} />
             ) : null}
             {report.libraryLine === null ? null : (
-              <ReportLine label="Repository" value={report.libraryLine} />
+              <ReportLine label="Library" value={report.libraryLine} />
             )}
           </>
         )}

@@ -15,7 +15,7 @@ folds into one verdict, which yields a **medal** against **par**.
 One puzzle. 33 across 8 worlds.
 
 - code: `LevelDef` (`src/levels/types.ts:8`), `CampaignOrder` (`src/game/campaign.ts:12`), `RegressionTarget` (`src/meta/regression.ts:34`)
-- player reads: **work order**. The fiction avoids "level" on purpose — the game has no levels, only work orders. Both words are correct; they just address different rooms.
+- player reads: **level**; finishing one is "closing" it (status CLOSED/OPEN/ON HOLD). "Work order" survives only in code names (`WorkOrderCard`, `.work-order`).
 - not: `order` on its own. `campaignOrder()` is the whole ordered campaign (`src/game/store.ts:1009`), not one level.
 
 ### world
@@ -32,7 +32,7 @@ Four things. Which one depends on what was on screen:
 
 - the whole graded attempt across all seeds — `runMode` (`src/game/store.ts:68`), the report sheet
 - one seed's execution — `runs` (`src/ui/library.ts:71`)
-- pressing the button — `workspace.run`, labelled **Dispatch**
+- pressing the button — `workspace.run`, labelled **Run**
 - scrubbing a finished trace — playback (`src/ui/workspace/TransportDeck.tsx:152`)
 
 `LevelProgress.attempts` and `CampaignStats.runs` are the same count (`src/game/save.ts:98`).
@@ -50,7 +50,7 @@ The optional objective on a level.
 The player's own `lib.ts` — functions published once, called from later levels.
 
 - code: `PublishedFunction` (`src/meta/types.ts:13`), `LibraryFunction` (`src/meta/structure.ts:5`), `useLibrary` (`src/ui/library.ts:13`)
-- player reads: **Shared Subroutines**, **Repository**, **~/lib.ts**
+- player reads: **Library (lib.ts)**
 
 ### par
 
@@ -80,14 +80,15 @@ One grid square.
 |---|---|---|
 | editor | the Monaco pane, not the screen around it | `MonacoBody.tsx`; one model lives at `PLAYER_FILE_PATH` for the life of the app |
 | renderer, main screen | the visible canvas panel | `FeedCanvas.tsx:168`. **Not** `Renderer` (`src/render/renderer.ts`, the drawing engine) nor `RendererPort` |
-| overworld, site map | the level-select screen | `LevelSelect.tsx`, titled "Orbital survey" |
-| hints | the per-level nudges | `LevelDef.hints` (`src/levels/types.ts:23`), shown as **Field notes** |
-| lore | a level's prose | `LevelDef.brief` (`:12`), shown as **Brief** |
+| overworld, site map | the level-select screen | `LevelSelect.tsx`, titled "Site map" |
+| hints | the per-level nudges | `LevelDef.hints` (`src/levels/types.ts:23`), shown as **Hints** |
+| lore, brief | a level's prose | `LevelDef.brief` (`:12`): a lore line (optional `— Name` sign-off), then the bold job line (**Your job**) |
+| facts, rules | what a level grades and relies on | `LevelDef.facts`, shown as **Rules**; a label is the noun the objective labels use, and is highlighted there |
 | hardware, tools | the API calls a level unlocks | `LevelDef.hardware` (`:16`), shown as **Commands** |
 | hopper | what a bot can carry | `Bot.capacity` (`src/engine/types.ts:125`), `hopperFullOf` (`src/levels/world-2/shared.ts:250`) |
 | binder | where a dismissed document is filed | `DeskDoc.filed` (`src/ui/paper/papers.ts:79`). **Not** `Binder`/`BINDERS` in `api-bindings.ts`, unrelated |
 | discrepancy | a closed level failing a hidden re-run | `Discrepancy` (`src/meta/types.ts:66`) |
-| board | four things | the live `World`; the canvas element; `LevelDef.board`, which is *prose statements* (`src/levels/types.ts:15`); the manual tab |
+| board | four things | the live `World`; the canvas element; `LevelDef.board.redrawn`, prose lines on what changes between seeds (`src/levels/types.ts:15`), shown as **Changes between boards**; the manual tab |
 
 ## No code counterpart
 
@@ -106,9 +107,9 @@ No meaning outside the fiction, each sitting over a real mechanic. Re-skinnable.
 | Fiction | Mechanic |
 |---|---|
 | memo | the points-tier performance review (`src/ui/screens/review.ts:59`); the UI labels it "Review" |
-| requisition | the per-level API unlock (`src/ui/copy.ts:272`) |
-| issue | the Repository delivery note (`src/ui/paper/usePaperwork.ts:51`) — never a bug |
-| Interlock | the lock on an unreachable level (`src/ui/screens/LockedLevel.tsx:99`) |
+| requisition | the per-level API unlock, `DocKind` `'requisition'` (`src/ui/paper/papers.ts:10`); the UI says "New commands" |
+| issue | the Library delivery note (`src/ui/paper/usePaperwork.ts:51`) — never a bug |
+| Interlock | the lock on an unreachable level (`src/ui/screens/LockedLevel.tsx:72`); the UI says "On hold" |
 | Dot | a copy slot on the workspace (`useWorkspace.ts:146`), not only a character |
 
 ## Two registers, both live
@@ -116,7 +117,7 @@ No meaning outside the fiction, each sitting over a real mechanic. Re-skinnable.
 The fiction began office-coded and turned industrial piecemeal on 14–15 Sep 2026. What was retired
 is narrow: the **desk and paper furniture** (tray, binder, stamp, sheet, signature) and the **HR
 framing of the player** (hire, onboarding, personnel, review). The bureaucratic *company* was never
-retired — Vance, Finance, Procurement, Legal and the memo format are current voice.
+retired — Vance, Finance, Procurement, Legal and their notes in the lore line are current voice.
 
 Current register: two flat beats, the second withdrawing the first. Time is a *shift*, not a date.
 Institutions are remote pressure named by function, indifferent rather than hostile.
@@ -124,8 +125,7 @@ Institutions are remote pressure named by function, indifferent rather than host
 Office-era wording still shipping, listed so it reads as history rather than as a pattern to copy:
 
 - `src/game/score.ts:89-138` — the review tiers, live and on screen; the only copy that grades the person rather than the work
-- `src/ui/copy.ts:272-279`, `:298-301` — dead requisition and performance-review consts
-- `src/levels/world-1/w1-01.ts:43,52-53` — "Onboarding", "NEW HIRE", the per-seat licence joke
-- `src/levels/world-1/w1-03.ts:32,39` — "quarterly", "Head Office"; elsewhere the copy says "upstairs"
-- `src/meta/copy.ts:8,19` — "sign for it", "folder"
+- `src/levels/world-1/w1-01.ts:47` — "Contractor #4471", the one hire-framed greeting
+- `src/levels/world-1/w1-03.ts:35` — "Head Office"
+- `src/meta/copy.ts:8` — "folder"
 - `src/ui/paper/` — `DeskDoc`, `DOC_HOME`, `filed`, `DESK_KEY`: the desk metaphor's core, moved but never renamed

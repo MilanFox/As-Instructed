@@ -215,7 +215,7 @@ describe('the work order prints both numbers and gives each its own word', () =>
     const level = getLevel(LIMIT_AS_OBJECTIVE) as LevelDef;
     openLevel(LIMIT_AS_OBJECTIVE, 180);
 
-    expect(cells(render(OrderCard)).get('Par')).toBe(`${String(level.par.ticks)} t`);
+    expect(cells(render(OrderCard)).get('For gold')).toBe(`≤ ${String(level.par.ticks)} ticks`);
   });
 
   test('the one that ends the work order is the objective that ends it', () => {
@@ -236,13 +236,13 @@ describe('the work order prints both numbers and gives each its own word', () =>
     const tree = render(OrderCard);
 
     const parWord = [...cells(tree)].find(
-      ([, value]) => value === `${String(level.par.ticks)} t`,
+      ([, value]) => value === `≤ ${String(level.par.ticks)} ticks`,
     )?.[0];
     const limitWord = [...readouts(tree)].find(([, value]) =>
       value.startsWith(`180 / ${String(limitOf(level))}`),
     )?.[0];
 
-    expect(parWord).toBe('Par');
+    expect(parWord).toBe('For gold');
     expect(limitWord).toBe(counted.label);
     expect(limitWord).not.toBe(parWord);
   });
@@ -254,11 +254,11 @@ describe('the work order prints both numbers and gives each its own word', () =>
     openLevel(LIMIT_AS_BUDGET, 40);
     const stats = cells(render(OrderCard));
 
-    expect(stats.get('Par')).toBe(`${String(level.par.ticks)} t`);
-    expect(stats.get('Limit')).toBe(`${String(stop)} t`);
+    expect(stats.get('For gold')).toBe(`≤ ${String(level.par.ticks)} ticks`);
+    expect(stats.get('Tick limit')).toBe(`${String(stop)} ticks`);
   });
 
-  test('a work order with no limit says so rather than printing par twice', () => {
+  test('a work order with no limit leaves the cell out rather than printing par twice', () => {
     const level = getLevel(NO_LIMIT) as LevelDef;
     expect(isGraded(level)).toBe(true);
     expect(limitOf(level)).toBeUndefined();
@@ -267,8 +267,8 @@ describe('the work order prints both numbers and gives each its own word', () =>
     openLevel(NO_LIMIT, 40);
     const stats = cells(render(OrderCard));
 
-    expect(stats.get('Par')).toBe(`${String(level.par.ticks)} t`);
-    expect(stats.get('Limit')).toBe('none');
+    expect(stats.get('For gold')).toBe(`≤ ${String(level.par.ticks)} ticks`);
+    expect(stats.has('Tick limit')).toBe(false);
   });
 
   test('every graded work order in the campaign fills both cells', () => {
@@ -279,8 +279,8 @@ describe('the work order prints both numbers and gives each its own word', () =>
       openLevel(level.id, 40);
       const stats = cells(render(OrderCard));
 
-      expect(stats.get('Par'), level.id).toBe(`${String(level.par.ticks)} t`);
-      expect(stats.get('Limit'), level.id).not.toBe(stats.get('Par'));
+      expect(stats.get('For gold'), level.id).toBe(`≤ ${String(level.par.ticks)} ticks`);
+      expect(stats.get('Tick limit'), level.id).not.toBe(stats.get('For gold'));
     }
   });
 });
@@ -290,7 +290,7 @@ describe('an ungraded work order has no par to print', () => {
     openLevel(UNGRADED, 78);
     const stats = cells(render(OrderCard));
 
-    expect(stats.get('Par')).toBe('—');
+    expect(stats.get('For gold')).toBe('—');
     expect(stats.get('Ticks')).toBe('78');
   });
 
@@ -298,7 +298,7 @@ describe('an ungraded work order has no par to print', () => {
     const level = getLevel(NO_LIMIT) as LevelDef;
     openLevel(NO_LIMIT, 78);
 
-    expect(cells(render(OrderCard)).get('Par')).toBe(`${String(level.par.ticks)} t`);
+    expect(cells(render(OrderCard)).get('For gold')).toBe(`≤ ${String(level.par.ticks)} ticks`);
   });
 
   test('the report prints par on a graded work order', () => {

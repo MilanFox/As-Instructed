@@ -1,6 +1,6 @@
 .workspace {
   --ws-column: 360px;
-  --ws-board-keep: 380px;
+  --ws-board-keep: 440px;
   --ws-flyout-user: 684px;
   --ws-flyout: min(var(--ws-flyout-user), calc(100vw - var(--ws-board-keep)));
   --ws-shift: 0px;
@@ -14,7 +14,9 @@
      so a deck run out to the frame edge stops 12px short of it rather than at --ws-inset. */
   --ws-deck-right: calc(var(--ws-inset) + 40px);
   --ws-slide: 240ms cubic-bezier(0.16, 0.88, 0.28, 1);
-  --ws-slam: 170ms cubic-bezier(0.5, 0, 0.75, 0);
+  --ws-slam-time: 170ms;
+  --ws-slam-ease: cubic-bezier(0.5, 0, 0.75, 0);
+  --ws-slam: var(--ws-slam-time) var(--ws-slam-ease);
 
   position: fixed;
   inset: 0;

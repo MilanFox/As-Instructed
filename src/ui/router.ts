@@ -27,12 +27,12 @@ function levelOfState(state: GameState): string | null {
 function announcementFor(state: GameState): string {
   if (state.blocked) {
     return state.blocked.reason === 'unknown'
-      ? `No work order ${state.blocked.levelId}.`
-      : `Work order ${state.blocked.levelId} is on hold.`;
+      ? `No level ${state.blocked.levelId}.`
+      : `Level ${state.blocked.levelId} is on hold.`;
   }
   const open = levelOfState(state);
   const level = open ? getLevel(open) : undefined;
-  return level ? `Work order ${level.id}, ${level.title}.` : 'Site map.';
+  return level ? `Level ${level.id}, ${level.title}.` : 'Site map.';
 }
 
 // Reopening the order already in hand would throw away its console and loaded trace, and Back

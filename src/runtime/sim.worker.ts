@@ -25,7 +25,7 @@ scope.onmessage = (event: MessageEvent<WorkerInbound>): void => {
         kind: 'runtime',
         code: FailureCode.Crash,
         message:
-          'The simulator failed while running your program. This is a bug in the game, not in ' +
+          'The game crashed while running your program. This is a bug in the game, not in ' +
           `your code: ${error instanceof Error ? error.message : String(error)}`,
       },
     };

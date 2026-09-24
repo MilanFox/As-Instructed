@@ -78,7 +78,7 @@ function Row({ report }: { report: FunctionReport }): React.JSX.Element {
                 <table className="lib-table">
                   <thead>
                     <tr>
-                      <th>Work order</th>
+                      <th>Level</th>
                       <th className="numeric">Calls</th>
                       <th className="numeric">Ticks in {report.name}</th>
                       <th className="numeric">{REFACTOR.columns.perCall}</th>

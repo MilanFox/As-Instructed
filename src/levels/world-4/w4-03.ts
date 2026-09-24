@@ -181,7 +181,7 @@ function haulTaken(ctx: ObjectiveContext): Divergence | undefined {
   if (points.length !== 3 || lift === undefined) return undefined;
   if (!haulComplete(ctx)) {
     return {
-      where: 'the haul',
+      where: 'the route',
       expected: `all ${String(points.length)} points, then the lift`,
       received: `${String(visitedCount(ctx))} of ${String(points.length)} points`,
     };
@@ -201,53 +201,34 @@ export const w4_03: LevelDef = {
   title: 'Map First, Move Second',
   hardware: [],
   brief: [
-    '```',
-    'MEMO KD-2429',
-    'FROM: Dep. Coordinator M. Vance',
-    'RE:   Unlogged unit',
+    'The lift charges for every step after the first collection point. Nobody knows who gave a lift a bank account. — M. Vance',
     '',
-    'A bot at depth is running a program with no deployment record.',
-    'Eleven months. Not malfunctioning. Facilities have classified it',
-    'as existing infrastructure, which requires no decision.',
-    '',
-    'The lift bills from the first collection point on; survey time',
-    'has no line item.',
-    '```',
-    '',
-    'Stand on all three collection points, then end on the lift.',
+    '**Stand on all three collection points, then end the run on the lift.**',
   ].join('\n'),
   board: {
-    fixed: [
-      'the map is 30 tiles square',
-      'tunnels are one tile wide',
-      'the cave is carved throughout — every tunnel is reachable from every other, and nothing is sealed off',
-      'three collection points and one lift, each at the blind end of a side passage',
-      'RIG-04 starts at a blind end too, and the lift is the one furthest from it',
-    ],
     redrawn: [
-      'the layout of the tunnels',
-      'one to three tunnels that rejoin further in',
-      'where the three points and the lift sit',
-      'how far apart the three points are — some shifts leave two of them almost together, others push all three as far apart as the cave allows',
-      'which side passage RIG-04 starts in',
+      'the tunnels, with one to three loops',
+      'where the three points and the lift are, and how far apart',
+      'which side passage the bot starts in',
     ],
   },
   facts: [
+    {
+      label: 'Cave',
+      value:
+        'Tunnels are one tile wide and all connected. The points, the lift and the start are each at the end of a short side passage.',
+    },
     { label: 'Collection points', value: 'Three pad tiles.' },
-    { label: 'The lift', value: 'Depot (a terrain). One tile of it.' },
+    { label: 'Lift', value: 'One depot tile, in the side passage furthest from the start.' },
     {
-      label: 'Where they sit',
-      value: 'Each of the four is at the end of a short side passage off the main tunnels.',
+      label: 'Steps',
+      value:
+        'For the star, counted from the **first** time the bot stands on any collection point until the run ends on the lift. Fewest means the shortest walk through all three points, in any order, to the lift.',
     },
     {
-      label: 'The haul',
+      label: 'Tick limit',
       value:
-        'For the star: the steps from the **first** time RIG-04 stands on a collection point to the end of the run on the lift. Everything before that first step onto a point is free.',
-    },
-    {
-      label: 'The clock',
-      value:
-        'It pays for one look around and one good circuit. It does not pay for three separate trips.',
+        'Enough to explore the cave once, then walk one planned route. Not enough for three separate trips.',
     },
   ],
   seeds: [1, 2, 3, 4],
@@ -271,14 +252,13 @@ export const w4_03: LevelDef = {
   bonus: [
     Objectives.custom(
       'shortest-haul',
-      'Go from the first collection point to the lift in the fewest steps the cave allows',
+      'From first standing on a point to the lift, take the fewest steps possible',
       (ctx) => tookShortestHaul(ctx),
       { divergence: haulTaken },
     ),
   ],
   starter: [
-    '// NOTE(4470): i kept mine like this. key(x, y) names a tile, the',
-    '// NOTE(4470): array is what it touches. the tunnels join up in places',
+    '// NOTE(4470): key(x, y) names a tile; the array holds the keys of its open neighbours',
     '',
     'const known = new Map<string, string[]>();',
     '',
@@ -286,15 +266,14 @@ export const w4_03: LevelDef = {
     '  return x + "," + y;',
     '}',
     '',
-    '// TODO(4470): the side chambers are easy to walk straight past',
+    '// TODO(4470): the side passages are easy to miss',
     '',
   ].join('\n'),
   hints: [
-    'You are being asked to do two different things. Doing them at the same time is what is expensive.',
-    'The first thing produces no movement towards any collection point and that is fine. It produces a description of the cave.',
-    'Once the cave is written down, the bot no longer has to be anywhere for you to work out how far apart two tiles are.',
-    'There are six ways to order three stops. Six is a small enough number to simply try all of them, and the cheapest one is the answer.',
-    'A route is a list of tiles chosen before the bot moves. Walking one tells you where the bot ends up without the bot having to be asked, as long as the program keeps the last tile it sent it to.',
+    'Do the job in two parts: first map the whole cave, then plan the route.',
+    'With the map in memory, you can find the distance between any two tiles without moving.',
+    'Three points can be visited in six orders. Try all six and take the shortest.',
+    'Plan the full route as a list of tiles before the bot moves. Then walk it.',
   ],
   docs: ['look', 'coordinates', 'memory'],
 };

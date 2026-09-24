@@ -14,38 +14,28 @@ export const w1_02: LevelDef = {
   title: 'Length Unknown',
   hardware: ['canMove'],
   brief: [
-    '**FROM:** Field Eng. D. Halloran',
+    'Every canMove() reading costs us money, and so does every bump into the wall. Your salary also costs us money, but we are working on that. — D. Halloran',
     '',
-    'survey corridor, west wall. it was measured in 2204 and the 2204 figure is a guess.',
-    'i am not walking it for you. the survey head is billed by the reading, not the hour,',
-    'so seven of them and no wandering.',
-    '',
-    'Drive East and park on the landing pad at the end.',
+    '**The corridor length changes. Drive East to the landing pad at its end.**',
   ].join('\n'),
   board: {
-    fixed: [
-      'one corridor, one tile deep, running East from the west wall',
-      'no branches and no side openings — the only way on is East',
-      'never shorter than eight tiles, and never long enough to reach the east wall',
-      'the pad is the last floor tile of the corridor',
-      'RIG-01 starts on the westmost tile, facing East',
-    ],
-    redrawn: [
-      'the corridor length — no one number covers every shift',
-      'the tile the pad sits on, since it is always the last of them',
-    ],
+    redrawn: ['the corridor length'],
   },
   facts: [
     {
-      label: '`canMove(Dir.East)`',
-      value: 'True when the next tile East is clear. Asking costs no tick. Every ask is counted.',
+      label: 'The run must end on the pad',
+      value:
+        'The pad is the last floor tile of the corridor. The bot must stand on it when your program ends.',
     },
-    { label: 'A blocked move', value: 'Goes nowhere and still costs a tick.' },
     {
-      label: 'A wasted step',
-      value: 'One tick beyond the straight drive from the start to the pad. A blocked move is one.',
+      label: 'Corridor: 8 to 29 tiles',
+      value: 'Straight East. The start tile counts as one of them.',
     },
-    { label: 'The bay', value: '30 tiles end to end. The corridor has never run the whole of it.' },
+    { label: 'canMove costs no tick', value: 'Every call still counts toward the bonus.' },
+    {
+      label: 'Wasted step: a tick past the shortest drive',
+      value: 'A move into the wall is one. It costs a tick, and the run goes on.',
+    },
   ],
   seeds: [1, 4, 7],
   par: { ticks: 24 },
@@ -59,19 +49,14 @@ export const w1_02: LevelDef = {
     return world;
   },
   objectives: [parkedOnPad()],
-  bonus: [rationedSurvey(7, 5, 'Use canMove at most 7 times and waste at most 5 steps')],
-  starter: [
-    '// NOTE(4470): counted twenty-two once. counted nineteen the next shift',
-    '// NOTE(4470): it is not the same corridor',
-    '',
-    'move(Dir.East);',
-    '',
-  ].join('\n'),
+  bonus: [rationedSurvey(7, 5, 'Use canMove at most 7 times, with at most 5 wasted steps')],
+  starter: ['// NOTE(4470): 22 tiles last shift. 19 this shift.', '', 'move(Dir.East);', ''].join(
+    '\n',
+  ),
   hints: [
-    'You cannot know the length before the run starts. What can you find out during it?',
-    'A `while` loop repeats for as long as something stays true. That something can be a question about the world.',
-    'The pad is the last tile of the corridor. What does canMove(Dir.East) report once the bot is standing on it?',
-    'Seven readings, and up to twenty-nine tiles of driving. One reading has to be good for more than one tile.',
+    'On the pad, canMove(Dir.East) is false.',
+    'A reading only looks one tile ahead.',
+    'You have 7 readings for up to 29 tiles.',
   ],
   docs: ['canMove', 'move'],
 };

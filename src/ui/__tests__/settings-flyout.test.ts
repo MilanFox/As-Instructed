@@ -168,20 +168,12 @@ describe('one way into settings, from anywhere', () => {
     expect(trigger?.props?.['aria-expanded']).toBe(true);
   });
 
-  test('escape closes it, and does not travel on to the work order', () => {
+  test('escape does not close it', () => {
     openSettings();
     const surround = withRole(panel(), 'presentation')[0];
-    let travelled = true;
-    const onKeyDown = surround?.props?.['onKeyDown'] as (event: unknown) => void;
-    onKeyDown({
-      key: 'Escape',
-      stopPropagation: () => {
-        travelled = false;
-      },
-    });
 
-    expect(settingsOpen()).toBe(false);
-    expect(travelled).toBe(false);
+    expect(surround?.props?.['onKeyDown']).toBeUndefined();
+    expect(settingsOpen()).toBe(true);
   });
 
   test('a click outside the panel closes it, a click inside does not', () => {
@@ -204,7 +196,7 @@ describe('the art direction control', () => {
     const group = nodes.find((node) => node.type === 'fieldset');
     const legend = shallow(group?.props?.['children']).find((node) => node.type === 'legend');
 
-    expect(legend?.props?.['children']).toBe('Art direction');
+    expect(legend?.props?.['children']).toBe('Art style');
     expect(artRadios(nodes).map((node) => node.props?.['type'])).toEqual(
       ART_OPTIONS.map(() => 'radio'),
     );

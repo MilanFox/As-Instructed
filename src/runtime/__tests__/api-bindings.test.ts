@@ -230,7 +230,7 @@ describe('transmit', () => {
       message = (error as Error).message;
     }
     expect(message).toContain('no antenna');
-    expect(message).toContain('Drop the call');
+    expect(message).toContain('Remove the call');
     expect(sim.ticks).toBe(1);
   });
 });

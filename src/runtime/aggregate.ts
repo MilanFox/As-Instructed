@@ -41,7 +41,7 @@ function worstPerObjective(
 }
 
 function seedPrefix(seed: number, index: number, total: number): string {
-  return total > 1 ? `Seed ${index + 1} of ${total} (seed ${seed}) failed. ` : '';
+  return total > 1 ? `Board ${index + 1} of ${total} (board ${seed}) failed. ` : '';
 }
 
 export function aggregate(runs: SeedRun[]): RunResponse {
@@ -51,7 +51,7 @@ export function aggregate(runs: SeedRun[]): RunResponse {
       error: {
         kind: 'runtime',
         code: FailureCode.Crash,
-        message: 'This level declares no seeds to run against, so there was nothing to simulate.',
+        message: 'This level has no boards, so nothing ran.',
       },
     };
   }

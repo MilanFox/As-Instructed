@@ -158,7 +158,7 @@ function returnPacket(ctx: ObjectiveContext): Divergence | undefined {
     };
   }
   return {
-    where: 'characters on the wire',
+    where: 'length of the return packet',
     expected: `${String(shortestEncoding(routeMoves).length)} characters`,
     received: `${String(mine.length)} characters`,
   };
@@ -171,52 +171,38 @@ export const w6_03: LevelDef = {
   title: 'Compression',
   hardware: ['decode'],
   brief: [
-    '**FROM:** Field Engineer D. Halloran',
+    'We pay for every character we send. Accounting now reads our messages out loud to find the long ones. — D. Halloran',
     '',
-    'the route comes in compressed because the band is metered by the character. finance reads',
-    'the invoice and nothing else, so send it back tighter than it arrived.',
-    '',
-    'Decode the packet, drive the route, and park on the pad.',
+    '**Decode the route, drive it to the pad, and send it back shorter.**',
   ].join('\n'),
   board: {
-    fixed: [
-      'the field is 20 by 20 and every tile off the route is a pit',
-      'RIG-06 starts on the antenna at (1, 5); the pad is at (18, 13)',
-      'one packet on the band, and it is the whole route',
-      'the route is exactly 37 moves, and it works east across the field without ever doubling back',
-      'every shift carries a group whose count is two digits long, and that group never arrives split',
-      'a group of a single move turns up on every shift as well',
-    ],
     redrawn: [
       'the key',
       'where the route turns',
-      'how the 37 moves divide into groups',
-      'which groups arrive split in two where one would have done',
-      'how many characters the packet arrives as',
+      'how the moves are grouped, and which groups are split in two',
     ],
   },
   facts: [
-    { label: 'The key', value: "`probe('mast').vars.key`. Free, and a new key every shift." },
     {
-      label: '`buffered()`',
+      label: 'Route key',
       value:
-        'How many packets are still unread, without taking one. Free. This band carries one packet, so it reads 1 before you take the route and 0 after.',
+        "The route is encrypted with this key. Get it with `probe('mast').vars.key`. Costs no tick.",
     },
     {
-      label: 'Route format',
+      label: 'Route',
       value:
-        'Groups run together, like `4E12S1W`: a count of one or more digits, then `N`, `E`, `S` or `W`.',
+        'The only packet in the queue. Groups with no spaces, like `4E12S1W`. Each group is a count (one or more digits), then `N`, `E`, `S` or `W`.',
     },
-    { label: 'Watch for', value: 'The same direction can turn up in two groups in a row.' },
+    { label: 'Split groups', value: 'Two groups in a row can have the same direction.' },
     {
-      label: 'Off the route',
+      label: 'Pits',
       value:
-        'Pit (a terrain). Every tile that is not on the route is a pit, and a bot that ends a move on one does not come back. `scan(dir).walkable` is `true` on a pit; `scan(dir).lethal` is the field that says it kills.',
+        'Every tile off the route is a pit. A bot that moves onto one is lost. On a pit, `scan(dir).lethal` is `true` (and so is `walkable`).',
     },
     {
       label: 'Return packet',
       value:
-        'The same moves in the same format, in as few characters as the format allows. That is 27 on every shift.',
+        'Send the route once with `transmit()`, in the same format. The shortest form is 27 characters.',
     },
   ],
   seeds: [1, 2, 3, 4],
@@ -249,7 +235,7 @@ export const w6_03: LevelDef = {
   bonus: [
     Objectives.custom(
       'shorter-encoding',
-      'Send the same route back in the fewest characters',
+      'Send the route back once, in 27 characters',
       (ctx) => {
         const sent = transmitted(ctx.world);
         if (sent.length !== 1) return false;
@@ -265,7 +251,7 @@ export const w6_03: LevelDef = {
     ),
   ],
   starter: [
-    '// Everything off the route is a pit.',
+    '// Every tile off the route is a pit.',
     '',
     "const key = probe('mast')?.vars.key ?? 0;",
     'const raw = receive();',
@@ -274,9 +260,8 @@ export const w6_03: LevelDef = {
     '',
   ].join('\n'),
   hints: [
-    'Decoding the packet is the cheap half. What comes out is still a description, not a route.',
-    'A count is not a character. Read digits until you run out of digits, and only then read the direction.',
-    'The stream may say the same direction twice in a row. Nothing says a group has to be as long as it could be.',
+    'After you decode the packet, you still have to expand each group into moves.',
+    'A count can have two digits. Read all the digits before the letter.',
   ],
   docs: ['decode', 'probe', 'receive', 'buffered', 'transmit'],
 };

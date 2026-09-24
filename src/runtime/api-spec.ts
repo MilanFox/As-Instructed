@@ -7,7 +7,7 @@ const TYPES: ApiTypeSpec[] = [
   x: number;
   y: number;
 }`,
-    doc: 'A grid position. `x` grows East, `y` grows South, so North is `y - 1`.',
+    doc: 'A grid position. `x` grows East, `y` grows South. North is `y - 1`.',
   },
   {
     name: 'Dir',
@@ -18,7 +18,7 @@ const TYPES: ApiTypeSpec[] = [
   readonly West: Dir;
 };
 type Dir = number;`,
-    doc: 'The four cardinal directions. A plain frozen object, not a TypeScript enum, so `Dir.North` survives transpilation into your program. The values are `0` North, `1` East, `2` South, `3` West, and they are plain numbers on purpose: `(dir + 1) % 4` turns right, and `let facing = Dir.North` can be reassigned later.',
+    doc: 'The four directions as numbers: `0` North, `1` East, `2` South, `3` West. So `(dir + 1) % 4` turns right.',
   },
   {
     name: 'Terrain',
@@ -55,7 +55,7 @@ declare const Terrain: {
   readonly Conveyor: Terrain;
   readonly Rack: Terrain;
 };`,
-    doc: 'What a tile is made of. `void` is outside the playable area, `pit` is walkable but kills a bot that stops on it, and `rack` is walkable storage decking. `ore`, `ice` and `regolith` name both a terrain and an `ItemKind`: the terrain is the face in the wall, the item is what `mine()` puts in the hold.',
+    doc: 'What a tile is made of. `void` is outside the grid. A bot that stops on a `pit` is lost. `ore`, `ice` and `regolith` are also item kinds: what `mine()` gives you.',
   },
   {
     name: 'ItemKind',
@@ -84,7 +84,7 @@ declare const ItemKind: {
   readonly Cell: ItemKind;
   readonly Chip: ItemKind;
 };`,
-    doc: 'Every kind of item a bot can hold, drop, plant or deliver. The values are plain strings, so `plant("seed")` and `plant(ItemKind.Seed)` are the same call.',
+    doc: 'Every kind of item. The values are plain strings, so `plant("seed")` and `plant(ItemKind.Seed)` do the same thing.',
   },
   {
     name: 'ItemStack',
@@ -92,7 +92,7 @@ declare const ItemKind: {
   kind: ItemKind;
   count: number;
 }`,
-    doc: 'A quantity of one item kind. Tile and machine inventories are arrays of these.',
+    doc: 'An amount of one item kind.',
   },
   {
     name: 'TileView',
@@ -111,7 +111,7 @@ declare const ItemKind: {
   machineId: string | null;
   mark: string | null;
 }`,
-    doc: 'Everything a bot perceives about one tile. `lethal` is true where ending a move kills the bot, which `walkable` does not tell you: a pit is walkable and fatal. A crop is ready when `growth >= maxGrowth`. A crop can also be planted with its clock set to start in the future, in which case `growth` reads 0 and stays there until `sproutsIn` counts down to 0. Tiles outside the world come back with `inBounds: false` and `terrain: "void"`.',
+    doc: 'What a bot sees on one tile. `lethal` is true where a bot that stops is lost (a pit is walkable but lethal). A crop is ripe when `growth >= maxGrowth`. A crop that has not started yet has `growth` 0 until `sproutsIn` reaches 0. Outside the grid: `inBounds: false` and `terrain: "void"`.',
   },
   {
     name: 'MachineView',
@@ -124,7 +124,7 @@ declare const ItemKind: {
   inventory: ItemStack[];
   links: Vec[];
 }`,
-    doc: "A read-only snapshot of one machine. `state` is free-form but stable per machine kind, typically one of `idle`, `on`, `off`, `open`, `closed` or `busy`. `links` lists the tiles this machine's state moves — the gate a door walls off, which turns back to floor when it opens — and is empty on a machine that moves none.",
+    doc: 'A read-only view of one machine. `state` is usually `idle`, `on`, `off`, `open`, `closed` or `busy`. `links` lists the tiles this machine changes, such as the gate tile of a door. It can be empty.',
   },
   {
     name: 'Message',
@@ -133,7 +133,7 @@ declare const ItemKind: {
   body: string | number;
   t: number;
 }`,
-    doc: 'One message in a bot inbox. `from` is the sender id and `t` is the sender clock at the moment it was sent.',
+    doc: "One message in an inbox. `from` is the sender's id. `t` is the sender's clock when it was sent.",
   },
   {
     name: 'Console',
@@ -144,16 +144,17 @@ declare const ItemKind: {
   error(...values: unknown[]): void;
   debug(...values: unknown[]): void;
 };`,
-    doc: 'Every `console` method does exactly what `print` does: one line in the console panel, values joined with a space, free, recorded in the trace. `warn` and `error` lines look the same as `log` lines.',
+    doc: 'Every `console` method works like `print`.',
   },
 ];
 
 const FUNCTIONS: ApiFunctionSpec[] = [
   {
     name: 'move',
-    params: [{ name: 'dir', type: 'Dir', doc: 'The cardinal direction to step in.' }],
+    params: [{ name: 'dir', type: 'Dir', doc: 'The direction to step in.' }],
     returns: 'boolean',
-    doc: 'Steps one tile in `dir` and returns whether the step happened. A move fails when the target tile is out of bounds, not walkable, or held by another bot at an overlapping time; the failed move still costs a tick and the bot still ends up facing `dir`.',
+    doc: 'Steps one tile in `dir` and returns true if the bot moved. It fails if the tile is outside the grid or not walkable. A failed move still costs 1 tick and turns the bot to face `dir`.',
+    crewDoc: 'A tile taken by another bot blocks the move too.',
     example: `for (let i = 0; i < 4; i++) {
   move(Dir.East);
 }`,
@@ -167,7 +168,7 @@ const FUNCTIONS: ApiFunctionSpec[] = [
     name: 'pos',
     params: [],
     returns: 'Vec',
-    doc: "Returns the bot's current grid position as a fresh object. Free, and safe to call as often as you like.",
+    doc: "Returns the bot's position as a new object. Free.",
     example: `const here = pos();
 if (here.x < 5) {
   move(Dir.East);
@@ -185,11 +186,11 @@ if (here.x < 5) {
         name: 'values',
         type: 'unknown[]',
         rest: true,
-        doc: 'Anything to write. Several values are joined with a space.',
+        doc: 'What to write. Values are joined with a space.',
       },
     ],
     returns: 'void',
-    doc: 'Writes one line to the console panel, like `console.log`. Strings are written as they are; objects and arrays as JSON. It is free, and it is recorded in the trace, so the line reappears at the exact tick it was printed when you scrub the replay. In a debug run, each object and array on the line is also shown as an expandable value.',
+    doc: 'Writes one line to the console, like `console.log`. Objects and arrays are written as JSON. Free. In the replay, the line appears at the tick it was printed. In a debug run you can expand objects and arrays.',
     example: `const here = pos();
 print(\`starting at \${here.x},\${here.y}\`);
 print('here is', here);`,
@@ -207,11 +208,12 @@ print('here is', here);`,
         type: 'number',
         optional: true,
         defaultValue: '1',
-        doc: 'How many ticks to burn.',
+        doc: 'How many ticks to wait.',
       },
     ],
     returns: 'void',
-    doc: "Burns `n` ticks doing nothing, advancing only this bot's clock. Use it to let a crop mature or to let another bot clear a tile you need.",
+    doc: 'Does nothing for `n` ticks.',
+    crewDoc: "Only this bot's clock moves.",
     example: `wait(3);
 move(Dir.East);`,
     cost: 'n',
@@ -223,7 +225,8 @@ move(Dir.East);`,
     name: 'canMove',
     params: [{ name: 'dir', type: 'Dir', doc: 'The direction to test.' }],
     returns: 'boolean',
-    doc: 'Reports whether a `move` in `dir` would succeed right now, without spending a tick or moving the bot. The answer reflects this instant only; another bot may take the tile before you get there.',
+    doc: 'Returns whether a `move` in `dir` would work right now. Free.',
+    crewDoc: 'Another bot may still take the tile first.',
     example: `if (!canMove(Dir.North)) {
   move(Dir.East);
 }`,
@@ -240,11 +243,11 @@ move(Dir.East);`,
         name: 'dir',
         type: 'Dir',
         optional: true,
-        doc: "Omit to scan the bot's own tile, otherwise the adjacent tile in this direction.",
+        doc: "Leave out for the bot's own tile. Otherwise, the neighbouring tile in this direction.",
       },
     ],
     returns: 'TileView',
-    doc: 'Returns a view of the bot\'s own tile, or of the adjacent tile in `dir`. It never returns null: a tile outside the world comes back with `inBounds: false` and `terrain: "void"`.',
+    doc: 'Returns the bot\'s own tile, or the neighbouring tile in `dir`. Never null: outside the grid it returns `inBounds: false` and `terrain: "void"`.',
     example: `const ahead = scan(Dir.South);
 if (ahead.walkable && ahead.botId === null) {
   move(Dir.South);
@@ -257,9 +260,9 @@ if (ahead.walkable && ahead.botId === null) {
   },
   {
     name: 'mine',
-    params: [{ name: 'dir', type: 'Dir', doc: 'Which adjacent tile to cut into.' }],
+    params: [{ name: 'dir', type: 'Dir', doc: 'Which neighbouring tile to mine.' }],
     returns: 'ItemKind | null',
-    doc: 'Cuts into the adjacent tile in the given direction, clearing it to bare floor and adding what it yielded to the inventory: rock gives stone, rubble gives scrap, and ore, ice and regolith each give their own kind. Returns the kind recovered, or null when that tile is not mineable or the inventory is already full, which still costs the full price.',
+    doc: 'Mines the neighbouring tile in `dir` and turns it into floor. Returns the item it gives: rock gives stone, rubble gives scrap, and ore, ice and regolith give their own kind. Returns null if the tile cannot be mined or the inventory is full. A null costs the same.',
     example: `const ore = mine(Dir.North);
 if (ore === null) {
   move(Dir.East);
@@ -274,7 +277,7 @@ if (ore === null) {
     name: 'harvest',
     params: [],
     returns: 'ItemKind | null',
-    doc: 'Harvests the mature crop on the tile under the bot and adds it to the inventory, returning the item kind gathered. Returns null when there is no crop, when it is not ripe yet, or when the inventory is already full, which still costs the full harvest price. The console flags the full-inventory case for you.',
+    doc: "Harvests the ripe crop on the bot's tile and returns its item kind. Returns null if there is no crop, it is not ripe, or the inventory is full. A null costs the same.",
     example: `const picked = harvest();
 if (picked === null) {
   wait(4);
@@ -297,7 +300,7 @@ if (picked === null) {
       },
     ],
     returns: 'boolean',
-    doc: 'Plants one item of `kind` from the inventory into plantable ground under the bot. It refuses for exactly three reasons: the ground is not soil (`scan().terrain`), something is already growing there (`scan().crop`), or the bot carries none of that kind. The first two have a free check that tells them apart, and the third is the one you find out by paying for it — a refusal costs the full price, so it is worth asking first.',
+    doc: "Plants one `kind` item on the bot's tile. It fails only if the ground is not soil (`scan().terrain`), something already grows there (`scan().crop`), or the bot has none. A failure costs the same, so check first.",
     example: `const here = scan();
 if (here.terrain !== 'soil') print('not soil');
 else if (here.crop !== null) print('already growing');
@@ -315,11 +318,11 @@ else plant();`,
         name: 'kind',
         type: 'ItemKind',
         optional: true,
-        doc: 'Count only this kind. Omit to count every item held.',
+        doc: 'Count only this kind. Leave out to count everything.',
       },
     ],
     returns: 'number',
-    doc: 'Counts what the bot is carrying: the total across all kinds, or just `kind` when you pass one.',
+    doc: 'Counts the items the bot carries: all of them, or only `kind`.',
     example: `harvest();
 print(\`crops held: \${inventory('crop')}\`);`,
     cost: 0,
@@ -335,7 +338,7 @@ print(\`crops held: \${inventory('crop')}\`);`,
         name: 'kind',
         type: 'ItemKind',
         optional: true,
-        doc: 'Take only this kind. Omit to take whatever is lying there.',
+        doc: 'Take only this kind. Leave out to take anything.',
       },
       {
         name: 'count',
@@ -346,7 +349,7 @@ print(\`crops held: \${inventory('crop')}\`);`,
       },
     ],
     returns: 'number',
-    doc: "Picks loose items up off the bot's own tile and returns how many were actually taken. The result is clamped by what is on the ground and by the remaining inventory capacity, so it can be smaller than `count`, or zero. A zero has three causes: nothing is lying there, or none of the kind you named is — `scan().items` tells those two apart for free — or the bot is already full, and nothing on the bot reports its own limit, so a return smaller than `count` is how that limit is found. It costs the full price either way.",
+    doc: "Picks up items from the bot's tile and returns how many it took. This can be less than `count`: too few items are there, or the bot is full. `scan().items` shows what is there, for free. No command shows how much a bot can carry. If it takes fewer than are there, it is full. Taking fewer costs the same ticks.",
     example: `const taken = pickup('ore', 5);
 print(\`loaded \${taken} ore\`);`,
     cost: 1,
@@ -362,7 +365,7 @@ print(\`loaded \${taken} ore\`);`,
         name: 'kind',
         type: 'ItemKind',
         optional: true,
-        doc: 'Drop only this kind. Omit to drop from the first stack held.',
+        doc: 'Drop only this kind. Leave out to drop from the first stack.',
       },
       {
         name: 'count',
@@ -373,7 +376,7 @@ print(\`loaded \${taken} ore\`);`,
       },
     ],
     returns: 'number',
-    doc: "Drops items from the inventory onto the bot's own tile and returns how many actually left the inventory. A zero means the bot is carrying nothing at all, or none of the kind you named — `inventory()` counts everything held and `inventory(kind)` counts one kind, both free — and it still costs a tick.",
+    doc: "Drops items onto the bot's tile and returns how many it dropped. 0 means the bot carries none of that kind. `inventory(kind)` checks for free. A 0 costs the same.",
     example: `while (inventory() > 0) {
   drop();
   move(Dir.East);
@@ -388,7 +391,7 @@ print(\`loaded \${taken} ore\`);`,
     name: 'carrying',
     params: [],
     returns: 'ItemKind[]',
-    doc: 'Lists the distinct item kinds the bot currently holds, in the order they were first picked up. Returns an empty array when the inventory is empty.',
+    doc: 'Lists the item kinds the bot holds, in the order it picked them up. Empty if it holds nothing.',
     example: `if (carrying().length === 0) {
   pickup();
 }`,
@@ -405,11 +408,11 @@ print(\`loaded \${taken} ore\`);`,
         name: 'dir',
         type: 'Dir',
         optional: true,
-        doc: "Omit to use the machine on the bot's own tile, otherwise the adjacent one in this direction.",
+        doc: "Leave out for the machine on the bot's tile. Otherwise, the neighbouring one in this direction.",
       },
     ],
     returns: 'boolean',
-    doc: "Operates a machine on the bot's tile, or the adjacent one in `dir`, advancing it one step through its state cycle. Returns true only when a machine actually moved: false means there is no machine on that tile, or the one there has no cycle for `use` to advance — a delivery bay or a mast, which are worked by `drop()` or by other hardware, or the one there draws its power from another machine that is not `on` yet, which `probe()` publishes as a `fed:<id>` key in its `vars`. `probe()` reads a machine's id, state and vars for free, and `use` costs the full price either way.",
+    doc: "Switches the machine on the bot's tile, or next to it in `dir`, to its next state. Returns false if nothing changed: there is no machine, the machine cannot be switched (a delivery bay or a mast), or it needs power from a machine that is not `on` yet. A machine that needs power has a key `fed:<id>` in its `vars`, where `<id>` is the machine that powers it. A switch that changes nothing costs the same ticks.",
     example: `if (!canMove(Dir.North)) {
   use(Dir.North);
   move(Dir.North);
@@ -423,17 +426,17 @@ print(\`loaded \${taken} ore\`);`,
   {
     name: 'look',
     params: [
-      { name: 'dir', type: 'Dir', doc: 'The direction to cast along.' },
+      { name: 'dir', type: 'Dir', doc: 'The direction to look in.' },
       {
         name: 'range',
         type: 'number',
         optional: true,
         defaultValue: 'Infinity',
-        doc: 'The most tile views to return. The tile that stops the cast counts as one of them. Left out, the ray runs until something stops it.',
+        doc: 'The most tiles to return. The tile that blocks the view counts. Leave out to look until something blocks it.',
       },
     ],
     returns: 'TileView[]',
-    doc: "Casts a ray from the bot along `dir` and returns at most `range` tile views, nearest first. The bot's own tile is excluded. The cast stops after the first sight-blocking or out-of-bounds tile, which is included in the result and counts against `range` — so a ray that runs off the edge of the site returns the tiles it crossed plus one view with `inBounds: false`. One call costs the same whatever `range` it is given.",
+    doc: "Returns up to `range` tiles along `dir`, nearest first, without the bot's own tile. The view ends at the first tile that blocks it or is outside the grid. That tile is included. Every call costs the same, whatever the `range`.",
     example: `const corridor = look(Dir.East, 5);
 const blockedAt = corridor.findIndex((tile) => !tile.walkable);
 print(\`clear for \${blockedAt < 0 ? corridor.length : blockedAt} tiles\`);`,
@@ -449,11 +452,12 @@ print(\`clear for \${blockedAt < 0 ? corridor.length : blockedAt} tiles\`);`,
       {
         name: 'text',
         type: 'string | null',
-        doc: 'The breadcrumb to write, or null to erase the existing one.',
+        doc: 'The text to write, or null to erase the mark.',
       },
     ],
     returns: 'void',
-    doc: "Writes a breadcrumb onto the bot's own tile, replacing whatever was there. Ordinary JavaScript values — objects, arrays, `Map`, `Set`, closures — already persist for the entire run, so use them for anything your own program needs to remember; `mark` is only for state that must live in the world itself, where another bot or a later pass can read it back with `readMark`.",
+    doc: "Writes text on the bot's tile and replaces any old mark. A later pass reads it with `readMark`. For your own memory, normal variables are enough: they keep their values for the whole run.",
+    crewDoc: 'Other bots can read it too.',
     example: `mark('visited');
 move(Dir.East);`,
     cost: 1,
@@ -465,7 +469,7 @@ move(Dir.East);`,
     name: 'readMark',
     params: [],
     returns: 'string | null',
-    doc: "Returns the breadcrumb written on the bot's own tile, or null when the tile carries no mark. Reading a mark is for state stored in the world; a `Set` or `Map` held in your own program persists for the whole run and needs no marks at all.",
+    doc: "Returns the text written on the bot's tile, or null if there is none.",
     example: `if (readMark() === null) {
   mark('seen');
 }`,
@@ -478,7 +482,7 @@ move(Dir.East);`,
     name: 'fuel',
     params: [],
     returns: 'number',
-    doc: 'Returns the fuel the bot has left. Levels that do not use the fuel mechanic report `Infinity`, so a check like `fuel() < 4` is simply never true there.',
+    doc: 'Returns the fuel the bot has left. In a level without fuel it returns `Infinity`.',
     example: `if (fuel() < 6) {
   refuel();
 }`,
@@ -491,7 +495,7 @@ move(Dir.East);`,
     name: 'refuel',
     params: [],
     returns: 'boolean',
-    doc: "Refills the bot to its maximum fuel. Only succeeds while the bot is parked on a depot tile; anywhere else it returns false and still costs the full price. Refuelling itself burns no fuel, and acting consumes fuel equal to the action's tick cost while sensing and waiting are free.",
+    doc: 'Fills the bot to full fuel. It works only on a depot tile. Anywhere else it returns false and costs the same. Each action uses 1 fuel per tick it costs. Sensing, waiting and refuelling use none.',
     example: `while (scan().terrain !== Terrain.Depot) {
   move(Dir.East);
 }
@@ -509,14 +513,14 @@ refuel();`,
         name: 'machineId',
         type: 'string',
         optional: true,
-        doc: "Omit to probe the machine under the bot, or the one on the tile it faces, otherwise any machine's id.",
+        doc: "Leave out for the machine under the bot or on the tile it faces. Or give any machine's id.",
       },
     ],
     returns: 'MachineView | null',
-    doc: "Returns a read-only snapshot of the machine under the bot, or of the one on the tile the bot faces, or of `machineId` anywhere in the world. Returns null when there is no such machine. The snapshot's `links` names the tiles that machine's state moves, so a gate can be routed to before anything has opened it.",
+    doc: 'Returns a read-only view of a machine: the one under the bot or on the tile it faces, or `machineId` anywhere. Returns null if there is no such machine. `links` shows which tiles the machine changes, such as the gate of a door.',
     example: `const node = probe('node-1');
 if (node !== null && node.state === 'off') {
-  print(\`\${node.id} is cold\`);
+  print(\`\${node.id} is off\`);
 }`,
     cost: 0,
     unlockedBy: 'w5-01',
@@ -528,10 +532,10 @@ if (node !== null && node.state === 'off') {
     name: 'power',
     params: [
       { name: 'machineId', type: 'string', doc: 'The machine to set.' },
-      { name: 'state', type: 'string', doc: "The state to force, typically 'on' or 'off'." },
+      { name: 'state', type: 'string', doc: "The state to set, usually 'on' or 'off'." },
     ],
     returns: 'boolean',
-    doc: "Sets a machine's state directly instead of stepping through its cycle the way `use` does, from anywhere on the map. Two calls stop the run rather than report back, because neither could have gone differently later in the shift: an id belonging to no machine here, and a machine publishing `vars.manual: 1`, which is hand-operated and moves only for a `use()` at its tile. Both name what was asked for; `probe(id)` is the free check for the first. It costs the full price either way.",
+    doc: "Sets a machine's state directly, from anywhere. The run stops if no machine has this id, or if the machine has `vars.manual: 1` (then only `use()` on its tile switches it). The ticks are spent even then. `probe(id)` is free and returns null if no machine has that id.",
     example: `power('node-1', 'on');
 power('node-2', 'off');`,
     cost: 2,
@@ -542,11 +546,11 @@ power('node-2', 'off');`,
   {
     name: 'link',
     params: [
-      { name: 'fromId', type: 'string', doc: 'The machine the connection starts at.' },
-      { name: 'toId', type: 'string', doc: 'The machine the connection ends at.' },
+      { name: 'fromId', type: 'string', doc: 'The machine at the start of the link.' },
+      { name: 'toId', type: 'string', doc: 'The machine at the end of the link.' },
     ],
     returns: 'boolean',
-    doc: 'Connects two machines so that `fromId` feeds `toId`. The run stops and names the id when either one belongs to no machine here — no command builds a machine, so a bad id stays bad, and `probe(id)` returns null on one for free. It returns false only where a level says a pair is illegal, and its brief says so. What a connection carries is defined by the level too.',
+    doc: 'Links `fromId` to `toId`. The run stops if either id is not a machine. `probe(id)` returns null for such an id. Returns false for a pair the level does not allow. The level says which pairs are allowed and what a link carries.',
     example: `link('node-1', 'node-2');
 power('node-1', 'on');`,
     cost: 2,
@@ -558,7 +562,7 @@ power('node-1', 'on');`,
     name: 'receive',
     params: [],
     returns: 'string | null',
-    doc: 'Reads the next queued packet out of the listening post buffer, or null when the buffer is empty. Taking a packet is the only thing that shortens the buffer, so `buffered()` falls by one after every read that hands one back. What arrives, and when, is defined by the level and stated in its brief. Against a sensing budget it counts as one `receive` and, for the antenna lookup, one `probe`.',
+    doc: 'Takes the next packet from the queue, or returns null if it is empty. The level says what arrives and when. Under a reading limit it counts as one `receive` and one `probe`.',
     example: `let packet = receive();
 while (packet !== null) {
   print(packet);
@@ -573,9 +577,9 @@ while (packet !== null) {
     name: 'buffered',
     params: [],
     returns: 'number',
-    doc: 'Returns how many packets are still unread in the listening post buffer, and takes none of them out of it. `buffered() === 0` is how a program learns the band is quiet without spending a packet to find out, and the count is stable until `receive()` consumes one. A work order carrying no antenna reports 0. Against a sensing budget asking counts as one `buffered` and, for the antenna lookup, one `probe`.',
+    doc: 'Returns how many packets wait in the queue, without taking any. Only `receive()` lowers the count. With no antenna it returns 0. Under a reading limit it counts as one `buffered` and one `probe`.',
     example: `if (buffered() === 0) {
-  print('nothing on the band this shift');
+  print('no packets waiting');
 }`,
     cost: 0,
     unlockedBy: 'w6-01',
@@ -584,12 +588,12 @@ while (packet !== null) {
   },
   {
     name: 'transmit',
-    params: [{ name: 'text', type: 'string', doc: 'The payload to send.' }],
+    params: [{ name: 'text', type: 'string', doc: 'The text to send.' }],
     returns: 'boolean',
-    doc: 'Sends `text` back out over the antenna and returns whether it was accepted. A false means the antenna is unpowered or the payload was refused; the exact acceptance rule is defined by the level. On a work order carrying no antenna at all the run stops instead, because powering one up is something you can do and installing one is not.',
+    doc: 'Sends `text` through the antenna. Returns false if the antenna has no power or the level refuses the text. In a level with no antenna, the run stops.',
     example: `const packet = receive();
 if (packet !== null && !transmit(packet)) {
-  print('antenna rejected the payload');
+  print('antenna refused the packet');
 }`,
     cost: 1,
     unlockedBy: 'w6-02',
@@ -599,11 +603,11 @@ if (packet !== null && !transmit(packet)) {
   {
     name: 'decode',
     params: [
-      { name: 'text', type: 'string', doc: 'The raw payload.' },
+      { name: 'text', type: 'string', doc: 'The coded text.' },
       { name: 'key', type: 'number', doc: "The level's decoding key." },
     ],
     returns: 'string',
-    doc: "Applies the level's decoding scheme to `text` using `key` and returns the plain result. Free, because it is arithmetic rather than an action. The cipher itself is defined by the level and stated in its brief.",
+    doc: 'Decodes `text` with `key` and returns the result. Free. The level says how the code works.',
     example: `const raw = receive();
 if (raw !== null) {
   transmit(decode(raw, 7));
@@ -623,7 +627,7 @@ if (raw !== null) {
       },
     ],
     returns: 'Bot',
-    doc: "Returns a handle to one bot in the fleet. Every command a bot can run is a method on the handle, and it acts on that bot alone against that bot's own clock, so `bot(0).move(...)` followed by `bot(1).move(...)` moves both of them in the same tick. The bare, unprefixed calls have not changed: they still command the first bot on site.",
+    doc: "Returns one bot. Every bot command is a method on it and runs on that bot's own clock: `bot(0).move(...)` then `bot(1).move(...)` moves both in the same tick. Plain calls like `move()` command the first bot.",
     example: `for (const id of bots()) {
   bot(id).move(Dir.East);
 }`,
@@ -637,7 +641,7 @@ if (raw !== null) {
     name: 'clock',
     params: [],
     returns: 'number',
-    doc: 'Returns the tick this bot has reached. Every bot keeps its own clock and the level is scored on the highest one at the end, so comparing clocks is how you find the bot that is furthest behind and hand it the next job.',
+    doc: "Returns this bot's clock, in ticks. Each bot has its own clock. The score is the highest clock at the end.",
     example: `let idle = bots()[0] as number;
 for (const id of bots()) {
   if (bot(id).clock() < bot(idle).clock()) idle = id;
@@ -651,9 +655,9 @@ for (const id of bots()) {
     name: 'bots',
     params: [],
     returns: 'number[]',
-    doc: 'Lists the ids of every living bot in ascending order, including the one running this program. Dead bots are omitted.',
+    doc: 'Lists the ids of all living bots, lowest first, including this one.',
     example: `const crew = bots();
-print(\`\${crew.length} units online\`);`,
+print(\`\${crew.length} bots running\`);`,
     cost: 0,
     unlockedBy: 'w7-01',
     world: 7,
@@ -663,9 +667,9 @@ print(\`\${crew.length} units online\`);`,
     name: 'sync',
     params: [],
     returns: 'number',
-    doc: 'Advances every living bot to the highest clock in the swarm and returns that tick, so the whole crew continues from the same moment. It costs nothing itself, but bots that were running ahead of the rest lose the lead they had built up.',
+    doc: "Moves every living bot's clock forward to the highest clock. Returns that tick. Free.",
     example: `const t = sync();
-print(\`swarm aligned at tick \${t}\`);`,
+print(\`all bots at tick \${t}\`);`,
     cost: 0,
     unlockedBy: 'w7-01',
     world: 7,
@@ -675,16 +679,15 @@ print(\`swarm aligned at tick \${t}\`);`,
     name: 'send',
     params: [
       { name: 'to', type: 'number', doc: 'The id of the receiving bot.' },
-      { name: 'body', type: 'string | number', doc: 'The payload to deliver.' },
+      { name: 'body', type: 'string | number', doc: 'The message.' },
     ],
     returns: 'boolean',
-    doc: "Queues a message in another bot's inbox, stamped with the sender's clock. The run stops and names the bot when `to` is an id that does not exist or one that has been lost — neither can start receiving later, so there is nothing to branch on. Delivery is causal: a bot only sees a message once its own clock has reached the moment the message was sent, so the working idiom is `send`, then `sync()`, then `recv()` on the receiving side. Skipping the `sync` leaves a receiver that is behind in virtual time with an empty inbox.",
+    doc: "Puts `body` in the inbox of bot `to`. The message's time is the sender's clock. Returns true. The run stops if `to` is not a living bot.",
     example: `for (const id of bots()) {
   if (id !== 0) {
     send(id, 'go');
   }
-}
-sync();`,
+}`,
     cost: 1,
     unlockedBy: 'w7-01',
     world: 7,
@@ -694,9 +697,8 @@ sync();`,
     name: 'recv',
     params: [],
     returns: 'Message | null',
-    doc: "Pops the oldest message from this bot's inbox, or null when the inbox is empty. Reading is free, so a bot can drain its whole inbox without spending a tick. Only messages the bot's own clock has caught up to are visible, so call `sync()` between the `send` and the `recv` when the receiver is running behind — otherwise the inbox looks empty even though the message was sent.",
-    example: `sync();
-const msg = recv();
+    doc: "Takes the oldest message from this bot's inbox. Returns null if the inbox is empty, or if that message's time is later than this bot's clock. Free.",
+    example: `const msg = recv();
 if (msg !== null && msg.body === 'go') {
   move(Dir.North);
 }`,
@@ -709,16 +711,16 @@ if (msg !== null && msg.body === 'go') {
   {
     name: 'spawn',
     params: [
-      { name: 'dir', type: 'Dir', doc: 'Which adjacent tile the new bot appears on.' },
+      { name: 'dir', type: 'Dir', doc: 'Where the new bot appears.' },
       {
         name: 'options',
         type: '{ name?: string; capacity?: number }',
         optional: true,
-        doc: 'Optional name and inventory limit. Both default from the parent: the capacity is inherited and the name becomes `bot-<id>`.',
+        doc: "A name and an inventory limit. By default the new bot gets this bot's limit and the name `bot-<id>`.",
       },
     ],
     returns: 'number',
-    doc: 'Creates a new bot on the adjacent tile in `dir` and returns its id. Returns -1 when that tile is out of bounds, not walkable, or held by another bot, and the failed spawn still costs the full price. `scan(dir)` reads the first two for free as `inBounds` and `walkable`; the third is the same rule `move` obeys, so a tile a neighbour is still stepping off can refuse a spawn even though it looks empty.',
+    doc: 'Creates a new bot on the neighbouring tile in `dir` and returns its id. Returns -1 if the tile is outside the grid, not walkable, or taken by another bot. `scan(dir)` checks the first two for free. A tile another bot is still leaving counts as taken. A failed spawn costs the same.',
     example: `const helper = spawn(Dir.East, { name: 'mule', capacity: 8 });
 if (helper >= 0) {
   send(helper, 'harvest');
@@ -766,7 +768,7 @@ export function botHandleDeclaration(
 const BOT_TYPE: ApiTypeSpec = {
   name: 'Bot',
   declaration: botHandleDeclaration(perBotApi()),
-  doc: "A handle to one bot in the fleet, as returned by `bot(id)`. Every method commands that bot alone and is charged to that bot's own clock.",
+  doc: 'One bot, as returned by `bot(id)`. Every method commands only that bot, on its own clock.',
 };
 
 export const PLAYER_API: PlayerApiSpec = {
@@ -774,6 +776,14 @@ export const PLAYER_API: PlayerApiSpec = {
   types: [...TYPES, BOT_TYPE],
   functions: FUNCTIONS,
 };
+
+export function hasCrew(functions: readonly ApiFunctionSpec[]): boolean {
+  return functions.some((fn) => fn.category === 'swarm');
+}
+
+export function docFor(fn: ApiFunctionSpec, crew: boolean): string {
+  return crew && fn.crewDoc !== undefined ? `${fn.doc} ${fn.crewDoc}` : fn.doc;
+}
 
 export function apiFunction(name: string): ApiFunctionSpec | undefined {
   return PLAYER_API.functions.find((fn) => fn.name === name);

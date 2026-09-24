@@ -114,7 +114,7 @@ const UNKEPT_FIXTURE = `
       path={PLAYER_FILE_PATH}
       value={code}
       onValidate={(markers) => onProblems?.(markers.filter((m) => m.severity === 8).length)}
-      loading={<span>opening the terminal…</span>}
+      loading={<span>Loading editor…</span>}
     />
   );
 `;

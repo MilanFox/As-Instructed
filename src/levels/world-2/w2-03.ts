@@ -76,59 +76,41 @@ export const w2_03: LevelDef = {
   title: 'Harvest Quota',
   hardware: [],
   brief: [
-    '**FROM:** Field Eng. D. Halloran',
+    'Ice-scrub grows in the same soil and is worth nothing. Every tile you drive on must be repaired, by me, on my weekend. — D. Halloran',
     '',
-    'two things grow in the west field. one of them is the crop. the other is ice-scrub,',
-    'which likes the same soil and is worth nothing to anybody.',
-    '',
-    'the beds were turned last week. every tile the wheels cross, somebody rakes again.',
-    '',
-    '**Come back with the hopper full of crop.**',
+    `**Fill the bot's hopper with crop within ${String(SHIFT)} ticks. Ice-scrub does not count, and it takes space.**`,
   ].join('\n'),
   board: {
-    fixed: [
-      'the west field is 12 by 6 of soil inside its wall, and every tile of it takes wheels',
-      'ripe crop is spread the length of the field, never bunched into one stretch of it',
-      'always more ripe crop standing than the hopper can hold',
-      'ice-scrub grows in the same soil as the crop and is never told apart by the arm',
-      'FIELD-02 starts in the north-west corner, facing East',
-    ],
     redrawn: [
-      'how much the hopper holds this shift',
-      'where in each stretch of the field the ripe crop stands',
+      'the hopper size',
+      'where the ripe crop stands',
       'how much ice-scrub there is, and where',
-      'which crops are still coming on, and how far out they are',
+      'which crops are still growing, and how long they need',
     ],
   },
   facts: [
     {
-      label: 'The field',
-      value: `**${String(WIDTH)} by ${String(HEIGHT)}** — ${String(WIDTH * HEIGHT)} tiles against a **${String(SHIFT)}-tick** shift, and a full hopper is 16 of those ticks before the wheels turn.`,
+      label: 'Field',
+      value: `${String(WIDTH)} by ${String(HEIGHT)}, ${String(WIDTH * HEIGHT)} tiles. The shift is **${String(SHIFT)} ticks**.`,
     },
     {
-      label: 'The hopper',
+      label: 'Hopper',
       value:
-        'Holds a different amount every shift and nothing on the bot reports its size. `inventory()` counts what is in it, for free, as often as you like.',
+        'What the bot carries. Starts empty. Its size changes every shift, and no command tells you the size. `inventory()` counts what is in it. The field always has more ripe crop than it holds.',
     },
     {
-      label: '`harvest()`',
+      label: 'Ice-scrub',
       value:
-        'Hands back nothing on a crop that is not ripe yet, and nothing when the hopper is full. The two look the same.',
+        'Only `scan().crop === "crop"` counts. Ice-scrub reads `"ice"`. `harvest()` takes ice-scrub too. It stays in the hopper for good, so a hopper with ice-scrub can never fill with crop. `harvest()` returns null on an unripe crop and when the hopper is full. Crops grow 1 per tick.',
     },
     {
-      label: '`scan().crop`',
+      label: 'Scan reach',
       value:
-        'The ice-scrub reads as `"ice"`. `"crop"` counts towards the quota; `"ice"` does not, and the slot it takes stays spent.',
+        '`scan(dir)` reads the one tile next to the bot in `dir`. So `scan(Dir.North)` and `scan(Dir.South)` read one tile of the rows above and below. Free.',
     },
     {
-      label: 'Sensor reach',
-      value:
-        '`scan(Dir.North)` and `scan(Dir.South)` read the rows either side. Three rows from one; the wheels cover one.',
-    },
-    {
-      label: 'Footprint',
-      value:
-        'For the star: the number of different tiles the wheels enter, the starting tile included. Crossing one a second time adds nothing.',
+      label: 'Tiles visited',
+      value: 'Every tile the bot stood on, the start included. Each tile counts once.',
     },
   ],
   seeds: [1, 2, 3, 4, 5],
@@ -142,28 +124,21 @@ export const w2_03: LevelDef = {
     return world;
   },
   objectives: [hopperFullOf(ItemKind.Crop, 'Fill the hopper with crop')],
-  bonus: [
-    withinFootprint(
-      FOOTPRINT,
-      `Fill the hopper having set foot on at most ${String(FOOTPRINT)} tiles`,
-    ),
-  ],
+  bonus: [withinFootprint(FOOTPRINT, `At most ${String(FOOTPRINT)} tiles visited`)],
   starter: [
-    '// scan().crop names what is growing here: "crop", "ice", or null on bare soil.',
-    '// harvest() hands back what it took, or null when it took nothing.',
+    '// scan().crop is "crop", "ice", or null on bare soil.',
+    '// harvest() gives back what it took, or null.',
     '',
     'const here = scan();',
     'print(`${here.crop} ${here.growth}/${here.maxGrowth}`);',
     '',
   ].join('\n'),
   hints: [
-    'Two things grow here and only one counts. The sensor tells them apart for free. The arm does not.',
-    'harvest gives back nothing on a crop that is not ripe yet. That is not the hopper being full.',
-    'The hopper does not open. A slot spent on the wrong thing is spent for the rest of the shift.',
-    'The shift is shorter than the field. Once the hopper is full, every further tile is a tick spent on nothing.',
-    'A tile three ticks from ripe may be worth three ticks. A tile thirty ticks from ripe is somebody else’s shift.',
-    'The sensor reads the row above and the row below. A bot driving the second row has already surveyed the first three, and two more rows of driving cover the rest of the field.',
-    'Read the lane, and only step off it for something the sensor has already said is worth the two ticks.',
+    'Only crop counts. scan() tells crop from ice for free. harvest() does not.',
+    'The shift is shorter than the field. Stop once the hopper is full.',
+    'A crop 3 ticks from ripe may be worth the wait. One 30 ticks away is not.',
+    'From row 2, scan() can read rows 1 to 3. From row 5, rows 4 to 6.',
+    'Drive your row. Step off it only for a ripe crop you have already seen.',
   ],
   docs: ['scan', 'harvest', 'inventory'],
 };

@@ -16,30 +16,30 @@ export interface LegendSection {
 
 const TERRAIN_IS: Record<Terrain, string> = {
   [Terrain.Void]: 'Outside the playable area.',
-  [Terrain.Floor]: 'Bare decking. The default surface, and it does nothing else.',
-  [Terrain.Wall]: 'Structure. The site was built around it.',
-  [Terrain.Pad]: 'A marked spot. What an objective usually counts.',
-  [Terrain.Regolith]: 'Loose dust — the ground rock this whole planet is made of.',
-  [Terrain.Soil]: 'Farmable ground. The only thing `plant()` accepts.',
+  [Terrain.Floor]: 'Plain floor.',
+  [Terrain.Wall]: 'A wall.',
+  [Terrain.Pad]: 'A target tile. Objectives often count these.',
+  [Terrain.Regolith]: 'Loose dust.',
+  [Terrain.Soil]: 'Farm ground. `plant()` works only here.',
   [Terrain.Rock]: 'Solid stone.',
   [Terrain.Ore]: 'An ore vein.',
-  [Terrain.Rubble]: 'Collapsed rock. Cheaper to cut than the stone it came from.',
+  [Terrain.Rubble]: 'Broken rock. Cheaper to mine than rock.',
   [Terrain.Ice]: 'Frozen ground.',
-  [Terrain.Pit]: 'An open shaft. Nothing stops a bot walking into one.',
-  [Terrain.Cable]: 'Power run.',
-  [Terrain.Depot]: 'Fuel depot. The only tile `refuel()` succeeds on.',
-  [Terrain.Conveyor]: 'Item transport.',
-  [Terrain.Rack]: 'A storage rack slot. Walkable, and what a slot objective counts.',
+  [Terrain.Pit]: 'A hole. A bot that stops here is lost.',
+  [Terrain.Cable]: 'A power cable.',
+  [Terrain.Depot]: 'Fuel depot. `refuel()` works only here.',
+  [Terrain.Conveyor]: 'Moves items along.',
+  [Terrain.Rack]: 'A storage slot. Bots can walk on it.',
 };
 
 const ITEM_IS: Record<ItemKind, string> = {
-  [ItemKind.Regolith]: 'Dust, cut out of regolith ground.',
-  [ItemKind.Stone]: 'Rock, cut out of a stone face.',
-  [ItemKind.Ore]: 'Raw ore, cut out of a vein.',
+  [ItemKind.Regolith]: 'Dust, mined from regolith.',
+  [ItemKind.Stone]: 'Mined from rock.',
+  [ItemKind.Ore]: 'Mined from an ore vein.',
   [ItemKind.Ice]: 'Water ice.',
-  [ItemKind.Scrap]: 'Salvage, pulled out of rubble.',
+  [ItemKind.Scrap]: 'Mined from rubble.',
   [ItemKind.Seed]: 'Plant it on soil.',
-  [ItemKind.Crop]: 'What a ripe plant is harvested into.',
+  [ItemKind.Crop]: 'What you get from harvesting a ripe plant.',
   [ItemKind.Crate]: 'A shipping crate.',
   [ItemKind.Part]: 'A machine part.',
   [ItemKind.Cell]: 'A power cell.',
@@ -47,16 +47,16 @@ const ITEM_IS: Record<ItemKind, string> = {
 };
 
 const MACHINE_IS: Record<MachineKind, string> = {
-  [MachineKind.Door]: 'A way through, when it is open.',
-  [MachineKind.Lever]: 'A switch. `use()` throws it.',
-  [MachineKind.Furnace]: 'A smelter.',
+  [MachineKind.Door]: 'You can pass when it is open.',
+  [MachineKind.Lever]: 'A switch. `use()` flips it.',
+  [MachineKind.Furnace]: 'A furnace.',
   [MachineKind.Press]: 'A press.',
-  [MachineKind.Sink]: 'Accepts deliveries. What a delivery objective counts.',
-  [MachineKind.Source]: 'Emits items.',
+  [MachineKind.Sink]: 'Takes deliveries. Delivery objectives count these.',
+  [MachineKind.Source]: 'Puts out items.',
   [MachineKind.Node]: 'A node on the power grid.',
-  [MachineKind.Antenna]: 'Sends and receives off-site.',
-  [MachineKind.Charger]: 'Puts fuel back into a bot.',
-  [MachineKind.Router]: 'Passes traffic on.',
+  [MachineKind.Antenna]: 'Sends and receives radio packets.',
+  [MachineKind.Charger]: 'Refuels a bot.',
+  [MachineKind.Router]: 'Holds values. `probe()` reads them.',
 };
 
 function terrainTraits(terrain: Terrain): string[] {
@@ -64,10 +64,10 @@ function terrainTraits(terrain: Terrain): string[] {
   if (!props) return [];
   const traits: string[] = [];
   traits.push(props.walkable ? 'walkable' : 'blocks movement');
-  if (props.opaque) traits.push('blocks sight');
-  if (props.lethal) traits.push('a bot that ends a move here dies');
-  if (props.plantable) traits.push('plantable');
-  if (props.mineable) traits.push(props.yields ? `mine it for ${props.yields}` : 'mineable');
+  if (props.opaque) traits.push('blocks the view');
+  if (props.lethal) traits.push('a bot that stops here is lost');
+  if (props.plantable) traits.push('can be planted');
+  if (props.mineable) traits.push(props.yields ? `mine it for ${props.yields}` : 'can be mined');
   return traits;
 }
 

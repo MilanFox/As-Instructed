@@ -7,6 +7,13 @@
   transition: transform var(--ws-slide);
 }
 
+/* The kicker names the site and its sector, which are too long for the column at the strip's
+   usual tracking, and it is the one strip whose words are worth a second line. */
+.work-order .panel-bar__title {
+  letter-spacing: 0.14em;
+  white-space: normal;
+}
+
 .work-order__fold {
   display: flex;
   flex: 1 1 auto;
@@ -66,4 +73,33 @@
 /* The card's last row would otherwise run into the cut on the bottom left corner. */
 .work-order .stat-grid {
   padding-bottom: calc(var(--ws-cut) * 0.45);
+}
+
+.work-order__commands {
+  flex: none;
+  align-items: center;
+  padding: 8px 10px;
+  border-bottom: 2px solid var(--border-strong);
+}
+
+.work-order__command-tools {
+  display: inline-flex;
+  gap: 5px;
+  margin-left: auto;
+}
+
+@media (width <= 900px) {
+  .work-order .panel-bar {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
+  .work-order .panel-bar__title {
+    flex: 1 1 88px;
+    min-width: min-content;
+  }
+
+  .work-order .panel-bar__tools {
+    margin-left: auto;
+  }
 }

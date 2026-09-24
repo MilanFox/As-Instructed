@@ -60,14 +60,14 @@ describe('points', () => {
 
 describe('reviewTier', () => {
   it('picks the tier at each boundary', () => {
-    expect(reviewTier(0).grade).toBe('CONSISTENT WITH EXPECTATION');
-    expect(reviewTier(33.4).grade).toBe('CONSISTENT WITH EXPECTATION');
-    expect(reviewTier(49.9).grade).toBe('CONSISTENT WITH EXPECTATION');
-    expect(reviewTier(50).grade).toBe('ABOVE BASELINE');
-    expect(reviewTier(74).grade).toBe('ABOVE BASELINE');
-    expect(reviewTier(75).grade).toBe('EXCEPTIONAL (NON-BINDING)');
-    expect(reviewTier(92).grade).toBe('EXCEPTIONAL (NON-BINDING)');
-    expect(reviewTier(99.9).grade).toBe('EXCEPTIONAL (NON-BINDING)');
+    expect(reviewTier(0).grade).toBe('AS EXPECTED');
+    expect(reviewTier(33.4).grade).toBe('AS EXPECTED');
+    expect(reviewTier(49.9).grade).toBe('AS EXPECTED');
+    expect(reviewTier(50).grade).toBe('ABOVE TARGET');
+    expect(reviewTier(74).grade).toBe('ABOVE TARGET');
+    expect(reviewTier(75).grade).toBe('EXCEPTIONAL (UNOFFICIAL)');
+    expect(reviewTier(92).grade).toBe('EXCEPTIONAL (UNOFFICIAL)');
+    expect(reviewTier(99.9).grade).toBe('EXCEPTIONAL (UNOFFICIAL)');
     expect(reviewTier(100).grade).toBe('RETAINED');
   });
 

@@ -4,7 +4,7 @@ export const MIN_DRAWER = 420;
 
 // The board is the other half of the job, so the widest the player may pull still leaves it
 // the right column and a strip to read. Named --ws-board-keep in workspace.css.
-export const BOARD_KEEP = 380;
+export const BOARD_KEEP = 440;
 
 // The right column's width at each reflow step (--ws-column in workspace.css and reflow.css).
 export function columnWidth(viewport: number): number {
@@ -22,6 +22,15 @@ const DECK_GUTTERS = 120;
 
 export function deckIsCrowded(drawer: number, viewport: number): boolean {
   return viewport - drawer - DECK_GUTTERS - columnWidth(viewport) < DECK_FLOOR;
+}
+
+// The site map link rides the flyout's edge, so it needs its own width and a clear gap either side
+// of it between that edge and the column; short of that it drops its words for the arrow alone.
+const BACK_ROOM = 130;
+const COLUMN_GAP = 16;
+
+export function backIsCrowded(drawer: number, viewport: number): boolean {
+  return viewport - drawer - COLUMN_GAP - columnWidth(viewport) < BACK_ROOM;
 }
 
 export function maxDrawer(viewport: number): number {

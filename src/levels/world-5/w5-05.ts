@@ -196,22 +196,22 @@ const misread = (ctx: ObjectiveContext): Divergence | undefined => {
   const said = lines[0];
   if (said === undefined) {
     return {
-      where: 'the outage report',
-      expected: 'a line naming what the district hangs off',
+      where: 'the weak line',
+      expected: 'a line: weak <id> <n>',
       received: NOTHING,
     };
   }
   if (lines.length > 1) {
     return {
-      where: 'the outage report',
-      expected: 'one line about the district',
+      where: 'the weak line',
+      expected: 'one weak line',
       received: `${String(lines.length)} of them`,
     };
   }
   const claim = readClaim(said);
   if (claim === null) {
     return {
-      where: 'the outage report',
+      where: 'the weak line',
       expected: 'a line reading `weak <id> <n>`',
       received: clipValue(said),
     };
@@ -219,7 +219,7 @@ const misread = (ctx: ObjectiveContext): Divergence | undefined => {
   const named = substations(ctx.world).find((machine) => machine.id === claim.id);
   if (named === undefined) {
     return {
-      where: 'the outage report',
+      where: 'the weak line',
       expected: 'a substation in the district',
       received: clipValue(claim.id),
     };
@@ -228,14 +228,14 @@ const misread = (ctx: ObjectiveContext): Divergence | undefined => {
   if (ids.has(claim.id)) {
     return {
       where: `${claim.id} · ${at(named.at)}`,
-      expected: 'the count of what goes dark with it',
+      expected: 'how many it cuts off',
       received: String(claim.load),
     };
   }
   return {
     where: `${claim.id} · ${at(named.at)}`,
-    expected: 'the station the district most hangs off',
-    received: `${String(darkWithout(ctx.world, claim.id))} dark with it`,
+    expected: 'the substation that cuts off the most',
+    received: `it cuts off ${String(darkWithout(ctx.world, claim.id))}`,
   };
 };
 
@@ -300,8 +300,8 @@ const notLive = (ctx: ObjectiveContext): Divergence | undefined => {
   if (stranded !== undefined) {
     return {
       where: `tick ${String(stranded.t)} · ${stranded.id}`,
-      expected: 'a live cable already reaching it',
-      received: 'nothing live was joined to it',
+      expected: 'a cable to a substation already on',
+      received: 'no cable to a substation that was on',
     };
   }
   const missed = substations(ctx.world).find(
@@ -338,58 +338,42 @@ export const w5_05: LevelDef = {
   title: 'Blackout',
   hardware: [],
   brief: [
-    '**MEMO KD-2544**',
-    '**FROM:** Dep. Coordinator M. Vance\\',
-    '**RE:** District 9, reconnection',
+    'We have one drum of cable. Insurance asks which substation would cut off the most if it failed, so they know what to worry about. — M. Vance',
     '',
-    'District 9 lost its cabling on Tuesday. Stores have issued one drum against the works',
-    'order. Not two.',
-    '',
-    'Re-cable District 9, then bring every substation up. Insurance renews next month and',
-    'wants one name off the finished grid.',
+    '**Join every substation to the reactor with cable, directly or through other substations. Then switch them all on.**',
   ].join('\n'),
   board: {
-    fixed: [
-      'district 9 is 30 by 24 of open floor — nothing stands between two machines, and a cable costs the grid distance between its ends',
-      'the reactor stands in the middle of the district, already on',
-      'RIG-01 starts on the reactor and never has to leave it — `link` and `power` both take their machines by id',
-      'every substation starts off',
-      'the drum is the shortest run that joins the district, plus eight per cent, on every shift',
-    ],
     redrawn: [
-      'ten to fourteen substations',
-      'where they stand — some shifts scatter them across the district, some pack them into three clumps',
-      'the size of the drum',
+      '10 to 14 substations',
+      'where they stand: spread out on some boards, in three groups on others',
     ],
   },
   facts: [
     {
-      label: '`probe(id)`',
-      value: 'Free. Substations are `sub-1` upward; past the last one it returns `null`.',
-    },
-    {
-      label: '`link(a, b)`',
+      label: 'Substations',
       value:
-        'Lays a cable between two machines. 2 ticks, and spends cable equal to the grid distance: the difference in `x` plus the difference in `y`.',
+        'Ids are `sub-1`, `sub-2`, …; `probe` returns `null` after the last. Probing is free. All start off.',
     },
+    { label: 'Reactor', value: 'In the middle, already on.' },
     {
-      label: 'A cable',
-      value: 'Carries both ways. Laying the same one twice spends the drum twice.',
-    },
-    {
-      label: 'The drum',
+      label: 'Cable',
       value:
-        'Finite. The reactor reports the whole of it in `vars.cableBudget`, and that figure is the shortest possible total run of cable for this district plus eight per cent for waste. A network a little off the cheapest still fits; one of the wrong shape does not. Going over fails the job.',
+        '`link(a, b)` lays one between two machines, from anywhere, for 2 ticks. It uses cable equal to the difference in `x` plus the difference in `y`. It works both ways. Nothing blocks a cable.',
     },
     {
-      label: '`power(id, "on")`',
+      label: 'Drum',
       value:
-        '2 ticks, and the switch throws whatever you do. A substation is only *up*, though, if a cable already joins it to the reactor through machines that are already on — one switched on ahead of its cable reads `on` and is not.',
+        "The reactor's `vars.cableBudget`: always the shortest network that joins everything, plus 8%, rounded up. Laying the same cable twice uses it twice.",
     },
     {
-      label: 'The outage report',
+      label: 'Connected',
       value:
-        'For the star: file one line, `weak <id> <n>` — a substation whose loss would cut the most of the district off from the reactor, and how many stations go dark with it, counting itself. It is read off the grid you leave behind, so the answer follows the cabling you laid. Printing otherwise costs nothing; only lines beginning `weak ` are read.',
+        '`power(id, "on")` costs 2 ticks and always works. It counts only if a cable already joins the substation to the reactor, or to a substation that already counts as on. An early call still reads `on` but does not count; call again later.',
+    },
+    {
+      label: 'Weak point',
+      value:
+        'For the star, print exactly one line `weak <id> <n>`: the substation that, if removed, cuts off the most substations from the reactor, and how many, counting itself. If several tie, any of them is right. It is checked against the network you built. Other lines are not read.',
     },
   ],
   seeds: [1, 2, 3, 4, 5],
@@ -441,7 +425,7 @@ export const w5_05: LevelDef = {
     ),
     Objectives.custom(
       'budget',
-      'Stay inside the cable drum',
+      'Use no more cable than the drum holds',
       (ctx) => cableSpent(ctx) <= (ctx.world.vars.cableBudget ?? 0),
       {
         progress: (ctx) => {
@@ -453,7 +437,7 @@ export const w5_05: LevelDef = {
     ),
     Objectives.custom(
       'energised',
-      'Bring every substation up on live cable',
+      'Switch every substation on after it is connected',
       (ctx) => {
         const stations = substations(ctx.world);
         return (
@@ -470,7 +454,7 @@ export const w5_05: LevelDef = {
   bonus: [
     Objectives.custom(
       'name-the-weak-link',
-      'Report which substation the district most hangs off',
+      'Print the weak point of your network',
       (ctx) => {
         const lines = outageReport(ctx);
         const claim = lines.length === 1 ? readClaim(lines[0] as string) : null;
@@ -484,17 +468,17 @@ export const w5_05: LevelDef = {
   starter: [
     "// import { waves } from 'lib';",
     '// NOTE(4470): the drum runs out before the district does. it always has',
-    '// NOTE(4470): a cable to somewhere already on the grid buys you nothing',
+    '// NOTE(4470): a cable between two substations already joined is wasted',
     '',
     "const reactor = probe('reactor');",
     '',
   ].join('\n'),
   hints: [
-    'Every position you need is readable before you spend anything. The whole problem is arithmetic on those positions, and arithmetic is free.',
-    "Every cable you lay either connects something new, or it doesn't.",
-    'Grow one network outward from the reactor. At each step there is a cheapest cable that reaches something not yet on the network, and it is not always the one that starts where you finished.',
-    'The tree you laid is also the order to switch things on. A station can only come up once whatever joins it to the reactor is already on.',
-    'You know which station you cabled each new one on to. Follow those links back towards the reactor and every station on the way is one the newcomer depends on — the district hangs off whichever of them collects the most.',
+    'Probe every position first. Planning costs no ticks.',
+    'Each cable should join something new to the network.',
+    'Grow the network from the reactor. Each time, add the cheapest cable that reaches a substation not yet joined. It may start anywhere on the network.',
+    'Switch substations on in the order you joined them.',
+    'Remember which substation you joined each new one to. The one with the most substations joined through it is the weak point.',
   ],
   docs: ['probe', 'link', 'power'],
 };

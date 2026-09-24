@@ -52,7 +52,6 @@ const WIRED = [
   ['opening the workbench closes lib.ts', /setOpen\(true\);[\s\S]{0,160}?closeLibrary\(\)/],
   ['the workbench flap closes lib.ts', /if \(!was\) \{[\s\S]{0,160}?closeLibrary\(\)/],
   ['an open lib.ts closes the workbench', /if \(libraryOpen\) setOpen\(false\)/],
-  ['escape dismisses lib.ts rather than nothing', /=== 'library'\) \{\s*closeOverlay\(\);/],
 ] as const;
 
 describe('the screen wires both directions', () => {

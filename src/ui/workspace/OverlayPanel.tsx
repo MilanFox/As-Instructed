@@ -37,7 +37,7 @@ export interface PanelBarProps {
 export function PanelBar({ children, tools, sub }: PanelBarProps): React.ReactElement {
   return (
     <div className={sub === true ? 'panel-bar panel-bar--sub' : 'panel-bar'}>
-      <span>{children}</span>
+      <span className="panel-bar__title">{children}</span>
       {tools ? <span className="panel-bar__tools">{tools}</span> : null}
     </div>
   );

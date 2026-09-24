@@ -7,6 +7,18 @@
   background: color-mix(in srgb, var(--bg-panel) 82%, transparent);
 }
 
+@media (width <= 900px) {
+  .settings-trigger {
+    right: 9px;
+  }
+}
+
+@media (width <= 600px) {
+  .settings-trigger {
+    right: 5px;
+  }
+}
+
 .overlay--corner {
   place-items: end;
   padding: var(--space-4) var(--space-4) calc(var(--space-4) + 36px);

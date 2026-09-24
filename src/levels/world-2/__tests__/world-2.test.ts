@@ -378,7 +378,7 @@ describe('w2-03 bonus — footprint', () => {
       try {
         run = runReference(w2_03, seed, serpentineHarvest);
       } catch (error) {
-        expect((error as Error).message, `seed ${String(seed)}`).toContain('Shift over');
+        expect((error as Error).message, `seed ${String(seed)}`).toContain('tick limit');
         continue;
       }
       closed.push(seed);

@@ -198,7 +198,7 @@ export function FeedCanvas({ onReadout, onView }: FeedCanvasProps): React.ReactE
     <canvas
       id="board"
       ref={canvasRef}
-      aria-label="Site view"
+      aria-label="Board"
       role="img"
       style={{ display: 'block', width: '100%', height: '100%', cursor: pointerCursor }}
       onPointerDown={onPointerDown}

@@ -22,9 +22,10 @@
 @media (width <= 900px) {
   .workspace {
     --ws-column: min(400px, calc(100vw - var(--ws-inset) * 2));
-    --ws-flyout: 100vw;
+    --ws-flyout: calc(100vw - 46px);
     --ws-cut: 16px;
     --ws-inset: 12px;
+    --ws-back: 34px;
   }
 
   /* Too narrow for a column: its surfaces take the screen on their own again. */
@@ -45,7 +46,7 @@
     position: fixed;
     top: var(--ws-inset);
     right: var(--ws-inset);
-    left: var(--ws-inset);
+    left: calc(var(--ws-inset) + var(--ws-back) + 16px);
     width: auto;
     max-height: min(42vh, calc(50vh - 108px));
     transform: none;
@@ -92,7 +93,7 @@
     position: fixed;
     top: var(--ws-inset);
     right: var(--ws-inset);
-    left: var(--ws-inset);
+    left: calc(var(--ws-inset) + var(--ws-back) + 16px);
     width: auto;
   }
 
@@ -107,10 +108,6 @@
 
   .workspace[data-flyout='open'] .hud-right > .postings {
     transform: translateY(calc(-100% - var(--ws-inset) - 12px));
-  }
-
-  .workspace[data-flyout='open'] {
-    --ws-handle-x: calc(100vw - 46px);
   }
 
   .drawer-handle {
@@ -140,6 +137,34 @@
     height: 116px;
   }
 
+  /* Back keeps the top-left corner to itself and the card starts past it. */
+  .site-map-link {
+    justify-content: center;
+    width: var(--ws-back);
+    height: 40px;
+    padding: 0;
+  }
+
+  .site-map-link__arrow {
+    font-size: 18px;
+  }
+
+  .site-map-link__text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  /* An open flyout leaves only the flap strip, so back waits at its foot, far from the flaps and
+     clear above the settings flap in the corner. */
+  .workspace[data-flyout='open'] .site-map-link {
+    top: auto;
+    bottom: 64px;
+    left: calc((100vw - var(--ws-flyout) - var(--ws-back)) / 2);
+  }
+
   .closed-banner__row {
     flex-wrap: wrap;
     gap: 14px;
@@ -150,8 +175,15 @@
 @media (width <= 600px) {
   .workspace {
     --ws-column: calc(100vw - var(--ws-inset) * 2);
+    --ws-flyout: calc(100vw - 38px);
     --ws-cut: 12px;
+    --ws-back: 30px;
     font-size: 12px;
+  }
+
+  /* Room for the title strip's second row when it wraps. */
+  .hud-right > .work-order {
+    max-height: calc(min(42vh, 50vh - 108px) + 26px);
   }
 
   .stat-grid {
@@ -174,10 +206,6 @@
   .run-log__lines {
     max-height: 112px;
     font-size: 12px;
-  }
-
-  .workspace[data-flyout='open'] {
-    --ws-handle-x: calc(100vw - 38px);
   }
 
   .drawer-handle {
@@ -247,5 +275,65 @@
   .library-handle {
     top: 243px;
     height: 80px;
+  }
+}
+
+/* A short desktop viewport would run the bottom-anchored flap column up into the site map link,
+   so the flaps get shorter before they ever reach it. */
+@media (width > 900px) and (height <= 780px) {
+  .drawer-handle,
+  .library-handle {
+    height: 100px;
+    letter-spacing: 0.12em;
+  }
+
+  .drawer-handle--dossier {
+    bottom: 462px;
+  }
+
+  .drawer-handle--program {
+    bottom: 352px;
+  }
+
+  .library-handle {
+    bottom: 242px;
+  }
+
+  .workspace:not(:has(.library-handle)) .drawer-handle--dossier {
+    bottom: 352px;
+  }
+
+  .workspace:not(:has(.library-handle)) .drawer-handle--program {
+    bottom: 242px;
+  }
+}
+
+@media (width > 900px) and (height <= 660px) {
+  .drawer-handle,
+  .library-handle {
+    height: 80px;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    clip-path: polygon(0 0, 100% 10px, 100% calc(100% - 10px), 0 100%);
+  }
+
+  .drawer-handle--dossier {
+    bottom: 390px;
+  }
+
+  .drawer-handle--program {
+    bottom: 304px;
+  }
+
+  .library-handle {
+    bottom: 218px;
+  }
+
+  .workspace:not(:has(.library-handle)) .drawer-handle--dossier {
+    bottom: 304px;
+  }
+
+  .workspace:not(:has(.library-handle)) .drawer-handle--program {
+    bottom: 218px;
   }
 }

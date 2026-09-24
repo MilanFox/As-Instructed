@@ -3,7 +3,7 @@ import { callLine } from './call-text.ts';
 
 const GHOST_MAX = 48;
 const HOVER_ROWS = 20;
-const UNRECORDED = 'not recorded — call log full';
+const UNRECORDED = 'not recorded, log full';
 
 const ROW_MAX = 64;
 const NBSP = '\u00a0';

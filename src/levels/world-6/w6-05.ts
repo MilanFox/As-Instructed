@@ -259,15 +259,15 @@ function firstRepair(ctx: ObjectiveContext): Divergence | undefined {
   const targets = repairTargets(ctx.initialWorld);
   const said = printedFixes(ctx);
   if (targets.length === 0) {
-    return { where: 'the band', expected: 'a corrupt block to repair', received: 'none arrived' };
+    return { where: 'the queue', expected: 'a bad copy to repair', received: 'none arrived' };
   }
   for (let i = 0; i < targets.length; i++) {
     const target = targets[i] as RepairTarget;
     const line = said[i];
     if (line === target.line) continue;
     return {
-      where: `block ${String(target.index)} on the band`,
-      expected: line === undefined ? 'a repair for it' : 'the line it was sent as, repaired',
+      where: `block ${String(target.index)} in the queue`,
+      expected: line === undefined ? 'a repair for it' : 'the line as it was sent',
       received: line === undefined ? NOTHING : clipValue(line),
     };
   }
@@ -275,7 +275,7 @@ function firstRepair(ctx: ObjectiveContext): Divergence | undefined {
   if (extra === undefined) return undefined;
   return {
     where: `repair line ${String(targets.length + 1)}`,
-    expected: 'no more corrupt blocks',
+    expected: 'no more bad copies',
     received: clipValue(extra),
   };
 }
@@ -287,72 +287,56 @@ export const w6_05: LevelDef = {
   title: 'Telemetry',
   hardware: [],
   brief: [
-    '**MEMO KD-2622**',
-    '**FROM:** Dep. Coordinator M. Vance\\',
-    '**CC:** Contractor #4470\\',
-    '**RE:** Dead band',
+    'The radio is old, proud, and cannot send again. Tell us how to repair the bad copies it sent. — M. Vance',
     '',
-    'The band is designated dead. Traffic on a dead band is, by designation, not traffic. The',
-    'station still sending on it uses the old nested format.',
-    '',
-    'Read the band, start from `main`, and drive the route. Anything that arrived damaged gets',
-    'repaired, not discarded; a dead band has no resend.',
+    '**The route comes in blocks, and some blocks are bad copies. Build the full route from `main` and drive it to the pad.**',
   ].join('\n'),
   board: {
-    fixed: [
-      'the field is 30 by 30 and every tile off the route is a pit',
-      'RIG-06 starts on the antenna, which stands on the first tile of the route',
-      'the route is exactly 60 moves',
-      'the whole band is queued before the shift starts, and `main` is always on it',
-      'three corrupt copies arrive alongside the real blocks, and exactly one real block arrives shifted',
-    ],
     redrawn: [
-      'where the route starts, and where the pad ends up',
-      'how deep the blocks nest — one shift is nothing but move groups, others go four deep',
+      'the start and the pad',
+      'how deep blocks nest: 1 to 4 levels',
       'the body of every block',
-      'the salt, and the shift on the block that came through the repeater',
-      'the order the blocks arrive in, and which blocks the corrupt copies misquote',
+      'the salt and the key',
+      'the order of the blocks, and which blocks are copied',
     ],
   },
   facts: [
     {
-      label: 'A block',
+      label: 'Block',
       value:
-        '`name|body*S,W`. `name` is `main`, `g1`, `g2` or `g3`. `body` is entries, comma separated.',
+        '`name|body*S,W`. `name` is `main`, `g1`, `g2` or `g3`. `body` is a list of move groups and calls, split by commas.',
     },
     { label: 'Move group', value: 'A count then `N`, `E`, `S` or `W`, like `12S`.' },
     {
       label: 'Call',
       value:
-        'A block name, `*`, a repeat count, like `g2*3` — run that whole block three times. Blocks nest up to four deep.',
+        'A block name, `*`, and a count, like `g2*3`: run block `g2` three times. Blocks nest up to four deep.',
     },
     {
-      label: 'The checks',
+      label: 'Checks',
       value:
-        'Over the characters of `name|body`: `S` is `(salt + c0 + ... + cn) mod 256`, `W` is `(salt + 1*c0 + ... + (n+1)*cn) mod 256`.',
+        'Made from the character codes of `name|body`: `S` is `(salt + c0 + ... + cn) mod 256`, `W` is `(salt + 1*c0 + ... + (n+1)*cn) mod 256`.',
     },
-    { label: 'The salt', value: "`probe('mast').vars.salt`. Free, and a new number every shift." },
+    { label: 'Salt', value: "`probe('mast').vars.salt`. Costs no tick." },
     {
-      label: '`buffered()`',
+      label: 'Bad copy',
       value:
-        'How many blocks are still unread, without taking one. Free, and it takes nothing off the band — it is the size of the band before you read any of it, and 0 once you have drained it.',
-    },
-    {
-      label: 'Corrupt blocks',
-      value:
-        'One character altered — replaced by another whose code is an odd distance from it. The checks themselves are untouched. Each one lies about a block that also arrived intact.',
+        'Three extra blocks each copy a real block, with one character code changed by an odd amount. Their checks were not changed.',
     },
     {
-      label: 'One shifted block',
+      label: 'Encrypted block',
       value:
-        'It came through the old repeater, shifted by a whole number from 0 to 94. Its checks are over the plain text.',
+        'One real block is encrypted with a key from 0 to 94. Its checks match its decoded text.',
     },
-    { label: 'Arrival order', value: 'None. Blocks arrive in any order.' },
-    { label: 'Off the route', value: 'Pit. Every tile that is not on the route is a pit.' },
     {
-      label: 'Repair report',
+      label: 'Fix line',
       value:
-        'For each corrupt block, in arrival order, print `fix ` and the `name|body` it was sent as.',
+        'For each bad copy, in the order it arrived, print `fix ` and its `name|body` before the change, without the checks.',
+    },
+    {
+      label: 'Pits',
+      value:
+        'Every tile off the route is a pit. A bot that moves onto one is lost. The bot starts on the first tile of the route.',
     },
   ],
   seeds: [1, 2, 3, 4, 5],
@@ -394,7 +378,7 @@ export const w6_05: LevelDef = {
   bonus: [
     Objectives.custom(
       'repair-blocks',
-      'Repair every corrupt block instead of discarding it',
+      'Repair every bad copy: print a fix line for each',
       (ctx) => {
         const wanted = repairTargets(ctx.initialWorld).map((target) => target.line);
         const said = printedFixes(ctx);
@@ -409,8 +393,7 @@ export const w6_05: LevelDef = {
   ],
   starter: [
     "// import { findKey, unpack } from 'lib';",
-    '// NOTE(4470): the old format nests. mine did not handle that for a month',
-    '// NOTE(4470): a block that fails its checks is not a block, it is furniture',
+    '// NOTE(4470): the format nests. mine did not handle that for a month',
     '',
     "const salt = probe('mast').vars.salt;",
     'const blocks = [];',
@@ -419,15 +402,14 @@ export const w6_05: LevelDef = {
     '  blocks.push(packet);',
     '  packet = receive();',
     '}',
-    'print(`${blocks.length} blocks on the band`);',
+    'print(`${blocks.length} blocks`);',
     '',
   ].join('\n'),
   hints: [
-    'Sort the traffic before you read any of it. Every block is one of three things, and the checks tell you which.',
-    'A block that fails its checks might still be a block. Something happened to it on the way, and you have already been taught how to undo that.',
-    'A move group produces moves. A call produces whatever the block it names produces, that many times over. The second sentence has the same shape as the first. So does the reader.',
-    'Going down a level means putting your place somewhere and picking it back up after. There are two well-known places to put it.',
-    'For the repair: the two checks are each out by a number. One is the size of the change. The other is that size times where it happened.',
+    'Each block is real, encrypted, or a bad copy. The checks tell you which.',
+    'A block that fails its checks may be the encrypted one. Try every key.',
+    'A called block can call other blocks too.',
+    'To repair a bad copy, compare its errors in S and W.',
   ],
   docs: ['decode', 'probe', 'receive', 'buffered'],
 };

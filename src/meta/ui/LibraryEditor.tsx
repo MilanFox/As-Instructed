@@ -109,10 +109,10 @@ export function LibraryEditor(): React.JSX.Element {
           className="lib__btn lib__btn--primary"
           disabled={!dirty || busy}
           onClick={() => void commit()}
-          aria-label="Commit"
-          title="Save lib.ts and re-run every closed work order that reads it"
+          aria-label="Save"
+          title="Save lib.ts and run again the levels that use it"
         >
-          Commit
+          Save
         </button>
       </div>
     </>

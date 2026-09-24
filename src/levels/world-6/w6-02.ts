@@ -107,16 +107,16 @@ function firstMishandled(ctx: ObjectiveContext): Divergence | undefined {
     const wentOut = sent[next] === packet.text;
     if (clean && !wentOut) {
       return {
-        where: `packet ${String(i)} on the band`,
-        expected: 'relayed',
-        received: sent[next] === undefined ? 'nothing more was sent' : 'not relayed',
+        where: `packet ${String(i)} in the queue`,
+        expected: 'sent',
+        received: sent[next] === undefined ? 'nothing more was sent' : 'not sent',
       };
     }
     if (!clean && wentOut) {
       return {
-        where: `packet ${String(i)} on the band`,
+        where: `packet ${String(i)} in the queue`,
         expected: 'held back',
-        received: 'relayed',
+        received: 'sent',
       };
     }
     if (wentOut) next++;
@@ -124,7 +124,7 @@ function firstMishandled(ctx: ObjectiveContext): Divergence | undefined {
   const extra = sent[next];
   if (extra === undefined) return undefined;
   return {
-    where: 'after the last clean packet',
+    where: 'after the last good packet',
     expected: 'nothing more',
     received: clipValue(extra),
   };
@@ -149,7 +149,7 @@ function firstFault(ctx: ObjectiveContext): Divergence | undefined {
     if (got === undefined) return undefined;
     return {
       where: `fault line ${String(i + 1)}`,
-      expected: 'no more corrupt packets',
+      expected: 'no more bad packets',
       received: clipValue(got),
     };
   }
@@ -164,15 +164,15 @@ function firstFault(ctx: ObjectiveContext): Divergence | undefined {
   if (target === null) return undefined;
   if (got === undefined) {
     return {
-      where: `packet ${String(target.packet)} on the band`,
-      expected: 'a line naming its altered byte',
+      where: `packet ${String(target.packet)} in the queue`,
+      expected: 'a line naming its changed byte',
       received: NOTHING,
     };
   }
   const mine = readFault(got);
   if (mine !== null && mine.packet === target.packet) {
     return {
-      where: `packet ${String(target.packet)} on the band`,
+      where: `packet ${String(target.packet)} in the queue`,
       expected: 'the byte that explains both checks',
       received: `byte ${String(mine.byte)}`,
     };
@@ -191,52 +191,44 @@ export const w6_02: LevelDef = {
   title: 'Checksum',
   hardware: ['transmit'],
   brief: [
-    '**FROM:** Dep. Coordinator M. Vance',
+    'In 2207 we obeyed a bad packet and harvested a whole field by mistake. For each bad one, tell us which byte lied. — M. Vance',
     '',
-    'Signal discipline on this band is mandatory. In 2207 an unverified packet was actioned and',
-    'the south field harvested itself on schedule. Memo KD-2601 covers it and is not reassuring.',
-    '',
-    'Relay the packets that verify. Name the failing byte in anything you hold; a nil return is',
-    'still a return.',
+    '**Check every packet. Send the good ones. Do not send the bad ones.**',
   ].join('\n'),
   board: {
-    fixed: [
-      'the post is a 12 by 6 shack; RIG-06 stays on the antenna',
-      'the whole band is queued before the shift starts, and it is drained once, in arrival order',
-      'every packet carries its own two check values, over four to ten payload bytes',
-      'a corrupt packet has exactly one payload byte altered; the check values themselves are never touched',
-    ],
     redrawn: [
       'the salt',
-      'twenty to forty packets on the band',
-      'how many bytes each packet carries',
-      'how much of the band is corrupt — a tenth to a third of it, or none of it',
-      'which byte of a corrupt packet was altered',
-      'whether the first packet you read is one of them',
+      '20 to 40 packets',
+      'bytes per packet',
+      '10% to 30% of packets are bad, or none',
+      'which byte is changed',
+      'whether the first packet is bad',
     ],
   },
   facts: [
     {
-      label: 'A packet',
-      value: '`b0,b1,...,bn*S,W` — payload bytes, 0 to 255, then the two check values.',
-    },
-    { label: '`S`', value: '`(salt + b0 + b1 + ... + bn) mod 256`' },
-    { label: '`W`', value: '`(salt + 1*b0 + 2*b1 + ... + (n+1)*bn) mod 256`' },
-    { label: 'The salt', value: "`probe('mast').vars.salt`. Free, and a new number every shift." },
-    {
-      label: '`buffered()`',
-      value:
-        'How many packets are still unread, without taking one. Free, and it takes nothing off the band — it is the length of the band before you read any of it, and 0 once you have drained it.',
+      label: 'Packet format',
+      value: '`b0,b1,...,bn*S,W`: the bytes (0 to 255), then two check values.',
     },
     {
-      label: 'A corrupt packet',
+      label: 'Checks',
       value:
-        'Exactly one payload byte altered, and always by an odd amount mod 256 — so both checks disagree, and exactly one position can account for the pair of differences.',
+        '`S` is `(salt + b0 + b1 + ... + bn) mod 256`. `W` is `(salt + 1*b0 + 2*b1 + ... + (n+1)*bn) mod 256`.',
+    },
+    { label: 'Salt', value: "`probe('mast').vars.salt`. Costs no tick." },
+    {
+      label: 'Good packet',
+      value: 'Both `S` and `W` match. Send its text unchanged with `transmit()`.',
     },
     {
-      label: 'Fault report',
+      label: 'Bad packet',
       value:
-        'One line per corrupt packet, in arrival order: `bad <packet> <byte>`. Both counted from 0, and `<packet>` counts the clean ones too. A shift with nothing corrupt gets one line, `bad none`.',
+        'One byte was changed by an odd amount. `S` and `W` were not changed. Only one byte position explains both errors.',
+    },
+    {
+      label: 'Changed byte',
+      value:
+        'For each bad packet, in order, print `bad <packet> <byte>`. Both count from 0. `<packet>` counts all packets. If none is bad, print `bad none`.',
     },
   ],
   seeds: [1, 2, 3, 4],
@@ -273,7 +265,7 @@ export const w6_02: LevelDef = {
   objectives: [
     Objectives.custom(
       'relay-clean',
-      'Relay every packet that verifies, and only those',
+      'Send every good packet, in arrival order, and no bad packet',
       (ctx) => {
         const wanted = cleanTraffic(ctx.initialWorld);
         const sent = relayed(ctx);
@@ -291,7 +283,7 @@ export const w6_02: LevelDef = {
   bonus: [
     Objectives.custom(
       'name-the-fault',
-      'Report the altered byte in every corrupt packet',
+      'Print the changed byte of every bad packet',
       (ctx) => {
         const wanted = faultReports(ctx.initialWorld);
         const said = reported(ctx);
@@ -307,7 +299,7 @@ export const w6_02: LevelDef = {
     ),
   ],
   starter: [
-    '// Relay the packets that verify. Reject the rest.',
+    '// Send the packets whose checks match. Do not send the others.',
     '',
     "const salt = probe('mast').vars.salt;",
     '',
@@ -318,9 +310,8 @@ export const w6_02: LevelDef = {
     '',
   ].join('\n'),
   hints: [
-    'A packet carries its own verdict. Work out what the two check values should be before you decide what to do with the packet.',
-    'The salt is not in this text and it is not the same on the next shift. The antenna knows it, and asking costs nothing.',
-    'Declining to send is an action. Some shifts nothing is wrong, and some shifts the first thing you see is.',
+    'Compute both check values yourself. Compare them with the two in the packet.',
+    'In a bad packet, compare the error in W with the error in S.',
   ],
   docs: ['transmit', 'probe', 'receive', 'buffered'],
 };

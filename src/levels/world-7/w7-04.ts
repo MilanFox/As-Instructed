@@ -184,7 +184,7 @@ function misreadDecider(ctx: ObjectiveContext): Divergence | undefined {
   if (line === undefined) {
     return {
       where: 'the shift report',
-      expected: 'a line naming the job that finished last',
+      expected: 'a line naming the last job to finish',
       received: NOTHING,
     };
   }
@@ -288,9 +288,9 @@ function wrongWave(ctx: ObjectiveContext): Divergence {
   const { size, wave, hands } = firstWave(ctx);
   if (wave.length < size) {
     return {
-      where: 'the first wave',
+      where: 'the first jobs',
       expected: `${String(size)} bots on a job of their own`,
-      received: `${String(hands)} ever began one`,
+      received: `${String(hands)} started one`,
     };
   }
   const inWave = new Set(wave.map((job) => job.id));
@@ -303,7 +303,7 @@ function wrongWave(ctx: ObjectiveContext): Divergence {
   return {
     where: weakest.id,
     expected: `a job costing ${String(passedOver)} or more`,
-    received: `cost ${String(weakest.cost)}, begun at tick ${String(weakest.begun)}`,
+    received: `cost ${String(weakest.cost)}, started at tick ${String(weakest.begun)}`,
   };
 }
 
@@ -315,67 +315,44 @@ export const w7_04: LevelDef = {
   hardware: [],
   costs: { use: 1 },
   brief: [
-    '**FROM:** Dep. Coordinator M. Vance\\',
-    '**RE:** Yard 7 dispatch',
+    'Head office wants the long jobs started first. It read this in a book, and now it also wants to know which job finished last. — M. Vance',
     '',
-    'The board is a different size every shift. Some items are a minute. Some are the whole',
-    'shift. The board does not distinguish between these, and neither, historically, have we.',
-    'Head office wants the long ones started first, and a line naming whatever held us open.',
-    '',
-    'Clear the board inside the shift.',
+    '**Several bots share many jobs of different costs. Finish every job before the deadline.**',
   ].join('\n'),
   board: {
-    fixed: [
-      'the yard is 26 by 18 of open floor inside its wall',
-      'the whole fleet starts at Depot 0 on the west wall, one bot to a row',
-      'the jobs stand in a block seven columns wide, with an empty row between every row of them',
-      'the jobs are `job-0` upward with no gaps, and the board never gains one mid-shift',
-      'no job costs more than twenty uses, and `probe` reports every cost before anybody moves',
-    ],
     redrawn: [
-      'how many bots the requisition approves, four to eight',
-      'how many jobs are on the board, fifteen to thirty',
-      'what each job costs',
-      'how the costs are spread — one shift is all much of a muchness, another puts a handful of long jobs among short ones',
-      'which yard tile each job stands on',
+      'the bot count, four to eight',
+      'the job count, 15 to 30',
+      'the cost of each job',
+      'how costs are spread: even, or a few long jobs among short ones',
+      'the tile of each job',
     ],
   },
   facts: [
-    { label: 'Your score', value: 'The clock stops when the **last** bot stops.' },
+    { label: 'Score', value: 'The tick when the **last** bot stops.' },
     {
-      label: 'The jobs',
+      label: 'Jobs',
       value:
-        '`job-0` upward. `probe(id)` is free, reports `vars.cost` and the position, and gives back `null` past the last one.',
+        '`probe("job-0")` upward, with no gaps. Free. Gives `vars.cost` and the position. Returns `null` after the last job. No new jobs appear.',
     },
     {
-      label: 'Clearing one',
+      label: 'Doing a job',
       value:
-        'Stand on the job and call `use()` exactly `cost` times. One tick each. A job is hand-worked and `power()` reaches none of them — `vars.manual` is 1 on every one.',
-    },
-    { label: 'One use too many', value: 'The state wraps and the job goes back to `open`.' },
-    {
-      label: 'The fleet',
-      value: 'Starts at Depot 0 on the west wall. The yard between is open floor.',
+        'Stand on it and call `use()` exactly `cost` times, 1 tick each. `power()` does not work on jobs. One `use()` too many sets it back to `open`: it needs all `cost` uses again.',
     },
     {
-      label: 'Load bound',
-      value:
-        "`probe('board').vars.bound` — the longer of the longest single job, or every job plus two ticks of walking shared out across the fleet, plus the walk out from Depot 0.",
+      label: 'Deadline',
+      value: "`probe('board').vars.deadline`. The last bot must stop by this tick.",
     },
     {
-      label: 'The deadline',
+      label: 'Last job',
       value:
-        "`probe('board').vars.deadline` — twice the load bound, posted before anybody moves. The shift is only cleared if the last bot stops on or before it, which no fleet that leaves bots at the depot will manage.",
+        "Print one line, `last <job> <tick>`: the job whose final `use()` came latest, and its bot's clock right after that use.",
     },
     {
-      label: 'Shift report',
+      label: 'Highest-cost jobs',
       value:
-        'One line, `last <job> <tick>`: the job whose final `use()` landed latest — not necessarily the last one you dispatched — and the clock reading of the bot that closed it, straight after that use.',
-    },
-    {
-      label: 'The first wave',
-      value:
-        'A job is begun on the tick of its first `use()`. For the star, the job each bot begins first must be one of the most expensive jobs on the board — one bot to each of them, so a bot that never begins a job costs you the star. Costs are compared, not job ids, so jobs of equal cost are interchangeable.',
+        'With n bots, these are the n jobs with the highest cost. Each bot starts one of them, a different one each. A bot starts a job with its first `use()`. Equal costs count the same. A bot with no job fails this.',
     },
   ],
   seeds: [1, 2, 3, 4, 5],
@@ -429,13 +406,13 @@ export const w7_04: LevelDef = {
   objectives: [
     Objectives.custom(
       'board-clear',
-      'Leave every job on the board done',
+      'Finish every job',
       (ctx) => doneCount(ctx.world) === jobMachines(ctx.initialWorld).length,
       { progress, divergence: unfinishedJob },
     ),
     Objectives.custom(
       'inside-the-deadline',
-      'Stop the last bot inside the deadline the board posts',
+      'The last bot stops by the deadline',
       (ctx) => ctx.trace.endTick <= deadlineIn(ctx.initialWorld),
       {
         progress: (ctx) => {
@@ -451,7 +428,7 @@ export const w7_04: LevelDef = {
   bonus: [
     Objectives.custom(
       'name-the-decider',
-      'Report the job that decided the shift',
+      'Print which job finished last',
       (ctx) => {
         const said = reportedLines(ctx.trace.events, 'last');
         if (said.length !== 1) return false;
@@ -464,27 +441,25 @@ export const w7_04: LevelDef = {
     ),
     Objectives.custom(
       'long-jobs-first',
-      'Put the fleet on the most expensive jobs first',
+      'Each bot starts with one of the highest-cost jobs',
       dearestFirst,
       { divergence: wrongWave },
     ),
   ],
   starter: [
-    '// NOTE(4470): the board is not sorted. it has never been sorted',
-    '// NOTE(4470): the twenty-tick jobs are the ones that decide the shift',
+    '// The jobs are not sorted by cost.',
     '',
     'const board = probe("board");',
     'const jobs = [];',
     'for (let i = 0; i < board.vars.jobs; i++) jobs.push(probe(`job-${i}`));',
-    'print(`${jobs.length} jobs, bound ${board.vars.bound}, deadline ${board.vars.deadline}`);',
+    'print(`${jobs.length} jobs, deadline ${board.vars.deadline}`);',
     '',
   ].join('\n'),
   hints: [
-    'Splitting the board between the bots before anybody moves is one decision made with no information. Deciding one job at a time is many decisions, each made with more.',
-    'Two bots do not become free at the same moment. The interesting question at any point is which one is free soonest, and you can answer it without asking the bot.',
-    'The last job to be started decides when the shift ends. It is much better for that job to be a short one.',
-    'A bot that is nearer to a job finishes it sooner. That matters, but not as much as the number written on the job.',
-    'Every bot is idle at the start, so the opening move is one free choice per bot, made with the whole board already known. Nothing later in the shift is that unconstrained.',
+    'Do not split all the jobs before the start. Give a bot its next job when it becomes free.',
+    'Bots become free at different times. You can work out which bot is free next without asking it.',
+    'The last job to start decides when the shift ends. It is better if that job is short.',
+    'A nearer job finishes sooner. But the cost of the job matters more.',
   ],
   docs: ['bots', 'sync', 'probe', 'use'],
 };

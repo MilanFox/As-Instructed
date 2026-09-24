@@ -67,8 +67,8 @@ const patchReport = (ctx: ObjectiveContext): Divergence => {
   }
   return {
     where: only,
-    expected: 'the segment the run goes dead at',
-    received: 'patched, and it is not that one',
+    expected: 'the broken relay',
+    received: 'patched, but it is not broken',
   };
 };
 
@@ -79,39 +79,25 @@ export const w5_02: LevelDef = {
   title: 'Continuity Test',
   hardware: ['power'],
   brief: [
-    '**MEMO KD-2491**',
-    '**FROM:** Dep. Coordinator M. Vance\\',
-    '**RE:** Feeder run 12, discontinuity',
+    'One relay in 200 is broken. Every probe costs money, the office pays for ten, and it would be delighted by fewer. — M. Vance',
     '',
-    'One segment of feeder run 12 has failed. The test set is rated for the number of',
-    'readings it is rated for; no one upstairs will be drawn further. Metering bills the',
-    'set by the reading.',
-    '',
-    'Find the broken segment and patch it.',
+    '**Find the one broken relay among 200 and patch it.**',
   ].join('\n'),
   facts: [
     {
-      label: 'The run',
-      value: '`relay-0` through `relay-199`, in order, from the reactor outward.',
-    },
-    {
-      label: 'A reading',
+      label: 'Relays',
       value:
-        '`probe(id).vars.live` is `1` while the run is still whole that far and `0` once it is not. The first `0` is the break.',
+        '`relay-0` to `relay-199`, in order from the reactor. `vars.live` is `1` before the break and `0` from the break on. The break can be at any relay, even the first or the last.',
     },
     {
-      label: 'The patch',
+      label: 'Broken relay',
       value:
-        '`power(id, "patched")`, 2 ticks. **Exactly one relay may end up patched, and it must be the broken one.**',
+        'The first relay with `live` at `0`. Patch it with `power(id, "patched")`, 2 ticks. Patch no other relay.',
     },
     {
-      label: 'Readings',
+      label: 'Probes',
       value:
-        'Ten `probe` calls for the whole shift, whatever you point them at. Nothing else reports continuity.',
-    },
-    {
-      label: 'The star',
-      value: 'Find the break and patch it on eight `probe` calls or fewer.',
+        'Probes cost no ticks. Every `probe` call counts, whatever it reads. Only `probe` shows `live`.',
     },
   ],
   seeds: [1, 2, 3, 4, 5],
@@ -161,7 +147,7 @@ export const w5_02: LevelDef = {
   objectives: [
     Objectives.custom(
       'patched',
-      'Patch the broken segment, and only that one',
+      'Patch the broken relay and no other',
       (ctx) => {
         const broken = `relay-${ctx.world.vars.breakAt ?? -1}`;
         const patched = patchedIds(ctx.world);
@@ -178,25 +164,19 @@ export const w5_02: LevelDef = {
       },
     ),
     Objectives.withinSenses('probe', 10, {
-      label: 'Locate the break using at most 10 probes',
+      label: 'Use at most 10 probes',
     }),
   ],
   bonus: [
     Objectives.withinSenses('probe', 8, {
-      label: 'Locate the break using at most 8 probes',
+      label: 'Use at most 8 probes',
     }),
   ],
-  starter: [
-    '// Ten probes, and only the broken relay may be patched.',
-    '',
-    'let low = 0;',
-    'let high = 199;',
-    '',
-  ].join('\n'),
+  starter: ['// Ten probes. Patch only the broken relay.', ''].join('\n'),
   hints: [
-    'A reading does not only tell you about the segment you pointed at. It tells you which side of it the break is on.',
-    'Two hundred segments and ten readings. Work out how much of the run one reading has to eliminate for that to be enough, and it will be more than one segment.',
-    'The readings run 1, 1, 1, ... then 0, 0, 0, and never go back. You are looking for the place they change, and you can always ask about the middle of whatever is left.',
+    'One probe tells you which side of that relay the break is on.',
+    '200 relays and 10 probes. Each probe must rule out much more than one relay.',
+    'The values go 1, 1, 1, then 0, 0, 0. Probe the middle of the part that is left.',
   ],
   docs: ['probe', 'power'],
 };

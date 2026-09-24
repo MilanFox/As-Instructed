@@ -256,7 +256,7 @@ describe('what the router announces and what it leaves behind', () => {
     expect(region()?.textContent).toBe('Site map.');
 
     useGame.getState().openLevel(DEEP);
-    expect(region()?.textContent).toBe(`Work order ${DEEP} is on hold.`);
+    expect(region()?.textContent).toBe(`Level ${DEEP} is on hold.`);
     detach();
   });
 

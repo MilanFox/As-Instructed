@@ -254,17 +254,17 @@ function orderFault(ctx: ObjectiveContext): Divergence | undefined {
   const filed = notesUnder(ctx, ORDER_NOTE);
   if (filed.length === 0) {
     return {
-      where: 'the filing',
-      expected: 'a line `order sub-<n>` per station',
+      where: 'the order note',
+      expected: 'a line `order sub-<n>` per substation',
       received: NOTHING,
     };
   }
   const late = filed.filter((note) => !note.filedEarly).length;
   if (late > 0) {
     return {
-      where: 'the filing',
-      expected: 'every line before the first step',
-      received: `${String(late)} filed after it`,
+      where: 'the order note',
+      expected: 'every line before the first move',
+      received: `${String(late)} printed after it`,
     };
   }
 
@@ -276,17 +276,17 @@ function orderFault(ctx: ObjectiveContext): Divergence | undefined {
       return {
         where: clipValue(note.text === '' ? NOTHING : note.text),
         expected: 'a substation on the grid',
-        received: 'nothing on the site answers to that',
+        received: 'no such substation',
       };
     }
     if (seen.has(note.text)) {
-      return { where: note.text, expected: 'one line each', received: 'filed twice' };
+      return { where: note.text, expected: 'one line each', received: 'printed twice' };
     }
     seen.add(note.text);
   }
   const left = stations.find((machine) => !seen.has(machine.id));
   if (left) {
-    return { where: left.id, expected: 'a line in the filing', received: 'left off it' };
+    return { where: left.id, expected: 'a line in the order note', received: 'left off it' };
   }
 
   const place = new Map(filed.map((note, index) => [note.text, index]));
@@ -295,8 +295,8 @@ function orderFault(ctx: ObjectiveContext): Divergence | undefined {
       if ((place.get(feeder) ?? -1) > (place.get(machine.id) ?? -1)) {
         return {
           where: `${machine.id} · feeder ${feeder}`,
-          expected: 'the feeder filed above it',
-          received: 'filed below it',
+          expected: 'its feeder listed before it',
+          received: 'listed after it',
         };
       }
     }
@@ -310,14 +310,14 @@ function orderFault(ctx: ObjectiveContext): Divergence | undefined {
       return {
         where: note.text,
         expected: 'a use() at the tile',
-        received: 'filed, and then never used',
+        received: 'listed, but never used',
       };
     }
     if (thrown < ahead.t - TIE_SLACK) {
       return {
-        where: clipValue(`${ahead.id} · filed above ${note.text}`),
-        expected: `thrown at tick ${String(thrown + TIE_SLACK)} or earlier`,
-        received: `thrown at tick ${String(ahead.t)}`,
+        where: clipValue(`${ahead.id} · listed before ${note.text}`),
+        expected: `switched on by tick ${String(thrown + TIE_SLACK)}`,
+        received: `switched on at tick ${String(ahead.t)}`,
       };
     }
     if (thrown > ahead.t) ahead = { id: note.text, t: thrown };
@@ -330,25 +330,29 @@ function finishFault(ctx: ObjectiveContext): Divergence | undefined {
   const note = posted[0];
   if (note === undefined) {
     return {
-      where: 'the note',
+      where: 'the finish note',
       expected: 'a line reading `finish <tick>`',
       received: NOTHING,
     };
   }
   if (posted.length > 1) {
-    return { where: 'the note', expected: 'one line', received: `${String(posted.length)} lines` };
+    return {
+      where: 'the finish note',
+      expected: 'one line',
+      received: `${String(posted.length)} lines`,
+    };
   }
   if (!note.filedEarly) {
     return {
-      where: 'the note',
-      expected: 'posted before the first step',
-      received: 'posted after the fleet had moved',
+      where: 'the finish note',
+      expected: 'printed before the first move',
+      received: 'printed after a bot moved',
     };
   }
   const claim = Number(note.text);
   if (!Number.isInteger(claim)) {
     return {
-      where: 'the note',
+      where: 'the finish note',
       expected: 'a line reading `finish <tick>`',
       received: clipValue(note.text === '' ? NOTHING : note.text),
     };
@@ -357,15 +361,15 @@ function finishFault(ctx: ObjectiveContext): Divergence | undefined {
   if (up < 0) {
     return {
       where: 'the grid',
-      expected: 'a station energised at some tick',
+      expected: 'a substation switched on',
       received: 'none was ever used',
     };
   }
   if (Math.abs(claim - up) > FINISH_SLACK) {
     return {
-      where: 'the tick posted',
-      expected: `the grid came up at tick ${String(up)}`,
-      received: `the note says tick ${String(claim)}`,
+      where: 'the finish note',
+      expected: `last one finished at tick ${String(up)}`,
+      received: `printed tick ${String(claim)}`,
     };
   }
   return undefined;
@@ -378,82 +382,49 @@ export const w8_03: LevelDef = {
   title: 'The Grid Goes Down',
   hardware: [],
   brief: [
-    '**MEMO KD-2833**',
-    '**FROM:** Dep. Coordinator M. Vance\\',
-    '**RE:**   Grid restart',
+    'The grid is down and every bot is in the yard. Procurement wants the switch-on order first, and Finance wants your finish time, also first. — M. Vance',
     '',
-    'The grid is down. Restarting it is a sequencing matter, not an engineering one, and the',
-    'whole fleet is already standing in the yard.',
-    '',
-    'Procurement want the running order filed before anyone moves, and Finance want the tick you',
-    'will finish on the same note; they costed the shift without asking.',
-    '',
-    'Energise every substation before the shift ends.',
+    '**With several bots, switch on every substation, each after its feeders, before the shift ends.**',
   ].join('\n'),
   board: {
-    fixed: [
-      'the plain is 30 by 22 inside its wall and open; the cable on the ground is walkable',
-      'the whole fleet starts in the yard around the desk, on the west wall',
-      'every substation tile is east of the yard, and they are kept apart from one another',
-      'the layout and the feeder lists are settled before the shift starts and never change',
-      'the station numbers are not an energising order: on every shift some station is fed by one numbered above it',
-      'the desk posts the shift alongside the station count, in the same read',
-    ],
     redrawn: [
-      'how many substations, fourteen to twenty',
-      'how many bots, four to eight',
-      'the shape of the grid — one shift is a single chain of feeders, another is three bands deep',
-      'which stations feed which',
-      'where the station tiles sit on the plain',
-      'the shift Finance allocates, since it is a function of the two above',
+      'number of substations, 14 to 20',
+      'number of bots, 4 to 8',
+      'grid shape: from one long chain to three layers',
+      'which substations feed which',
+      'where the substations are',
+      'the shift length, which follows from the two above',
     ],
   },
   facts: [
     {
-      label: 'The desk',
+      label: 'Desk',
       value:
-        '`probe("desk")`. Its `vars.stations` is how many substations there are, named `sub-0` up to `sub-<n-1>`, and its `vars.shift` is how many ticks Finance allocated.',
+        'Probe it. `vars.stations` is the substation count (`sub-0` to `sub-<n-1>`). `vars.shift` is the shift length in ticks. The clock stops when the last bot stops.',
     },
     {
-      label: 'The shift',
-      value:
-        'Overrunning `vars.shift` fails the work order. It is set from the grid — the longest chain of feeders and the round the busiest bot has to walk — so it moves with the layout.',
-    },
-    {
-      label: 'A station',
-      value:
-        '`probe(id)` reads any machine from anywhere and costs no ticks. Nothing but a station state changes while you run, so one read of each is all the grid has to give.',
+      label: 'Substations',
+      value: 'A probe reads any substation from anywhere, for free. The whole yard is walkable.',
     },
     {
       label: 'Feeders',
       value:
-        '`vars.deps` is how many stations feed this one. `vars.dep0`, `vars.dep1` … hold their numbers, so `dep0: 3` means `sub-3` feeds it.',
+        '`vars.deps` is how many substations feed this one. `vars.dep0`, `vars.dep1` … are their numbers: `dep0: 3` means `sub-3` feeds it. A substation may **start** only after all its feeders **finish**: a `use` at tick 40 finishes at 42, so starting at 42 is fine and 41 is not. Lower numbers do not always come first.',
     },
     {
-      label: 'Energising',
+      label: 'Switching on',
       value:
-        'Stand on the station tile and call `use()`. Two ticks. The cycle is `off, on` and it wraps, so a second use turns it back off. Every station is hand-operated — `power()` reaches none of them, and `vars.manual` is 1 on every one.',
+        'Stand on the substation and call `use()`. It takes 2 ticks. A second `use` switches it off again. `power()` does not work here.',
     },
     {
-      label: 'The order rule',
+      label: 'Order note',
       value:
-        'A station may not **start** until every feeder has **finished**. A `use` at tick 40 finishes at 42, so 42 is legal and 41 is not. Read off the log, not the final state.',
+        'Before any bot moves, print `order sub-<n>` once per substation, feeders first. Then switch them on in that order. Only the first `use()` at each substation counts for the order. Two starts within 2 ticks of each other may come in either order.',
     },
     {
-      label: 'The plain',
+      label: 'Finish time',
       value:
-        'Open. The cable on the ground is walkable. The layout and the feeder lists are fixed before the shift starts — the only thing that changes while you run is a station state.',
-    },
-    { label: 'Your score', value: 'The clock stops when the last bot stops.' },
-    {
-      label: 'The running order',
-      value:
-        'The first bonus. Before any bot moves, `print` one line per station reading `order sub-<n>`, in the order you mean to energise them — every station, once each. The run then has to come up in that order, read off the tick of the first `use()` at each tile. Two stations thrown within 2 ticks of each other count as tied, and a tie passes.',
-    },
-    {
-      label: 'The finish note',
-      value:
-        'The second bonus. One more line before any bot moves, `finish <tick>`: the tick the last station to come up finishes its first `use()`. Switching a station off and on again later does not move it. Anything within 2 ticks of the real one is filed correctly. Both notes are read off the whole fleet’s log, so it does not matter which bot prints them.',
+        "Before any bot moves, print `finish <tick>`: the tick the last substation's first `use()` finishes. Within 2 ticks passes. Any bot may print the order and finish lines.",
     },
   ],
   seeds: [1, 2, 3, 4, 5],
@@ -529,7 +500,7 @@ export const w8_03: LevelDef = {
   objectives: [
     Objectives.custom(
       'grid-live',
-      'Leave every substation energised',
+      'Leave every substation on',
       (ctx) => allEnergised(ctx) === stationsOf(ctx.world).length,
       {
         progress: (ctx) => [allEnergised(ctx), stationsOf(ctx.world).length],
@@ -538,7 +509,7 @@ export const w8_03: LevelDef = {
           if (!dark) return undefined;
           return {
             where: `${dark.id} at (${String(dark.at.x)}, ${String(dark.at.y)})`,
-            expected: 'on, switched by a use() at the tile',
+            expected: 'on, switched by use() on its tile',
             received: dark.reason,
           };
         },
@@ -546,7 +517,7 @@ export const w8_03: LevelDef = {
     ),
     Objectives.custom(
       'precedence-held',
-      'Start no station before every feeder it hangs off has finished',
+      'Start no substation before its feeders finish',
       (ctx) => breachesIn(ctx).length === 0,
       {
         progress: (ctx) => {
@@ -567,7 +538,7 @@ export const w8_03: LevelDef = {
     ),
     Objectives.custom(
       'within-shift',
-      'Finish the whole grid inside the shift the desk posts',
+      'Finish within the shift length on the desk',
       (ctx) => ctx.trace.endTick <= deadlineFor(ctx.initialWorld),
       {
         progress: (ctx) => [ctx.trace.endTick, deadlineFor(ctx.initialWorld)],
@@ -580,23 +551,22 @@ export const w8_03: LevelDef = {
   bonus: [
     Objectives.custom(
       'file-the-order',
-      'File the running order before the first step, and energise in it',
+      'Print the order note before moving, then follow it',
       (ctx) => orderFault(ctx) === undefined,
       { divergence: orderFault },
     ),
     Objectives.custom(
       'call-the-clock',
-      `Post when the grid comes up before the first step, inside ${String(FINISH_SLACK)} of the real finish`,
+      `Print the finish time before moving, within ${String(FINISH_SLACK)} of the real finish`,
       (ctx) => finishFault(ctx) === undefined,
       { divergence: finishFault },
     ),
   ],
   starter: [
+    '// If you published these to lib.ts, you can import them:',
     "// import { waves, deal, pathTo } from 'lib';",
-    '// The desk publishes how many substations there are and how long the shift is.',
-    '// Each station publishes its own feeders.',
-    '// NOTE(4470): the grid went down the night i switched my code off. it was not a fault',
-    '// NOTE(4470): two bots at one station finish no sooner than one',
+    '// The desk gives the substation count and shift length; each substation lists its feeders.',
+    '// NOTE(4470): two bots at one substation finish no sooner than one',
     '',
     'const count = probe("desk").vars.stations;',
     'for (let i = 0; i < count; i++) {',
@@ -606,10 +576,10 @@ export const w8_03: LevelDef = {
     '',
   ].join('\n'),
   hints: [
-    'Two bots given orders one after the other do not take turns. They spend the same ticks. The only thing that makes one bot wait for another is a wait or a sync you wrote.',
-    'A feeder list is not a queue. Read every station before anyone moves. Ask which stations have nothing feeding them, then which have nothing left unfinished above them, and so on down.',
-    'A bot sitting on its station with nothing to do is cheaper than a bot walking. Decide who goes where before anyone leaves the yard.',
-    'The grid is fixed the moment the shift starts. Reading a station to find out whether it came up yet tells you nothing you did not already know.',
+    'Bots do not take turns. Commands to two bots run in the same ticks. Only wait or sync makes one bot wait.',
+    'Read every substation before anyone moves. First find substations with no feeders, then those whose feeders are all done, and so on.',
+    'Waiting on a substation takes fewer ticks than walking. Plan who goes where before anyone leaves the yard.',
+    'The grid never changes on its own. You never need to check whether a substation came on.',
   ],
   docs: ['probe', 'use', 'bots', 'wait', 'sync', 'print'],
 };

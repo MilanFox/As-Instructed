@@ -275,6 +275,16 @@ describe('the flaps stay reachable', () => {
         ]).toEqual([`${name} right edge at ${String(width)}px`, true]);
       });
 
+      test(`an open flyout's ${name} stands past its edge at ${String(width)}px`, () => {
+        const offset = px(custom('--ws-handle-x', width, true) ?? '0px', width, true);
+        const flyout = px(custom('--ws-flyout', width, true) ?? '0px', width, true);
+
+        expect([`${name} at ${String(width)}px`, offset >= flyout]).toEqual([
+          `${name} at ${String(width)}px`,
+          true,
+        ]);
+      });
+
       test(`a shut flyout leaves ${name} on screen at ${String(width)}px`, () => {
         const offset = px(custom('--ws-handle-x', width, false) ?? '0px', width, false);
         const flap = px(resolve(selector, 'width', width) ?? '0px', width, false);
@@ -326,6 +336,9 @@ const FOLDED_AWAY_AT_COMPACT = [
   "reflow @900 .work-order[data-open='false'] .stat-grid",
 ] as const;
 
+// The brief page repeats the objectives for phones only.
+const FOLDED_IN_THE_BRIEF = ['drawer @any .dossier-section--objectives'] as const;
+
 const carriesTheMap = (selector: string): boolean => {
   const last = selector.split(' ').at(-1) ?? '';
   return /^(?:\.workspace(?:\[[^\]]*\])?|\.workspace__map|#board|canvas)$/.test(last);
@@ -348,7 +361,7 @@ describe('the map is never taken off the screen', () => {
   test('the only display: none in the promoted sheets is the folded-away work order', () => {
     const hidden = RULES.filter((rule) => HIDDEN_BY[0][1].test(rule.body)).map(where);
 
-    expect(hidden).toEqual([...FOLDED_AWAY_AT_COMPACT]);
+    expect(hidden).toEqual([...FOLDED_IN_THE_BRIEF, ...FOLDED_AWAY_AT_COMPACT]);
   });
 
   test('the map is a full-bleed layer underneath every overlay', () => {

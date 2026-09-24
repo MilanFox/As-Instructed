@@ -150,7 +150,7 @@ describe('w5-01 order-declared', () => {
       const stations = mainsLayout(seed).names.length;
       const run = orderStar(seed, (text) => text.split(' ').slice(0, -1).join(' '));
       expect(run.star.met, `seed ${String(seed)}`).toBe(false);
-      expect(run.star.divergence?.where, `seed ${String(seed)}`).toBe(`latch ${String(stations)}`);
+      expect(run.star.divergence?.where, `seed ${String(seed)}`).toBe(`switch ${String(stations)}`);
       expect(run.star.divergence?.expected, `seed ${String(seed)}`).toBe('the list to end here');
     }
   });
@@ -161,7 +161,7 @@ describe('w5-01 order-declared', () => {
       const byLabel = Array.from({ length: count }, (_, k) => `sub-${String(k + 1)}`).join(' ');
       const run = orderStar(seed, () => byLabel);
       expect(run.star.met, `seed ${String(seed)}`).toBe(false);
-      expect(run.star.divergence?.where, `seed ${String(seed)}`).toMatch(/^latch \d+$/);
+      expect(run.star.divergence?.where, `seed ${String(seed)}`).toMatch(/^switch \d+$/);
     }
   });
 
@@ -184,7 +184,7 @@ describe('w5-01 order-declared', () => {
         ORDER_STAR,
       );
       expect(star.met, `seed ${String(seed)}`).toBe(false);
-      expect(star.divergence?.received, `seed ${String(seed)}`).toBe('the bot stepped off first');
+      expect(star.divergence?.received, `seed ${String(seed)}`).toBe('the bot moved first');
     }
   });
 

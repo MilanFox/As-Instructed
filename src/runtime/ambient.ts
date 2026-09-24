@@ -3,14 +3,16 @@ import {
   PLAYER_API,
   apiUnlockedBy,
   botHandleDeclaration,
+  docFor,
+  hasCrew,
   perBotApi,
   renderParams,
 } from './api-spec.ts';
 
 const DTS_HEADER = [
-  '// AS INSTRUCTED — bot firmware API.',
+  '// AS INSTRUCTED — bot commands.',
   '// Generated from src/runtime/api-spec.ts. Do not edit; it is rebuilt on every level load.',
-  '// Only the hardware installed on this bot is declared here.',
+  '// Only the commands this level has are declared here.',
 ].join('\n');
 
 export function unlockedApiNames(levelId: string): string[] {
@@ -51,7 +53,7 @@ export function renderSignature(fn: ApiFunctionSpec): string {
 }
 
 function costLine(cost: number | string): string {
-  if (cost === 0) return 'Free: costs no ticks, but still counts against the instruction budget.';
+  if (cost === 0) return 'Free: costs no ticks. It still counts toward the instruction limit.';
   if (cost === 1) return 'Costs 1 tick.';
   if (typeof cost === 'number') return `Costs ${cost} ticks.`;
   return `Costs \`${cost}\` ticks.`;
@@ -61,8 +63,8 @@ function safeForJsDoc(text: string): string {
   return text.replace(/\*\//g, '*\\/');
 }
 
-function jsDoc(fn: ApiFunctionSpec): string {
-  const lines: string[] = [fn.doc, '', costLine(fn.cost)];
+function jsDoc(fn: ApiFunctionSpec, crew: boolean): string {
+  const lines: string[] = [docFor(fn, crew), '', costLine(fn.cost)];
 
   for (const param of fn.params) {
     const parts = [param.doc];
@@ -96,15 +98,17 @@ export function typeDeclarationFor(
 export function buildAmbientDts(unlockedHardware: string[]): string {
   const functions = apiFunctionsFor(unlockedHardware);
   const types = requiredTypesFor(functions);
+  const crew = hasCrew(functions);
+  const docOf = (fn: ApiFunctionSpec): string => jsDoc(fn, crew);
 
   const blocks: string[] = [DTS_HEADER];
 
   for (const type of types) {
-    blocks.push(`${jsDocForType(type)}\n${typeDeclarationFor(type, functions, jsDoc)}`);
+    blocks.push(`${jsDocForType(type)}\n${typeDeclarationFor(type, functions, docOf)}`);
   }
 
   for (const fn of functions) {
-    blocks.push(`${jsDoc(fn)}\n${renderSignature(fn)}`);
+    blocks.push(`${docOf(fn)}\n${renderSignature(fn)}`);
   }
 
   return `${blocks.join('\n\n')}\n`;

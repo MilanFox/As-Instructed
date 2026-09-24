@@ -405,40 +405,44 @@ function misreadPlan(ctx: ObjectiveContext): Divergence {
   const line = said[0];
   if (line === undefined) {
     return {
-      where: 'the reading',
-      expected: 'a line reading `plan <cipher> <legs>`',
+      where: 'the plan line',
+      expected: 'a line `plan <key> <legs>`',
       received: NOTHING,
     };
   }
   if (said.length > 1) {
-    return { where: 'the reading', expected: 'one line', received: `${String(said.length)} lines` };
+    return {
+      where: 'the plan line',
+      expected: 'one line',
+      received: `${String(said.length)} lines`,
+    };
   }
   const claim = readPlanNote(line);
   if (claim === null) {
     return {
-      where: 'the reading',
-      expected: 'a line reading `plan <cipher> <legs>`',
+      where: 'the plan line',
+      expected: 'a line `plan <key> <legs>`',
       received: clipValue(line),
     };
   }
   const survey = surveyFor(ctx.initialWorld.vars.seed ?? 1);
   if (claim.cipher !== survey.cipherKey) {
     return {
-      where: 'the cipher',
-      expected: 'the shift every filed packet adds up under',
-      received: `shift ${String(claim.cipher)} of the ninety-five`,
+      where: 'the key',
+      expected: 'the key every real packet checks under',
+      received: `key ${String(claim.cipher)} of 95`,
     };
   }
   if (claim.legs !== survey.legs.length) {
     return {
       where: 'the plan',
-      expected: 'the legs the filed sections describe',
+      expected: 'the leg count of the real packets',
       received: `${String(claim.legs)} legs`,
     };
   }
   return {
     where: 'KD-0001-T at the end of the run',
-    expected: 'in the bot, under the filed note',
+    expected: 'held by the bot',
     received: clipValue(formStanding(ctx)),
   };
 }
@@ -450,7 +454,7 @@ const holdsForm = (ctx: ObjectiveContext): boolean => {
 
 function formStanding(ctx: ObjectiveContext): string {
   for (const bot of ctx.world.bots) {
-    if (inventoryCount(bot, ItemKind.Chip) > 0) return `in the hold of ${bot.name}`;
+    if (inventoryCount(bot, ItemKind.Chip) > 0) return `held by ${bot.name}`;
   }
   const loose = ctx.world.items.find((stack) => stack.kind === ItemKind.Chip && stack.count > 0);
   if (loose === undefined) return 'nowhere on the site';
@@ -501,15 +505,15 @@ function strayed(ctx: ObjectiveContext): Divergence {
   const first = stray[0];
   if (first === undefined) {
     return {
-      where: 'the far end of the filed route',
+      where: 'the locker at the end of the route',
       expected: 'the bot standing on it',
       received: 'the run stopped short',
     };
   }
   return {
     where: `tick ${String(first.t)} · ${point(first.at)}`,
-    expected: 'a tile the filed route covers',
-    received: clipValue(`${String(stray.length)} tiles in the old workings`),
+    expected: 'a tile on the route',
+    received: clipValue(`${String(stray.length)} tiles off the route`),
   };
 }
 
@@ -520,91 +524,70 @@ export const w8_04: LevelDef = {
   title: 'Signal from 4470',
   hardware: [],
   brief: [
-    '**MEMO KD-2840**',
-    '**FROM:** Dep. Coordinator M. Vance\\',
-    '**CC:** Contractor #4470\\',
-    '**RE:** Countersignature',
+    '#4470 radioed this route a year ago. Keep to it, because the rest is unsafe, and tell me his key and the number of legs. — M. Vance',
     '',
-    'A locker down one of the workings holds an unsigned form and a spare chair caster. #4470',
-    'filed the route eleven months ago; most of it is still true. The rest of the site is logged',
-    'unsafe, so keep to his route and nobody has to write you up.',
-    '',
-    'Bring the form up, and tell me what shift he filed under and how many legs he filed. Nobody',
-    'here can read the band.',
+    "**End the run holding form KD-0001-T. #4470's radio route leads to its locker.**",
   ].join('\n'),
   board: {
-    fixed: [
-      'the site is 28 by 28 of rock inside the wall, and the lift is the only way in',
-      'RIG-11 starts on the lift, and section 0 of the plan starts there too',
-      'no two corridors ever run side by side, so there is one route to any tile and a wrong turn is a walk back',
-      'the old workings are dead ends: no working joins the route twice, or joins another working',
-      'every working ends in a locker, and the form is in the one the plan leads to',
-      'a fall never seals the route, and the way round is six moves longer than the stretch it replaces',
-    ],
     redrawn: [
-      'where the route runs, and which of the ninety-five shifts the traffic was filed under',
-      'how many groups of moves the plan describes',
-      'how much of the plan has gone stale',
-      'how many decoy packets are on the band',
-      'which locker id names which working',
-      'where the old workings run, and how far in they go',
+      'the route, and which of the 95 keys was used',
+      'how many legs the route has',
+      'how many legs are blocked',
+      'how many fake packets are on the radio',
+      'which locker id belongs to which tunnel',
+      'where the side tunnels run and how long they are',
     ],
   },
   facts: [
     {
-      label: 'The band',
-      value: '`antenna` is live at the lift. `receive()` returns the next packet, or `null`.',
+      label: 'Radio',
+      value: 'The bot starts on the lift. `receive()` there returns the next packet, or `null`.',
     },
-    { label: 'Packet', value: '`KD4470|SEC|<n>|<route>|<checksum>`' },
+    {
+      label: 'Packet',
+      value:
+        'Decoded, it reads `KD4470|SEC|<n>|<route>|<checksum>`. `<n>` is the section number. Packets come in any order.',
+    },
     {
       label: 'Checksum',
       value:
-        'The character codes of everything before the final `|`, added up, modulo 1000. Traffic that does not add up is not the plan.',
+        'On the decoded packet: sum of the character codes before the last `|`, modulo 1000. A wrong checksum means a fake packet.',
     },
     {
-      label: 'The cipher',
+      label: 'Packet key',
       value:
-        'The whole packet is Caesar-shifted over printable ASCII by one number from 0 to 94. `decode(text, key)` undoes it.',
+        'All packets use one key, a number from 0 to 94. Each character moves that far through printable ASCII. `decode(text, key)` reverses it.',
     },
     {
-      label: '`<route>`',
+      label: 'Route',
       value:
-        'A count then `N`, `E`, `S` or `W`, groups run together. Section 0 starts at the lift; each section starts where the last one ended.',
+        'Legs, each a count then `N`, `E`, `S` or `W`. Section 0 starts at the lift; each section starts where the one before ended.',
     },
     {
-      label: 'The lockers',
+      label: 'Lockers',
       value:
-        '`locker-0` upwards, one per working. `probe(id)` finds any of them from anywhere, and the numbering is shuffled every shift.',
+        '`locker-0` and up, shuffled per board. A probe finds any from anywhere. Scan or look reads its mark: the form number and whether it is signed.',
     },
     {
-      label: 'A locker tile',
+      label: 'Form',
       value:
-        'Carries the locker machine and a stencil giving the form number and whether it is signed. `scan(dir).mark` reads the stencil back as a string; `look` reports it too, so a locker can be read without standing on it.',
+        'KD-0001-T lies on the locker tile at the end of the route. `pickup()` takes it. That it is unsigned does not matter here.',
     },
     {
-      label: 'The form',
+      label: 'Rock falls',
       value:
-        'KD-0001-T is an item lying on the tile of the locker the plan leads to. `pickup()` takes it — nothing about the locker machine has to be used.',
+        'Rock blocks up to 5 legs, maybe none. The route does not show falls. The end tile of every leg is still right. Every fall has a way around it that leaves and rejoins the leg, 6 moves longer than the straight way.',
     },
     {
-      label: 'The workings',
+      label: 'Tunnels',
       value:
-        'No two corridors ever run side by side, so there is exactly one way from the lift to any tile on the site.',
+        'No two tunnels touch side by side. Apart from the ways around rock falls, there is one path to any tile. Side tunnels leave the route once, never meet each other, and each ends in a locker.',
     },
+    { label: 'Rock', value: 'Moving into rock goes nowhere and still costs a tick.' },
     {
-      label: 'What changed',
+      label: 'Plan line',
       value:
-        'How much of the plan has gone stale changes from shift to shift: none of it on a good one, five groups of moves in twelve on the worst. There is always a way round a fall, six moves longer than the stretch it replaces, and the plan does not know about either.',
-    },
-    {
-      label: 'Still true',
-      value: 'Everywhere else, including where each group of moves was meant to finish.',
-    },
-    { label: 'A move into rock', value: 'Goes nowhere and still costs a tick.' },
-    {
-      label: 'The reading',
-      value:
-        'One line, `plan <cipher> <legs>`: the shift the filed traffic decodes under, and how many groups of moves the plan describes once the decoys are thrown away. Neither is anywhere in the workings. The note is read only on a shift that brings KD-0001-T up.',
+        'Print one line `plan <key> <legs>`: the key, and the total number of legs in all real packets. It counts only if the bot ends holding KD-0001-T.',
     },
   ],
   seeds: [1, 2, 3, 4, 5],
@@ -612,38 +595,30 @@ export const w8_04: LevelDef = {
   budget: { maxTicks: 3000 },
   build,
   objectives: [
-    Objectives.custom(
-      'form-recovered',
-      'Finish the shift holding KD-0001-T, wherever the bot is standing',
-      holdsForm,
-      {
-        divergence: (ctx) => ({
-          where: 'KD-0001-T at the end of the run',
-          expected: 'in the bot',
-          received: clipValue(formStanding(ctx)),
-        }),
-      },
-    ),
+    Objectives.custom('form-recovered', 'End the run holding KD-0001-T', holdsForm, {
+      divergence: (ctx) => ({
+        where: 'KD-0001-T at the end of the run',
+        expected: 'in the bot',
+        received: clipValue(formStanding(ctx)),
+      }),
+    }),
   ],
   bonus: [
-    Objectives.custom(
-      'read-the-plan',
-      'Report the shift the plan was filed under and its leg count, holding KD-0001-T',
-      planRead,
-      { divergence: misreadPlan },
-    ),
+    Objectives.custom('read-the-plan', 'Print the plan line: the key and the leg count', planRead, {
+      divergence: misreadPlan,
+    }),
     Objectives.custom(
       'walk-the-plan',
-      'Reach the locker standing only on the filed route and the ways round its falls',
+      'Reach the locker using only the route and the ways around rock falls',
       walkedTheRoute,
       { divergence: strayed },
     ),
   ],
   starter: [
+    '// If you published these to lib.ts, you can import them:',
     "// import { findKey, unpack, reach } from 'lib';",
-    '// NOTE(4470): the route below was true when i filed it. some of it still is',
-    '// TODO(4470): whoever gets this. the form is in the locker. it is not signed',
-    '// TODO(4470): i could not sign it. read the charter and you will see why',
+    '// NOTE(4470): the route was true when i sent it. some of it still is',
+    '// TODO(4470): the form is in the locker. it is not signed. read the charter and you will see why',
     '',
     'let packet = receive();',
     'while (packet !== null) {',
@@ -653,12 +628,11 @@ export const w8_04: LevelDef = {
     '',
   ].join('\n'),
   hints: [
-    'The band is not the puzzle. You have decoded a shifted, checksummed stream before, and this one is in the same format.',
-    'The plan is a description of the tunnel as it was. Every claim it makes can be checked before you act on it, and checking costs nothing.',
-    'A group of moves says two things: how to get somewhere, and where you end up. Only one of those has stopped being true.',
-    'When the way is shut, you already know where you were trying to get to. That turns a lost run into a short local problem.',
-    'Throwing the plan away is a correct program. Count how much of the workings it makes you walk.',
-    'Nothing in the tunnel will ever tell you what shift the traffic came in under. The only thing that knows is the checksum, and there are only ninety-five things to ask it.',
+    'Packets use a key and a checksum, as on earlier radio jobs.',
+    'Look along each leg before you walk it. Looking costs nothing.',
+    'When a leg is blocked, you still know its end tile. Find a short way around to it.',
+    'Ignoring the route also works, but you walk far more of the tunnels.',
+    'Only the checksum can tell you the key. There are only 95 keys to try.',
   ],
   docs: ['decode', 'receive', 'probe', 'look', 'canMove', 'pickup'],
 };

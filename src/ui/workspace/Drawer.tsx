@@ -31,7 +31,7 @@ export function Drawer({
     <section
       className="flyout drawer"
       id="workspace-drawer"
-      aria-label="Workbench"
+      aria-label="Side panel"
       data-on={String(on)}
       {...(on ? {} : { inert: true })}
     >
@@ -80,6 +80,7 @@ export function Drawer({
             reference={workspace.reference}
             types={workspace.types}
             legend={workspace.legend}
+            guideIds={workspace.guideIds}
           />
         </div>
       </div>
@@ -90,11 +91,11 @@ export function Drawer({
           className={running ? 'control control--stop' : 'control control--go'}
           onClick={running ? workspace.cancel : onRun}
         >
-          {running ? 'Cancel' : 'Dispatch ⌘⏎'}
+          {running ? 'Cancel' : 'Run ⌘⏎'}
         </button>
         <span className="readout readout--dim">
           {problems > 0 ? `${String(problems)} problem${problems === 1 ? '' : 's'} · ` : ''}
-          {last ? last.text : 'nothing on the wire'}
+          {last ? last.text : 'No output yet.'}
         </span>
       </div>
     </section>

@@ -188,8 +188,7 @@ export async function compilePlayerCode(
       ok: false,
       diagnostics,
       error: compileFailure(
-        'The compiler could not produce a program from this source. Check for an unclosed brace ' +
-          'or bracket.',
+        'Your program could not be compiled. Check for a missing closing brace or bracket.',
       ),
     };
   }
@@ -276,11 +275,11 @@ function laterHardware(diagnostic: CompileDiagnostic): CompileDiagnostic {
     return {
       ...diagnostic,
       severity: 'warning',
-      message: `\`${name}()\` is not installed until level ${fn.unlockedBy}.`,
+      message: `\`${name}()\` is not available until level ${fn.unlockedBy}.`,
     };
   }
   if (PLAYER_API.types.some((type) => type.name === name)) {
-    return { ...diagnostic, severity: 'warning', message: `\`${name}\` is not installed yet.` };
+    return { ...diagnostic, severity: 'warning', message: `\`${name}\` is not available yet.` };
   }
   return diagnostic;
 }
@@ -297,9 +296,7 @@ export async function compileLibrary(
     worker.getSyntacticDiagnostics(fileName),
     worker.getSemanticDiagnostics(fileName),
   ]);
-  const diagnostics = toCompileDiagnostics(source, [...syntactic, ...semantic]).map(
-    laterHardware,
-  );
+  const diagnostics = toCompileDiagnostics(source, [...syntactic, ...semantic]).map(laterHardware);
   const errors = diagnostics.filter((diagnostic) => diagnostic.severity === 'error');
 
   if (errors.length > 0) {
@@ -321,7 +318,7 @@ export async function compileLibrary(
       ok: false,
       diagnostics,
       error: compileFailure(
-        'The repository could not be built from this source. Check for an unclosed brace or bracket.',
+        'lib.ts could not be compiled. Check for a missing closing brace or bracket.',
       ),
     };
   }
@@ -357,7 +354,7 @@ export async function emitOnly(monaco: MonacoApi, model: TextModel): Promise<Com
     return {
       ok: false,
       diagnostics,
-      error: compileFailure('The compiler could not produce a program from this source.'),
+      error: compileFailure('Your program could not be compiled.'),
     };
   }
 

@@ -844,7 +844,7 @@ describe('power', () => {
       message = (error as Error).message;
     }
     expect(message).toContain('power("ghost")');
-    expect(message).toContain('no machine on this work order has that id');
+    expect(message).toContain('no machine here has that id');
     expect(message).toContain('probe("ghost")');
   });
 
@@ -870,7 +870,7 @@ describe('power', () => {
     const error = thrown as IllegalActionError;
     expect(error.message).toContain('power("sub-3")');
     expect(error.message).toContain('(7, 3)');
-    expect(error.message).toContain('hand-operated');
+    expect(error.message).toContain('manual. Only use()');
     expect(error.message).toContain('use()');
     expect(error.at).toEqual(vec(7, 3));
     expect(must(machineById(world, 'sub-3')).state).toBe('off');
@@ -1658,7 +1658,7 @@ describe('livelock', () => {
       if (error instanceof LivelockError) {
         expect(error.code).toBe('blocked-livelock');
         expect(error.botIds).toEqual([0, 1]);
-        expect(error.message).toContain('Livelock');
+        expect(error.message).toContain('Stuck');
       }
     }
   });

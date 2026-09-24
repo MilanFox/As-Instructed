@@ -58,5 +58,5 @@ describe('a call reads like the line that made it', () => {
 });
 
 test('the cap note counts what was not recorded', () => {
-  expect(unrecordedNote(312)).toBe('log full · 312 unrecorded');
+  expect(unrecordedNote(312)).toBe('log full, 312 not recorded');
 });

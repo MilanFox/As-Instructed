@@ -5,6 +5,7 @@ import { COMPACT_QUERY } from '../breakpoints.ts';
 import {
   BOARD_KEEP,
   MIN_DRAWER,
+  backIsCrowded,
   clampDrawer,
   columnWidth,
   deckIsCrowded,
@@ -80,6 +81,13 @@ describe('a width the player picks still leaves the screen usable', () => {
     expect(deckIsCrowded(600, 1280)).toBe(true);
     expect(deckIsCrowded(548, 1200)).toBe(true);
     expect(deckIsCrowded(548, 901)).toBe(true);
+  });
+
+  test('the site map link keeps its words wherever the strip beside the column holds them', () => {
+    expect(backIsCrowded(600, 1280)).toBe(false);
+    expect(backIsCrowded(684, 1920)).toBe(false);
+    expect(backIsCrowded(1060, 1440)).toBe(true);
+    expect(backIsCrowded(540, 920)).toBe(true);
   });
 
   test('the model measures the deck against the column the sheet actually draws', () => {

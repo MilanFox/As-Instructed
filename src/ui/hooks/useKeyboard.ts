@@ -1,9 +1,7 @@
 import { useEffect } from 'react';
 import { useGame } from '../../game/store.ts';
-import { useLibrary } from '../../meta/index.ts';
-import { usePapers } from '../paper/papers.ts';
 import { KEY_LIST, type KeyId } from './keys.ts';
-import { closeOverlay, overlayState, toggleOverlay } from './useOverlay.ts';
+import { toggleOverlay } from './useOverlay.ts';
 
 function isEditorTarget(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && target.closest('.monaco-editor') !== null;
@@ -34,15 +32,6 @@ export function useKeyboard(): void {
       const actions: Record<KeyId, () => void> = {
         run: () => {
           state.run();
-        },
-
-        escape: () => {
-          const papers = usePapers.getState();
-          if (papers.lifted) papers.putDown();
-          else if (useLibrary.getState().offer) useLibrary.getState().skipPublish(false);
-          else if (overlayState().open === 'docs' || overlayState().open === 'library')
-            closeOverlay();
-          else if (state.screen !== 'levels' && !isEditorTarget(event.target)) state.goto('levels');
         },
 
         play: () => {
@@ -76,10 +65,6 @@ export function useKeyboard(): void {
           if (typing || modified) return;
           if (state.screen !== 'workspace') return;
         }
-        // The workspace claims an escape that shut its flyout, so the same press does not also
-        // leave the level. The editor has its own escapes and never leaves the level anyway.
-        if (binding.id === 'escape' && event.defaultPrevented && !isEditorTarget(event.target))
-          return;
         event.preventDefault();
         actions[binding.id]();
         return;

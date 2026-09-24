@@ -88,7 +88,7 @@ describe('w2-01 names the tile, and says whether the arm ever came down on it', 
     expect(divergence).toEqual({
       where: at(first),
       expected: 'planted',
-      received: '1 swing, nothing sown',
+      received: '1 try, nothing sown',
     });
   });
 
@@ -101,7 +101,7 @@ describe('w2-01 names the tile, and says whether the arm ever came down on it', 
     expect(met).toBe(false);
     expect(divergence).toEqual({
       where: `tick 0 · ${at({ x: 1, y: 1 })}`,
-      expected: 'a swing that finds something',
+      expected: 'a harvest or plant that works',
       received: 'harvest took nothing, 2 wasted in all',
     });
   });
@@ -117,7 +117,7 @@ describe('w2-02 separates a swing that found nothing from a tile nobody visited'
     expect(divergence).toEqual({
       where: at({ x: 1, y: 1 }),
       expected: 'harvested',
-      received: '1 swing, nothing taken',
+      received: '1 try, nothing taken',
     });
   });
 
@@ -137,7 +137,7 @@ describe('w2-02 separates a swing that found nothing from a tile nobody visited'
     const shown = must(divergence, 'a divergence');
     expect(shown.where).toBe(at({ x: 1, y: 1 }));
     expect(shown.expected).toBe('planted');
-    expect(shown.received).toMatch(/^\d+ swings, nothing sown$/);
+    expect(shown.received).toMatch(/^\d+ tries, nothing sown$/);
   });
 
   test('crop-spoilage on a crop nobody picked asks for the crop before it asks for the ledger', () => {

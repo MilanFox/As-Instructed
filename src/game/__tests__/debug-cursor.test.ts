@@ -305,8 +305,6 @@ describe('the store keeps the cursor and the tick telling the same story', () =>
     useGame.setState({ trace: bare, endTick: bare.endTick, tick: 0 });
     useGame.getState().seekToLine('program', 1);
 
-    expect(useGame.getState().debugNote).toBe(
-      'This run recorded no lines. Dispatch a debug run.',
-    );
+    expect(useGame.getState().debugNote).toBe('This run did not record lines. Start a debug run.');
   });
 });

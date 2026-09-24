@@ -35,6 +35,6 @@ export function divergenceCells(cause: ReportCause | null, world: World | null):
 export function divergenceLine(cause: ReportCause | null, cells: readonly Vec[]): string {
   if (!cause || cells.length === 0) return '';
   const at = (cell: Vec): string => `(${String(cell.x)}, ${String(cell.y)})`;
-  if (cells.length === 1) return `MARKED ${at(cells[0] as Vec)}`;
+  if (cells.length === 1) return `HERE ${at(cells[0] as Vec)}`;
   return `WANT ${at(cells[0] as Vec)} · GOT ${at(cells[1] as Vec)}`;
 }

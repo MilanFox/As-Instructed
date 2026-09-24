@@ -289,7 +289,7 @@ describe('the player-facing compiler accepts ordinary JavaScript', () => {
     if (!result.ok) return;
     expect(result.exports).toEqual(['scanAround', 'lookAround']);
     expect(result.diagnostics.map((diagnostic) => diagnostic.message)).toContain(
-      '`look()` is not installed until level w4-01.',
+      '`look()` is not available until level w4-01.',
     );
   });
 

@@ -131,7 +131,7 @@ function markOrigin(stepped: Stepped | null, previous: Map<string, string[]>): v
             range: new monaco.Range(line, end, line, end),
             options: {
               showIfCollapsed: true,
-              hoverMessage: { value: 'hover the line for every value' },
+              hoverMessage: { value: 'Hover to see all values' },
               after: {
                 content: text,
                 inlineClassName: 'debug-step-ghost',
@@ -277,7 +277,7 @@ export function MonacoBody({
     editor.addCommand(api.KeyMod.CtrlCmd | api.KeyCode.Enter, () => runRef.current());
     editor.addAction({
       id: 'as-instructed.goToFirstEventFromLine',
-      label: 'Go to the first event from this line',
+      label: 'Go to first event from this line',
       contextMenuGroupId: 'navigation',
       keybindings: [api.KeyMod.Alt | api.KeyCode.KeyE],
       run: (target) => {
@@ -302,7 +302,7 @@ export function MonacoBody({
       onChange={(next) => setCode(next ?? '')}
       onMount={onMount}
       onValidate={(markers) => onProblems?.(markers.filter((m) => m.severity === 8).length)}
-      loading={<span>opening the terminal…</span>}
+      loading={<span>Loading editor…</span>}
       options={options}
     />
   );

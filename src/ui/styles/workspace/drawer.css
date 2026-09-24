@@ -89,7 +89,8 @@
 .workspace[data-flyout='shut'] .flyout-grip,
 .workspace[data-flyout='shut'] .transport-deck,
 .workspace[data-flyout='shut'] .work-order {
-  transition-duration: var(--ws-slam);
+  transition-duration: var(--ws-slam-time);
+  transition-timing-function: var(--ws-slam-ease);
 }
 
 .drawer-handle {
@@ -135,7 +136,8 @@
 }
 
 .workspace[data-flyout='shut'] .drawer-handle {
-  transition-duration: var(--ws-slam);
+  transition-duration: var(--ws-slam-time);
+  transition-timing-function: var(--ws-slam-ease);
 }
 
 /* The pair: whichever face is up is the filled one. Shut, neither is. */
@@ -175,6 +177,70 @@
 .drawer-handle__text {
   display: block;
   writing-mode: vertical-rl;
+}
+
+/* Back is a plain link over the board, well clear of the flap column and the flyout's edge, so
+   it never reads as one more flap that closes the panel. It rides out with the edge all the same,
+   so an open flyout never covers it. */
+.site-map-link {
+  position: fixed;
+  top: var(--ws-inset);
+  left: var(--ws-inset);
+  z-index: 7;
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  box-sizing: border-box;
+  height: 32px;
+  padding: 0 12px 0 10px;
+  border: 1px solid rgb(201 213 227 / 45%);
+  border-radius: 4px;
+  background: rgb(5 8 12 / 78%);
+  color: var(--ink);
+  font-family: var(--font-prose);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  transform: translateX(var(--ws-handle-x));
+  transition: transform var(--ws-slide);
+}
+
+.workspace[data-flyout='shut'] .site-map-link {
+  transition-duration: var(--ws-slam-time);
+  transition-timing-function: var(--ws-slam-ease);
+}
+
+.site-map-link__arrow {
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* A flyout pulled close to the column leaves no room for the words (backIsCrowded). */
+.site-map-link[data-words='hidden'] {
+  justify-content: center;
+  width: 32px;
+  padding: 0;
+}
+
+.site-map-link[data-words='hidden'] .site-map-link__text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.site-map-link:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.site-map-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .drawer-tabs {
@@ -275,32 +341,86 @@
   line-height: 1.6;
 }
 
-.fact-row {
-  display: flex;
+/* The lore sits inside the job's block so it reads as the job's lead-in, not a section of its own. */
+.dossier-lore {
+  margin: 0 0 12px;
+  color: color-mix(in srgb, var(--ink) 72%, transparent);
+  font-size: 12.5px;
+  font-style: italic;
+  line-height: 1.5;
+}
+
+.dossier-lore p {
   margin: 0;
-  gap: 8px;
-  align-items: baseline;
-  padding: 6px 0;
+}
+
+.dossier-lore__from {
+  margin-top: 2px;
+  font-size: 11.5px;
+  font-style: normal;
+  opacity: 0.75;
+  text-align: right;
+}
+
+.dossier-fold__summary {
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.dossier-fold__summary .dossier-section__title {
+  display: inline;
+}
+
+.dossier-fold__summary:hover .dossier-section__title {
+  color: var(--ink);
+}
+
+.dossier-fold[open] > .dossier-fold__summary {
+  margin-bottom: 6px;
+}
+
+.fact-row {
+  margin: 0 -8px;
+  padding: 6px 8px;
 }
 
 .fact-row + .fact-row {
   border-top: 2px solid #0e141c;
 }
 
-.fact-row__label {
-  flex: none;
-  width: 118px;
-  color: var(--ink-dim);
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+.fact-row:focus {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
-.dossier-lead {
-  margin-bottom: 4px;
-  color: var(--ink-dim);
-  font-size: 12px;
+.fact-row__label {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.fact-row__value {
+  margin: 3px 0 2px;
+}
+
+/* The card beside the flyout already lists the objectives; only a phone, where the card is
+   folded away, needs them repeated at the top of the brief. */
+.dossier-section--objectives {
+  display: none;
+}
+
+.dossier-section--objectives + .dossier-section {
+  border-top: 0;
+}
+
+@media (width <= 900px) {
+  .dossier-section--objectives {
+    display: block;
+  }
+
+  .dossier-section--objectives + .dossier-section {
+    border-top: 2px solid var(--border-strong);
+  }
 }
 
 .board-row {
@@ -333,6 +453,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  align-items: baseline;
 }
 
 .field-note {
@@ -358,10 +479,6 @@
   flex-wrap: wrap;
   gap: var(--space-2);
   align-items: flex-start;
-}
-
-.field-note-asks__caption {
-  margin-top: var(--space-2);
 }
 
 .api-entry {

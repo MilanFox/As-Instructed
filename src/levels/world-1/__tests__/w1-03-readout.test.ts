@@ -90,8 +90,8 @@ describe('w1-03 grades the same number it shows', () => {
 
       expect(report.met).toBe(false);
       expect(must(report.divergence, 'divergence')).toMatchObject({
-        expected: 'entered at least once',
-        received: 'never entered',
+        expected: 'visited',
+        received: 'never visited',
       });
     }
   });

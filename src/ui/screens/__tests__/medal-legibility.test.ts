@@ -90,7 +90,7 @@ function part(row: Node, className: string): Node | undefined {
 }
 
 function orderRows(tree: Node[]): Node[] {
-  const dossier = named(tree, 'Work orders on this site');
+  const dossier = named(tree, 'Levels on this site');
   return dossier ? all([dossier], (node) => classes(node).includes('order-row')) : [];
 }
 

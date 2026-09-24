@@ -65,7 +65,7 @@ export const WORLDS: readonly WorldMeta[] = [
   {
     id: 7,
     name: 'Swarm',
-    subtitle: 'A hundred cheap robots',
+    subtitle: 'Several bots at once',
     blurb:
       'Cheaper together, if they do not queue. Many bots at once, dividing work, and a clock that stops with the last of them.',
     concepts: ['Concurrency'],

@@ -57,7 +57,7 @@ export function App(): React.JSX.Element {
       <Settings />
       <div className="modal-layer">
         <ModalBoundary
-          label="The publish offer"
+          label="The publish window"
           onDismiss={() => useLibrary.getState().skipPublish(false)}
         >
           <PublishDialog />

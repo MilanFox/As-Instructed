@@ -123,40 +123,40 @@ describe('the report says what the Repository did on this run', () => {
       },
     });
 
-    expect(screen(Results)).toContain('2 routines from the Repository, 52 ticks inside them.');
+    expect(screen(Results)).toContain('Used 2 functions from your library: 52 ticks inside them.');
   });
 
   test('it is the seed the report is describing, not seed one', () => {
     reportRun({ ticks: 52, calls: { pathTo: { calls: 4, ticks: 52 } } });
     const text = screen(Results);
 
-    expect(text).toContain('1 routine from the Repository, 52 ticks inside it.');
+    expect(text).toContain('Used 1 function from your library: 52 ticks inside it.');
     expect(text).not.toContain('999');
   });
 
   test('a run that linked the library and called nothing says nothing', () => {
     reportRun({ ticks: 0, calls: { pathTo: { calls: 0, ticks: 0 } } });
 
-    expect(screen(Results)).not.toContain('from the Repository');
+    expect(screen(Results)).not.toContain('from your library');
   });
 
   test('a run that never linked it says nothing either', () => {
     reportRun(null);
 
-    expect(screen(Results)).not.toContain('from the Repository');
+    expect(screen(Results)).not.toContain('from your library');
   });
 
   test('one routine and one tick are written as one of each', () => {
     reportRun({ ticks: 1, calls: { pathTo: { calls: 1, ticks: 1 } } });
 
-    expect(screen(Results)).toContain('1 routine from the Repository, 1 tick inside it.');
+    expect(screen(Results)).toContain('Used 1 function from your library: 1 tick inside it.');
   });
 });
 
 describe('the line is a fact, not a scoreline', () => {
   function withoutTheLine(text: string): string {
     return text.replace(
-      / ?On record Repository \d+ routines? from the Repository, \d+ ticks? inside (?:it|them)\./,
+      / ?Saved result Library Used \d+ functions? from your library: \d+ ticks? inside (?:it|them)\./,
       '',
     );
   }
@@ -182,7 +182,7 @@ describe('the line is a fact, not a scoreline', () => {
     const used = screen(Results);
 
     const scoreline = (text: string): string =>
-      /Ticks \d+.*?(?= Seeds )/.exec(text)?.[0] ?? 'no scoreline';
+      /Ticks \d+.*?(?= Boards )/.exec(text)?.[0] ?? 'no scoreline';
 
     expect(scoreline(bare)).toMatch(/Points \d/);
     expect(scoreline(used)).toBe(scoreline(bare));
@@ -239,8 +239,8 @@ describe('the Structure tab says how far a routine has travelled', () => {
   test('the column is there and it is about work orders', () => {
     reusedLibrary();
 
-    expect(STRUCTURE.columns.orders).toBe('Work orders');
-    expect(screen(StructureScreen)).toContain('Work orders');
+    expect(STRUCTURE.columns.orders).toBe('Levels');
+    expect(screen(StructureScreen)).toContain('Levels');
   });
 
   test('the count is the number of work orders that import it', () => {

@@ -95,7 +95,7 @@ export class Runner {
           error: {
             kind: 'runtime',
             message:
-              'The simulator refused the request. This is a bug in the game: ' +
+              'The game could not start the run. This is a bug in the game: ' +
               `${error instanceof Error ? error.message : String(error)}`,
           },
         });

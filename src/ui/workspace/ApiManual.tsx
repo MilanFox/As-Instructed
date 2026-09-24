@@ -2,8 +2,11 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 
 import { InlineMarkdown, Markdown } from '../components/Markdown.tsx';
 import { GUIDES, MEMORY, typeParts } from '../reference/api.ts';
+import type { GuidePage } from '../reference/api.ts';
 import type { LegendSection } from '../reference/legend.ts';
 import type { ReferenceEntry, TypeEntry } from './useWorkspace.ts';
+
+import '../styles/workspace/manual-fold.css';
 
 type ManualPage = 'commands' | 'types' | 'board' | 'guides';
 
@@ -18,6 +21,15 @@ export interface ApiManualProps {
   reference: readonly ReferenceEntry[];
   types: readonly TypeEntry[];
   legend: readonly LegendSection[];
+  guideIds: readonly string[];
+}
+
+function byCategory(entries: readonly ReferenceEntry[]): [string, ReferenceEntry[]][] {
+  const groups = new Map<string, ReferenceEntry[]>();
+  for (const entry of entries) {
+    groups.set(entry.category, [...(groups.get(entry.category) ?? []), entry]);
+  }
+  return [...groups];
 }
 
 interface TypeLinksProps {
@@ -50,17 +62,71 @@ function TypeLinks({ text, names, onOpen }: TypeLinksProps): React.ReactElement 
   );
 }
 
-export function ApiManual({ reference, types, legend }: ApiManualProps): React.ReactElement {
+interface CommandGroupProps {
+  title: string;
+  entries: readonly ReferenceEntry[];
+  names: readonly string[];
+  onOpen: (name: string) => void;
+}
+
+function CommandGroup({ title, entries, names, onOpen }: CommandGroupProps): React.ReactElement {
+  return (
+    <div className="dossier-section">
+      <h2 className="dossier-section__title">{title}</h2>
+      {entries.map((entry) => (
+        <div className="api-entry" key={entry.name}>
+          <span className="api-entry__signature">
+            <TypeLinks text={entry.signature} names={names} onOpen={onOpen} />
+          </span>
+          <p className="api-entry__doc">{entry.description}</p>
+          <span className="api-entry__cost">{entry.cost}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function GuideSection({ guide }: { guide: GuidePage }): React.ReactElement {
+  return (
+    <div className="dossier-section">
+      <h2 className="dossier-section__title">{guide.title}</h2>
+      <Markdown source={guide.body} className="guide-body" />
+      {guide.example === undefined ? null : (
+        <pre className="guide-example">
+          <code>{guide.example}</code>
+        </pre>
+      )}
+      {guide.caption === undefined ? null : <p className="note guide-caption">{guide.caption}</p>}
+    </div>
+  );
+}
+
+export function ApiManual({
+  reference,
+  types,
+  legend,
+  guideIds,
+}: ApiManualProps): React.ReactElement {
   const [page, setPage] = useState<ManualPage>('commands');
   const [wanted, setWanted] = useState<string | null>(null);
 
-  const groups = useMemo(() => {
-    const byCategory = new Map<string, ReferenceEntry[]>();
-    for (const entry of reference) {
-      byCategory.set(entry.category, [...(byCategory.get(entry.category) ?? []), entry]);
-    }
-    return [...byCategory];
+  const freshCommands = useMemo(() => reference.filter((entry) => entry.fresh), [reference]);
+  const earlierGroups = useMemo(() => {
+    const earlier = reference.filter((entry) => !entry.fresh);
+    return { count: earlier.length, groups: byCategory(earlier) };
   }, [reference]);
+
+  const guides = useMemo(() => {
+    const installed = new Set(reference.map((entry) => entry.name));
+    const all = [MEMORY, ...GUIDES].map((guide) => {
+      const lines = (guide.commands ?? []).filter((command) => installed.has(command.name));
+      if (lines.length === 0) return guide;
+      return { ...guide, body: [guide.body, ...lines.map((command) => command.line)].join('\n') };
+    });
+    const featured = all.filter((guide) => guideIds.includes(guide.id));
+    if (featured.length === 0) return { featured: all, other: [] };
+    return { featured, other: all.filter((guide) => !guideIds.includes(guide.id)) };
+  }, [guideIds, reference]);
 
   const names = useMemo(() => types.map((type) => type.name), [types]);
 
@@ -72,6 +138,8 @@ export function ApiManual({ reference, types, legend }: ApiManualProps): React.R
   useEffect(() => {
     if (wanted === null) return;
     const entry = document.getElementById(`manual-type-${wanted}`);
+    const fold = entry?.closest('details');
+    if (fold) fold.open = true;
     entry?.scrollIntoView({ block: 'start' });
     entry?.focus();
     setWanted(null);
@@ -119,23 +187,43 @@ export function ApiManual({ reference, types, legend }: ApiManualProps): React.R
         aria-labelledby="manual-tab-commands"
         hidden={page !== 'commands'}
       >
-        {groups.length === 0 ? (
-          <p className="empty-note">No hardware fitted yet.</p>
-        ) : (
-          groups.map(([category, entries]) => (
-            <div className="dossier-section" key={category}>
-              <h2 className="dossier-section__title">{category}</h2>
-              {entries.map((entry) => (
-                <div className="api-entry" key={entry.name}>
-                  <span className="api-entry__signature">
-                    <TypeLinks text={entry.signature} names={names} onOpen={openType} />
-                  </span>
-                  <p className="api-entry__doc">{entry.description}</p>
-                  <span className="api-entry__cost">{entry.cost}</span>
-                </div>
-              ))}
-            </div>
+        {reference.length === 0 ? (
+          <p className="empty-note">No commands yet.</p>
+        ) : freshCommands.length === 0 ? (
+          earlierGroups.groups.map(([category, entries]) => (
+            <CommandGroup
+              key={category}
+              title={category}
+              entries={entries}
+              names={names}
+              onOpen={openType}
+            />
           ))
+        ) : (
+          <>
+            <CommandGroup
+              title="New in this level"
+              entries={freshCommands}
+              names={names}
+              onOpen={openType}
+            />
+            {earlierGroups.count === 0 ? null : (
+              <details className="manual-fold">
+                <summary className="manual-fold__summary">
+                  Earlier commands ({String(earlierGroups.count)})
+                </summary>
+                {earlierGroups.groups.map(([category, entries]) => (
+                  <CommandGroup
+                    key={category}
+                    title={category}
+                    entries={entries}
+                    names={names}
+                    onOpen={openType}
+                  />
+                ))}
+              </details>
+            )}
+          </>
         )}
       </div>
 
@@ -146,7 +234,7 @@ export function ApiManual({ reference, types, legend }: ApiManualProps): React.R
         hidden={page !== 'types'}
       >
         {types.length === 0 ? (
-          <p className="empty-note">No hardware fitted yet.</p>
+          <p className="empty-note">No commands yet.</p>
         ) : (
           types.map((entry) => (
             <div
@@ -210,20 +298,19 @@ export function ApiManual({ reference, types, legend }: ApiManualProps): React.R
         aria-labelledby="manual-tab-guides"
         hidden={page !== 'guides'}
       >
-        {[MEMORY, ...GUIDES].map((guide) => (
-          <div className="dossier-section" key={guide.id}>
-            <h2 className="dossier-section__title">{guide.title}</h2>
-            <Markdown source={guide.body} className="guide-body" />
-            {guide.example === undefined ? null : (
-              <pre className="guide-example">
-                <code>{guide.example}</code>
-              </pre>
-            )}
-            {guide.caption === undefined ? null : (
-              <p className="note guide-caption">{guide.caption}</p>
-            )}
-          </div>
+        {guides.featured.map((guide) => (
+          <GuideSection key={guide.id} guide={guide} />
         ))}
+        {guides.other.length === 0 ? null : (
+          <details className="manual-fold">
+            <summary className="manual-fold__summary">
+              More guides ({String(guides.other.length)})
+            </summary>
+            {guides.other.map((guide) => (
+              <GuideSection key={guide.id} guide={guide} />
+            ))}
+          </details>
+        )}
       </div>
     </>
   );

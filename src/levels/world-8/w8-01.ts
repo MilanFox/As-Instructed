@@ -140,7 +140,7 @@ function harvestMiss(ctx: ObjectiveContext): Divergence {
   return {
     where: `the silo at ${point(siloTile(ctx.initialWorld))}`,
     expected: `${String(ripeAtStart(ctx.initialWorld))} crops`,
-    received: held > 0 ? `${landed} crops, ${String(held)} still in the arms` : `${landed} crops`,
+    received: held > 0 ? `${landed} crops, ${String(held)} still carried` : `${landed} crops`,
   };
 }
 
@@ -175,7 +175,7 @@ function haulLoose(ctx: ObjectiveContext): Divergence {
     };
   }
   return {
-    where: 'the haulage log',
+    where: 'drops on the silo',
     expected: `${String(loadsAllowed(ctx.initialWorld))} loads`,
     received: `${String(loadsFiled(ctx))} loads`,
   };
@@ -227,14 +227,14 @@ function misreadAudit(ctx: ObjectiveContext): Divergence {
   const line = said[0];
   if (line === undefined) {
     return {
-      where: 'the audit note',
-      expected: 'a line naming the row that carried the most',
+      where: 'the row report',
+      expected: 'a line `row <y> <n>`',
       received: NOTHING,
     };
   }
   if (said.length > 1) {
     return {
-      where: 'the audit note',
+      where: 'the row report',
       expected: 'one line',
       received: `${String(said.length)} lines`,
     };
@@ -242,7 +242,7 @@ function misreadAudit(ctx: ObjectiveContext): Divergence {
   const claim = readAudit(line);
   if (claim === null) {
     return {
-      where: 'the audit note',
+      where: 'the row report',
       expected: 'a line reading `row <y> <n>`',
       received: clipValue(line),
     };
@@ -250,15 +250,15 @@ function misreadAudit(ctx: ObjectiveContext): Divergence {
   const held = ripePerRow(ctx.initialWorld)[claim.row];
   if (held === undefined) {
     return {
-      where: 'the audit note',
+      where: 'the row report',
       expected: `a row between 0 and ${String(FIELD_H - 1)}`,
       received: `row ${String(claim.row)}`,
     };
   }
   return {
     where: `row ${String(claim.row)}`,
-    expected: claim.count === held ? 'the heaviest row on the field' : `${String(held)} ripe`,
-    received: claim.count === held ? 'a lighter row' : `${String(claim.count)} claimed`,
+    expected: claim.count === held ? 'the row with the most ripe crops' : `${String(held)} ripe`,
+    received: claim.count === held ? 'a row with fewer' : `${String(claim.count)} claimed`,
   };
 }
 
@@ -269,48 +269,34 @@ export const w8_01: LevelDef = {
   title: 'Efficiency Audit',
   hardware: [],
   brief: [
-    '**FROM:** Dep. Coordinator M. Vance',
+    'Finance now limits looks and scans too. An auditor wants the ripest row and the fewest trips, and he has a clipboard. — M. Vance',
     '',
-    'The field is ripe and the work order is one you have run a dozen times. Finance',
-    'have since attached a second budget, and an auditor who wants the row tally as',
-    'the shift opened and a haulage log free of half-empty trips.',
-    '',
-    'Nobody upstairs will say why. Bring the ripe crop in.',
+    '**Bring every ripe crop to the silo. Looks and scans are limited.**',
   ].join('\n'),
   facts: [
     {
-      label: 'The field',
-      value: `${String(FIELD_W)} by ${String(FIELD_H)} of open soil. Nothing on it blocks a beam.`,
+      label: 'Silo',
+      value: 'The bot starts on it. `probe("silo")` finds it for free.',
     },
     {
-      label: 'The silo',
-      value: '`probe("silo")` reports it from anywhere, for nothing. The bot starts on it.',
-    },
-    {
-      label: 'Readings',
-      value: `Both instruments are metered, separately and hard: ${String(SURVEY_BUDGET)} \`look()\` and ${String(SURVEY_BUDGET)} \`scan()\` for the shift. One call is one reading, however far it reaches.`,
-    },
-    {
-      label: 'What each reads',
+      label: 'Looks and scans',
       value:
-        'A `look()` returns a whole line to the edge of the site. A `scan()` returns the tile under the bot, or one tile beside it.',
+        'Looks and scans cost no ticks. Nothing on the field blocks a look; it sees to the edge. A long look counts as one look.',
     },
-    { label: 'The shift', value: `${String(SHIFT_TICKS)} ticks, hard. Reading costs no ticks.` },
-    { label: 'Ripe', value: 'A crop still green at the start does not count and does not travel.' },
+    { label: 'Ripe', value: 'Only crops ripe at the start count.' },
     {
-      label: 'The bot',
+      label: 'Bot capacity (hidden)',
       value:
-        'Carries a fixed number of crops. The number changes between shifts, and nothing on the bot reports it — a harvest into full arms comes back empty and still costs its ticks.',
-    },
-    {
-      label: 'A load',
-      value:
-        'One `drop()` on the silo tile. The fewest loads a shift can take is its ripe count divided by what the arms hold, rounded up.',
+        'The bot carries a fixed number of crops. It changes per board and is not shown. A harvest when full gets nothing but costs ticks.',
     },
     {
-      label: 'Audit note',
+      label: 'Load',
+      value: 'One `drop()` on the silo. Fewest loads = ripe crops ÷ capacity, rounded up.',
+    },
+    {
+      label: 'Row report',
       value:
-        'One line, `row <y> <n>`: the row that held the most ripe crop **when the shift opened**, and how much that was. The field will not still say so once you have worked it.',
+        'Print one line `row <y> <n>`: the row with the most ripe crops at the start, and how many. Rows count from 0. On a tie, any top row passes.',
     },
   ],
   seeds: [1, 2, 3, 4],
@@ -319,7 +305,7 @@ export const w8_01: LevelDef = {
   objectives: [
     Objectives.custom(
       'ripe-to-silo',
-      'Deliver every crop that was ripe at the start to the silo',
+      'Deliver every crop ripe at the start to the silo',
       (ctx) => delivered(ctx) >= ripeAtStart(ctx.initialWorld),
       {
         progress: (ctx) => {
@@ -331,7 +317,7 @@ export const w8_01: LevelDef = {
     ),
     Objectives.withinTicks(SHIFT_TICKS, {
       id: 'shift-budget',
-      label: `Close the shift within ${String(SHIFT_TICKS)} ticks`,
+      label: `Finish within ${String(SHIFT_TICKS)} ticks`,
     }),
     Objectives.withinSenses('look', SURVEY_BUDGET, {
       label: `Call look at most ${String(SURVEY_BUDGET)} times`,
@@ -341,43 +327,41 @@ export const w8_01: LevelDef = {
     }),
   ],
   bonus: [
-    Objectives.custom('name-the-row', 'Name the row that held the most ripe crop', auditFiled, {
-      divergence: misreadAudit,
-    }),
     Objectives.custom(
-      'fewest-loads',
-      'Take the crop off the field in the fewest loads the arms allow',
-      haulTight,
+      'name-the-row',
+      'Print the row report: the row with the most ripe crops',
+      auditFiled,
       {
-        progress: (ctx) => {
-          const allowed = loadsAllowed(ctx.initialWorld);
-          return [Math.min(loadsFiled(ctx), allowed), allowed];
-        },
-        divergence: haulLoose,
-        meter: { kind: 'events', event: 'drop' },
-        unit: 'loads',
+        divergence: misreadAudit,
       },
     ),
+    Objectives.custom('fewest-loads', 'Deliver in the fewest possible loads', haulTight, {
+      progress: (ctx) => {
+        const allowed = loadsAllowed(ctx.initialWorld);
+        return [Math.min(loadsFiled(ctx), allowed), allowed];
+      },
+      divergence: haulLoose,
+      meter: { kind: 'events', event: 'drop' },
+      unit: 'loads',
+    }),
   ],
   starter: [
+    '// If you published these to lib.ts, you can import them:',
     "// import { pathTo } from 'lib';",
-    '// The field is 14 by 10. probe("silo") reports the drop point.',
-    '// 215 ticks, 16 looks, 16 scans. Finance costed all three.',
-    '// NOTE(4470): the second budget came in the week i asked to read the charter',
-    '// NOTE(4470): a look to the edge is billed like a single tile. i paid for tiles',
+    '// Field 14 × 10. probe("silo") gives the drop point.',
+    '// Limits: 215 ticks, 16 looks, 16 scans.',
+    '// NOTE(4470): a long look counts as one look, same as a short one',
     '',
     'const silo = probe("silo").at;',
     'print(silo.x + "," + silo.y);',
     '',
   ].join('\n'),
   hints: [
-    'Reading costs no ticks. It is only rationed. Find out what is on the field before you decide where to walk.',
-    'The bot does not have to stand on a tile to know what grows there. One pass along the edge can report every row, and a line costs the same as a single tile.',
-    'A green crop is two ticks and nothing to show for it. Check how ripe a crop is, not just that it is there.',
-    'The bot carries a fixed number of crops. Decide which ones travel together before you set off.',
-    'A harvest into full arms comes back with nothing and still costs its ticks. What the bot was already carrying is how much the arms hold.',
-    'Nothing on the field changes except what you harvest. Keep what a beam told you, and never spend a second beam on the same row.',
-    'The field will not still say which row was heaviest once you have worked it. Anything you mean to report about how the shift opened has to be counted while the survey is still fresh.',
+    'A look from the edge of a row sees the whole row.',
+    'Harvest only ripe crops. A green crop wastes 2 ticks.',
+    'A harvest when full gets nothing. What the bot holds then is its capacity.',
+    'Only harvesting changes the field. Remember each look; never look at the same row twice.',
+    'Count the rows during the survey. After you harvest, the field no longer shows the answer.',
   ],
   docs: ['look', 'scan', 'harvest', 'drop', 'probe'],
 };

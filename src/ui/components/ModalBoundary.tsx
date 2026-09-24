@@ -33,16 +33,14 @@ export class ModalBoundary extends Component<
           className="modal modal--narrow"
           role="alertdialog"
           aria-modal="true"
-          aria-label={`${this.props.label} — unavailable`}
+          aria-label={`${this.props.label} — error`}
         >
           <header className="modal__head">
-            <h2 className="modal__verdict modal__verdict--fail">WITHDRAWN</h2>
+            <h2 className="modal__verdict modal__verdict--fail">ERROR</h2>
           </header>
           <div className="modal__body">
-            <p className="modal__line">
-              {this.props.label} stopped responding and has been taken offline for this session.
-            </p>
-            <p className="modal__line">Your program and your progress are where you left them.</p>
+            <p className="modal__line">{this.props.label} stopped working.</p>
+            <p className="modal__line">Your code and progress are safe.</p>
           </div>
           <footer className="modal__foot">
             <button
@@ -51,7 +49,7 @@ export class ModalBoundary extends Component<
               ref={(element) => element?.focus({ preventScroll: true })}
               onClick={this.dismiss}
             >
-              Back to the program
+              Close
             </button>
           </footer>
         </div>

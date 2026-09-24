@@ -25,6 +25,8 @@ import type { ApiFunctionSpec, RuntimeFailure } from '../../runtime/index.ts';
 import {
   PLAYER_API,
   apiFunctionsFor,
+  docFor,
+  hasCrew,
   requiredTypesFor,
   typeDeclarationFor,
 } from '../../runtime/index.ts';
@@ -74,7 +76,6 @@ export interface Targets {
   ticks: number | null;
   hardStop: number | null;
   seeds: readonly number[];
-  hasTickLimit: boolean;
 }
 
 export interface WorldRow {
@@ -89,7 +90,7 @@ export interface BriefData {
   kicker: string;
   ask: readonly string[];
   facts: readonly LevelFact[];
-  board: { fixed: readonly string[]; redrawn: readonly string[] } | null;
+  board: { redrawn: readonly string[] } | null;
   prose: string;
   seeds: readonly number[];
 }
@@ -109,9 +110,9 @@ export function lineOf(debug: DebugView): string {
   if (debug.origin) {
     return `${SOURCE_NAMES[debug.origin.file]} line ${String(debug.origin.line)}`;
   }
-  if (!debug.attributed) return 'no lines recorded — this run was not a debug run';
-  if (debug.kind === 'sense') return 'no single line — these sense calls are coalesced';
-  return 'no line — the engine raised this, not an API call';
+  if (!debug.attributed) return 'no line: run Debug to see lines';
+  if (debug.kind === 'sense') return 'no single line: sense calls merged';
+  return 'no line: game event, not your code';
 }
 
 // Counted in words, because the tick readout beside it is a padded 000/000 fraction and two
@@ -130,6 +131,7 @@ export interface ReferenceEntry {
   description: string;
   cost: string;
   category: string;
+  fresh: boolean;
 }
 
 export interface TypeEntry {
@@ -196,7 +198,6 @@ export interface WorkspaceData {
   crew: readonly CrewRow[];
   fuel: FuelRow | null;
   banked: readonly string[];
-  bankedCount: number;
   targets: Targets;
 
   divergence: string | null;
@@ -232,6 +233,7 @@ export interface WorkspaceData {
   reference: readonly ReferenceEntry[];
   types: readonly TypeEntry[];
   legend: readonly LegendSection[];
+  guideIds: readonly string[];
 }
 
 function signatureOf(fn: ApiFunctionSpec): string {
@@ -244,6 +246,7 @@ function signatureOf(fn: ApiFunctionSpec): string {
 }
 
 const NO_HINTS: readonly string[] = [];
+const NO_GUIDES: readonly string[] = [];
 const NO_BANKED: readonly string[] = [];
 
 export function useWorkspace(): WorkspaceData {
@@ -271,8 +274,8 @@ export function useWorkspace(): WorkspaceData {
     trace === null || runMode === 'dispatch' || runMode === null
       ? null
       : traceSeed === null
-        ? 'one seed · ungraded'
-        : `seed ${String(traceSeed)} · ungraded`;
+        ? 'one board · not graded'
+        : `board ${String(traceSeed)} · not graded`;
 
   const tick = useGame((state) => state.tick);
   const endTick = useGame((state) => state.endTick);
@@ -375,12 +378,6 @@ export function useWorkspace(): WorkspaceData {
   const objectives = useMemo(() => rows.filter((row) => !row.bonus), [rows]);
   const bonus = useMemo(() => rows.filter((row) => row.bonus), [rows]);
 
-  const bankedCount = useMemo(() => {
-    if (!level) return 0;
-    const ids = new Set(banked);
-    return level.objectives.filter((objective) => ids.has(objective.id)).length;
-  }, [level, banked]);
-
   const board = useMemo<World | null>(() => {
     if (trace) return replayTo(trace, flooredTick);
     return level ? level.build(surveySeed ?? (level.seeds[0] as number)) : null;
@@ -428,7 +425,7 @@ export function useWorkspace(): WorkspaceData {
 
   const targets = useMemo<Targets>(() => {
     if (!level) {
-      return { graded: false, par: 0, ticks: null, hardStop: null, seeds: [], hasTickLimit: false };
+      return { graded: false, par: 0, ticks: null, hardStop: null, seeds: [] };
     }
     const gradesTicks = level.objectives.some(
       (objective) => objective.meter?.kind === 'ticks' || TICK_OBJECTIVE.test(objective.label),
@@ -439,7 +436,6 @@ export function useWorkspace(): WorkspaceData {
       ticks: grade?.stats.ticks ?? null,
       hardStop: gradesTicks ? null : (level.budget?.maxTicks ?? null),
       seeds: level.seeds,
-      hasTickLimit: gradesTicks || level.budget?.maxTicks !== undefined,
     };
   }, [level, grade]);
 
@@ -469,9 +465,9 @@ export function useWorkspace(): WorkspaceData {
     if (!level) return null;
     const meta = worldMeta(level.world);
     return {
-      head: ['WORK ORDER', level.id.toUpperCase()],
+      head: ['LEVEL', level.id.toUpperCase()],
       title: level.title,
-      kicker: meta ? `${meta.name} · ${meta.subtitle}` : `WORLD ${String(level.world)}`,
+      kicker: meta ? `${meta.name} · ${meta.subtitle}` : `SITE ${String(level.world)}`,
       ask: level.objectives.map((objective) => objective.label),
       facts: level.facts ?? [],
       board: level.board ?? null,
@@ -485,7 +481,7 @@ export function useWorkspace(): WorkspaceData {
     const meta = worldMeta(level.world);
     return {
       id: level.world,
-      name: meta?.name ?? `World ${String(level.world)}`,
+      name: meta?.name ?? `Site ${String(level.world)}`,
       accentVar: `--world-${String(level.world)}`,
     };
   }, [level]);
@@ -493,15 +489,17 @@ export function useWorkspace(): WorkspaceData {
   const reference = useMemo<ReferenceEntry[]>(() => {
     if (!level) return [];
     const installed = new Set(unlockedHardware(level.id));
-    return PLAYER_API.functions
-      .filter((fn) => installed.has(fn.name))
-      .map((fn) => ({
-        name: fn.name,
-        signature: signatureOf(fn),
-        description: fn.doc,
-        cost: costLabel(levelCost(fn, level.costs)),
-        category: CATEGORIES.find((entry) => entry.id === fn.category)?.label ?? 'Other',
-      }));
+    const fresh = new Set(level.hardware);
+    const available = PLAYER_API.functions.filter((fn) => installed.has(fn.name));
+    const crew = hasCrew(available);
+    return available.map((fn) => ({
+      name: fn.name,
+      signature: signatureOf(fn),
+      description: docFor(fn, crew),
+      cost: costLabel(levelCost(fn, level.costs)),
+      category: CATEGORIES.find((entry) => entry.id === fn.category)?.label ?? 'Other',
+      fresh: fresh.has(fn.name),
+    }));
   }, [level]);
 
   const types = useMemo<TypeEntry[]>(() => {
@@ -609,7 +607,6 @@ export function useWorkspace(): WorkspaceData {
     crew,
     fuel,
     banked,
-    bankedCount,
     targets,
     divergence,
     divergenceCells: cells,
@@ -637,5 +634,6 @@ export function useWorkspace(): WorkspaceData {
     reference,
     types,
     legend,
+    guideIds: level?.docs ?? NO_GUIDES,
   };
 }

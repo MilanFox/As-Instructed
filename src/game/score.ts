@@ -89,53 +89,47 @@ export interface ReviewTier {
 export const REVIEW_TIERS: readonly ReviewTier[] = [
   {
     rank: 2,
-    grade: 'CONSISTENT WITH EXPECTATION',
+    grade: 'AS EXPECTED',
     min: 0,
     body:
-      'Your output is consistent with expectation. Expectation was established in 2204 by a ' +
-      'contractor who has since been reassigned, or has not.\n\n' +
-      'This is the grade the site was designed around. Please do not feel that it is the ceiling. ' +
-      'It is, functionally, the ceiling.',
-    dot: 'consistent is fine. consistent is how the fields got planted.',
+      'Your work is as expected. The site was built around this grade.\n\n' +
+      'It is not the top grade. In practice, it is.',
+    dot: 'as expected is fine. that is how the fields got planted.',
   },
   {
     rank: 3,
-    grade: 'ABOVE BASELINE',
+    grade: 'ABOVE TARGET',
     min: 50,
     body:
-      'You are exceeding baseline in [n] of [m] work orders. Baseline is a planning figure and ' +
-      "was not intended to be exceeded, as it is used to set next quarter's baseline.\n\n" +
-      'I have not forwarded these numbers upward. I have retained them, which protects both of us, ' +
-      'and I would ask you to read that generously.',
-    dot: "you're making the numbers move. numbers moving makes people upstairs look at the numbers.",
-    legal: ['Retention of performance data does not constitute a record.'],
+      'You beat the target in [n] of [m] levels. The target was not meant to be beaten. ' +
+      'It is used to set the next one.\n\n' +
+      'I have not sent these numbers to management. I kept them. That is meant kindly.',
+    dot: 'your numbers are going up. then the managers start to look.',
+    legal: ['Keeping these numbers does not make them a record.'],
   },
   {
     rank: 4,
-    grade: 'EXCEPTIONAL (NON-BINDING)',
+    grade: 'EXCEPTIONAL (UNOFFICIAL)',
     min: 75,
     body:
-      '[n] gold results. Finance have asked whether the tick budgets were set correctly. They ' +
-      'were. I have told them they were. They have asked again.\n\n' +
-      'Please understand that when a contractor performs at this level, the question the site asks ' +
-      'is not "how", it is "why is this possible", and that question has historically been resolved ' +
-      'by adjusting the budgets.\n\n' +
-      'Contractor #4470 held this grade for two consecutive quarters.',
-    dot: "4470 got this grade too. i'd slow down. i wouldn't, but i'd say it.",
-    legal: ['"Exceptional" is descriptive and confers no entitlement, escalation, or standing.'],
+      '[n] gold results. Finance asked if par was wrong. It was not. ' +
+      'They asked again.\n\n' +
+      'Usually the site fixes this by changing par.\n\n' +
+      'Contractor #4470 had this grade for half a year.',
+    dot: '4470 got this grade too. be careful.',
+    legal: ['"Exceptional" gives you no rights.'],
   },
   {
     rank: 5,
     grade: 'RETAINED',
     min: 100,
     body:
-      'Every work order issued to you is closed at or under par. There is no grade above this one. ' +
-      'There has never needed to be.\n\n' +
-      'Your engagement has been marked for retention. Retention is not a promotion, a bonus, or a ' +
-      'term of employment. It is a flag on a record that prevents the record from being closed.\n\n' +
-      'Contractor #4470 is also retained. I have never been able to withdraw it.',
-    dot: 'hey. good work. genuinely. now go and look at what "retained" means in the glossary.',
-    legal: ['Retention persists beyond the term of the engagement.', 'See footnote 7.'],
+      'Every level is closed at or under par. There is no higher grade.\n\n' +
+      'Your record is now marked "retained", which means kept. That is not a promotion. ' +
+      'It means your record can never be closed.\n\n' +
+      'Contractor #4470 is also retained. I have never been able to remove it.',
+    dot: 'hey. good work. really. kept forever is a long time.',
+    legal: ['A retained record stays after the contract ends.', 'See footnote 7.'],
   },
 ];
 

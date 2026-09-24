@@ -25,8 +25,8 @@ export function at(pos: Vec): string {
   return `(${String(pos.x)}, ${String(pos.y)})`;
 }
 
-function swings(n: number): string {
-  return `${String(n)} swing${n === 1 ? '' : 's'}`;
+function tries(n: number): string {
+  return `${String(n)} ${n === 1 ? 'try' : 'tries'}`;
 }
 
 function wastedSwingsAt(ctx: ObjectiveContext, kind: 'harvest' | 'plant', pos: Vec): number {
@@ -88,8 +88,8 @@ function firstEmptySwing(ctx: ObjectiveContext): Divergence | undefined {
   if (swing === undefined) return undefined;
   return {
     where: `tick ${String(swing.t)} · ${at(swing.at)}`,
-    expected: 'a swing that finds something',
-    received: 'the arm came back empty',
+    expected: 'a harvest that takes a crop',
+    received: 'harvest took nothing',
   };
 }
 
@@ -197,7 +197,7 @@ export function leftUnripeStanding(label = 'Leave every unripe crop where it is'
   );
 }
 
-export function everyTilePlanted(label = 'Leave every soil tile planted'): Objective {
+export function everyTilePlanted(label = 'Leave every tile planted'): Objective {
   const done = (ctx: ObjectiveContext): number =>
     soilTiles(ctx.initialWorld).filter((at) => tileAt(ctx.world, at)?.crop !== undefined).length;
   return Objectives.custom(
@@ -215,7 +215,7 @@ export function everyTilePlanted(label = 'Leave every soil tile planted'): Objec
         return {
           where: at(bare),
           expected: 'planted',
-          received: wasted === 0 ? 'still bare' : `${swings(wasted)}, nothing sown`,
+          received: wasted === 0 ? 'still bare' : `${tries(wasted)}, nothing sown`,
         };
       },
     },
@@ -241,7 +241,7 @@ export function harvestedEvery(
       return {
         where: at(left),
         expected: 'harvested',
-        received: wasted === 0 ? 'never harvested' : `${swings(wasted)}, nothing taken`,
+        received: wasted === 0 ? 'never harvested' : `${tries(wasted)}, nothing taken`,
       };
     },
   });
@@ -294,7 +294,7 @@ function firstWastedSwing(ctx: ObjectiveContext): Divergence | undefined {
   const arm = first.kind === 'harvest' ? 'harvest took nothing' : 'plant sowed nothing';
   return {
     where: `tick ${String(first.t)} · ${at(first.at)}`,
-    expected: 'a swing that finds something',
+    expected: 'a harvest or plant that works',
     received: clipValue(`${arm}, ${String(wasted)} wasted in all`),
   };
 }
@@ -305,9 +305,7 @@ export function noWastedFieldwork(label = 'Waste no harvest and no planting'): O
   });
 }
 
-export function noFailedHarvests(
-  label = 'Never swing at a hopper that is already full',
-): Objective {
+export function noFailedHarvests(label = 'No harvest when the hopper is full'): Objective {
   return Objectives.custom('no-failed-harvests', label, (ctx) => harvestCalls(ctx).failed === 0, {
     divergence: firstEmptySwing,
   });
@@ -328,8 +326,8 @@ export function harvestedNothingTwice(label = 'One harvest per ripe crop, no mis
         const { ok } = harvestCalls(ctx);
         return {
           where: 'the arm',
-          expected: `${String(ripeAtStart(ctx.initialWorld).length)} swings`,
-          received: `${String(ok)} swings`,
+          expected: `${String(ripeAtStart(ctx.initialWorld).length)} harvests`,
+          received: `${String(ok)} harvests`,
         };
       },
     },

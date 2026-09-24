@@ -73,7 +73,7 @@ export function parkedOnPad(label = 'Park the bot on the landing pad'): Objectiv
   );
 }
 
-export function inspectedEveryTile(label = 'Enter every floor tile in the bay'): Objective {
+export function inspectedEveryTile(label = 'Visit every floor tile'): Objective {
   const total = (ctx: ObjectiveContext): Vec[] => walkableTiles(ctx.initialWorld);
   const done = (ctx: ObjectiveContext): number => {
     const seen = visitedTiles(ctx);
@@ -86,7 +86,7 @@ export function inspectedEveryTile(label = 'Enter every floor tile in the bay'):
       const seen = visitedTiles(ctx);
       const skipped = total(ctx).find((tile) => !seen.has(key(tile)));
       if (skipped === undefined) return undefined;
-      return { where: at(skipped), expected: 'entered at least once', received: 'never entered' };
+      return { where: at(skipped), expected: 'visited', received: 'never visited' };
     },
   });
 }
@@ -98,7 +98,7 @@ const BLOCKED_BY: Readonly<Record<string, string>> = Object.freeze({
   dead: 'a bot that had stopped running',
 });
 
-export function noBlockedMoves(label = 'Finish without a single blocked move'): Objective {
+export function noBlockedMoves(label = 'No blocked moves'): Objective {
   return Objectives.custom('no-blocked-moves', label, (ctx) => blockedMoves(ctx) === 0, {
     divergence: (ctx) => {
       const bump = ctx.trace.events.find(
@@ -147,7 +147,7 @@ export function rationedSurvey(reads: number, waste: number, label: string): Obj
           };
         }
         return {
-          where: 'ticks beyond the shortest route',
+          where: 'wasted steps',
           expected: `at most ${String(waste)}`,
           received: String(wastedTicks(ctx)),
         };
@@ -183,7 +183,7 @@ export function fewerMovesThanFloorTiles(label: string): Objective {
       if (over === undefined) return undefined;
       return {
         where: `tick ${String(over.t)} · ${at(over.from)}`,
-        expected: `${String(allowed)} moves, one under the floor count`,
+        expected: `at most ${String(allowed)} moves`,
         received: `move ${String(allowed + 1)} of ${String(movesIssued(ctx))}`,
       };
     },

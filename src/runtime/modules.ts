@@ -382,9 +382,7 @@ export function stripLibraryExports(emittedJs: string, options: StripOptions = {
     if (statement.keyword === 'import') {
       problems.push({
         line: statement.line,
-        message:
-          'The library cannot import anything. It is the bottom of the stack: every function ' +
-          'the bot offers is already available to it as a global.',
+        message: 'lib.ts cannot import anything. All bot commands are already available in it.',
       });
       continue;
     }
@@ -396,16 +394,14 @@ export function stripLibraryExports(emittedJs: string, options: StripOptions = {
     if (/^default\b/.test(rest)) {
       problems.push({
         line: statement.line,
-        message:
-          'The library has no default export. Every subroutine is published under its own name, ' +
-          'so the level that imports it can say which one it means.',
+        message: 'lib.ts has no default export. Export each function by name.',
       });
       continue;
     }
     if (rest.startsWith('*')) {
       problems.push({
         line: statement.line,
-        message: 'The library cannot re-export another module. There is no other module.',
+        message: 'lib.ts cannot re-export another module.',
       });
       continue;
     }
@@ -417,7 +413,7 @@ export function stripLibraryExports(emittedJs: string, options: StripOptions = {
       if (/\bfrom\b/.test(rest.slice(close + 1))) {
         problems.push({
           line: statement.line,
-          message: 'The library cannot re-export another module. There is no other module.',
+          message: 'lib.ts cannot re-export another module.',
         });
         continue;
       }
@@ -432,9 +428,7 @@ export function stripLibraryExports(emittedJs: string, options: StripOptions = {
     if (!head) {
       problems.push({
         line: statement.line,
-        message:
-          'This is not something the library knows how to publish. Export a function, a class, ' +
-          'or a `const`.',
+        message: 'lib.ts can only export a function, a class or a `const`.',
       });
       continue;
     }
@@ -468,7 +462,7 @@ export function stripLibraryExports(emittedJs: string, options: StripOptions = {
     if (seen.has(entry.name)) {
       problems.push({
         line: 1,
-        message: `\`${entry.name}\` is published twice. The repository keeps one subroutine per name.`,
+        message: `\`${entry.name}\` is published twice. The library keeps one function per name.`,
       });
       continue;
     }
@@ -524,8 +518,7 @@ export function rewriteProgramImports(emittedJs: string): ProgramModule {
       problems.push({
         line: statement.line,
         message:
-          'A level program cannot export anything. Publish the subroutine to `lib.ts` instead, ' +
-          'and the next work order can import it.',
+          'Your program cannot export anything. Put the function in `lib.ts` instead.',
       });
       continue;
     }
@@ -535,15 +528,13 @@ export function rewriteProgramImports(emittedJs: string): ProgramModule {
     const moduleName = specifier?.[2] ?? bare?.[2];
 
     if (moduleName === undefined) {
-      problems.push({ line: statement.line, message: 'This import has no module to import from.' });
+      problems.push({ line: statement.line, message: 'This import does not name a module.' });
       continue;
     }
     if (moduleName !== LIB_SPECIFIER) {
       problems.push({
         line: statement.line,
-        message:
-          `There is no module \`${moduleName}\`. The only module on this site is \`'lib'\`, the ` +
-          'Shared Subroutines Repository.',
+        message: `There is no module \`${moduleName}\`. The only module is \`'lib'\`, your library.`,
       });
       continue;
     }
@@ -604,7 +595,7 @@ function importBinding(
   problems.push({
     line,
     message:
-      'The library has no default export. Name the subroutines you want: ' +
+      'lib.ts has no default export. Name the functions you want: ' +
       "`import { pathTo } from 'lib';`",
   });
   return undefined;
@@ -784,9 +775,8 @@ export class MissingLibraryError extends Error {
   readonly wanted: readonly string[];
   constructor(wanted: readonly string[]) {
     super(
-      `This work order imports ${wanted.map((n) => `\`${n}\``).join(', ')} from \`'lib'\`, but the ` +
-        'Shared Subroutines Repository is empty on this unit. Write the subroutine here, or ' +
-        'publish it from a work order you have already closed.',
+      `This level imports ${wanted.map((n) => `\`${n}\``).join(', ')} from \`'lib'\`, but ` +
+        'your library does not have them. Write them here, or publish them from a finished level.',
     );
     this.name = 'MissingLibraryError';
     this.wanted = wanted;

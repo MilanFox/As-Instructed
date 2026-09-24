@@ -179,15 +179,15 @@ const leftTheOrder = (ctx: ObjectiveContext): Divergence | undefined => {
   if (declared.length === 0) {
     return {
       where: 'the order',
-      expected: 'ids printed before the first step',
-      received: droveFirst ? 'the bot stepped off first' : NOTHING,
+      expected: 'ids printed before the first move',
+      received: droveFirst ? 'the bot moved first' : NOTHING,
     };
   }
   if (matched === declared.length && matched === latched.length) return undefined;
   const said = declared[matched];
   const took = latched[matched];
   return {
-    where: `latch ${String(matched + 1)}`,
+    where: `switch ${String(matched + 1)}`,
     expected: said ?? 'the list to end here',
     received: took ?? 'the run stopped here',
   };
@@ -200,67 +200,37 @@ export const w5_01: LevelDef = {
   title: 'Mains',
   hardware: ['probe', 'use'],
   brief: [
-    '**MEMO KD-2488**',
-    '**FROM:** Dep. Coordinator M. Vance\\',
-    '**RE:** Feeder line 7, energisation',
+    'Two crews built this line from opposite ends and numbered it with confidence. The planners want your switching order before you start, for their wall. — M. Vance',
     '',
-    'Feeder line 7 was laid by two crews working inward from opposite ends. Neither recorded',
-    'which end it started from, and both stencilled cabinet numbers as they went, so the',
-    'numbers are labels and nothing more. Line 7 also predates the addressed loop, so every',
-    'cabinet on it is hand-throw. Scheduling want the switching order in advance;',
-    'filed afterwards it is a report, not a plan.',
-    '',
-    'Bring every substation on the line to `on`. One throw each — Safety counts the handles.',
+    '**The reactor feeds a line of substations. Each one needs the one before it on. Switch them all on, one `use()` each.**',
   ].join('\n'),
   board: {
-    fixed: [
-      'feeder line 7 is one row of cable, twenty tiles long, walled on every side',
-      'the reactor sits on one end of it, already on, and RIG-01 starts on the reactor',
-      'every substation starts off, and the chain runs outward from the reactor',
-      'the number in a substation id is a stencilled label, not its place on the line',
-    ],
     redrawn: [
-      'which end of the line the reactor sits on',
-      'six to nine substations',
-      'the gaps between them',
-      'which id got stencilled on which substation',
+      'which end the reactor is at',
+      'six to nine substations, and the gaps between them',
+      'which id is on which substation',
     ],
   },
   facts: [
     {
-      label: 'The line',
+      label: 'Substations',
       value:
-        'One row of cable (a terrain), walkable, walled on every side. The bot starts on the reactor. The substations run away from it in one straight line.',
+        'Ids are `sub-1`, `sub-2`, …; `probe` returns `null` after the last. Probing is free. The id number is not its place on the line: `vars.index` is (the reactor is 0). All start off.',
+    },
+    {
+      label: 'Feeder',
+      value:
+        "A substation's feeder is the one before it on the line; `vars.feed` is the feeder's index. The reactor is at one end, already on; RIG-01 starts on it. A substation counts only if its feeder was on when you switched it. A switch too early never counts, even if you switch it again later.",
     },
     {
       label: '`use()`',
       value:
-        'Steps the substation under the bot one place along its cycle, `off` → `on` → `off`. Costs 2 ticks, so a second call takes the same station back off again. Line 7 is hand-throw gear: a substation moves for nothing else, and `probe(id).vars.manual` is 1 on every one.',
+        'Switches the substation under the bot, not one beside it, off to on or on to off, for 2 ticks. Substations have no `fed:` key, so it works even if the feeder is off. Every call counts, even on plain cable.',
     },
     {
-      label: 'Latch handles',
+      label: 'Switching order',
       value:
-        'The shift carries one throw per substation and no more. Every `use()` call counts against it, including the ones that hit bare cable.',
-    },
-    {
-      label: 'Latching',
-      value:
-        '`use()` flips a substation on either way. It only **counts** if the machine feeding it was already `on`, and a station latched early stays uncounted for the rest of the shift — there is no repairing it later.',
-    },
-    {
-      label: '`probe(id)`',
-      value:
-        'Reads any machine anywhere, for free. The ids run `sub-1` upward; past the last one it returns `null`. Which id sits where on the line is not fixed.',
-    },
-    {
-      label: 'What a station reports',
-      value:
-        '`index` — its place in the chain, the reactor being 0, and not the number in its id. `feed` — the index of the machine that feeds it. `at` — the tile it stands on.',
-    },
-    {
-      label: 'The order',
-      value:
-        'For the star: before the first step, print the substation ids in the order the bot is going to latch them — a four-station line would file `sub-4 sub-1 sub-6 sub-2`. One line holds the lot. Every `sub-n` printed before that first step is read as part of the order and the rest of the text is ignored; the reactor is not named. The star is earned if the run then latches exactly those stations, in that order, and latches no other.',
+        "For the star, print the ids in switching order before the bot's first step, like `sub-4 sub-1 sub-6`. Every `sub-n` printed before that step counts. The run must then switch exactly those, in that order.",
     },
   ],
   seeds: [1, 2, 3],
@@ -310,7 +280,7 @@ export const w5_01: LevelDef = {
     ),
     Objectives.custom(
       'in-order',
-      'Latch each substation only after its feeder is live',
+      'Switch each substation on only after its feeder is on',
       (ctx) => orderedCount(ctx) === substations(ctx.world).length,
       {
         progress: (ctx) => [orderedCount(ctx), substations(ctx.world).length],
@@ -319,7 +289,7 @@ export const w5_01: LevelDef = {
     ),
     Objectives.custom(
       'one-throw-each',
-      'Call `use()` once per substation and no more',
+      'Call `use()` once per substation and nowhere else',
       (ctx) => throwsTaken(ctx) <= throwsAllowed(ctx),
       {
         meter: { kind: 'events', event: 'use' },
@@ -336,7 +306,7 @@ export const w5_01: LevelDef = {
   bonus: [
     Objectives.custom(
       'order-declared',
-      'Print the latch order before walking it',
+      'Print the switching order before the first move',
       latchedWhatItSaid,
       {
         progress: orderProgress,
@@ -345,16 +315,16 @@ export const w5_01: LevelDef = {
     ),
   ],
   starter: [
-    '// probe(id) reads any machine in the world. use() switches the one under the bot.',
+    '// probe(id) reads any machine. use() switches the one under the bot.',
     '',
     "const reactor = probe('reactor');",
     '',
   ].join('\n'),
   hints: [
-    'The reactor is not at the same end every shift. Where it is, is in the world, and reading the world costs nothing.',
-    'probe() answers about any machine by id, not only the one under the bot. Ask about a station that might not be there and it tells you so.',
-    'Every substation reports the index of the machine that feeds it. Start at the reactor and follow that chain outward; the order comes out of the chain, not out of the stencilled number.',
-    'Nothing about the order needs the bot to move. probe() answers while RIG-01 is still standing on the reactor, so the whole list can be filed before the first step.',
+    'The reactor is not always at the same end. Probe it to find out.',
+    'Probe sub-1, sub-2, and so on until you get null. Now you have every substation.',
+    'Each substation names its feeder. Start at the reactor and follow the chain outward.',
+    'You can work out the whole order before the bot moves. Print it, then walk it.',
   ],
   docs: ['probe', 'use', 'move'],
 };

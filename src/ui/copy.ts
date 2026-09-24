@@ -6,31 +6,31 @@ function pick(lines: readonly string[], salt: number): string {
 }
 
 const BRONZE = [
-  'It works. Kessler & Daughters asks for nothing further, and means it.',
-  'Passed. Filed. Forwarded to somebody who will not read it.',
-  'Work order closed. You may close it too.',
+  'It works. Nobody asks for more.',
+  'Passed. That is enough for bronze.',
+  'It works. Faster would earn more.',
 ];
 
 const SILVER = [
-  'Under budget. Not the budget we hoped for. A budget.',
-  'Efficient. Noted. Not, at this time, rewarded.',
-  'Dot looked at your trace and said nothing. That is high praise.',
+  'Fast. Not quite fast enough for gold.',
+  'Good time. Gold needs a better one.',
+  'Silver. Gold needs fewer ticks.',
 ];
 
 const GOLD = [
-  'At par. Somebody upstairs will assume par was set wrong.',
-  'Gold. The number is small and the number is correct.',
-  'Par met. Facilities asked whether the meter is broken. It is not.',
+  'At par. Someone will think par is wrong.',
+  'Gold. At par, and correct.',
+  'Par met. The tick counter is not broken.',
 ];
 
 const CLOSED = [
-  'Work order closed. Kessler & Daughters has no notes.',
-  'Closed. The job had one shape, and you found it.',
-  'Closed. Nothing further is expected.',
+  'Level closed.',
+  'Closed. You found the way.',
+  'Closed. Nothing more to do.',
 ];
 
-export const UNDER_PAR = 'Under par. Par has been adjusted. This is how it has always worked.';
-export const BONUS_MET = 'Bonus met. There is no bonus. There is a star.';
+export const UNDER_PAR = 'Under par. We will have to set a new par.';
+export const BONUS_MET = 'Bonus met. You get a star.';
 
 export function successLine(medal: Medal | null, ticks: number, parTicks: number): string {
   if (medal === null) return pick(CLOSED, ticks);
@@ -41,48 +41,40 @@ export function successLine(medal: Medal | null, ticks: number, parTicks: number
 }
 
 export function personalBestLine(previous: number, now: number): string {
-  return `Your own record, lowered by ${previous - now}. The old figure has been retained.`;
+  const saved = previous - now;
+  return `New personal best: ${saved} tick${saved === 1 ? '' : 's'} faster.`;
 }
 
 export function libraryUsageLine(routines: number, ticks: number): string {
-  const called = `${routines} routine${routines === 1 ? '' : 's'} from the Repository`;
-  return `${called}, ${ticks} tick${ticks === 1 ? '' : 's'} inside ${routines === 1 ? 'it' : 'them'}.`;
+  const called = `Used ${routines} function${routines === 1 ? '' : 's'} from your library`;
+  return `${called}: ${ticks} tick${ticks === 1 ? '' : 's'} inside ${routines === 1 ? 'it' : 'them'}.`;
 }
 
-export const NO_PENALTY = 'Nothing was billed. Attempts are not recorded against you.';
-
 const HALT = [
-  'Your program did not halt. We stopped it. We would like this noted on the record.',
-  'Still running. It has been running for some time. It has not been going anywhere.',
-  'Stopped at the tick budget. It showed no sign of ever intending to stop on its own.',
+  'Your program did not stop. We stopped it.',
+  'Still running, but doing nothing new. We stopped it.',
+  'Stopped at the tick limit.',
 ];
 
-const UNMET = [
-  'Run complete. The objective that counts is still open.',
-  'Shift ended. The work did not.',
-];
+const UNMET = ['Run over. An objective is not met.', 'The run ended. The work is not done.'];
 
 const BY_CODE: Partial<Record<FailureCode, readonly string[]>> = {
   [FailureCode.Halt]: HALT,
-  [FailureCode.OpLimit]: [
-    'Stopped at the instruction budget. It sensed a great deal and did very little.',
-  ],
+  [FailureCode.OpLimit]: ['Stopped at the instruction limit. Too much checking, too little doing.'],
   [FailureCode.Timeout]: HALT,
   [FailureCode.ObjectivesUnmet]: UNMET,
   [FailureCode.OutOfFuel]: [
-    'Cell depleted. The bot is where it ran out, and that is where it is staying.',
-    'Out of charge. Recovery has been scheduled for a date to be confirmed.',
+    'Out of fuel. The bot stays where it stopped.',
+    'No charge left. The bot cannot move.',
   ],
-  [FailureCode.Crash]: ['The program stopped itself. It did not say why. It rarely does.'],
-  [FailureCode.BlockedLivelock]: [
-    'Two bots have each yielded to the other. They are still yielding.',
-  ],
-  [FailureCode.BotLost]: ['The bot is not recoverable. Shipping have been informed.'],
+  [FailureCode.Crash]: ['The program stopped with an error. See the console.'],
+  [FailureCode.BlockedLivelock]: ['Two bots are each waiting for the other. Forever.'],
+  [FailureCode.BotLost]: ['The bot is lost.'],
   [FailureCode.IllegalAction]: [
-    'The bot declined the instruction. The console says why, in full.',
-    'Instruction refused, with a reason attached. It is in the console.',
+    'The bot refused a command. The console says why.',
+    'Command refused. The reason is in the console.',
   ],
-  [FailureCode.Compile]: ['It did not compile. Nothing was dispatched, so nothing was billed.'],
+  [FailureCode.Compile]: ['The program did not compile. Nothing ran.'],
 };
 
 export function failureLine(code: FailureCode | undefined, salt: number): string {
@@ -111,192 +103,48 @@ export function codeForKind(kind: RuntimeFailure['kind'] | undefined): FailureCo
   }
 }
 
-export function seedFailureLine(passedSeed: number, failedSeed: number): string {
-  return `Passed on seed ${passedSeed}. Failed on seed ${failedSeed}. The field is not always the same field.`;
-}
-
-export const VERDICT_PASS = 'work order closed';
-export const VERDICT_FAIL = 'work order open';
-
 export interface HardwareNote {
   spec: string;
-  opens: string;
 }
 
 const HARDWARE: Record<string, HardwareNote> = {
-  move: {
-    spec: 'Moves the bot one tile in a direction. Returns false if the way is blocked. Costs 1 tick.',
-    opens: 'The bot can be somewhere other than where it was left.',
-  },
-  pos: {
-    spec: "Returns the bot's tile as { x, y }. Sensing is free.",
-    opens: 'You can know where it is without anybody walking out to look.',
-  },
-  canMove: {
-    spec: 'Returns whether a move in a direction would succeed. Sensing is free.',
-    opens: 'The wall can be asked about before it is met.',
-  },
-  print: {
-    spec: 'Writes one line to the console at the current tick. Sensing is free.',
-    opens: 'The bot can tell you what it believes it is doing.',
-  },
-  wait: {
-    spec: 'Holds the bot for n ticks. Costs n ticks.',
-    opens: 'Doing nothing becomes something you can schedule.',
-  },
-  scan: {
-    spec: "Returns what is on a neighbouring tile, or on the bot's own. Sensing is free.",
-    opens: 'The bot stops needing to be told what is in front of it.',
-  },
-  harvest: {
-    spec: "Takes the crop on the bot's tile into inventory. Costs 2 ticks.",
-    opens: 'The fields can be worked without a person standing in one.',
-  },
-  plant: {
-    spec: "Plants one seed from inventory on the bot's tile. Costs 2 ticks.",
-    opens: 'What was taken can be put back, which Legal prefers we mention.',
-  },
-  inventory: {
-    spec: 'Returns how many items the bot is carrying, of one kind or in total. Sensing is free.',
-    opens: 'The bot can check its own pockets.',
-  },
-  mine: {
-    spec: 'Breaks the deposit on a neighbouring tile into inventory. Costs 2 ticks.',
-    opens: 'Rock becomes stock. The paperwork treats these as the same thing.',
-  },
-  pickup: {
-    spec: "Lifts a loose item from the bot's tile. Costs 1 tick.",
-    opens: 'Things on the ground stop being where they are.',
-  },
-  drop: {
-    spec: "Places a carried item on the bot's tile. Costs 1 tick.",
-    opens: 'A crate can end its day somewhere it was meant to.',
-  },
-  carrying: {
-    spec: 'Returns what the bot is holding. Sensing is free.',
-    opens: 'The manifest can be checked against the bot rather than against the manifest.',
-  },
-  use: {
-    spec: 'Operates the machine on or beside the tile. Costs 2 ticks.',
-    opens: 'The line has substations. Nobody has ever been sent out to throw one.',
-  },
-  look: {
-    spec: 'Returns the tiles the bot can see along one direction. Sensing is free.',
-    opens: 'The dark stops being uniformly dark.',
-  },
-  mark: {
-    spec: "Writes a line of text onto the bot's current tile. Persists for the run. Costs 1 tick.",
-    opens: 'The tunnels can be made to remember you were there.',
-  },
-  readMark: {
-    spec: "Returns the text written on the bot's tile, or null when it carries none. Sensing is free.",
-    opens: 'A corridor you have already walked can say so.',
-  },
-  power: {
-    spec: 'Sets a machine to a given state directly, by id. Costs 2 ticks.',
-    opens: 'The grid can be set rather than only read.',
-  },
-  probe: {
-    spec: 'Tests one node and reports its state. Sensing is free, but levels may budget it.',
-    opens: 'You can ask the grid a question. The grid counts how often you ask.',
-  },
-  link: {
-    spec: 'Runs cable between two nodes the level allows. Costs 2 ticks and spends cable.',
-    opens: 'The map stops being fixed. You are now the one drawing it.',
-  },
-  receive: {
-    spec: 'Returns the next frame on the listening band, or null when the band is quiet. Sensing is free.',
-    opens: 'Something on a dead band has been transmitting for some time.',
-  },
-  buffered: {
-    spec: 'Returns how many frames are still unread in the buffer, and takes none of them out of it. Sensing is free.',
-    opens:
-      'The band can be asked how much it is holding, before a single frame is spent finding out.',
-  },
-  transmit: {
-    spec: 'Sends one frame on the outbound band. Costs 1 tick.',
-    opens: 'The listening post can, for the first time, answer.',
-  },
-  decode: {
-    spec: "Returns the decoded payload of a frame under the level's key. Free: it is arithmetic, not an action.",
-    opens: 'Noise becomes a message, assuming it was ever noise.',
-  },
-  refuel: {
-    spec: 'Restores the bot to full charge. Only at a depot tile. Costs 2 ticks.',
-    opens: 'A bot that stops can be a bot that starts again.',
-  },
-  fuel: {
-    spec: 'Returns the charge the bot has left. Sensing is free.',
-    opens: 'You find out how far it can go before it finds out.',
-  },
-  bot: {
-    spec: 'Returns a handle to one bot by id. Every command on it is scheduled on its own clock.',
-    opens: 'There is more than one bot now. They do not wait for each other.',
-  },
-  bots: {
-    spec: 'Returns the id of every live bot. Sensing is free.',
-    opens: 'The fleet can be addressed as a fleet.',
-  },
-  clock: {
-    spec: "Returns the bot's own tick count. Sensing is free.",
-    opens: 'Each bot keeps its own time. This is the whole difficulty and the whole opportunity.',
-  },
+  move: { spec: 'Moves the bot one tile. Returns false if blocked. Costs 1 tick.' },
+  pos: { spec: "Returns the bot's tile as { x, y }. Free." },
+  canMove: { spec: 'Returns whether a move in a direction would work. Free.' },
+  print: { spec: 'Writes one line to the console. Free.' },
+  wait: { spec: 'Waits n ticks. Costs n ticks.' },
+  scan: { spec: "Returns what is on the bot's tile or a tile next to it. Free." },
+  harvest: { spec: "Takes the crop on the bot's tile. Costs 2 ticks." },
+  plant: { spec: "Plants one seed on the bot's tile. Costs 2 ticks." },
+  inventory: { spec: 'Returns how many items the bot carries. Free.' },
+  mine: { spec: 'Mines a tile next to the bot. Costs 2 ticks.' },
+  pickup: { spec: "Picks up an item from the bot's tile. Costs 1 tick." },
+  drop: { spec: "Drops a carried item on the bot's tile. Costs 1 tick." },
+  carrying: { spec: 'Returns what the bot is holding. Free.' },
+  use: { spec: 'Uses the machine on or next to the bot. Costs 2 ticks.' },
+  look: { spec: 'Returns the tiles the bot can see in one direction. Free.' },
+  mark: { spec: "Writes text on the bot's tile. It stays for the run. Costs 1 tick." },
+  readMark: { spec: "Returns the text on the bot's tile, or null. Free." },
+  power: { spec: 'Sets a machine to a state, by id. Costs 2 ticks.' },
+  probe: { spec: 'Returns the state of one node. Free, but a level may limit it.' },
+  link: { spec: 'Connects two nodes with cable. Costs 2 ticks and uses cable.' },
+  receive: { spec: 'Returns the next packet, or null when there is none. Free.' },
+  buffered: { spec: 'Returns how many packets are waiting. Free.' },
+  transmit: { spec: 'Sends one packet. Costs 1 tick.' },
+  decode: { spec: 'Returns the message inside a packet. Free.' },
+  refuel: { spec: 'Fills the bot to full charge. Only on a depot tile. Costs 2 ticks.' },
+  fuel: { spec: 'Returns the charge the bot has left. Free.' },
+  bot: { spec: 'Returns one bot by id. Each bot has its own clock.' },
+  bots: { spec: 'Returns the id of every bot still running. Free.' },
+  clock: { spec: "Returns the bot's own tick count. Free." },
   spawn: {
-    spec: 'Brings a new bot online on a neighbouring tile. Costs 5 ticks on the spawning bot. A bot holds the tile it stands on against its own clock: a second bot sent to that tile does not take a turn and does not wait, its move simply fails.',
-    opens:
-      'Robots are cheap, because they do not talk to each other. Split the ground, not the list.',
+    spec: "Starts a new bot on a tile next to this one. Costs 5 ticks. Bots cannot share a tile.",
   },
-  sync: {
-    spec: 'Advances every clock to the latest one. Costs whatever the slowest bot still owed.',
-    opens: 'A hundred independent clocks can be made to agree, at a price.',
-  },
-  send: {
-    spec: 'Delivers a message to another bot. Costs 1 tick.',
-    opens: 'Bots can tell each other things, which is how they stop queueing.',
-  },
-  recv: {
-    spec: "Returns the next message in the bot's queue, or null when it is empty. Sensing is free.",
-    opens: 'Being told something becomes a thing a bot can do.',
-  },
+  sync: { spec: 'Moves every clock forward to the latest one.' },
+  send: { spec: 'Sends a message to another bot. Costs 1 tick.' },
+  recv: { spec: 'Returns the next message for this bot, or null. Free.' },
 };
 
 export function hardwareNote(name: string): HardwareNote {
-  return (
-    HARDWARE[name] ?? {
-      spec: 'See the reference for the exact signature, cost, and edge behaviour.',
-      opens: 'Fitted to the bot. Procurement have closed the requisition.',
-    }
-  );
+  return HARDWARE[name] ?? { spec: 'See the Manual for details.' };
 }
-
-export const REQUISITION_TITLE = 'HARDWARE REQUISITION — NEW TOOLS DELIVERED';
-export const REQUISITION_FROM = 'Procurement, via Dep. Coordinator M. Vance';
-
-const REQUISITION_INTROS = [
-  'The requisition has cleared. This is unusual and we would rather not examine it.',
-  'Fitted to the bot before the paperwork cleared, which is the approved order of operations.',
-  'Delivered, installed, and logged as a capability rather than as an asset. See Appendix C.',
-  'Signed for on your behalf. The signature is not yours and the item is.',
-];
-
-export function requisitionIntro(salt: number): string {
-  return pick(REQUISITION_INTROS, salt);
-}
-
-const REQUISITION_DOT = [
-  'it works. it has always worked. nobody wrote down that it works',
-  "read the reference before you trust it. i didn't, once",
-  'this is the good one. you will use it more than they think',
-  "it's cheaper than the last version and it is better. don't ask me why",
-];
-
-export function requisitionDot(salt: number): string {
-  return pick(REQUISITION_DOT, salt);
-}
-
-export const REVIEW = {
-  from: 'Personnel & Scheduling — for information only, pending review',
-  title: 'PERFORMANCE REVIEW — CONTRACTOR #4471',
-  author: 'Deputy Site Coordinator M. Vance',
-  dismiss: 'Acknowledge receipt',
-} as const;

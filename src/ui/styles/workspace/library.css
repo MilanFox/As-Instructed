@@ -27,7 +27,8 @@
 }
 
 .workspace[data-flyout='shut'] .library-handle {
-  transition-duration: var(--ws-slam);
+  transition-duration: var(--ws-slam-time);
+  transition-timing-function: var(--ws-slam-ease);
 }
 
 /* The pair: whichever face is up is the filled one. Shut, neither is. */

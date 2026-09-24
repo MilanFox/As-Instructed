@@ -7,13 +7,12 @@ describe('the board block', () => {
   for (const level of LEVELS) {
     const exempt = FINDING_THE_SHAPE_IS_THE_PUZZLE.includes(level.id);
 
-    test(`${level.id} ${exempt ? 'withholds its shape on purpose' : 'says what its seeds share'}`, () => {
+    test(`${level.id} ${exempt ? 'withholds its shape on purpose' : 'says what changes between seeds'}`, () => {
       if (exempt) {
         expect(level.board).toBeUndefined();
         return;
       }
       expect(level.board).toBeDefined();
-      expect(level.board?.fixed.length ?? 0).toBeGreaterThan(0);
       expect(level.board?.redrawn.length ?? 0).toBeGreaterThan(0);
     });
   }

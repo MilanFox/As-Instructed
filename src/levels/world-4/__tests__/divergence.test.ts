@@ -140,7 +140,7 @@ describe('w4-03 prices the haul the run took against the shortest one', () => {
     const { met, divergence } = diverge(w4_03, seed, 'shortest-haul', () => undefined);
     expect(met).toBe(false);
     expect(divergence).toEqual({
-      where: 'the haul',
+      where: 'the route',
       expected: 'all 3 points, then the lift',
       received: '0 of 3 points',
     });
@@ -220,7 +220,7 @@ describe('the rest of World 4 names a point too', () => {
     expect(met).toBe(false);
     const shown = must(divergence, 'a divergence');
     expect(shown.where).toMatch(/^\(\d+, \d+\)$/);
-    expect(shown.expected).toBe('a breadcrumb beside it');
+    expect(shown.expected).toBe('a mark beside it');
     expect(shown.received).toBe('(nothing)');
   });
 });

@@ -78,7 +78,7 @@ describe('the ceremony still fires', () => {
 
   test('the record line is untouched — it compares the player against themselves', () => {
     expect(personalBestLine(84, TICKS)).toBe(
-      'Your own record, lowered by 6. The old figure has been retained.',
+      'New personal best: 6 ticks faster.',
     );
   });
 });

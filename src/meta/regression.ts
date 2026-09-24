@@ -340,9 +340,9 @@ export function summaryLine(summary: RegressionSummary): string {
   if (!needsAttention(summary)) return REGRESSION.clean;
   const parts: string[] = [];
   if (summary.broken > 0) {
-    parts.push(`${summary.broken} no longer ${summary.broken === 1 ? 'closes' : 'close'}`);
+    parts.push(`${summary.broken} now ${summary.broken === 1 ? 'fails' : 'fail'}`);
   }
-  if (summary.degraded > 0) parts.push(`${summary.degraded} degraded`);
+  if (summary.degraded > 0) parts.push(`${summary.degraded} got slower`);
   return `${parts.join(', ')}. ${REGRESSION.medalKept}`;
 }
 

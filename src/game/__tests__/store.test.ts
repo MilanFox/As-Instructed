@@ -219,7 +219,7 @@ describe('run state machine', () => {
     const state = useGame.getState();
     expect(state.runState).toBe('idle');
     expect(state.failure?.kind).toBe('timeout');
-    expect(state.failure?.message).toContain('did not halt');
+    expect(state.failure?.message).toContain('did not stop');
   });
 
   it('the Run button re-arms after a cancel', async () => {

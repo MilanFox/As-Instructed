@@ -69,7 +69,7 @@ const shortDepot = (ctx: ObjectiveContext): Divergence | undefined => {
       received:
         strays === 0
           ? `${crates(got)} of its class`
-          : `${crates(got)} of its class, and ${crates(strays)} that belong elsewhere`,
+          : `${crates(got)} of its class, ${String(strays)} of others`,
     };
   }
   return undefined;
@@ -114,57 +114,29 @@ export const w3_02: LevelDef = {
   title: 'Sorted by Colour',
   hardware: ['carrying'],
   brief: [
-    '```',
-    'MEMO KD-2302',
-    'FROM: Dep. Coordinator M. Vance',
-    'RE:   Routing terminology',
+    'Stock control closes a depot as soon as you leave it. Opening it again takes a form, and the form takes three weeks. — M. Vance',
     '',
-    '"Shortcut" is not an approved routing term. Log it as an efficiency',
-    'and I will approve it retroactively, which is the only direction in',
-    'which I am able to approve things.',
-    '',
-    'Stock control closes a pad the moment you leave it.',
-    '```',
-    '',
-    'Every crate belongs on the depot pad stencilled with its class.',
+    '**Sort the crates. Carry them one at a time to the depot painted with their class.**',
   ].join('\n'),
   board: {
-    fixed: [
-      'the yard is 14 wide and 10 deep inside its wall',
-      'open floor throughout — any tile is reachable by running along `x`, then along `y`',
-      'one depot pad for each class the yard is stocking',
-      'every crate on the floor has a depot painted for its class',
-      'one crate to a tile, and no crate starts on a pad',
-      'RIG-04 works the yard with a one-crate clamp',
-    ],
     redrawn: [
-      'four or five classes stocked',
+      'four or five classes',
       'which pad takes which class',
-      'where the depot pads stand',
-      'eight to fourteen crates, and how they divide between the classes',
-      'the tile RIG-04 starts on',
+      'where the pads are',
+      'eight to fourteen crates, and how many of each class',
+      'where the bot starts',
     ],
   },
   facts: [
     {
-      label: 'The crates',
+      label: 'Class',
       value:
-        'Crates (an item) lying loose on the yard floor. A crate has no stencil — its class is the kind of item it is.',
+        "A crate's item kind. `scan(dir).items` shows it. The crate has no paint. The bot carries one crate at a time.",
     },
     {
-      label: '`scan(dir).mark`',
-      value: 'Reads a stencil. Gives back the class name, or `null` on an unpainted tile.',
-    },
-    {
-      label: 'The stencils',
+      label: 'Depot',
       value:
-        'Repainted between shifts. Where the depot pads stand changes, which pad takes which class changes, and so does how many classes the yard is stocking.',
-    },
-    { label: 'The clamp', value: 'One crate at a time.' },
-    {
-      label: 'Finished in one go',
-      value:
-        'The last crate of a class delivered before the first crate of the next. Come back to a pad later and it counts as started twice.',
+        'A pad painted with one class. `scan(dir).mark` reads the paint. One depot for each class. A depot is finished when it has every crate of its class. It is started by the first crate dropped on it. Walking over it does not count.',
     },
   ],
   seeds: [1, 2, 3, 4],
@@ -202,7 +174,7 @@ export const w3_02: LevelDef = {
   bonus: [
     Objectives.custom(
       'one-depot-at-a-time',
-      'Finish each depot before you start the next',
+      'Finish each depot before you bring a crate to the next',
       (ctx) => depotSwitches(ctx) <= depotsWorked(ctx.initialWorld) - 1,
       {
         progress: (ctx) => [depotSwitches(ctx), Math.max(0, depotsWorked(ctx.initialWorld) - 1)],
@@ -212,20 +184,18 @@ export const w3_02: LevelDef = {
   ],
   budget: { maxTicks: 4000 },
   starter: [
-    '// NOTE(4470): the stencils on the depots get repainted between shifts',
-    '// NOTE(4470): they do not always get repainted the same way',
+    '// NOTE(4470): the depots move between shifts. so do their colours.',
     '',
-    '// Park in the northwest corner of the yard and work from there.',
+    '// Start from the north-west corner.',
     'while (canMove(Dir.West)) move(Dir.West);',
     'while (canMove(Dir.North)) move(Dir.North);',
     '',
   ].join('\n'),
   hints: [
-    'The stencil on a depot pad says which class belongs there. It is repainted between shifts.',
-    'You will walk past a crate long before you have found the depot that takes it.',
-    'A chain of if-statements has a fixed number of branches. The yard does not have a fixed number of classes.',
-    'Two things change every shift: where each depot is, and which class it takes.',
-    'The table that says where a class belongs will also say what order to work the yard in.',
+    'Depots and their classes change every shift. Read them on every run.',
+    'You will pass crates before you find their depot.',
+    'A chain of ifs has a fixed number of branches. The number of classes is not fixed.',
+    'A depot is finished only when every crate of its class is on it.',
   ],
   docs: ['scan', 'carrying'],
 };

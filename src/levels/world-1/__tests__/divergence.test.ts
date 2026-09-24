@@ -88,7 +88,7 @@ describe('w1-02 says which half of the ration ran out', () => {
 
     expect(met).toBe(false);
     expect(divergence).toEqual({
-      where: 'ticks beyond the shortest route',
+      where: 'wasted steps',
       expected: 'at most 5',
       received: String(overshoot - manhattan({ x: 1, y: 1 }, padOf(w1_02, 1))),
     });
@@ -102,8 +102,8 @@ describe('w1-03 names a tile rather than a shortfall', () => {
     expect(met).toBe(false);
     expect(divergence).toEqual({
       where: at({ x: 2, y: 1 }),
-      expected: 'entered at least once',
-      received: 'never entered',
+      expected: 'visited',
+      received: 'never visited',
     });
   });
 
@@ -119,7 +119,7 @@ describe('w1-03 names a tile rather than a shortfall', () => {
     expect(met).toBe(false);
     expect(divergence).toEqual({
       where: `tick ${String(allowed)} · ${at({ x: (allowed + 1) % 2 === 1 ? 1 : 2, y: 1 })}`,
-      expected: `${String(allowed)} moves, one under the floor count`,
+      expected: `at most ${String(allowed)} moves`,
       received: `move ${String(allowed + 1)} of ${String(filed)}`,
     });
   });

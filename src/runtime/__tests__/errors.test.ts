@@ -163,7 +163,7 @@ describe('rewriteMessage', () => {
       wrapperOffset: 2,
       unlocked,
     });
-    expect(message).toContain('`scan()` is not installed');
+    expect(message).toContain('`scan()` is not available yet');
     expect(message).toContain('w2-01');
   });
 
@@ -270,7 +270,7 @@ describe('toRuntimeFailure', () => {
   test('LivelockError keeps its own code', () => {
     const failure = toRuntimeFailure(new LivelockError([0, 1], 8), context);
     expect(failure.code).toBe('blocked-livelock');
-    expect(failure.message).toContain('Livelock');
+    expect(failure.message).toContain('Stuck');
   });
 
   test('a player error is rewritten and located', () => {
@@ -305,7 +305,7 @@ describe('timeoutFailure', () => {
   test('says the program did not halt, and how long it was given', () => {
     const failure = timeoutFailure(5000);
     expect(failure.kind).toBe('timeout');
-    expect(failure.message).toContain('did not halt');
+    expect(failure.message).toContain('did not stop');
     expect(failure.message).toContain('5000 ms');
   });
 });

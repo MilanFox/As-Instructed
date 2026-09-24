@@ -57,7 +57,7 @@ export function createMetaRunner(options: {
           return {
             passed: false,
             ticks: 0,
-            failure: { message: 'lib.ts does not build.', file: 'lib' },
+            failure: { message: 'lib.ts has an error.', file: 'lib' },
           };
         }
       }

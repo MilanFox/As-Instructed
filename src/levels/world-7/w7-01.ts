@@ -1,5 +1,13 @@
-import type { Divergence, ObjectiveContext, World } from '../../engine/index.ts';
+import type {
+  Divergence,
+  ObjectiveContext,
+  RecvEvent,
+  SendEvent,
+  Vec,
+  World,
+} from '../../engine/index.ts';
 import {
+  DEFAULT_COSTS,
   Dir,
   NOTHING,
   Objectives,
@@ -13,22 +21,15 @@ import {
   vec,
 } from '../../engine/index.ts';
 import type { LevelDef } from '../types.ts';
-import {
-  at,
-  botsOnPads,
-  heardFromAnother,
-  idleTicks,
-  localSeed,
-  matchingPrefix,
-  reportedLines,
-} from './shared.ts';
+import { at, botsOnPads, localSeed, reportedLines } from './shared.ts';
 
 const HEIGHT = 5;
 const MAX_LEN = 9;
 const WIDTH = MAX_LEN + 3;
+const SEND_TICKS = DEFAULT_COSTS.send;
 
 const LENGTHS: Record<number, [number, number]> = {
-  1: [6, 5],
+  1: [7, 4],
   2: [3, 9],
   3: [6, 6],
 };
@@ -47,14 +48,54 @@ function padColumn(world: World, row: number): number {
   return -1;
 }
 
-function idleReport(ctx: ObjectiveContext): string[] {
-  return ctx.initialWorld.bots.map(
-    (bot) => `idle ${String(bot.id)} ${String(idleTicks(ctx.trace.events, new Set([bot.id])))}`,
-  );
+function waitedTicks(ctx: ObjectiveContext, botId: number): number {
+  const start = ctx.initialWorld.bots.find((bot) => bot.id === botId);
+  const end = ctx.world.bots.find((bot) => bot.id === botId);
+  if (!start || !end) return 0;
+  const walk = padColumn(ctx.initialWorld, start.at.y) - start.at.x;
+  return end.clock - walk - SEND_TICKS;
 }
 
 function botOfLine(line: string): string {
   return line.split(' ')[1] ?? '';
+}
+
+function positionAt(ctx: ObjectiveContext, botId: number, tick: number): Vec | undefined {
+  let pos = ctx.initialWorld.bots.find((bot) => bot.id === botId)?.at;
+  for (const event of ctx.trace.events) {
+    if (event.kind === 'move' && event.botId === botId && event.ok && event.t < tick) {
+      pos = event.to;
+    }
+  }
+  return pos;
+}
+
+function sentFromPad(ctx: ObjectiveContext, send: SendEvent): boolean {
+  const pos = positionAt(ctx, send.botId, send.t);
+  return pos !== undefined && tileAt(ctx.initialWorld, pos)?.terrain === Terrain.Pad;
+}
+
+function sendsOf(ctx: ObjectiveContext, received: RecvEvent): SendEvent[] {
+  return ctx.trace.events.filter(
+    (event): event is SendEvent =>
+      event.kind === 'send' &&
+      event.ok &&
+      event.botId === received.from &&
+      event.to === received.botId &&
+      event.body === received.body &&
+      event.t <= received.t,
+  );
+}
+
+function heardFromPad(ctx: ObjectiveContext, botId: number): boolean {
+  return ctx.trace.events.some(
+    (event) =>
+      event.kind === 'recv' &&
+      event.botId === botId &&
+      event.from !== null &&
+      event.from !== botId &&
+      sendsOf(ctx, event).some((send) => sentFromPad(ctx, send)),
+  );
 }
 
 function unparked(ctx: ObjectiveContext): Divergence | undefined {
@@ -73,13 +114,26 @@ function unparked(ctx: ObjectiveContext): Divergence | undefined {
 
 function unheard(ctx: ObjectiveContext): Divergence | undefined {
   for (const bot of ctx.world.bots) {
-    if (heardFromAnother(ctx.trace.events, bot.id)) continue;
+    if (heardFromPad(ctx, bot.id)) continue;
     const calls = ctx.trace.events.filter(
-      (event) => event.kind === 'recv' && event.botId === bot.id,
+      (event): event is RecvEvent => event.kind === 'recv' && event.botId === bot.id,
     );
-    const empty = calls.filter((event) => event.kind === 'recv' && event.from === null).length;
+    const offPad = calls
+      .filter((event) => event.from !== null && event.from !== bot.id)
+      .flatMap((event) => sendsOf(ctx, event))
+      .at(-1);
+    const where = `bot #${String(bot.id)}`;
+    if (offPad) {
+      const from = positionAt(ctx, offPad.botId, offPad.t);
+      return {
+        where,
+        expected: `a message sent from bot #${String(offPad.botId)}'s pad`,
+        received: from ? `one sent from ${at(from)}` : 'one sent off its pad',
+      };
+    }
+    const empty = calls.filter((event) => event.from === null).length;
     return {
-      where: `bot #${String(bot.id)}`,
+      where,
       expected: 'a message from the other bot',
       received:
         calls.length === 0
@@ -92,40 +146,56 @@ function unheard(ctx: ObjectiveContext): Divergence | undefined {
   return undefined;
 }
 
+function reportFor(ctx: ObjectiveContext, botId: number): string {
+  return `idle ${String(botId)} ${String(waitedTicks(ctx, botId))}`;
+}
+
 function misreportedIdle(ctx: ObjectiveContext): Divergence | undefined {
-  const wanted = idleReport(ctx);
   const said = reportedLines(ctx.trace.events, 'idle');
-  const i = matchingPrefix(said, wanted);
-  const want = wanted[i];
-  const got = said[i];
-  if (want === undefined) {
-    if (got === undefined) return undefined;
+  const ids = ctx.initialWorld.bots.map((bot) => bot.id);
+  for (const id of ids) {
+    const subject = String(id);
+    const lines = said.filter((line) => botOfLine(line) === subject);
+    const first = lines[0];
+    if (first === undefined) {
+      return {
+        where: `bot #${subject}`,
+        expected: 'a line saying how long it waited',
+        received: NOTHING,
+      };
+    }
+    if (lines.length > 1) {
+      return {
+        where: `bot #${subject}`,
+        expected: 'one line',
+        received: `${String(lines.length)} lines`,
+      };
+    }
+    if (first !== reportFor(ctx, id)) {
+      return {
+        where: `bot #${subject}`,
+        expected: 'ticks past its walk and one send',
+        received: clipValue(first),
+      };
+    }
+  }
+  const stray = said.find((line) => !ids.map(String).includes(botOfLine(line)));
+  if (stray !== undefined) {
     return {
-      where: `report line ${String(i + 1)}`,
-      expected: 'no more bots',
-      received: clipValue(got),
+      where: 'idle report',
+      expected: 'a line per bot, no more',
+      received: clipValue(stray),
     };
   }
-  const subject = botOfLine(want);
-  if (got === undefined) {
-    return {
-      where: `bot #${subject}`,
-      expected: 'a line saying how long it stood still',
-      received: NOTHING,
-    };
-  }
-  if (botOfLine(got) === subject) {
-    return {
-      where: `bot #${subject}`,
-      expected: 'its wait ticks plus what sync() cost it',
-      received: clipValue(got),
-    };
-  }
-  return {
-    where: `report line ${String(i + 1)}`,
-    expected: `a line about bot #${subject}`,
-    received: clipValue(got),
-  };
+  return undefined;
+}
+
+function reportedRight(ctx: ObjectiveContext): number {
+  const said = reportedLines(ctx.trace.events, 'idle');
+  return ctx.initialWorld.bots.filter((bot) => {
+    const lines = said.filter((line) => botOfLine(line) === String(bot.id));
+    return lines.length === 1 && lines[0] === reportFor(ctx, bot.id);
+  }).length;
 }
 
 export const w7_01: LevelDef = {
@@ -135,45 +205,36 @@ export const w7_01: LevelDef = {
   title: 'Two Bots',
   hardware: ['bot', 'bots', 'clock', 'sync', 'send', 'recv'],
   brief: [
-    '**FROM:** Field Eng. D. Halloran',
+    'Rigs bill by the tick, so the office wants to know how long each bot waited. Waiting is not a hobby. — D. Halloran',
     '',
-    'two bots now. add their two clocks together and you get a much larger number that',
-    'nobody upstairs has ever asked for. accounts wants the standing-about itemised per',
-    'bot; nobody has said why.',
-    '',
-    'Park each bot on the pad at the end of its own corridor, and have each one hear from',
-    'the other.',
+    '**Two bots, and each counts its own ticks. Park both on their pads, and pass a message each way, pad to pad.**',
   ].join('\n'),
   board: {
-    fixed: [
-      'two bots, one to a corridor, on every shift',
-      'both corridors run East from the west wall, one tile deep, no branches',
-      'each corridor is a dead end and its pad is the last tile of it',
-      'RIG-07 starts in the north corridor and RIG-08 in the south, both facing East',
-    ],
     redrawn: [
-      'the length of each corridor, three to nine tiles',
-      'which of the two is the longer walk',
-      'whether one is longer at all — some shifts draw them equal',
+      'each corridor length, 3 to 9 tiles',
+      'which corridor is longer, or if they are equal',
     ],
   },
   facts: [
-    { label: 'Your score', value: 'The clock stops when the **last** bot stops. Not the total.' },
+    { label: 'Score', value: 'The tick when the **last** bot stops.' },
     {
-      label: 'The clocks',
+      label: 'Corridors',
+      value: 'Each bot has its own corridor going East. Its pad is the last tile.',
+    },
+    {
+      label: 'Clocks',
       value:
-        'One per bot, running at once. `bot(0).move(...)` then `bot(1).move(...)` both happen in the same tick.',
+        'Each bot has its own clock. They run at once: `bot(0).move()` and `bot(1).move()` take the same tick.',
     },
     {
       label: 'Messages',
       value:
-        "`recv()` gives back `null` until the reader's own clock reaches the tick the message was sent at.",
+        "A message counts only if the sender stood on its pad when it sent it. `recv()` returns `null` until this bot's clock reaches the send tick.",
     },
-    { label: '`sync()`', value: 'Raises every living bot to the highest clock in the fleet.' },
     {
-      label: 'Idle report',
+      label: 'Waiting',
       value:
-        'One line per bot, in id order: `idle <bot> <n>`, where `n` is the ticks that bot spent waiting — its own `wait` calls plus whatever a `sync()` cost it.',
+        "Print `idle <id> <n>`, one line per bot, in any order. `n` is every tick on the bot's clock at the end of the run, except walking its corridor once and one `send()`.",
     },
   ],
   seeds: [1, 2, 3],
@@ -196,7 +257,7 @@ export const w7_01: LevelDef = {
   objectives: [
     Objectives.custom(
       'both-parked',
-      'Park each bot on the pad at the end of its corridor',
+      'Park each bot on its pad',
       (ctx) => botsOnPads(ctx) === ctx.world.bots.length,
       {
         progress: (ctx) => [botsOnPads(ctx), ctx.world.bots.length],
@@ -205,11 +266,11 @@ export const w7_01: LevelDef = {
     ),
     Objectives.custom(
       'both-heard',
-      "Have each bot receive the other bot's message",
-      (ctx) => ctx.world.bots.every((bot) => heardFromAnother(ctx.trace.events, bot.id)),
+      "Each bot receives a message sent from the other bot's pad",
+      (ctx) => ctx.world.bots.every((bot) => heardFromPad(ctx, bot.id)),
       {
         progress: (ctx) => [
-          ctx.world.bots.filter((bot) => heardFromAnother(ctx.trace.events, bot.id)).length,
+          ctx.world.bots.filter((bot) => heardFromPad(ctx, bot.id)).length,
           ctx.world.bots.length,
         ],
         divergence: unheard,
@@ -219,34 +280,26 @@ export const w7_01: LevelDef = {
   bonus: [
     Objectives.custom(
       'name-the-idle',
-      'Report how long each bot stood idle',
-      (ctx) => {
-        const wanted = idleReport(ctx);
-        const said = reportedLines(ctx.trace.events, 'idle');
-        return said.length === wanted.length && matchingPrefix(said, wanted) === wanted.length;
-      },
+      'Print how long each bot waited',
+      (ctx) => misreportedIdle(ctx) === undefined,
       {
-        progress: (ctx) => {
-          const wanted = idleReport(ctx);
-          return [matchingPrefix(reportedLines(ctx.trace.events, 'idle'), wanted), wanted.length];
-        },
+        progress: (ctx) => [reportedRight(ctx), ctx.initialWorld.bots.length],
         divergence: misreportedIdle,
       },
     ),
   ],
   starter: [
-    '// NOTE(4470): both of them run at once. you are billed for the slow one',
-    '// NOTE(4470): an inbox is not a noticeboard. a message you have not caught up to is not there',
+    '// Both bots run at the same time. Your score is the slower bot.',
+    "// recv() only sees messages sent at or before this bot's clock.",
     '',
     'const ids = bots();',
     'bot(ids[0]).move(Dir.East);',
     '',
   ].join('\n'),
   hints: [
-    'Both corridors are dead ends. A bot does not need to know how long its corridor is. It needs to know when it can no longer walk.',
-    'Nothing you write makes one bot wait for another. Only sync() does that. So the question is not how to run them in parallel; it is where you are accidentally stopping them.',
-    'A bot that is behind in time has not heard anything yet. When you call sync(), how far along is the shorter walk, and what does the other bot still have left?',
-    'sync() hands back the tick it dragged everyone up to. A bot that asks its own clock first knows exactly how much of the shift it just lost.',
+    'A bot does not need to know its corridor length. It walks until it cannot move.',
+    'The bot with the shorter corridor reaches its pad first. The other message does not exist yet.',
+    "sync() returns the new tick. Read the bot's clock before the call to know how many ticks it lost.",
   ],
   docs: ['ticks', 'bot', 'bots', 'sync', 'send', 'recv'],
 };

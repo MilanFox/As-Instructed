@@ -17,14 +17,12 @@ export function ClosedBanner({ workspace }: ClosedBannerProps): React.ReactEleme
   }, []);
 
   return (
-    <section className="closed-banner" aria-label="Work order closed">
+    <section className="closed-banner" aria-label="Level closed">
       <div className="closed-banner__row">
         <span className="closed-banner__id">{id}</span>
         <span className="closed-banner__word">
           Closed
-          <span className="closed-banner__sub">
-            {report?.headline ?? 'Every objective met. Nothing further is expected.'}
-          </span>
+          <span className="closed-banner__sub">{report?.headline ?? 'All objectives met.'}</span>
         </span>
         {medal ? (
           <span className="closed-banner__medal" data-medal={medal}>
@@ -37,7 +35,7 @@ export function ClosedBanner({ workspace }: ClosedBannerProps): React.ReactEleme
           ref={acknowledgeRef}
           onClick={workspace.closeOut}
         >
-          Acknowledge
+          OK
         </button>
       </div>
     </section>
