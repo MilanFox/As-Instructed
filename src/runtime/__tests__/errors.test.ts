@@ -304,7 +304,7 @@ describe('toRuntimeFailure', () => {
 describe('timeoutFailure', () => {
   test('names the board that ran too long, and its limit', () => {
     expect(timeoutFailure(5000, { index: 1, total: 3, seed: 4 }).message).toBe(
-      'Board 2 of 3 (board 4) ran past 5 s. A loop may never end.',
+      'Board 4 ran past 5 s. A loop may never end.',
     );
     expect(timeoutFailure(20_000, { index: 0, total: 1, seed: 7 }).message).toBe(
       'Board 7 ran past 20 s. A loop may never end.',

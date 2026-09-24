@@ -244,8 +244,7 @@ interface TimedOutBoard {
 
 function timedOutName(board: TimedOutBoard | undefined): string {
   if (board === undefined || board.seed === undefined) return 'Your program';
-  if (board.total <= 1) return `Board ${String(board.seed)}`;
-  return `Board ${String(board.index + 1)} of ${String(board.total)} (board ${String(board.seed)})`;
+  return `Board ${String(board.seed)}`;
 }
 
 export function timeoutFailure(timeoutMs: number, board?: TimedOutBoard): RuntimeFailure {

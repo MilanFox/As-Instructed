@@ -40,8 +40,8 @@ function worstPerObjective(
   });
 }
 
-function seedPrefix(seed: number, index: number, total: number): string {
-  return total > 1 ? `Board ${index + 1} of ${total} (board ${seed}) failed. ` : '';
+function seedPrefix(seed: number, total: number): string {
+  return total > 1 ? `Board ${seed} failed. ` : '';
 }
 
 export function aggregate(runs: SeedRun[]): RunResponse {
@@ -87,7 +87,7 @@ export function aggregate(runs: SeedRun[]): RunResponse {
 
   if (reported.verdict.failure) {
     const prefix =
-      failedIndex === -1 ? '' : seedPrefix(reported.result.seed, reportedIndex, runs.length);
+      failedIndex === -1 ? '' : seedPrefix(reported.result.seed, runs.length);
     verdict.failure = {
       ...reported.verdict.failure,
       message: `${prefix}${reported.verdict.failure.message}`,

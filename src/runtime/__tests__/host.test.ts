@@ -241,7 +241,7 @@ describe('the watchdog', () => {
     expect(response.ok).toBe(false);
     if (response.ok) return;
     expect(response.error.message).toBe(
-      'Board 2 of 3 (board 4) ran past 5 s. A loop may never end.',
+      'Board 4 ran past 5 s. A loop may never end.',
     );
     runner.dispose();
   });
@@ -256,7 +256,7 @@ describe('the watchdog', () => {
     expect(response.ok).toBe(false);
     if (response.ok) return;
     expect(response.error.message).toBe(
-      'Board 1 of 3 (board 1) ran past 5 s. A loop may never end.',
+      'Board 1 ran past 5 s. A loop may never end.',
     );
     runner.dispose();
   });

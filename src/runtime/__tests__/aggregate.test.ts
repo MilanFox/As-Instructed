@@ -82,7 +82,7 @@ describe('aggregate', () => {
     expect(response.traceSeed).toBe(33);
     expect(response.trace).toBe(runs[2]?.trace);
     expect(response.trace).not.toBe(runs[0]?.trace);
-    expect(response.verdict.failure?.message).toContain('Board 3 of 5 (board 33) failed.');
+    expect(response.verdict.failure?.message).toContain('Board 33 failed.');
     expect(response.verdict.failure?.message).toContain('The bot never reached the pad.');
     expect(response.verdict.objectives[0]?.label).toBe('seed 33');
   });
@@ -118,7 +118,7 @@ describe('aggregate', () => {
     expect(response.ok).toBe(true);
     if (!response.ok) return;
     expect(response.failedSeed).toBe(5);
-    expect(response.verdict.failure?.message).toContain('Board 1 of 2 (board 5) failed.');
+    expect(response.verdict.failure?.message).toContain('Board 5 failed.');
   });
 
   test('spend is merged worst-case per resource', () => {
