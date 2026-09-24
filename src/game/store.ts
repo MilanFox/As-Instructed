@@ -1,5 +1,12 @@
 import { create } from 'zustand';
-import type { EventOrigin, PrintEvent, Trace, TraceEvent, Verdict } from '../engine/index.ts';
+import type {
+  EventOrigin,
+  PrintEvent,
+  Snapshot,
+  Trace,
+  TraceEvent,
+  Verdict,
+} from '../engine/index.ts';
 import { Medal, eventIndexAt, usesFuel } from '../engine/index.ts';
 import type { PerSeedResult, RuntimeFailure, TraceShape } from '../runtime/protocol.ts';
 import { WORKER_TIMEOUT_MS } from '../runtime/protocol.ts';
@@ -40,6 +47,7 @@ export interface ConsoleLine {
   kind: ConsoleKind;
   text: string;
   line?: number;
+  values?: Snapshot[];
 }
 
 export const SPEEDS: readonly number[] = [0.25, 0.5, 1, 2, 4, 8, 16, 32, 64, Infinity];
@@ -523,6 +531,7 @@ export const useGame = create<GameState>((set, get) => {
               kind: 'print' as const,
               text: event.text,
               ...(event.line !== undefined ? { line: event.line } : {}),
+              ...(event.values !== undefined ? { values: event.values } : {}),
             })),
             ...notices,
           ].sort((a, b) => a.t - b.t),
@@ -912,6 +921,7 @@ export const useGame = create<GameState>((set, get) => {
               kind: 'print' as const,
               text: event.text,
               ...(event.line !== undefined ? { line: event.line } : {}),
+              ...(event.values !== undefined ? { values: event.values } : {}),
             })),
             ...notices,
           ].sort((a, b) => a.t - b.t),

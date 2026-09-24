@@ -14,7 +14,7 @@ import { apiFunctionsFor, requiredTypesFor } from './ambient.ts';
 
 export type PlayerFunction = (...args: unknown[]) => unknown;
 
-type Attribute = (fn: PlayerFunction) => PlayerFunction;
+type Attribute = (fn: PlayerFunction, name: string, botId: number) => PlayerFunction;
 
 type Binder = (
   sim: Sim,
@@ -26,7 +26,7 @@ type Binder = (
 const PLAIN: Attribute = (fn) => fn;
 
 function attributing(sim: Sim, locate: () => EventOrigin | undefined): Attribute {
-  return (fn) =>
+  return (fn, name, botId) =>
     (...args): unknown => {
       let origin: EventOrigin | undefined;
       try {
@@ -35,8 +35,14 @@ function attributing(sim: Sim, locate: () => EventOrigin | undefined): Attribute
         origin = undefined;
       }
       sim.attributeTo(origin);
+      sim.beginCall(name, botId, args);
       try {
-        return fn(...args);
+        const returned = fn(...args);
+        sim.endCall(botId, { returned });
+        return returned;
+      } catch (error) {
+        sim.endCall(botId, { threw: error });
+        throw error;
       } finally {
         sim.attributeTo(undefined);
       }
@@ -58,7 +64,7 @@ function botHandles(
     const handle: Record<string, PlayerFunction> = {};
     for (const fn of members) {
       const binder = BINDERS[fn.name];
-      if (binder) handle[fn.name] = attribute(binder(sim, id, unlocked, attribute));
+      if (binder) handle[fn.name] = attribute(binder(sim, id, unlocked, attribute), fn.name, id);
     }
     cache.set(id, handle);
     return handle;
@@ -201,7 +207,7 @@ const BINDERS: Record<string, Binder> = {
   print:
     (sim, botId) =>
     (text): void => {
-      sim.print(botId, stringify(text));
+      sim.print(botId, stringify(text), undefined, sim.recordsCalls ? [text] : undefined);
     },
   canMove:
     (sim, botId) =>
@@ -352,23 +358,25 @@ export function buildPlayerScope(
           'api-spec.ts and api-bindings.ts have drifted apart.',
       );
     }
-    api[fn.name] = attribute(binder(sim, botId, functions, attribute));
+    api[fn.name] = attribute(binder(sim, botId, functions, attribute), fn.name, botId);
   }
 
   const values: Record<string, unknown> = {};
   for (const type of requiredTypesFor(functions)) {
     if (type.name in VALUES) values[type.name] = VALUES[type.name];
   }
-  values['console'] = consoleFor(sim, botId, api);
+  values['console'] = consoleFor(sim, botId, attribute);
 
   return { api, values };
 }
 
-function consoleFor(sim: Sim, botId: number, api: Record<string, PlayerFunction>): unknown {
+const CONSOLE_METHODS = ['log', 'info', 'warn', 'error', 'debug', 'trace'] as const;
+
+function consoleFor(sim: Sim, botId: number, attribute: Attribute): unknown {
   const write = (...args: unknown[]): void => {
-    const text = args.map(stringify).join(' ');
-    if (api['print']) api['print'](text);
-    else sim.print(botId, text);
+    sim.print(botId, args.map(stringify).join(' '), undefined, sim.recordsCalls ? args : undefined);
   };
-  return { log: write, info: write, warn: write, error: write, debug: write, trace: write };
+  return Object.fromEntries(
+    CONSOLE_METHODS.map((method) => [method, attribute(write, `console.${method}`, botId)]),
+  );
 }
