@@ -15,10 +15,16 @@ import {
   setTile,
   tileAt,
 } from './world.ts';
+import type { Snapshot, SnapshotBudget } from './snapshot.ts';
+import { SNAPSHOT_MAX_NODES, snapshot, snapshotBudget } from './snapshot.ts';
 
 export const KEYFRAME_INTERVAL = 500;
 
 export const MAX_SENSE_EVENTS = 20_000;
+
+export const MAX_API_CALLS = 20_000;
+
+export const MAX_CALL_LOG_NODES = 500_000;
 
 export interface EventOrigin {
   file: 'program' | 'lib';
@@ -123,7 +129,13 @@ export type RecvEvent = BotAction & {
   body: string | number | null;
 };
 
-export type PrintEvent = AtTick & { kind: 'print'; text: string; line?: number; botId?: number };
+export type PrintEvent = AtTick & {
+  kind: 'print';
+  text: string;
+  line?: number;
+  botId?: number;
+  values?: Snapshot[];
+};
 export type TileChangeEvent = AtTick & { kind: 'tileChange'; at: Vec; before: Tile; after: Tile };
 export type MachineChangeEvent = AtTick & {
   kind: 'machineChange';
@@ -181,11 +193,37 @@ export interface Keyframe {
   eventIndex: number;
 }
 
+export type ApiCallOutcome = { returned: Snapshot } | { threw: Snapshot };
+
+export interface ApiCall {
+  seq: number;
+  name: string;
+  botId: number;
+  t: number;
+  until: number;
+  origin?: EventOrigin;
+  args: Snapshot[];
+  outcome: ApiCallOutcome;
+  events: number[];
+  eventIndex: number;
+}
+
+export interface CallLog {
+  calls: ApiCall[];
+  dropped: number;
+}
+
 export interface Trace {
   initialWorld: World;
   events: TraceEvent[];
   keyframes: Keyframe[];
   endTick: number;
+  calls?: CallLog;
+}
+
+interface OpenCall {
+  record: ApiCall;
+  touched: TraceEvent[];
 }
 
 function isBotAction(event: TraceEvent): event is TraceEvent & BotAction {
@@ -357,14 +395,79 @@ export class TraceBuilder {
   private senseEventCount = 0;
   private readonly senseOverflow = new Map<string, SenseEvent>();
   private origin: EventOrigin | undefined;
+  private readonly calls: OpenCall[] | undefined;
+  private openCall: OpenCall | undefined;
+  private droppedCalls = 0;
+  private logNodes = MAX_CALL_LOG_NODES;
 
-  constructor(initialWorld: World, maxSenseEvents: number = MAX_SENSE_EVENTS) {
+  constructor(
+    initialWorld: World,
+    maxSenseEvents: number = MAX_SENSE_EVENTS,
+    recordCalls: boolean = false,
+  ) {
     this.initialWorld = cloneWorld(initialWorld);
     this.maxSenseEvents = maxSenseEvents;
+    this.calls = recordCalls ? [] : undefined;
+  }
+
+  get recordsCalls(): boolean {
+    return this.calls !== undefined;
   }
 
   attributeTo(origin: EventOrigin | undefined): void {
     this.origin = origin;
+  }
+
+  beginCall(name: string, botId: number, t: number, args: readonly unknown[]): void {
+    if (this.calls === undefined) return;
+    if (this.calls.length >= MAX_API_CALLS || this.logNodes <= 0) {
+      this.droppedCalls += 1;
+      this.openCall = undefined;
+      return;
+    }
+    const record: ApiCall = {
+      seq: this.calls.length,
+      name,
+      botId,
+      t,
+      until: t,
+      args: args.map((arg) => this.snapshot(arg)),
+      outcome: { returned: { $: 'undefined' } },
+      events: [],
+      eventIndex: 0,
+    };
+    if (this.origin !== undefined) record.origin = this.origin;
+    this.openCall = { record, touched: [] };
+    this.calls.push(this.openCall);
+  }
+
+  endCall(until: number, outcome: { returned: unknown } | { threw: unknown }): void {
+    const open = this.openCall;
+    this.openCall = undefined;
+    if (open === undefined) return;
+    open.record.until = until;
+    open.record.outcome =
+      'threw' in outcome
+        ? { threw: this.snapshot(outcome.threw) }
+        : { returned: this.snapshot(outcome.returned) };
+  }
+
+  snapshotValues(values: readonly unknown[]): Snapshot[] | undefined {
+    if (this.calls === undefined || this.logNodes <= 0) return undefined;
+    return values.map((value) => this.snapshot(value));
+  }
+
+  private snapshot(value: unknown): Snapshot {
+    const budget: SnapshotBudget = snapshotBudget(Math.min(SNAPSHOT_MAX_NODES, this.logNodes));
+    const start = budget.nodes;
+    const encoded = snapshot(value, budget);
+    this.logNodes -= start - budget.nodes;
+    return encoded;
+  }
+
+  private touch(event: TraceEvent): void {
+    const open = this.openCall;
+    if (open !== undefined && !open.touched.includes(event)) open.touched.push(event);
   }
 
   push(event: TraceEvent): void {
@@ -376,6 +479,7 @@ export class TraceBuilder {
       }
     }
     this.events.push(event);
+    this.touch(event);
   }
 
   pushSense(event: SenseEvent): void {
@@ -393,6 +497,7 @@ export class TraceBuilder {
       last.count += event.count;
       // A coalesced event stands for calls from more than one place; one of their lines would be a lie.
       if (last.origin !== undefined && !sameOrigin(last.origin, origin)) delete last.origin;
+      this.touch(last);
       return;
     }
 
@@ -400,6 +505,7 @@ export class TraceBuilder {
       const running = this.senseOverflow.get(event.name);
       if (running) {
         running.count += event.count;
+        this.touch(running);
         return;
       }
       const aggregate: SenseEvent = {
@@ -413,11 +519,13 @@ export class TraceBuilder {
       };
       this.senseOverflow.set(event.name, aggregate);
       this.events.push(aggregate);
+      this.touch(aggregate);
       return;
     }
 
     if (origin !== undefined) event.origin = origin;
     this.events.push(event);
+    this.touch(event);
     this.senseEventCount += 1;
   }
 
@@ -427,13 +535,36 @@ export class TraceBuilder {
 
   build(endTick: number, keyframeInterval: number = KEYFRAME_INTERVAL): Trace {
     const events = this.events.slice().sort((a, b) => a.t - b.t);
-    return {
+    const trace: Trace = {
       initialWorld: cloneWorld(this.initialWorld),
       events,
       keyframes: buildKeyframes(this.initialWorld, events, keyframeInterval),
       endTick,
     };
+    if (this.calls !== undefined) trace.calls = this.callLog(trace);
+    return trace;
   }
+
+  // The sort above moves events away from the order they were pushed in, so a call can only
+  // name its events once their final positions are known.
+  private callLog(trace: Trace): CallLog {
+    const position = new Map<TraceEvent, number>();
+    for (const [index, event] of trace.events.entries()) position.set(event, index);
+    const calls = (this.calls ?? []).map(({ record, touched }) => {
+      const events = touched
+        .map((event) => position.get(event))
+        .filter((index): index is number => index !== undefined)
+        .sort((a, b) => a - b);
+      return { ...record, events, eventIndex: events[0] ?? eventIndexAfter(trace, record.t) };
+    });
+    return { calls, dropped: this.droppedCalls };
+  }
+}
+
+function eventIndexAfter(trace: Trace, tick: number): number {
+  let index = eventIndexAt(trace, tick);
+  while (index < trace.events.length && (trace.events[index] as TraceEvent).t <= tick) index += 1;
+  return index;
 }
 
 export function replayTo(trace: Trace, tick: number): World {
@@ -451,6 +582,21 @@ export function replayTo(trace: Trace, tick: number): World {
     if (event.t > tick) break;
     applyEvent(world, event);
   }
+  return world;
+}
+
+export function replayThrough(trace: Trace, eventCount: number): World {
+  let start = trace.initialWorld;
+  let index = 0;
+  for (const keyframe of trace.keyframes) {
+    if (keyframe.eventIndex > eventCount) break;
+    start = keyframe.world;
+    index = keyframe.eventIndex;
+  }
+
+  const world = cloneWorld(start);
+  const end = Math.min(eventCount, trace.events.length);
+  for (let i = index; i < end; i++) applyEvent(world, trace.events[i] as TraceEvent);
   return world;
 }
 

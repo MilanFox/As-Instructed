@@ -135,6 +135,17 @@ declare const ItemKind: {
 }`,
     doc: 'One message in a bot inbox. `from` is the sender id and `t` is the sender clock at the moment it was sent.',
   },
+  {
+    name: 'Console',
+    declaration: `declare const console: {
+  log(...values: unknown[]): void;
+  info(...values: unknown[]): void;
+  warn(...values: unknown[]): void;
+  error(...values: unknown[]): void;
+  debug(...values: unknown[]): void;
+};`,
+    doc: 'Every `console` method does exactly what `print` does: one line in the console panel, values joined with a space, free, recorded in the trace. `warn` and `error` lines look the same as `log` lines.',
+  },
 ];
 
 const FUNCTIONS: ApiFunctionSpec[] = [
@@ -169,15 +180,24 @@ if (here.x < 5) {
   },
   {
     name: 'print',
-    params: [{ name: 'text', type: 'string', doc: 'The line to write.' }],
+    params: [
+      {
+        name: 'values',
+        type: 'unknown[]',
+        rest: true,
+        doc: 'Anything to write. Several values are joined with a space.',
+      },
+    ],
     returns: 'void',
-    doc: 'Writes one line to the console panel. It is free, and it is recorded in the trace, so the line reappears at the exact tick it was printed when you scrub the replay.',
+    doc: 'Writes one line to the console panel, like `console.log`. Strings are written as they are; objects and arrays as JSON. It is free, and it is recorded in the trace, so the line reappears at the exact tick it was printed when you scrub the replay. In a debug run, each object and array on the line is also shown as an expandable value.',
     example: `const here = pos();
-print(\`starting at \${here.x},\${here.y}\`);`,
+print(\`starting at \${here.x},\${here.y}\`);
+print('here is', here);`,
     cost: 0,
     unlockedBy: 'w1-01',
     world: 1,
     category: 'output',
+    requiresTypes: ['Console'],
   },
   {
     name: 'wait',
@@ -719,7 +739,10 @@ export function perBotApi(functions: readonly ApiFunctionSpec[] = FUNCTIONS): Ap
 
 export function renderParams(fn: ApiFunctionSpec): string {
   return fn.params
-    .map((param) => `${param.name}${param.optional ? '?' : ''}: ${param.type}`)
+    .map(
+      (param) =>
+        `${param.rest ? '...' : ''}${param.name}${param.optional ? '?' : ''}: ${param.type}`,
+    )
     .join(', ');
 }
 

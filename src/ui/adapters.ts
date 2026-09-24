@@ -192,6 +192,10 @@ export class CanvasRenderer implements RendererPort {
     this.renderer.setHover(cell);
   }
 
+  setInspected(cell: Vec | null, botId: number | null = null): void {
+    this.renderer.setInspected(cell, botId);
+  }
+
   fit(): void {
     this.renderer.fit();
   }

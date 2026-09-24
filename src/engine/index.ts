@@ -105,22 +105,45 @@ export type {
   ObjectiveEvent,
   FxEvent,
 } from './trace.ts';
-export type { EventOrigin, RefuelEvent, SenseEvent, SpendEvent } from './trace.ts';
+export type {
+  ApiCall,
+  ApiCallOutcome,
+  CallLog,
+  EventOrigin,
+  RefuelEvent,
+  SenseEvent,
+  SpendEvent,
+} from './trace.ts';
 export {
   FUEL_BURNING,
   KEYFRAME_INTERVAL,
+  MAX_API_CALLS,
+  MAX_CALL_LOG_NODES,
   MAX_SENSE_EVENTS,
   TraceBuilder,
   applyEvent,
   eventIndexAt,
   printsUpTo,
+  replayThrough,
   replayTo,
   reviveTrace,
   senseTotals,
 } from './trace.ts';
 
-export type { SimOptions, TileView, MachineView } from './sim.ts';
+export type { Snapshot } from './snapshot.ts';
 export {
+  SNAPSHOT_MAX_DEPTH,
+  SNAPSHOT_MAX_ENTRIES,
+  SNAPSHOT_MAX_NODES,
+  SNAPSHOT_MAX_STRING,
+  snapshot,
+} from './snapshot.ts';
+
+export type { BotView, SimOptions, TileView, MachineView } from './sim.ts';
+export {
+  botView,
+  machineView,
+  tileView,
   DEFAULT_GROW_TIME,
   DEFAULT_LIVELOCK_ROUNDS,
   DEFAULT_MAX_OPS,

@@ -50,7 +50,10 @@ function stripped(events: readonly TraceEvent[]): unknown[] {
   return events.map((event) => {
     const copy: Record<string, unknown> = { ...event };
     delete copy['origin'];
-    if (event.kind === 'print') delete copy['line'];
+    if (event.kind === 'print') {
+      delete copy['line'];
+      delete copy['values'];
+    }
     return copy;
   });
 }

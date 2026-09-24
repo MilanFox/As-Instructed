@@ -1,10 +1,15 @@
 import { useMemo } from 'react';
 
-import { SPEEDS } from '../../game/store.ts';
+import type { ApiCall, Trace } from '../../engine/index.ts';
+import { cursorCalls } from '../../game/debug-values.ts';
+import { SPEEDS, useGame } from '../../game/store.ts';
+import { showCall } from '../hooks/useInspect.ts';
 import { openOverlay, useOverlay } from '../hooks/useOverlay.ts';
+import { callLine, unrecordedNote } from './call-text.ts';
 import { OverlayPanel, PanelBar } from './OverlayPanel.tsx';
-import type { WorkspaceData } from './useWorkspace.ts';
-import { describeDebug } from './useWorkspace.ts';
+import { RunLogLine } from './RunLogLine.tsx';
+import type { DebugView, WorkspaceData } from './useWorkspace.ts';
+import { describeDebug, lineOf } from './useWorkspace.ts';
 
 const FILTERS = ['all', 'print', 'system'] as const;
 
@@ -20,6 +25,29 @@ function faultOf(workspace: WorkspaceData): { text: string; jump: boolean } | nu
   if (!failure) return null;
   const where = failure.line === undefined ? '' : ` · line ${String(failure.line)}`;
   return { text: `${failure.kind}${where} · ${failure.message}`, jump: failure.line !== undefined };
+}
+
+const CALL_CHARS = 48;
+
+function lastRecordedEvent(trace: Trace | null): number | null {
+  const last = trace?.calls?.calls.at(-1);
+  if (last === undefined) return null;
+  return Math.max(last.eventIndex, ...last.events);
+}
+
+function callToken(calls: readonly ApiCall[]): string | null {
+  const first = calls[0];
+  if (first === undefined) return null;
+  const more = calls.length > 1 ? ` +${String(calls.length - 1)}` : '';
+  return `${callLine(first, CALL_CHARS)}${more}`;
+}
+
+function splitDebug(debug: DebugView): { head: string; tail: string } | null {
+  if (debug.note !== null || debug.index === null) return null;
+  return {
+    head: `event ${String(debug.index + 1)} of ${String(debug.total)} · `,
+    tail: ` · ${lineOf(debug)}`,
+  };
 }
 
 export interface TransportDeckProps {
@@ -50,6 +78,17 @@ export function TransportDeck({
   // The subroutines file is a flap of its own, so an event attributed to it names a line the
   // player cannot see until they open it.
   const shutLib = workspace.debug.origin?.file === 'lib' && overlay !== 'library';
+
+  const recording = workspace.trace?.calls !== undefined;
+  const dropped = workspace.trace?.calls?.dropped ?? 0;
+  const calls = useGame(cursorCalls);
+  const lastRecorded = useMemo(() => lastRecordedEvent(workspace.trace), [workspace.trace]);
+  const debugParts = recording ? splitDebug(workspace.debug) : null;
+  const pastLog =
+    dropped > 0 &&
+    workspace.debug.index !== null &&
+    (lastRecorded === null || workspace.debug.index > lastRecorded);
+  const token = pastLog ? null : callToken(calls);
 
   const rung = useMemo(() => {
     const found = SPEEDS.indexOf(workspace.speed);
@@ -102,7 +141,29 @@ export function TransportDeck({
             »
           </button>
         </span>
-        <span className="debug-strip__text">{describeDebug(workspace.debug)}</span>
+        {debugParts !== null && (pastLog || token !== null) ? (
+          <span className="debug-strip__text debug-strip__text--call">
+            <span className="debug-strip__head">{debugParts.head}</span>
+            {token === null ? (
+              <span className="debug-strip__unrecorded">not recorded — call log full</span>
+            ) : (
+              <button
+                type="button"
+                className="debug-strip__call"
+                onClick={showCall}
+                title="Inspect this call"
+              >
+                {token}
+              </button>
+            )}
+            <span className="debug-strip__tail">{debugParts.tail}</span>
+          </span>
+        ) : (
+          <span className="debug-strip__text">{describeDebug(workspace.debug)}</span>
+        )}
+        {recording && dropped > 0 ? (
+          <span className="debug-strip__grade">{unrecordedNote(dropped)}</span>
+        ) : null}
         {shutLib ? (
           <button
             type="button"
@@ -271,12 +332,7 @@ export function TransportDeck({
             {workspace.console.length === 0 ? (
               <p className="empty-note">nothing on the wire</p>
             ) : (
-              workspace.console.map((line) => (
-                <p className="run-log__line" key={line.id} data-kind={line.kind}>
-                  <span className="run-log__tick">{String(Math.round(line.t))}</span>
-                  <span className="run-log__text">{line.text}</span>
-                </p>
-              ))
+              workspace.console.map((line) => <RunLogLine key={line.id} line={line} />)
             )}
           </div>
         ) : null}

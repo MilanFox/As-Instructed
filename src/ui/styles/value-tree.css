@@ -1,0 +1,93 @@
+/* ---- value tree: devtools-style snapshot inspector ---- */
+
+.value-tree {
+  display: inline-block;
+  max-width: 100%;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 18px;
+  vertical-align: top;
+  color: var(--ink);
+  outline: none;
+}
+
+.vt__row {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: default;
+  border-radius: var(--radius);
+}
+
+.vt__row[aria-expanded] {
+  cursor: pointer;
+}
+
+.vt__row:hover {
+  background: var(--bg-raised);
+}
+
+.value-tree:focus-visible .vt__row[data-active] {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.vt__row[data-change='changed'],
+.vt__row[data-change='added'] {
+  background: rgb(255 176 32 / 12%);
+}
+
+.vt__twisty {
+  display: inline-block;
+  width: 12px;
+  color: var(--ink-dim);
+  text-align: center;
+}
+
+.vt__key {
+  color: var(--ink);
+}
+
+.vt__punct {
+  color: var(--ink-dim);
+}
+
+.vt__string {
+  color: var(--ok);
+}
+
+.vt__number {
+  color: var(--accent-2);
+}
+
+.vt__boolean {
+  color: var(--accent);
+}
+
+.vt__nil {
+  color: var(--ink-dim);
+}
+
+.vt__symbol,
+.vt__type {
+  color: #9ad0ff;
+}
+
+.vt__function {
+  color: var(--accent);
+  font-style: italic;
+}
+
+.vt__error {
+  color: var(--danger);
+}
+
+.vt__meta {
+  color: var(--ink-dim);
+  font-style: italic;
+}
+
+.vt__was {
+  color: var(--ink-dim);
+  text-decoration: line-through;
+}

@@ -1,6 +1,7 @@
 import type * as MonacoEditor from 'monaco-editor';
 import type { RuntimeFailure } from './protocol.ts';
 import { buildAmbientDts, unlockedApiNames } from './ambient.ts';
+import { PLAYER_API, apiFunction } from './api-spec.ts';
 import { compileFailure, offsetToPosition } from './errors.ts';
 import { decodeLineMap } from './sourcemap.ts';
 
@@ -262,6 +263,28 @@ function exportedNames(dts: string): string[] {
   return [...names];
 }
 
+const CANNOT_FIND_NAME = new Set([2304, 2552]);
+
+// lib.ts is shared by every level but is checked against the open level's hardware, so a helper
+// written for later hardware must not stop an earlier level from importing the rest of the file.
+function laterHardware(diagnostic: CompileDiagnostic): CompileDiagnostic {
+  if (!CANNOT_FIND_NAME.has(diagnostic.code)) return diagnostic;
+  const name = /'([^']+)'/.exec(diagnostic.message)?.[1];
+  if (name === undefined) return diagnostic;
+  const fn = apiFunction(name);
+  if (fn) {
+    return {
+      ...diagnostic,
+      severity: 'warning',
+      message: `\`${name}()\` is not installed until level ${fn.unlockedBy}.`,
+    };
+  }
+  if (PLAYER_API.types.some((type) => type.name === name)) {
+    return { ...diagnostic, severity: 'warning', message: `\`${name}\` is not installed yet.` };
+  }
+  return diagnostic;
+}
+
 export async function compileLibrary(
   monaco: MonacoApi,
   model: TextModel,
@@ -274,7 +297,9 @@ export async function compileLibrary(
     worker.getSyntacticDiagnostics(fileName),
     worker.getSemanticDiagnostics(fileName),
   ]);
-  const diagnostics = toCompileDiagnostics(source, [...syntactic, ...semantic]);
+  const diagnostics = toCompileDiagnostics(source, [...syntactic, ...semantic]).map(
+    laterHardware,
+  );
   const errors = diagnostics.filter((diagnostic) => diagnostic.severity === 'error');
 
   if (errors.length > 0) {

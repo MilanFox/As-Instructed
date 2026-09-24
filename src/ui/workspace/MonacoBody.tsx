@@ -1,10 +1,12 @@
 import Editor, { type OnMount } from '@monaco-editor/react';
 import { useEffect, useMemo, useRef } from 'react';
 
-import type { EventOrigin } from '../../engine/index.ts';
+import type { ApiCall, EventOrigin, Trace } from '../../engine/index.ts';
+import { callsAtEvent, callsFromLine } from '../../game/debug-values.ts';
 import { currentLevel, resolveEventCursor, useGame } from '../../game/store.ts';
 import { LIB_FILE_PATH, PLAYER_FILE_PATH } from '../../runtime/index.ts';
 import { THEME, monaco, setupMonaco } from '../monaco-setup.ts';
+import { ghostText, lineHover, pastCallLog, seekTarget } from './value-hover.ts';
 
 const RUNTIME_MARKER_OWNER = 'as-instructed-runtime';
 
@@ -19,26 +21,126 @@ const FILE_PATHS: Readonly<Record<EventOrigin['file'], string>> = {
   lib: LIB_FILE_PATH,
 };
 
+const SEEK_TO_CALL = 'as-instructed.seekToCall';
+
 type StandaloneEditor = monaco.editor.IStandaloneCodeEditor;
+
+interface Stepped {
+  origin: EventOrigin;
+  calls: readonly ApiCall[];
+  unrecorded: boolean;
+}
+
+const GHOST_MARGIN = 3;
+const GHOST_MIN = 16;
+
+// Monaco wraps a line that injected text pushes past the wrapping column, so the ghost is cut to
+// the room the narrowest editor showing the document has left on that line.
+function ghostRoom(model: monaco.editor.ITextModel, line: number): number | undefined {
+  const columns = monaco.editor
+    .getEditors()
+    .filter((editor) => editor.getModel() === model)
+    .map((editor) => editor.getOption(monaco.editor.EditorOption.wrappingInfo).wrappingColumn)
+    .filter((column) => column > 0);
+  if (columns.length === 0) return undefined;
+  const used = model.getLineContent(line).replace(/\t/g, '  ').length;
+  return Math.max(GHOST_MIN, Math.min(...columns) - used - GHOST_MARGIN);
+}
+
+function fileAt(uri: monaco.Uri): EventOrigin['file'] | null {
+  for (const [file, path] of Object.entries(FILE_PATHS)) {
+    if (monaco.Uri.parse(path).toString() === uri.toString()) return file as EventOrigin['file'];
+  }
+  return null;
+}
+
+function lastEventFromLine(trace: Trace, file: EventOrigin['file'], line: number): number | null {
+  for (let index = trace.events.length - 1; index >= 0; index -= 1) {
+    const origin = trace.events[index]?.origin;
+    if (origin?.file === file && origin.line === line) return index;
+  }
+  return null;
+}
+
+function seekLink(call: ApiCall): string {
+  return `command:${SEEK_TO_CALL}?${encodeURIComponent(JSON.stringify([call.seq]))}`;
+}
+
+function seekToCall(seq: number): void {
+  const state = useGame.getState();
+  const trace = state.trace;
+  const call = trace?.calls?.calls[seq];
+  if (!trace || !call) return;
+  const target = seekTarget(call, trace.events.length);
+  if (target !== null) {
+    state.seekToEvent(target);
+    return;
+  }
+  state.pause();
+  state.seek(call.t);
+}
+
+function lineHoverAt(
+  model: monaco.editor.ITextModel,
+  position: monaco.Position,
+  stepped: Stepped | null,
+): monaco.languages.Hover | null {
+  const trace = useGame.getState().trace;
+  const file = fileAt(model.uri);
+  if (!trace?.calls || file === null) return null;
+  const line = position.lineNumber;
+  const onGhost =
+    stepped !== null &&
+    ghostText(stepped.calls, stepped.unrecorded) !== null &&
+    stepped.origin.file === file &&
+    stepped.origin.line === line &&
+    position.column >= model.getLineMaxColumn(line);
+  if (onGhost) return null;
+  const last = lastEventFromLine(trace, file, line);
+  const unrecorded = last !== null && pastCallLog(trace.calls, last);
+  const value = lineHover(callsFromLine(trace, file, line), unrecorded, seekLink);
+  if (value === null) return null;
+  return {
+    range: new monaco.Range(line, 1, line, model.getLineMaxColumn(line)),
+    contents: [{ value, isTrusted: { enabledCommands: [SEEK_TO_CALL] } }],
+  };
+}
 
 // The lib file is shown by an editor this component does not own, and the program file by one
 // that comes and goes, so the decoration is put on the documents rather than on either editor.
-function markOrigin(origin: EventOrigin | null, previous: Map<string, string[]>): void {
+function markOrigin(stepped: Stepped | null, previous: Map<string, string[]>): void {
   for (const path of Object.values(FILE_PATHS)) {
     const model = monaco.editor.getModel(monaco.Uri.parse(path));
     if (!model) continue;
     const wanted =
-      origin && FILE_PATHS[origin.file] === path
-        ? [Math.max(1, Math.min(model.getLineCount(), origin.line))]
+      stepped && FILE_PATHS[stepped.origin.file] === path
+        ? [Math.max(1, Math.min(model.getLineCount(), stepped.origin.line))]
         : [];
     previous.set(
       path,
       model.deltaDecorations(
         previous.get(path) ?? [],
-        wanted.map((line) => ({
-          range: new monaco.Range(line, 1, line, model.getLineMaxColumn(line)),
-          options: STEP_DECORATION,
-        })),
+        wanted.flatMap((line) => {
+          const end = model.getLineMaxColumn(line);
+          const step = { range: new monaco.Range(line, 1, line, end), options: STEP_DECORATION };
+          const text = stepped
+            ? ghostText(stepped.calls, stepped.unrecorded, ghostRoom(model, line))
+            : null;
+          if (text === null) return [step];
+          const ghost = {
+            range: new monaco.Range(line, end, line, end),
+            options: {
+              showIfCollapsed: true,
+              hoverMessage: { value: 'hover the line for every value' },
+              after: {
+                content: text,
+                inlineClassName: 'debug-step-ghost',
+                cursorStops: monaco.editor.InjectedTextCursorStops.None,
+              },
+            },
+          };
+          return [step, ghost];
+        }),
       ),
     );
   }
@@ -72,9 +174,23 @@ export function MonacoBody({
   const seekToLineRef = useRef(seekToLine);
   seekToLineRef.current = seekToLine;
   const markedRef = useRef(new Map<string, string[]>());
+  const steppedRef = useRef<Stepped | null>(null);
 
   useEffect(() => {
     setupMonaco();
+  }, []);
+
+  useEffect(() => {
+    const command = monaco.editor.registerCommand(SEEK_TO_CALL, (_accessor, seq: unknown) => {
+      if (typeof seq === 'number') seekToCall(seq);
+    });
+    const hover = monaco.languages.registerHoverProvider('typescript', {
+      provideHover: (model, position) => lineHoverAt(model, position, steppedRef.current),
+    });
+    return () => {
+      command.dispose();
+      hover.dispose();
+    };
   }, []);
 
   useEffect(() => {
@@ -107,7 +223,16 @@ export function MonacoBody({
   useEffect(() => {
     const index = trace ? resolveEventCursor(trace, tick, eventCursor) : null;
     const origin = (index === null ? undefined : trace?.events[index]?.origin) ?? null;
-    markOrigin(origin, markedRef.current);
+    const stepped =
+      origin && trace && index !== null
+        ? {
+            origin,
+            calls: trace.calls ? callsAtEvent(trace, index) : [],
+            unrecorded: pastCallLog(trace.calls, index),
+          }
+        : null;
+    steppedRef.current = stepped;
+    markOrigin(stepped, markedRef.current);
     if (origin?.file === 'program') {
       editorRef.current?.revealLineInCenterIfOutsideViewport(origin.line);
     }

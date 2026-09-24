@@ -105,7 +105,7 @@ export interface DebugView {
 
 // Why there is no line is three different facts, and the player is told which one it is: the
 // run recorded none, the call was coalesced into one event, or the engine raised it itself.
-function lineOf(debug: DebugView): string {
+export function lineOf(debug: DebugView): string {
   if (debug.origin) {
     return `${SOURCE_NAMES[debug.origin.file]} line ${String(debug.origin.line)}`;
   }
@@ -238,7 +238,7 @@ function signatureOf(fn: ApiFunctionSpec): string {
   const params = fn.params.map((param) => {
     const mark = param.optional === true && param.defaultValue === undefined ? '?' : '';
     const fallback = param.defaultValue === undefined ? '' : ` = ${param.defaultValue}`;
-    return `${param.name}${mark}: ${param.type}${fallback}`;
+    return `${param.rest === true ? '...' : ''}${param.name}${mark}: ${param.type}${fallback}`;
   });
   return `${fn.name}(${params.join(', ')}): ${fn.returns}`;
 }

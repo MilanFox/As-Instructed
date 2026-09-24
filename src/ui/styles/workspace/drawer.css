@@ -453,3 +453,21 @@
   margin-left: 3px;
   background: var(--accent);
 }
+
+.debug-step-ghost {
+  margin-left: 2ch;
+  color: var(--ink-dim);
+  font-style: italic;
+  opacity: 0.85;
+}
+
+.monaco-editor .monaco-hover a[data-href^='command:as-instructed.seekToCall'] {
+  font-family: var(--font-mono);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.monaco-editor .monaco-hover a[data-href^='command:as-instructed.seekToCall']:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}

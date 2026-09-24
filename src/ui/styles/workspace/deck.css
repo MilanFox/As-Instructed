@@ -103,6 +103,56 @@
   white-space: nowrap;
 }
 
+/* A button is atomic to text-overflow, so the call is its own flex item that ellipsises, and
+   the line number gives way before it does. */
+.debug-strip__text--call {
+  display: flex;
+}
+
+.debug-strip__head,
+.debug-strip__tail,
+.debug-strip__call,
+.debug-strip__unrecorded {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: pre;
+}
+
+.debug-strip__head {
+  flex: none;
+}
+
+.debug-strip__tail {
+  flex: 0 1000 auto;
+  min-width: 0;
+}
+
+.debug-strip__call,
+.debug-strip__unrecorded {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.debug-strip__call {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-decoration: underline dotted var(--ink-dim);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.debug-strip__call:hover,
+.debug-strip__call:focus-visible {
+  color: var(--accent);
+}
+
+.debug-strip__unrecorded {
+  color: var(--accent-2);
+}
+
 .transport {
   display: flex;
   flex: none;
@@ -213,6 +263,24 @@
   min-width: 0;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+}
+
+.run-log__values {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 0 8px;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.run-log__values .run-log__text {
+  flex: none;
+  max-width: 100%;
+}
+
+.run-log__values .value-tree {
+  line-height: inherit;
 }
 
 .run-log__line[data-kind='error'] .run-log__text {

@@ -274,6 +274,32 @@ describe('the player-facing compiler accepts ordinary JavaScript', () => {
     if (result.ok) expect(result.exports).toContain('firstOpen');
   });
 
+  test('a library helper for later hardware does not stop an earlier level importing it', async () => {
+    configurePlayerLanguage(editor.monaco, { levelId: 'w3-03' });
+    const lib = editor.model(
+      LIB_FILE_PATH,
+      [
+        'export const scanAround = () => [scan(Dir.North), scan()];',
+        'export const lookAround = () => [look(Dir.North), scan()];',
+        '',
+      ].join('\n'),
+    );
+    const result = await compileLibrary(editor.monaco, lib);
+    expect(result.ok ? [] : [result.error.message]).toEqual([]);
+    if (!result.ok) return;
+    expect(result.exports).toEqual(['scanAround', 'lookAround']);
+    expect(result.diagnostics.map((diagnostic) => diagnostic.message)).toContain(
+      '`look()` is not installed until level w4-01.',
+    );
+  });
+
+  test('a library that misspells a name still does not build', async () => {
+    configurePlayerLanguage(editor.monaco, { levelId: 'w3-03' });
+    const lib = editor.model(LIB_FILE_PATH, 'export const here = () => scna();\n');
+    const result = await compileLibrary(editor.monaco, lib);
+    expect(result.ok).toBe(false);
+  });
+
   test('hardware the level has not installed is still TS2304', async () => {
     const result = await compilePlayerCode(editor.monaco, playerModel('w1-01', 'scan();'));
     expect(result.ok).toBe(false);

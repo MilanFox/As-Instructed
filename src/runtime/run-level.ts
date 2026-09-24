@@ -54,6 +54,7 @@ export function runSeed(options: SeedRunOptions): SeedRun {
     costs: options.costOverrides ?? level.costs,
     ...(maxTicks !== undefined ? { maxTicks } : {}),
     ...(maxOps !== undefined ? { maxOps } : {}),
+    ...(options.debug === true ? { recordCalls: true } : {}),
   });
   const botId = world.bots[0]?.id ?? 0;
 

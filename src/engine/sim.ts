@@ -8,7 +8,7 @@ import {
   OpLimitError,
   OutOfFuelError,
 } from './errors.ts';
-import type { EventOrigin, SenseEvent, Trace } from './trace.ts';
+import type { EventOrigin, PrintEvent, SenseEvent, Trace } from './trace.ts';
 import { KEYFRAME_INTERVAL, MAX_SENSE_EVENTS, TraceBuilder } from './trace.ts';
 import type { Bot, Dir, ItemKind, ItemStack, Machine, Message, Tile, Vec, World } from './types.ts';
 import { FED_BY, MANUAL_ONLY, Terrain } from './types.ts';
@@ -48,6 +48,7 @@ export interface SimOptions {
   keyframeInterval?: number;
   livelockRounds?: number;
   maxSenseEvents?: number;
+  recordCalls?: boolean;
 }
 
 export interface TileView {
@@ -76,7 +77,90 @@ export interface MachineView {
   links: Vec[];
 }
 
+export interface BotView {
+  id: number;
+  name: string;
+  at: Vec;
+  facing: Dir;
+  clock: number;
+  alive: boolean;
+  inventory: ItemStack[];
+  capacity: number;
+  fuel: number;
+  fuelMax: number;
+  inbox: number;
+}
+
 const OUT_OF_BOUNDS_TERRAIN = Terrain.Void;
+
+export function tileView(world: World, at: Vec, t: number): TileView {
+  const tile = tileAt(world, at);
+  if (!tile) {
+    return {
+      at: { x: at.x, y: at.y },
+      inBounds: false,
+      terrain: OUT_OF_BOUNDS_TERRAIN,
+      walkable: false,
+      lethal: false,
+      growth: 0,
+      maxGrowth: 0,
+      sproutsIn: 0,
+      crop: null,
+      items: [],
+      botId: null,
+      machineId: null,
+      mark: null,
+    };
+  }
+  const occupant = tile.occupant;
+  const standing =
+    occupant !== undefined && (botById(world, occupant)?.alive ?? false) ? occupant : null;
+  return {
+    at: { x: at.x, y: at.y },
+    inBounds: true,
+    terrain: tile.terrain,
+    walkable: terrainProps(tile.terrain).walkable,
+    lethal: terrainProps(tile.terrain).lethal,
+    growth: maturity(tile, t),
+    maxGrowth: tile.maxGrowth ?? 0,
+    sproutsIn: sproutsIn(tile, t),
+    crop: tile.crop ?? null,
+    items: itemsAt(world, at).map((s) => ({ kind: s.kind, count: s.count })),
+    botId: standing,
+    machineId: machineAt(world, at)?.id ?? null,
+    mark: tile.mark ?? null,
+  };
+}
+
+export function machineView(machine: Machine): MachineView {
+  return {
+    id: machine.id,
+    kind: machine.kind,
+    at: { x: machine.at.x, y: machine.at.y },
+    state: machine.state,
+    vars: { ...machine.vars },
+    inventory: machine.inventory.map((s) => ({ kind: s.kind, count: s.count })),
+    links: (machine.links ?? []).map((at) => ({ x: at.x, y: at.y })),
+  };
+}
+
+export function botView(bot: Bot): BotView {
+  return {
+    id: bot.id,
+    name: bot.name,
+    at: { x: bot.at.x, y: bot.at.y },
+    facing: bot.facing,
+    clock: bot.clock,
+    alive: bot.alive,
+    inventory: bot.inventory
+      .filter((s) => s.count > 0)
+      .map((s) => ({ kind: s.kind, count: s.count })),
+    capacity: bot.capacity,
+    fuel: bot.fuel,
+    fuelMax: bot.fuelMax,
+    inbox: bot.inbox.length,
+  };
+}
 
 interface Occupancy {
   botId: number;
@@ -125,7 +209,11 @@ export class Sim {
     this.maxOps = options.maxOps ?? DEFAULT_MAX_OPS;
     this.keyframeInterval = options.keyframeInterval ?? KEYFRAME_INTERVAL;
     this.livelockRounds = options.livelockRounds ?? DEFAULT_LIVELOCK_ROUNDS;
-    this.builder = new TraceBuilder(world, options.maxSenseEvents ?? MAX_SENSE_EVENTS);
+    this.builder = new TraceBuilder(
+      world,
+      options.maxSenseEvents ?? MAX_SENSE_EVENTS,
+      options.recordCalls ?? false,
+    );
 
     for (const bot of world.bots) {
       if (!bot.alive) continue;
@@ -154,6 +242,18 @@ export class Sim {
 
   attributeTo(origin: EventOrigin | undefined): void {
     this.builder.attributeTo(origin);
+  }
+
+  get recordsCalls(): boolean {
+    return this.builder.recordsCalls;
+  }
+
+  beginCall(name: string, botId: number, args: readonly unknown[]): void {
+    this.builder.beginCall(name, botId, botById(this.world, botId)?.clock ?? 0, args);
+  }
+
+  endCall(botId: number, outcome: { returned: unknown } | { threw: unknown }): void {
+    this.builder.endCall(botById(this.world, botId)?.clock ?? 0, outcome);
   }
 
   noteObjective(id: string, state: 'met' | 'lost'): void {
@@ -262,15 +362,7 @@ export class Sim {
       machineId === undefined ? this.machineNear(bot) : machineById(this.world, machineId);
     this.sense(bot, 'probe', machine !== undefined, machine?.id ?? machineId);
     if (!machine) return null;
-    return {
-      id: machine.id,
-      kind: machine.kind,
-      at: { x: machine.at.x, y: machine.at.y },
-      state: machine.state,
-      vars: { ...machine.vars },
-      inventory: machine.inventory.map((s) => ({ kind: s.kind, count: s.count })),
-      links: (machine.links ?? []).map((at) => ({ x: at.x, y: at.y })),
-    };
+    return machineView(machine);
   }
 
   recordSense(botId: number, name: string, ok: boolean, detail?: string): void {
@@ -665,10 +757,13 @@ export class Sim {
     this.charge(bot, dt);
   }
 
-  print(botId: number, text: string, line?: number): void {
+  print(botId: number, text: string, line?: number, values?: readonly unknown[]): void {
     const bot = this.requireBot(botId);
-    const event = { t: bot.clock, kind: 'print' as const, text, botId };
-    this.builder.push(line === undefined ? event : { ...event, line });
+    const event: PrintEvent = { t: bot.clock, kind: 'print', text, botId };
+    if (line !== undefined) event.line = line;
+    const recorded = values === undefined ? undefined : this.builder.snapshotValues(values);
+    if (recorded !== undefined) event.values = recorded;
+    this.builder.push(event);
   }
 
   send(botId: number, to: number, body: string | number): boolean {
@@ -849,42 +944,7 @@ export class Sim {
   }
 
   private view(at: Vec, t: number): TileView {
-    const tile = tileAt(this.world, at);
-    if (!tile) {
-      return {
-        at: { x: at.x, y: at.y },
-        inBounds: false,
-        terrain: OUT_OF_BOUNDS_TERRAIN,
-        walkable: false,
-        lethal: false,
-        growth: 0,
-        maxGrowth: 0,
-        sproutsIn: 0,
-        crop: null,
-        items: [],
-        botId: null,
-        machineId: null,
-        mark: null,
-      };
-    }
-    const occupant = tile.occupant;
-    const standing =
-      occupant !== undefined && (botById(this.world, occupant)?.alive ?? false) ? occupant : null;
-    return {
-      at: { x: at.x, y: at.y },
-      inBounds: true,
-      terrain: tile.terrain,
-      walkable: terrainProps(tile.terrain).walkable,
-      lethal: terrainProps(tile.terrain).lethal,
-      growth: maturity(tile, t),
-      maxGrowth: tile.maxGrowth ?? 0,
-      sproutsIn: sproutsIn(tile, t),
-      crop: tile.crop ?? null,
-      items: itemsAt(this.world, at).map((s) => ({ kind: s.kind, count: s.count })),
-      botId: standing,
-      machineId: machineAt(this.world, at)?.id ?? null,
-      mark: tile.mark ?? null,
-    };
+    return tileView(this.world, at, t);
   }
 
   private machineNear(bot: Bot): Machine | undefined {
