@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, JSX, KeyboardEvent, MouseEvent } from 'react';
+import type { CSSProperties, JSX, KeyboardEvent, MouseEvent, PointerEvent } from 'react';
 import { buildCampaign } from '../../game/campaign.ts';
 import type { CampaignOrder, CampaignSite } from '../../game/campaign.ts';
 import { exportSave } from '../../game/save.ts';
@@ -47,6 +47,12 @@ function medalMark(order: CampaignOrder): string {
 }
 
 const NARROW = 1040;
+
+// A phone gets one site per screen: the plan is laid out a page per site and the view pans along
+// the route. The width is the workspace's phone breakpoint.
+const PAGED = 600;
+const SWIPE_SLOP = 12;
+const SWIPE_FLING = 0.18;
 
 // The lockup is centred in the gap the tally and the dossier leave along the top. The tally is
 // sized by its own contents, so that gap is measured rather than derived from the viewport; below
@@ -256,20 +262,38 @@ function hatchPlot(points: readonly Point[], radius: number): string {
   return path;
 }
 
+// Paged, each site sits alone in the strip between the tally and the pager, its plate below it.
+const PAGE_GAP = 14;
+const PAGE_FOOT = 102;
+const PLATE_ROOM = 72;
+
+function pagedCentres(page: number, h: number, head: number): { radius: number; centres: Point[] } {
+  const top = head + PAGE_GAP;
+  const bottom = h - Math.min(h * 0.42, 320) - PAGE_FOOT;
+  const room = Math.max(120, bottom - top);
+  const radius = Math.max(36, Math.min(76, page * 0.2, (room - PLATE_ROOM) / 2.2));
+  const slack = Math.max(0, room - PLATE_ROOM - radius * 2.1);
+  const centres = SITE_SPOTS.map((spot, i) => ({
+    x: page * i + page / 2,
+    y: top + radius * 1.1 + slack * spot.y,
+  }));
+  return { radius, centres };
+}
+
 // Narrow puts the dossier on the bottom edge instead of the right, so the sites move with it.
 // `band` is the strip the title lockup occupies along the top; the sites start below it rather
-// than under it, which is also what keeps the pins clear of it.
+// than under it, which is also what keeps the pins clear of it. A `page` width lays the plan out
+// one site per page instead, `w` then being every page end to end.
 function buildPlan(
   w: number,
   h: number,
   counts: readonly number[],
   narrow: boolean,
   band: number,
+  page = 0,
+  head = 0,
 ): Plan {
   const rnd = mulberry(PLAN_SEED);
-  const radius = narrow
-    ? Math.max(30, Math.min(46, Math.min(w, h) * 0.07))
-    : Math.max(42, Math.min(76, Math.min(w, h - band) * 0.088));
   const spanX = narrow ? Math.max(200, w - 196) : Math.max(300, w - 600);
   const spanY = narrow
     ? Math.max(120, h - Math.min(h * 0.42, 320) - 240)
@@ -277,10 +301,18 @@ function buildPlan(
   const originX = narrow ? 98 : 104;
   const originY = narrow ? 92 : 78 + band;
 
-  const centres: Point[] = SITE_SPOTS.map((spot) => ({
-    x: originX + spot.x * spanX,
-    y: originY + spot.y * spanY,
-  }));
+  const { radius, centres } =
+    page > 0
+      ? pagedCentres(page, h, head)
+      : {
+          radius: narrow
+            ? Math.max(30, Math.min(46, Math.min(w, h) * 0.07))
+            : Math.max(42, Math.min(76, Math.min(w, h - band) * 0.088)),
+          centres: SITE_SPOTS.map((spot) => ({
+            x: originX + spot.x * spanX,
+            y: originY + spot.y * spanY,
+          })),
+        };
 
   const step = 86;
   let gridLight = '';
@@ -548,11 +580,13 @@ export function LevelSelect(): JSX.Element {
   const rows = useRef(new Map<number, HTMLAnchorElement>());
   const tally = useRef<HTMLElement | null>(null);
   const dossier = useRef<HTMLElement | null>(null);
-  const [box, setBox] = useState({ w: 1440, h: 860, aside: 0, flank: 1440 });
+  const [box, setBox] = useState({ w: 1440, h: 860, aside: 0, flank: 1440, head: 0 });
   const [seals, setSeals] = useState(false);
   const [picked, setPicked] = useState<number | null>(null);
   const [pinAt, setPinAt] = useState(0);
   const [rowAt, setRowAt] = useState(0);
+  const [drag, setDrag] = useState(0);
+  const swipe = useRef<{ id: number; x: number; y: number; live: boolean } | null>(null);
 
   // Measured on mount as well as observed: inside a throttled frame the observer never delivers,
   // and a plan built for the wrong box is worse than one built a frame late.
@@ -564,11 +598,16 @@ export function LevelSelect(): JSX.Element {
       const w = Math.round(rect.width);
       const h = Math.round(rect.height);
       const aside = Math.round(tally.current?.getBoundingClientRect().right ?? 0);
+      const head = Math.round(tally.current?.getBoundingClientRect().bottom ?? 0);
       const flank = Math.round(dossier.current?.getBoundingClientRect().left ?? w);
       setBox((was) =>
-        was.w === w && was.h === h && was.aside === aside && was.flank === flank
+        was.w === w &&
+        was.h === h &&
+        was.aside === aside &&
+        was.flank === flank &&
+        was.head === head
           ? was
-          : { w, h, aside, flank },
+          : { w, h, aside, flank, head },
       );
     };
     measure();
@@ -585,17 +624,22 @@ export function LevelSelect(): JSX.Element {
 
   const campaign = useMemo(() => buildCampaign(save), [save]);
   const narrow = box.w < NARROW;
+  const paged = box.w <= PAGED;
   const titled = !narrow && box.flank - box.aside >= MARK_WIDTH + 2 * MARK_GUTTER;
+  const span = paged ? box.w * campaign.sites.length : box.w;
+  const head = paged ? box.head : 0;
   const plan = useMemo(
     () =>
       buildPlan(
-        box.w,
+        span,
         box.h,
         campaign.sites.map((site) => site.orders.length),
         narrow,
         titled ? MARK_BAND : 0,
+        paged ? box.w : 0,
+        head,
       ),
-    [box.w, box.h, campaign.sites, narrow, titled],
+    [span, box.w, box.h, campaign.sites, narrow, titled, paged, head],
   );
 
   const stopped = blocked
@@ -607,16 +651,95 @@ export function LevelSelect(): JSX.Element {
   const orders = site?.orders ?? [];
   const rowIndex = Math.min(rowAt, Math.max(0, orders.length - 1));
 
+  // Picking a site while an interlock is up is one click: the refusal lifts and that site opens.
+  const pickSite = useCallback(
+    (index: number): void => {
+      setPicked(index);
+      setPinAt(index);
+      setRowAt(0);
+      if (blocked) goto('levels');
+    },
+    [blocked, goto],
+  );
+
+  const last = campaign.sites.length - 1;
+  const turnPage = useCallback(
+    (by: number): void => {
+      const to = Math.max(0, Math.min(last, chosen + by));
+      if (to !== chosen) pickSite(to);
+    },
+    [chosen, last, pickSite],
+  );
+
   const onPinKeys = useCallback(
     (event: KeyboardEvent<HTMLUListElement>): void => {
       const to = nextPin(event.key, pinAt, plan.plots);
       if (to === null) return;
       event.preventDefault();
-      setPinAt(to);
+      if (paged) pickSite(to);
+      else setPinAt(to);
       pins.current.get(to)?.focus();
     },
-    [pinAt, plan.plots],
+    [pinAt, plan.plots, paged, pickSite],
   );
+
+  // The pin and row lists claim their own arrows first; what reaches the window turns the page.
+  useEffect(() => {
+    if (!paged) return;
+    const onKey = (event: globalThis.KeyboardEvent): void => {
+      if (event.defaultPrevented || event.altKey || event.metaKey || event.ctrlKey) return;
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+      const target = event.target;
+      if (target instanceof HTMLElement && target.closest('input, textarea, [contenteditable]')) {
+        return;
+      }
+      event.preventDefault();
+      turnPage(event.key === 'ArrowRight' ? 1 : -1);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [paged, turnPage]);
+
+  // A swipe only starts on the plan itself, so the sheet still scrolls and its rows still tap.
+  // Past the slop the pointer is captured, which also keeps the release from landing as a tap.
+  const onSwipeStart = (event: PointerEvent<HTMLDivElement>): void => {
+    if (!paged || !event.isPrimary || event.button !== 0) return;
+    if (
+      event.target instanceof Element &&
+      event.target.closest('.survey-frame, .survey-seals-tab, .survey-pager')
+    ) {
+      return;
+    }
+    swipe.current = { id: event.pointerId, x: event.clientX, y: event.clientY, live: false };
+  };
+
+  const onSwipeMove = (event: PointerEvent<HTMLDivElement>): void => {
+    const start = swipe.current;
+    if (!start || start.id !== event.pointerId) return;
+    const dx = event.clientX - start.x;
+    if (!start.live) {
+      if (Math.abs(dx) < SWIPE_SLOP) return;
+      if (Math.abs(event.clientY - start.y) > Math.abs(dx)) {
+        swipe.current = null;
+        return;
+      }
+      start.live = true;
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
+    const atEdge = (dx > 0 && chosen === 0) || (dx < 0 && chosen === last);
+    setDrag(atEdge ? dx / 3 : dx);
+  };
+
+  const onSwipeEnd = (event: PointerEvent<HTMLDivElement>): void => {
+    const start = swipe.current;
+    if (!start || start.id !== event.pointerId) return;
+    swipe.current = null;
+    if (!start.live) return;
+    const dx = event.clientX - start.x;
+    setDrag(0);
+    if (event.type === 'pointerup' && Math.abs(dx) >= box.w * SWIPE_FLING)
+      turnPage(dx < 0 ? 1 : -1);
+  };
 
   const onRowKeys = useCallback(
     (event: KeyboardEvent<HTMLUListElement>): void => {
@@ -628,14 +751,6 @@ export function LevelSelect(): JSX.Element {
     },
     [rowIndex, orders.length],
   );
-
-  // Picking a site while an interlock is up is one click: the refusal lifts and that site opens.
-  const pickSite = (index: number): void => {
-    setPicked(index);
-    setPinAt(index);
-    setRowAt(0);
-    if (blocked) goto('levels');
-  };
 
   const onExport = (): void => {
     const blob = new Blob([exportSave(save, librarySave)], { type: 'application/json' });
@@ -654,13 +769,68 @@ export function LevelSelect(): JSX.Element {
     importLibrary(text);
   };
 
+  const actions = (
+    <>
+      {open ? (
+        <button
+          type="button"
+          className="survey-ctl survey-ctl--tight"
+          title={`Back to the station — ${open.id.toUpperCase()}`}
+          aria-label={paged ? 'Back to the station' : undefined}
+          onClick={() => goto('workspace')}
+        >
+          <IconMap />
+          <span>{paged ? 'station' : 'back to the station'}</span>
+        </button>
+      ) : null}
+      <button
+        type="button"
+        className="survey-ctl survey-ctl--tight"
+        title="Export progress and shared subroutines"
+        onClick={onExport}
+      >
+        export
+      </button>
+      <button
+        type="button"
+        className="survey-ctl survey-ctl--tight"
+        title="Import progress and shared subroutines"
+        onClick={() => file.current?.click()}
+      >
+        import
+      </button>
+      <input
+        ref={file}
+        type="file"
+        accept="application/json"
+        className="sr-only"
+        aria-label="Import a save file"
+        onChange={(event) => {
+          void onImport(event.target.files?.[0]);
+          event.target.value = '';
+        }}
+      />
+    </>
+  );
+
   return (
-    <div className="survey" ref={frame} data-narrow={String(narrow)}>
+    <div
+      className="survey"
+      ref={frame}
+      data-narrow={String(narrow)}
+      data-paged={String(paged)}
+      data-dragging={String(drag !== 0)}
+      style={paged ? ({ '--survey-pan': `${String(drag - chosen * box.w)}px` } as Vars) : undefined}
+      onPointerDown={onSwipeStart}
+      onPointerMove={onSwipeMove}
+      onPointerUp={onSwipeEnd}
+      onPointerCancel={onSwipeEnd}
+    >
       <svg
         className="survey__plan"
-        width={box.w}
+        width={span}
         height={box.h}
-        viewBox={`0 0 ${String(box.w)} ${String(box.h)}`}
+        viewBox={`0 0 ${String(span)} ${String(box.h)}`}
         aria-hidden="true"
       >
         <path className="plan__grid" d={plan.gridLight} />
@@ -809,6 +979,33 @@ export function LevelSelect(): JSX.Element {
         })}
       </ul>
 
+      {paged ? (
+        <nav className="survey-pager" aria-label="Site pager">
+          <button
+            type="button"
+            className="survey-ctl survey-ctl--tight"
+            aria-label="Previous site"
+            aria-disabled={chosen === 0}
+            onClick={() => turnPage(-1)}
+          >
+            ‹
+          </button>
+          <span className="survey-pager__at" aria-live="polite">
+            <span className="sr-only">Site </span>
+            {chosen + 1} / {campaign.sites.length}
+          </span>
+          <button
+            type="button"
+            className="survey-ctl survey-ctl--tight"
+            aria-label="Next site"
+            aria-disabled={chosen === last}
+            onClick={() => turnPage(1)}
+          >
+            ›
+          </button>
+        </nav>
+      ) : null}
+
       <section
         className="survey-frame survey__tally"
         aria-label="Campaign survey totals"
@@ -821,46 +1018,12 @@ export function LevelSelect(): JSX.Element {
               <span>
                 {campaign.closed}/{campaign.issued}
               </span>
-              {open ? (
-                <button
-                  type="button"
-                  className="survey-ctl survey-ctl--tight"
-                  title={`Back to the station — ${open.id.toUpperCase()}`}
-                  onClick={() => goto('workspace')}
-                >
-                  <IconMap />
-                  <span>back to the station</span>
-                </button>
-              ) : null}
-              <button
-                type="button"
-                className="survey-ctl survey-ctl--tight"
-                title="Export progress and shared subroutines"
-                onClick={onExport}
-              >
-                export
-              </button>
-              <button
-                type="button"
-                className="survey-ctl survey-ctl--tight"
-                title="Import progress and shared subroutines"
-                onClick={() => file.current?.click()}
-              >
-                import
-              </button>
-              <input
-                ref={file}
-                type="file"
-                accept="application/json"
-                className="sr-only"
-                aria-label="Import a save file"
-                onChange={(event) => {
-                  void onImport(event.target.files?.[0]);
-                  event.target.value = '';
-                }}
-              />
+              {paged ? null : actions}
             </span>
           </div>
+          {paged ? (
+            <div className="survey-bar survey-bar--sub survey-tally__actions">{actions}</div>
+          ) : null}
           <dl className="survey-tally__grid">
             <div className="survey-tally__cell">
               <dt>Points</dt>

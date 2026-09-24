@@ -1044,3 +1044,77 @@
 .survey[data-narrow='true'] .pin__name {
   font-size: 11px;
 }
+
+/* ---- paged: a phone sees one site at a time and pans along the route to the next ---- */
+
+.survey[data-paged='true'] {
+  touch-action: pan-y;
+}
+
+.survey[data-paged='true'] .survey__plan,
+.survey[data-paged='true'] .survey__pins {
+  transform: translateX(var(--survey-pan, 0));
+  transition: transform var(--survey-slide);
+}
+
+.survey[data-dragging='true'] .survey__plan,
+.survey[data-dragging='true'] .survey__pins {
+  transition: none;
+}
+
+.survey-pager {
+  position: fixed;
+  bottom: calc(var(--survey-inset) + var(--survey-dock) + var(--survey-sheet) + 10px);
+  left: 50%;
+  z-index: 5;
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  padding: 3px;
+  border: 1px dashed var(--border-strong);
+  background: rgb(5 8 12 / 82%);
+  transform: translateX(-50%);
+}
+
+.survey-pager .survey-ctl {
+  min-width: 36px;
+  min-height: 30px;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.survey-pager .survey-ctl[aria-disabled='true'] {
+  border-color: var(--border-strong);
+  background: transparent;
+  color: var(--ink-dim);
+  cursor: default;
+}
+
+.survey-pager__at {
+  min-width: 44px;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .survey[data-paged='true'] .survey__plan,
+  .survey[data-paged='true'] .survey__pins {
+    transition: none;
+  }
+}
+
+/* A phone has no room for the campaign's controls beside the title, so they take a row of their
+   own under it. */
+.survey-tally__actions {
+  justify-content: flex-start;
+  padding: 5px var(--space-3);
+}
+
+.survey-tally__actions .survey-ctl {
+  border-color: var(--survey-edge);
+  color: var(--ink);
+}
