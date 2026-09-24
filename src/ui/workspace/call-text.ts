@@ -1,21 +1,9 @@
 import type { ApiCall, Snapshot } from '../../engine/index.ts';
-import { ALL_DIRS, dirName } from '../../engine/index.ts';
 import { apiFunction } from '../../runtime/index.ts';
 import { previewText } from '../components/value-tree.ts';
 
 function isUndefined(value: Snapshot): boolean {
   return typeof value === 'object' && value !== null && value.$ === 'undefined';
-}
-
-function argText(value: Snapshot, type: string | undefined): string {
-  if (
-    type === 'Dir' &&
-    typeof value === 'number' &&
-    (ALL_DIRS as readonly number[]).includes(value)
-  ) {
-    return `Dir.${dirName(value as (typeof ALL_DIRS)[number])}`;
-  }
-  return previewText(value);
 }
 
 function outcomeText(call: ApiCall): string {
@@ -24,7 +12,10 @@ function outcomeText(call: ApiCall): string {
     const named = typeof thrown === 'object' && thrown !== null && thrown.$ === 'error';
     return ` → threw ${named ? thrown.name : previewText(thrown)}`;
   }
-  return isUndefined(call.outcome.returned) ? '' : ` → ${previewText(call.outcome.returned)}`;
+  const returned = call.outcome.returned;
+  return isUndefined(returned)
+    ? ''
+    : ` → ${previewText(returned, apiFunction(call.name)?.returns)}`;
 }
 
 function clip(text: string, max: number): string {
@@ -34,7 +25,7 @@ function clip(text: string, max: number): string {
 
 export function callLine(call: ApiCall, max: number): string {
   const params = apiFunction(call.name)?.params ?? [];
-  const args = call.args.map((value, index) => argText(value, params[index]?.type)).join(', ');
+  const args = call.args.map((value, index) => previewText(value, params[index]?.type)).join(', ');
   return clip(`${call.name}(${args})${outcomeText(call)}`, max);
 }
 

@@ -45,7 +45,9 @@ describe('a call reads like the line that made it', () => {
       ],
       omitted: 0,
     };
-    expect(callLine(call({ name: 'pos', outcome: { returned } }), 80)).toBe('pos() → {x: 1, y: 2}');
+    expect(callLine(call({ name: 'pos', outcome: { returned } }), 80)).toBe(
+      'pos() → Vec {x: 1, y: 2}',
+    );
   });
 
   test('a long line is cut to the width it is given', () => {

@@ -27,7 +27,24 @@ type StandaloneEditor = monaco.editor.IStandaloneCodeEditor;
 
 interface Stepped {
   origin: EventOrigin;
-  ghost: string | null;
+  calls: readonly ApiCall[];
+  unrecorded: boolean;
+}
+
+const GHOST_MARGIN = 3;
+const GHOST_MIN = 16;
+
+// Monaco wraps a line that injected text pushes past the wrapping column, so the ghost is cut to
+// the room the narrowest editor showing the document has left on that line.
+function ghostRoom(model: monaco.editor.ITextModel, line: number): number | undefined {
+  const columns = monaco.editor
+    .getEditors()
+    .filter((editor) => editor.getModel() === model)
+    .map((editor) => editor.getOption(monaco.editor.EditorOption.wrappingInfo).wrappingColumn)
+    .filter((column) => column > 0);
+  if (columns.length === 0) return undefined;
+  const used = model.getLineContent(line).replace(/\t/g, '  ').length;
+  return Math.max(GHOST_MIN, Math.min(...columns) - used - GHOST_MARGIN);
 }
 
 function fileAt(uri: monaco.Uri): EventOrigin['file'] | null {
@@ -49,23 +66,18 @@ function seekLink(call: ApiCall): string {
   return `command:${SEEK_TO_CALL}?${encodeURIComponent(JSON.stringify([call.seq]))}`;
 }
 
-// There is no store action for an arbitrary event index, so land on its tick and step the event
-// cursor the rest of the way — the same path the event step buttons take.
 function seekToCall(seq: number): void {
   const state = useGame.getState();
   const trace = state.trace;
   const call = trace?.calls?.calls[seq];
   if (!trace || !call) return;
-  state.pause();
   const target = seekTarget(call, trace.events.length);
-  if (target === null) {
-    state.seek(call.t);
+  if (target !== null) {
+    state.seekToEvent(target);
     return;
   }
-  state.seek((trace.events[target] as Trace['events'][number]).t);
-  const landed = useGame.getState();
-  const from = resolveEventCursor(trace, landed.tick, landed.eventCursor);
-  if (from !== null && from !== target) landed.stepEvent(target - from);
+  state.pause();
+  state.seek(call.t);
 }
 
 function lineHoverAt(
@@ -78,7 +90,8 @@ function lineHoverAt(
   if (!trace?.calls || file === null) return null;
   const line = position.lineNumber;
   const onGhost =
-    stepped?.ghost != null &&
+    stepped !== null &&
+    ghostText(stepped.calls, stepped.unrecorded) !== null &&
     stepped.origin.file === file &&
     stepped.origin.line === line &&
     position.column >= model.getLineMaxColumn(line);
@@ -110,14 +123,17 @@ function markOrigin(stepped: Stepped | null, previous: Map<string, string[]>): v
         wanted.flatMap((line) => {
           const end = model.getLineMaxColumn(line);
           const step = { range: new monaco.Range(line, 1, line, end), options: STEP_DECORATION };
-          if (!stepped?.ghost) return [step];
+          const text = stepped
+            ? ghostText(stepped.calls, stepped.unrecorded, ghostRoom(model, line))
+            : null;
+          if (text === null) return [step];
           const ghost = {
             range: new monaco.Range(line, end, line, end),
             options: {
               showIfCollapsed: true,
               hoverMessage: { value: 'hover the line for every value' },
               after: {
-                content: stepped.ghost,
+                content: text,
                 inlineClassName: 'debug-step-ghost',
                 cursorStops: monaco.editor.InjectedTextCursorStops.None,
               },
@@ -211,9 +227,8 @@ export function MonacoBody({
       origin && trace && index !== null
         ? {
             origin,
-            ghost: trace.calls
-              ? ghostText(callsAtEvent(trace, index), pastCallLog(trace.calls, index))
-              : null,
+            calls: trace.calls ? callsAtEvent(trace, index) : [],
+            unrecorded: pastCallLog(trace.calls, index),
           }
         : null;
     steppedRef.current = stepped;

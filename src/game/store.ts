@@ -139,6 +139,7 @@ export interface GameState {
   seek(tick: number): void;
   step(delta: number): void;
   stepEvent(delta: number): void;
+  seekToEvent(index: number): void;
   seekToLine(file: EventOrigin['file'], line: number): void;
   play(): void;
   pause(): void;
@@ -1202,7 +1203,14 @@ export const useGame = create<GameState>((set, get) => {
         set({ debugNote: delta < 0 ? 'No earlier event.' : 'No later event.' });
         return;
       }
-      get().seek((trace.events[index] as TraceEvent).t);
+      get().seekToEvent(index);
+    },
+
+    seekToEvent(index) {
+      const event = get().trace?.events[index];
+      if (!event) return;
+      get().pause();
+      get().seek(event.t);
       set({ eventCursor: index });
     },
 
@@ -1222,9 +1230,7 @@ export const useGame = create<GameState>((set, get) => {
         });
         return;
       }
-      get().pause();
-      get().seek((trace.events[index] as TraceEvent).t);
-      set({ eventCursor: index });
+      get().seekToEvent(index);
     },
 
     play() {

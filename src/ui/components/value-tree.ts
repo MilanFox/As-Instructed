@@ -1,4 +1,6 @@
 import type { Snapshot } from '../../engine/index.ts';
+import { enumText, fieldType, itemType, typeName } from './value-type.ts';
+import type { TypeRef } from './value-type.ts';
 
 export type ValueTone =
   | 'string'
@@ -26,6 +28,7 @@ export interface ValueRow {
   label: string | null;
   separator: string;
   value: Snapshot | null;
+  type: TypeRef | undefined;
   omitted: number;
   expandable: boolean;
   expanded: boolean;
@@ -38,6 +41,7 @@ interface Child {
   separator: string;
   diffKey: string;
   value: Snapshot;
+  type: TypeRef | undefined;
 }
 
 const PREVIEW_ENTRIES = 5;
@@ -71,7 +75,13 @@ function quoted(text: string, limit: number): string {
   return JSON.stringify(clipped);
 }
 
-function leaf(value: Snapshot, stringLimit: number): ValueSegment[] | null {
+function leaf(
+  value: Snapshot,
+  stringLimit: number,
+  type: TypeRef | undefined,
+): ValueSegment[] | null {
+  const named = enumText(type, value);
+  if (named !== null) return [{ text: named, tone: 'number' }];
   if (value === null) return [{ text: 'null', tone: 'nil' }];
   if (typeof value === 'boolean') return [{ text: String(value), tone: 'boolean' }];
   if (typeof value === 'number') return [{ text: String(value), tone: 'number' }];
@@ -107,7 +117,7 @@ function leaf(value: Snapshot, stringLimit: number): ValueSegment[] | null {
   }
 }
 
-function containerTitle(node: Tagged): ValueSegment[] {
+function containerTitle(node: Tagged, type: TypeRef | undefined): ValueSegment[] {
   switch (node.$) {
     case 'array':
       return [{ text: `Array(${node.length})`, tone: 'type' }];
@@ -115,8 +125,10 @@ function containerTitle(node: Tagged): ValueSegment[] {
       return [{ text: `Map(${node.size})`, tone: 'type' }];
     case 'set':
       return [{ text: `Set(${node.size})`, tone: 'type' }];
-    case 'object':
-      return node.ctor ? [{ text: node.ctor, tone: 'type' }] : [];
+    case 'object': {
+      const name = typeName(type, node) ?? node.ctor;
+      return name ? [{ text: name, tone: 'type' }] : [];
+    }
     default:
       return [];
   }
@@ -126,18 +138,20 @@ function isPlainLeaf(value: Snapshot): boolean {
   return tagged(value) === null;
 }
 
-function abbreviated(value: Snapshot): ValueSegment[] {
+function abbreviated(value: Snapshot, type: TypeRef | undefined): ValueSegment[] {
   const node = tagged(value);
-  if (node?.$ === 'object' && !node.ctor) {
+  if (node?.$ === 'object') {
     const small =
       node.omitted === 0 &&
       node.entries.length <= INLINE_OBJECT_ENTRIES &&
       node.entries.every(([, entry]) => isPlainLeaf(entry));
-    if (!small) return [{ text: node.entries.length === 0 ? '{}' : '{…}', tone: 'punct' }];
-    return previewSegments(value);
+    if (small && !node.ctor) return previewSegments(value, type, false);
+    const title = containerTitle(node, type);
+    if (title.length > 0) return title;
+    return [{ text: node.entries.length === 0 ? '{}' : '{…}', tone: 'punct' }];
   }
-  if (node && isContainer(node)) return containerTitle(node);
-  return leaf(value, PREVIEW_STRING) ?? [];
+  if (node && isContainer(node)) return containerTitle(node, type);
+  return leaf(value, PREVIEW_STRING, type) ?? [];
 }
 
 function isContainer(node: Tagged): boolean {
@@ -148,17 +162,21 @@ function textLength(segments: readonly ValueSegment[]): number {
   return segments.reduce((sum, segment) => sum + segment.text.length, 0);
 }
 
-export function previewSegments(value: Snapshot): ValueSegment[] {
+export function previewSegments(
+  value: Snapshot,
+  type?: TypeRef,
+  titled: boolean = true,
+): ValueSegment[] {
   const node = tagged(value);
-  const scalar = leaf(value, PREVIEW_STRING);
+  const scalar = leaf(value, PREVIEW_STRING, type);
   if (!node || !isContainer(node)) return scalar ?? [];
 
-  const title = containerTitle(node);
+  const title = titled ? containerTitle(node, type) : [];
   const [open, close] = node.$ === 'array' ? ['[', ']'] : ['{', '}'];
   const out: ValueSegment[] = title.length > 0 ? [...title, { text: ' ', tone: 'punct' }] : [];
   out.push({ text: open, tone: 'punct' });
 
-  const children = childrenOf(value);
+  const children = childrenOf(value, type);
   const omitted = 'omitted' in node ? node.omitted : 0;
   let shown = 0;
   for (const child of children) {
@@ -167,7 +185,7 @@ export function previewSegments(value: Snapshot): ValueSegment[] {
     if (child.label !== null && node.$ !== 'array' && node.$ !== 'set') {
       out.push({ text: child.label, tone: 'key' }, { text: child.separator, tone: 'punct' });
     }
-    out.push(...abbreviated(child.value));
+    out.push(...abbreviated(child.value, child.type));
     shown += 1;
   }
   if (shown < children.length || omitted > 0) {
@@ -177,36 +195,40 @@ export function previewSegments(value: Snapshot): ValueSegment[] {
   return out;
 }
 
-export function headerSegments(value: Snapshot): ValueSegment[] {
+export function headerSegments(value: Snapshot, type?: TypeRef): ValueSegment[] {
   const node = tagged(value);
-  if (!node || !isContainer(node)) return previewSegments(value);
-  const title = containerTitle(node);
+  if (!node || !isContainer(node)) return previewSegments(value, type);
+  const title = containerTitle(node, type);
   return title.length > 0 ? title : [{ text: 'Object', tone: 'type' }];
 }
 
-export function previewText(value: Snapshot): string {
-  return previewSegments(value)
+export function previewText(value: Snapshot, type?: TypeRef): string {
+  return previewSegments(value, type)
     .map((segment) => segment.text)
     .join('');
 }
 
-function childrenOf(value: Snapshot): Child[] {
+function childrenOf(value: Snapshot, type: TypeRef | undefined): Child[] {
   const node = tagged(value);
   if (!node) return [];
   switch (node.$) {
-    case 'array':
+    case 'array': {
+      const items = itemType(type, node);
       return node.items.map((item, index) => ({
         label: String(index),
         separator: ': ',
         diffKey: String(index),
         value: item,
+        type: items,
       }));
+    }
     case 'set':
       return node.items.map((item, index) => ({
         label: null,
         separator: '',
         diffKey: String(index),
         value: item,
+        type: undefined,
       }));
     case 'object':
       return node.entries.map(([key, entry]) => ({
@@ -214,11 +236,12 @@ function childrenOf(value: Snapshot): Child[] {
         separator: ': ',
         diffKey: key,
         value: entry,
+        type: fieldType(type, node, key),
       }));
     case 'map':
       return node.entries.map(([key, entry]) => {
         const label = previewText(key);
-        return { label, separator: ' => ', diffKey: label, value: entry };
+        return { label, separator: ' => ', diffKey: label, value: entry, type: undefined };
       });
     default:
       return [];
@@ -241,6 +264,7 @@ export interface FlattenOptions {
   expanded: ReadonlySet<string>;
   diff: boolean;
   previous: Snapshot | undefined;
+  type?: TypeRef;
 }
 
 export const ROOT_ROW = 'r';
@@ -273,6 +297,7 @@ export function flattenRows(value: Snapshot, options: FlattenOptions): ValueRow[
       label: child.label,
       separator: child.separator,
       value: child.value,
+      type: child.type,
       omitted: 0,
       expandable,
       expanded,
@@ -282,12 +307,12 @@ export function flattenRows(value: Snapshot, options: FlattenOptions): ValueRow[
     if (!expanded) return;
 
     const priorChildren = new Map(
-      (previous === undefined ? [] : childrenOf(previous)).map((each) => [
+      (previous === undefined ? [] : childrenOf(previous, child.type)).map((each) => [
         each.diffKey,
         each.value,
       ]),
     );
-    const children = childrenOf(child.value);
+    const children = childrenOf(child.value, child.type);
     const omitted = omittedOf(child.value);
     const size = children.length + (omitted > 0 ? 1 : 0);
     children.forEach((each, index) => {
@@ -310,6 +335,7 @@ export function flattenRows(value: Snapshot, options: FlattenOptions): ValueRow[
         label: null,
         separator: '',
         value: null,
+        type: undefined,
         omitted,
         expandable: false,
         expanded: false,
@@ -323,7 +349,7 @@ export function flattenRows(value: Snapshot, options: FlattenOptions): ValueRow[
     1,
     1,
     1,
-    { label: options.label, separator: ': ', value },
+    { label: options.label, separator: ': ', value, type: options.type },
     options.previous,
     options.previous !== undefined,
   );

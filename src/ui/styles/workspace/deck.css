@@ -103,6 +103,36 @@
   white-space: nowrap;
 }
 
+/* A button is atomic to text-overflow, so the call is its own flex item that ellipsises, and
+   the line number gives way before it does. */
+.debug-strip__text--call {
+  display: flex;
+}
+
+.debug-strip__head,
+.debug-strip__tail,
+.debug-strip__call,
+.debug-strip__unrecorded {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: pre;
+}
+
+.debug-strip__head {
+  flex: none;
+}
+
+.debug-strip__tail {
+  flex: 0 1000 auto;
+  min-width: 0;
+}
+
+.debug-strip__call,
+.debug-strip__unrecorded {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
 .debug-strip__call {
   padding: 0;
   border: 0;

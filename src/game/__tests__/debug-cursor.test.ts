@@ -272,6 +272,14 @@ describe('the store keeps the cursor and the tick telling the same story', () =>
     expect(useGame.getState().debugNote).toBe('No earlier event.');
   });
 
+  it('lands on any event by index, even the middle of a shared tick', () => {
+    loaded();
+    useGame.getState().seekToEvent(2);
+
+    expect(useGame.getState().eventCursor).toBe(2);
+    expect(useGame.getState().tick).toBe(4);
+  });
+
   it('jumps to the first event a line raised', () => {
     loaded();
     useGame.getState().seekToLine('lib', 9);

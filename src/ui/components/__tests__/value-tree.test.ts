@@ -216,3 +216,45 @@ describe('ValueTree', () => {
     expect(textOf(row)).toBe('fuel: 9 → 8');
   });
 });
+
+describe('player API types', () => {
+  const plain: Snapshot = { ...tile, ctor: null } as Snapshot;
+  const bot: Snapshot = {
+    $: 'object',
+    ctor: null,
+    entries: [
+      ['facing', 1],
+      ['inventory', { $: 'array', items: [], length: 0, omitted: 0 }],
+    ],
+    omitted: 0,
+  };
+
+  test('a plain view is titled with the type the API declares for it', () => {
+    expect(previewText({ $: 'array', items: [plain], length: 1, omitted: 0 }, 'TileView[]')).toBe(
+      'Array(1) [TileView]',
+    );
+    expect(previewText(plain, 'TileView | null')).toBe(
+      'TileView {at: {x: 3, y: 4}, terrain: "soil", crop: null}',
+    );
+  });
+
+  test('a direction reads as its name, as it does in the call line', () => {
+    expect(previewText(bot, 'BotView')).toBe('BotView {facing: Dir.East, inventory: Array(0)}');
+    const rows = flattenRows(bot, {
+      label: null,
+      expanded: new Set(['r']),
+      diff: false,
+      previous: undefined,
+      type: 'BotView',
+    });
+    expect(rows[1]?.type).toBe('Dir');
+    expect(previewText(1, 'Dir')).toBe('Dir.East');
+  });
+
+  test('open starts with the top level expanded', () => {
+    const tree = mount({ value: plain, label: 'now', type: 'TileView', open: true })();
+    const rows = items(tree);
+    expect(rows).toHaveLength(4);
+    expect(textOf(rows[0] as HostNode)).toBe('▾now: TileView');
+  });
+});

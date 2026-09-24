@@ -6,6 +6,7 @@ import { cursorCalls, entityViewsAt } from '../../game/debug-values.ts';
 import type { InspectTarget } from '../../game/debug-values.ts';
 import { resolveEventCursor, useGame } from '../../game/store.ts';
 import { ValueTree } from '../components/ValueTree.tsx';
+import type { TypeRef } from '../components/value-type.ts';
 import { pick, showCall, useInspect } from '../hooks/useInspect.ts';
 import { OverlayPanel, PanelBar } from './OverlayPanel.tsx';
 import type { CrewRow, WorkspaceData } from './useWorkspace.ts';
@@ -75,17 +76,31 @@ function namedArgs(call: ApiCall): Snapshot {
   };
 }
 
+const VIEW_TYPES: Record<InspectTarget['kind'], TypeRef> = {
+  tile: 'TileView',
+  machine: 'MachineView',
+  bot: 'BotView',
+};
+
+function argTypes(call: ApiCall): TypeRef {
+  const params = apiFunction(call.name)?.params ?? [];
+  return Object.fromEntries(params.map((param) => [param.name, param.type]));
+}
+
 function CallValues({ call }: { call: ApiCall }): React.ReactElement {
+  const spec = apiFunction(call.name);
   return (
     <div className="inspect__call">
       <div className="inspect__name">
         {call.name} <span className="crew-row__dim">t{String(call.t)}</span>
       </div>
-      {call.args.length > 0 ? <ValueTree value={namedArgs(call)} label="args" /> : null}
+      {call.args.length > 0 ? (
+        <ValueTree value={namedArgs(call)} label="args" type={argTypes(call)} />
+      ) : null}
       {'threw' in call.outcome ? (
         <ValueTree value={call.outcome.threw} label="threw" />
       ) : (
-        <ValueTree value={call.outcome.returned} label="return" />
+        <ValueTree value={call.outcome.returned} label="return" type={spec?.returns} open />
       )}
     </div>
   );
@@ -129,7 +144,13 @@ function TargetValues({ target }: { target: InspectTarget }): React.ReactElement
   return (
     <>
       {unchanged ? <p className="inspect__note">unchanged by this event</p> : null}
-      <ValueTree value={current} previous={unchanged ? undefined : previous} label="now" />
+      <ValueTree
+        value={current}
+        previous={unchanged ? undefined : previous}
+        label="now"
+        type={VIEW_TYPES[target.kind]}
+        open
+      />
     </>
   );
 }

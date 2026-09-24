@@ -118,6 +118,11 @@
   max-height: min(86vh, calc(100vh - 260px));
 }
 
+.telemetry--debug .crew-list {
+  flex-shrink: 0;
+  max-height: 88px;
+}
+
 button.crew-row {
   width: 100%;
   border: 0;

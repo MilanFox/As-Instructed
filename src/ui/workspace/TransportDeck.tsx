@@ -142,8 +142,8 @@ export function TransportDeck({
           </button>
         </span>
         {debugParts !== null && (pastLog || token !== null) ? (
-          <span className="debug-strip__text">
-            {debugParts.head}
+          <span className="debug-strip__text debug-strip__text--call">
+            <span className="debug-strip__head">{debugParts.head}</span>
             {token === null ? (
               <span className="debug-strip__unrecorded">not recorded — call log full</span>
             ) : (
@@ -156,7 +156,7 @@ export function TransportDeck({
                 {token}
               </button>
             )}
-            {debugParts.tail}
+            <span className="debug-strip__tail">{debugParts.tail}</span>
           </span>
         ) : (
           <span className="debug-strip__text">{describeDebug(workspace.debug)}</span>

@@ -10,6 +10,7 @@ import {
   treeKeyAction,
 } from './value-tree.ts';
 import type { ValueRow, ValueSegment } from './value-tree.ts';
+import type { TypeRef } from './value-type.ts';
 import '../styles/value-tree.css';
 
 export interface ValueTreeProps {
@@ -17,6 +18,8 @@ export interface ValueTreeProps {
   label?: string;
   previous?: Snapshot;
   diff?: boolean;
+  type?: TypeRef;
+  open?: boolean;
   className?: string;
 }
 
@@ -37,7 +40,7 @@ function Segments({ segments }: { segments: readonly ValueSegment[] }): React.JS
 function rowTitle(row: ValueRow): string | undefined {
   if (row.change === 'added') return 'new';
   if (row.change === 'changed' && row.previous !== undefined) {
-    return `was ${previewText(row.previous)}`;
+    return `was ${previewText(row.previous, row.type)}`;
   }
   return undefined;
 }
@@ -47,13 +50,15 @@ function RowValue({ row }: { row: ValueRow }): React.JSX.Element {
     return <span className="vt__meta">… {row.omitted} more</span>;
   }
   const value = row.value;
-  const segments = row.expanded ? headerSegments(value) : previewSegments(value);
+  const segments = row.expanded
+    ? headerSegments(value, row.type)
+    : previewSegments(value, row.type);
   const showWas = row.change === 'changed' && !row.expandable && row.previous !== undefined;
   return (
     <>
       {showWas && row.previous !== undefined ? (
         <>
-          <del className="vt__was">{previewText(row.previous)}</del>
+          <del className="vt__was">{previewText(row.previous, row.type)}</del>
           <span className="vt__punct"> → </span>
         </>
       ) : null}
@@ -67,15 +72,19 @@ export function ValueTree({
   label,
   previous,
   diff = previous !== undefined,
+  type,
+  open = false,
   className,
 }: ValueTreeProps): React.JSX.Element {
   const [idPrefix] = useState(() => `value-tree-${(treeSequence += 1)}`);
-  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(
+    () => new Set(open ? [ROOT_ROW] : []),
+  );
   const [focused, setFocused] = useState(ROOT_ROW);
 
   const rows = useMemo(
-    () => flattenRows(value, { label: label ?? null, expanded, diff, previous }),
-    [value, label, expanded, diff, previous],
+    () => flattenRows(value, { label: label ?? null, expanded, diff, previous, type }),
+    [value, label, expanded, diff, previous, type],
   );
   const active = rows.some((row) => row.id === focused) ? focused : ROOT_ROW;
 

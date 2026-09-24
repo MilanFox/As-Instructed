@@ -23,11 +23,15 @@ export function pastCallLog(log: CallLog | undefined, eventIndex: number): boole
   return log !== undefined && log.dropped > 0 && eventIndex > lastRecordedEvent(log);
 }
 
-export function ghostText(calls: readonly ApiCall[], unrecorded: boolean): string | null {
+export function ghostText(
+  calls: readonly ApiCall[],
+  unrecorded: boolean,
+  max: number = GHOST_MAX,
+): string | null {
   const [first] = calls;
   if (first === undefined) return unrecorded ? UNRECORDED : null;
   const more = calls.length > 1 ? ` +${String(calls.length - 1)}` : '';
-  return callLine(first, GHOST_MAX - more.length) + more;
+  return callLine(first, Math.min(max, GHOST_MAX) - more.length) + more;
 }
 
 // Monaco renders hovers as markdown, so a snapshot like `[1, 2]` or `a_b` must not become a
