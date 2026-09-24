@@ -237,7 +237,10 @@ describe('run state machine', () => {
     useGame.getState().run();
     expect(useGame.getState().runState).toBe('running');
 
-    await vi.advanceTimersByTimeAsync(20_000);
+    const boards = getLevel(useGame.getState().currentLevelId ?? '')?.seeds.length ?? 1;
+    await vi.advanceTimersByTimeAsync(boards * 5000 + 1999);
+    expect(useGame.getState().runState).toBe('running');
+    await vi.advanceTimersByTimeAsync(2);
 
     const state = useGame.getState();
     expect(state.runState).toBe('idle');

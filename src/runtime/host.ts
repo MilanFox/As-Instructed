@@ -28,6 +28,8 @@ interface Pending {
   timer: ReturnType<typeof setTimeout>;
   timeoutMs: number;
   onProgress: ((progress: RunProgress) => void) | undefined;
+  board: number;
+  expire: () => void;
 }
 
 function defaultWorkerFactory(): WorkerLike {
@@ -87,11 +89,14 @@ export class Runner {
     const timeoutMs = request.timeoutMs ?? this.defaultTimeoutMs;
 
     return new Promise<RunResponse>((resolve) => {
-      const timer = setTimeout(() => {
-        this.abort(requestId, { ok: false, error: timeoutFailure(timeoutMs) });
-      }, timeoutMs);
+      const expire = (): void => {
+        const index = Math.min(this.pending?.board ?? 0, Math.max(0, request.seeds.length - 1));
+        const board = { index, total: request.seeds.length, seed: request.seeds[index] };
+        this.abort(requestId, { ok: false, error: timeoutFailure(timeoutMs, board) });
+      };
+      const timer = setTimeout(expire, timeoutMs);
 
-      this.pending = { requestId, settle: resolve, timer, timeoutMs, onProgress };
+      this.pending = { requestId, settle: resolve, timer, timeoutMs, onProgress, board: 0, expire };
 
       const message: WorkerRequestMessage = { type: 'run', requestId, request };
       try {
@@ -127,6 +132,9 @@ export class Runner {
     const pending = this.pending;
     if (!pending || !message || message.requestId !== pending.requestId) return;
     if (message.type === 'progress') {
+      clearTimeout(pending.timer);
+      pending.board = message.boardsDone;
+      pending.timer = setTimeout(pending.expire, pending.timeoutMs);
       pending.onProgress?.({ boardsDone: message.boardsDone, boards: message.boards });
       return;
     }

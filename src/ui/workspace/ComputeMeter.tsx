@@ -31,29 +31,35 @@ export function ComputeMeter({ computing }: { computing: Computing }): React.Rea
     return () => clearInterval(timer);
   }, []);
 
-  const { boardsDone, boards, startedAt, limitMs } = computing;
-  const elapsed = Math.min(limitMs, Math.max(0, now - startedAt));
+  const { boardsDone, boards, boardStartedAt, limitMs } = computing;
+  const elapsed = Math.min(limitMs, Math.max(0, now - boardStartedAt));
+  const board = Math.min(boards, boardsDone + 1);
 
   return (
     <>
-      <span
-        className="scrubber compute-meter"
-        role="progressbar"
-        aria-label="Boards computed"
-        aria-valuemin={0}
-        aria-valuemax={boards}
-        aria-valuenow={boardsDone}
-        aria-valuetext={`${String(boardsDone)} of ${String(boards)} boards computed`}
-      >
-        {Array.from({ length: boards }, (_, index) => (
-          <span
-            key={index}
-            className="compute-meter__board"
-            data-state={index < boardsDone ? 'done' : index === boardsDone ? 'live' : 'queued'}
-          />
-        ))}
+      <span className="scrubber compute-meter">
+        {boards > 1 ? (
+          <span className="compute-meter__label">{`board ${String(board)}/${String(boards)}`}</span>
+        ) : null}
+        <span
+          className="compute-meter__track"
+          role="progressbar"
+          aria-label="Boards computed"
+          aria-valuemin={0}
+          aria-valuemax={boards}
+          aria-valuenow={boardsDone}
+          aria-valuetext={`${String(boardsDone)} of ${String(boards)} boards computed`}
+        >
+          {Array.from({ length: boards }, (_, index) => (
+            <span
+              key={index}
+              className="compute-meter__board"
+              data-state={index < boardsDone ? 'done' : index === boardsDone ? 'live' : 'queued'}
+            />
+          ))}
+        </span>
       </span>
-      <span className="readout" title="Time spent computing, and the limit">
+      <span className="readout" title="Time on this board so far, and its limit">
         {seconds(elapsed)}
         <span className="readout--dim">/{seconds(limitMs)}</span>
       </span>

@@ -167,8 +167,7 @@ describe('the watchdog', () => {
     expect(response.ok).toBe(false);
     if (response.ok) return;
     expect(response.error.kind).toBe('timeout');
-    expect(response.error.message).toContain('did not stop');
-    expect(response.error.message).toContain('100 ms');
+    expect(response.error.message).toBe('Board 1 ran past 0.1 s. A loop may never end.');
     runner.dispose();
   });
 
@@ -203,6 +202,65 @@ describe('the watchdog', () => {
     runner.dispose();
   });
 
+  test('the limit is per board: three boards of 3 s each pass under a 5 s limit', async () => {
+    const runner = makeRunner(5000);
+    const worker = latest();
+    worker.responsive = false;
+    const pending = runner.run({ ...REQUEST, seeds: [1, 4, 7] });
+    const requestId = worker.received[0]?.requestId ?? 0;
+    for (let board = 1; board <= 3; board++) {
+      await vi.advanceTimersByTimeAsync(3000);
+      worker.onmessage?.({
+        data: { type: 'progress', requestId, boardsDone: board, boards: 3 },
+      } as MessageEvent);
+    }
+    worker.reply(requestId, okResponse(1));
+
+    const response = await pending;
+    expect(response.ok).toBe(true);
+    expect(worker.terminated).toBe(false);
+    runner.dispose();
+  });
+
+  test('a board that never ends is stopped at its own limit, and named', async () => {
+    const runner = makeRunner(5000);
+    const worker = latest();
+    worker.responsive = false;
+    const pending = runner.run({ ...REQUEST, seeds: [1, 4, 7] });
+    const requestId = worker.received[0]?.requestId ?? 0;
+    await vi.advanceTimersByTimeAsync(2000);
+    worker.onmessage?.({
+      data: { type: 'progress', requestId, boardsDone: 1, boards: 3 },
+    } as MessageEvent);
+    await vi.advanceTimersByTimeAsync(4999);
+    expect(worker.terminated).toBe(false);
+    await vi.advanceTimersByTimeAsync(2);
+
+    const response = await pending;
+    expect(worker.terminated).toBe(true);
+    expect(response.ok).toBe(false);
+    if (response.ok) return;
+    expect(response.error.message).toBe(
+      'Board 2 of 3 (board 4) ran past 5 s. A loop may never end.',
+    );
+    runner.dispose();
+  });
+
+  test('a busy loop on the first board fails there', async () => {
+    const runner = makeRunner(5000);
+    latest().responsive = false;
+    const pending = runner.run({ ...REQUEST, seeds: [1, 4, 7] });
+    await vi.advanceTimersByTimeAsync(5001);
+
+    const response = await pending;
+    expect(response.ok).toBe(false);
+    if (response.ok) return;
+    expect(response.error.message).toBe(
+      'Board 1 of 3 (board 1) ran past 5 s. A loop may never end.',
+    );
+    runner.dispose();
+  });
+
   test('a per-request timeout overrides the runner default', async () => {
     const runner = makeRunner(10_000);
     latest().responsive = false;
@@ -213,7 +271,7 @@ describe('the watchdog', () => {
 
     expect(response.ok).toBe(false);
     if (response.ok) return;
-    expect(response.error.message).toContain('30 ms');
+    expect(response.error.message).toContain('0.03 s');
     runner.dispose();
   });
 });

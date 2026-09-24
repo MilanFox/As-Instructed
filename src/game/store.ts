@@ -48,6 +48,7 @@ export interface BlockedLevel {
 
 export interface Computing extends RunProgress {
   startedAt: number;
+  boardStartedAt: number;
   limitMs: number;
 }
 
@@ -67,9 +68,11 @@ export const BASE_TICKS_PER_SECOND = 4;
 // The 5000ms worker default is not enough to record an attributed trace on the heaviest levels.
 export const DEBUG_TIMEOUT_MS = 20_000;
 
-const UI_WATCHDOG_MS = WORKER_TIMEOUT_MS + 2000;
+const WATCHDOG_SLACK_MS = 2000;
 
-const DEBUG_WATCHDOG_MS = DEBUG_TIMEOUT_MS + 2000;
+function watchdogMs(boards: number, boardLimitMs: number): number {
+  return Math.max(1, boards) * boardLimitMs + WATCHDOG_SLACK_MS;
+}
 
 export const SOURCE_NAMES: Readonly<Record<EventOrigin['file'], string>> = {
   program: 'program',
@@ -402,14 +405,15 @@ export const useGame = create<GameState>((set, get) => {
   }
 
   function computingFor(boards: number, limitMs: number): Computing {
-    return { boardsDone: 0, boards, startedAt: performance.now(), limitMs };
+    const now = performance.now();
+    return { boardsDone: 0, boards, startedAt: now, boardStartedAt: now, limitMs };
   }
 
   function progressOf(token: number): (progress: RunProgress) => void {
     return (progress) => {
       const computing = get().computing;
       if (get().runToken !== token || computing === null) return;
-      set({ computing: { ...computing, ...progress } });
+      set({ computing: { ...computing, ...progress, boardStartedAt: performance.now() } });
     };
   }
 
@@ -522,7 +526,7 @@ export const useGame = create<GameState>((set, get) => {
           },
         ]);
       },
-      debug ? DEBUG_WATCHDOG_MS : UI_WATCHDOG_MS,
+      watchdogMs(seeds.length, debug ? DEBUG_TIMEOUT_MS : WORKER_TIMEOUT_MS),
     );
 
     state
@@ -893,22 +897,25 @@ export const useGame = create<GameState>((set, get) => {
       ]);
 
       clearWatchdog();
-      watchdog = setTimeout(() => {
-        finishRun(token, {
-          failure: {
-            kind: 'timeout',
-            message: 'Your program did not stop, so we stopped it.',
-          },
-          ...failedReport(),
-        });
-        pushLines([
-          {
-            t: 0,
-            kind: 'error',
-            text: 'We tried to stop your program. It did not answer in time.',
-          },
-        ]);
-      }, UI_WATCHDOG_MS);
+      watchdog = setTimeout(
+        () => {
+          finishRun(token, {
+            failure: {
+              kind: 'timeout',
+              message: 'Your program did not stop, so we stopped it.',
+            },
+            ...failedReport(),
+          });
+          pushLines([
+            {
+              t: 0,
+              kind: 'error',
+              text: 'We tried to stop your program. It did not answer in time.',
+            },
+          ]);
+        },
+        watchdogMs(seeds.length, WORKER_TIMEOUT_MS),
+      );
 
       state
         .runner()

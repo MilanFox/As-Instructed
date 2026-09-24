@@ -236,14 +236,23 @@ export function rewriteMessage(
   return text.length > 0 ? text : `${name} (no message)`;
 }
 
-const TIMEOUT_MESSAGE =
-  'Your program did not stop before the time limit. Check that every loop can end.';
+interface TimedOutBoard {
+  index: number;
+  total: number;
+  seed: number | undefined;
+}
 
-export function timeoutFailure(timeoutMs: number): RuntimeFailure {
+function timedOutName(board: TimedOutBoard | undefined): string {
+  if (board === undefined || board.seed === undefined) return 'Your program';
+  if (board.total <= 1) return `Board ${String(board.seed)}`;
+  return `Board ${String(board.index + 1)} of ${String(board.total)} (board ${String(board.seed)})`;
+}
+
+export function timeoutFailure(timeoutMs: number, board?: TimedOutBoard): RuntimeFailure {
   return {
     kind: 'timeout',
     code: 'timeout',
-    message: `${TIMEOUT_MESSAGE} (Limit: ${timeoutMs} ms.)`,
+    message: `${timedOutName(board)} ran past ${String(timeoutMs / 1000)} s. A loop may never end.`,
   };
 }
 

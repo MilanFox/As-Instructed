@@ -1,6 +1,6 @@
 import type { CostOverrides } from '../../engine/index.ts';
 import type { ApiFunctionSpec } from '../../runtime/protocol.ts';
-import { ApiCategory } from '../../runtime/index.ts';
+import { ApiCategory, WORKER_TIMEOUT_MS } from '../../runtime/index.ts';
 
 export const CATEGORIES: { id: ApiCategory; label: string }[] = [
   { id: ApiCategory.Movement, label: 'Movement' },
@@ -91,6 +91,8 @@ print(\`\${here.x},\${here.y} -> \${north.x},\${north.y}\`);`,
       '- Bronze: all objectives met.',
       '',
       'The level card shows par as **For gold**, and a hard stop as **Tick limit**.',
+      '',
+      `Each board also gets ${String(WORKER_TIMEOUT_MS / 1000)} seconds of real time. A board that takes longer is stopped.`,
     ].join('\n'),
     commands: [
       {
