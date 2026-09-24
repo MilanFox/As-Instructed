@@ -65,8 +65,8 @@ function blocksIn(css: string): Block[] {
     const open = bare.indexOf('{', at);
     const end = closingBrace(bare, open);
     const prelude = bare.slice(at, open);
-    // Short-screen tweaks sit outside the width model this suite measures.
-    if (/height/.test(prelude)) {
+    // Short-screen and reduced-motion tweaks sit outside the width model this suite measures.
+    if (/height|prefers-/.test(prelude)) {
       i = end + 1;
       continue;
     }

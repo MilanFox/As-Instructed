@@ -2,7 +2,14 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 
 import { COMPACT_QUERY } from '../breakpoints.ts';
-import { BOARD_KEEP, MIN_DRAWER, clampDrawer, deckIsCrowded, maxDrawer } from '../drawerSize.ts';
+import {
+  BOARD_KEEP,
+  MIN_DRAWER,
+  clampDrawer,
+  columnWidth,
+  deckIsCrowded,
+  maxDrawer,
+} from '../drawerSize.ts';
 
 const FLAP = 46;
 
@@ -10,6 +17,10 @@ const SHEET = readFileSync(
   new URL('../../styles/workspace/workspace.css', import.meta.url),
   'utf8',
 );
+
+const REFLOW = readFileSync(new URL('../../styles/workspace/reflow.css', import.meta.url), 'utf8');
+
+const PANEL = readFileSync(new URL('../../styles/workspace/panel.css', import.meta.url), 'utf8');
 
 const COMPACT = Number(/(\d+)px/.exec(COMPACT_QUERY)?.[1] ?? 0);
 
@@ -56,12 +67,34 @@ describe('a width the player picks still leaves the screen usable', () => {
     }
   });
 
-  // The fold is for widths the player asked for, never for one the layout already shipped.
-  test('the deck stays put at the width every screen opens on', () => {
+  // The fold is for widths the player asked for, and for screens with no room beside the column
+  // at all; never for a screen that seats the deck at the width it opens on.
+  test('the deck stays put at the width every roomy screen opens on', () => {
     expect(deckIsCrowded(684, 1920)).toBe(false);
+    expect(deckIsCrowded(684, 1536)).toBe(false);
     expect(deckIsCrowded(600, 1440)).toBe(false);
-    expect(deckIsCrowded(548, 1200)).toBe(false);
+    expect(deckIsCrowded(600, 1366)).toBe(false);
+  });
+
+  test('a screen with no room beside the column folds the deck at its opening width', () => {
+    expect(deckIsCrowded(600, 1280)).toBe(true);
+    expect(deckIsCrowded(548, 1200)).toBe(true);
     expect(deckIsCrowded(548, 901)).toBe(true);
+  });
+
+  test('the model measures the deck against the column the sheet actually draws', () => {
+    const steps = [
+      ...REFLOW.matchAll(/width <= (\d+)px\) \{\s*\.workspace \{[^}]*--ws-column:\s*(\d+)px/g),
+    ];
+    const widest = Number(/--ws-column:\s*(\d+)px/.exec(SHEET)?.[1] ?? 0);
+
+    expect(steps.length).toBeGreaterThan(0);
+    expect(columnWidth(COMPACT + 10_000)).toBe(widest);
+    for (const [, ceiling, column] of steps) {
+      expect([ceiling, columnWidth(Number(ceiling))]).toEqual([ceiling, Number(column)]);
+      expect([ceiling, columnWidth(Number(ceiling) + 1)]).not.toEqual([ceiling, Number(column)]);
+    }
+    expect(PANEL).toContain('right: calc(var(--ws-column) + var(--ws-inset) + 22px)');
   });
 
   test('120 columns of program still leaves the deck where it was', () => {

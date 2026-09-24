@@ -3,7 +3,7 @@
 /* The flap rides out on the flyout's edge, the same one the workbench flap rides. */
 .library-handle {
   position: fixed;
-  bottom: 504px;
+  bottom: 274px;
   left: 0;
   z-index: 7;
   display: grid;

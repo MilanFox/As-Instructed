@@ -30,6 +30,7 @@
   /* Too narrow for a column: its surfaces take the screen on their own again. */
   .hud-right {
     display: contents;
+    scrollbar-color: auto;
   }
 
   .hud-right > .work-order {
@@ -114,23 +115,29 @@
 
   .drawer-handle {
     bottom: auto;
+    height: 116px;
   }
 
   .drawer-handle--dossier {
-    top: 211px;
+    top: 71px;
   }
 
   .drawer-handle--program {
-    top: 335px;
+    top: 197px;
   }
 
   .drawer-handle--manual {
-    top: 459px;
+    top: 449px;
+  }
+
+  .workspace:not(:has(.library-handle)) .drawer-handle--manual {
+    top: 323px;
   }
 
   .library-handle {
-    top: 71px;
+    top: 323px;
     bottom: auto;
+    height: 116px;
   }
 
   .closed-banner__row {
@@ -175,26 +182,30 @@
 
   .drawer-handle {
     width: 38px;
-    height: 96px;
+    height: 100px;
     letter-spacing: 0.12em;
   }
 
   .drawer-handle--dossier {
-    top: 189px;
+    top: 71px;
   }
 
   .drawer-handle--program {
-    top: 295px;
+    top: 181px;
   }
 
   .drawer-handle--manual {
     top: 401px;
   }
 
+  .workspace:not(:has(.library-handle)) .drawer-handle--manual {
+    top: 291px;
+  }
+
   .library-handle {
-    top: 71px;
+    top: 291px;
     width: 38px;
-    height: 108px;
+    height: 100px;
     letter-spacing: 0.16em;
   }
 
@@ -212,23 +223,29 @@
 @media (width <= 600px) and (height <= 760px) {
   .drawer-handle {
     height: 80px;
+    font-size: 11px;
     letter-spacing: 0.04em;
     clip-path: polygon(0 0, 100% 10px, 100% calc(100% - 10px), 0 100%);
   }
 
   .drawer-handle--dossier {
-    top: 165px;
+    top: 71px;
   }
 
   .drawer-handle--program {
-    top: 251px;
+    top: 157px;
   }
 
   .drawer-handle--manual {
-    top: 337px;
+    top: 329px;
+  }
+
+  .workspace:not(:has(.library-handle)) .drawer-handle--manual {
+    top: 243px;
   }
 
   .library-handle {
-    height: 88px;
+    top: 243px;
+    height: 80px;
   }
 }

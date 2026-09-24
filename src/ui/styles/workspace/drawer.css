@@ -28,6 +28,14 @@
   pointer-events: none;
 }
 
+/* Shutting takes the face away in the same commit, so its fade waits out the slide or the
+   close would only ever show an empty edge moving. */
+.workspace[data-flyout='shut'] .flyout[data-on='false'] {
+  transition:
+    transform var(--ws-slam),
+    opacity 0s var(--ws-slam);
+}
+
 /* One edge for both faces: a strip pinned to the viewport at whatever width the flyout is
    at, rather than a child of either one, so neither face's own content can cover it. */
 .flyout-grip {
@@ -94,7 +102,7 @@
   transform: translateX(var(--ws-handle-x));
   transition: transform var(--ws-slide);
   width: 46px;
-  height: 112px;
+  height: 128px;
   padding: 0;
   border: 0;
   background: var(--ws-edge);
@@ -110,11 +118,20 @@
 }
 
 .drawer-handle--dossier {
-  bottom: 380px;
+  bottom: 558px;
 }
 
 .drawer-handle--program {
-  bottom: 256px;
+  bottom: 416px;
+}
+
+/* lib.ts holds the slot between Program and Manual; until it is unlocked the stack closes up. */
+.workspace:not(:has(.library-handle)) .drawer-handle--dossier {
+  bottom: 416px;
+}
+
+.workspace:not(:has(.library-handle)) .drawer-handle--program {
+  bottom: 274px;
 }
 
 .workspace[data-flyout='shut'] .drawer-handle {
@@ -125,6 +142,34 @@
 .drawer-handle:hover,
 .drawer-handle[aria-expanded='true'] {
   background: var(--accent);
+}
+
+/* A level nobody has opened the workbench on points at its brief. The fill comes and goes, so
+   it never reads as the steady fill that means a face is up. */
+.drawer-handle[data-beckon='true']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--accent);
+  animation: flap-beckon 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes flap-beckon {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer-handle[data-beckon='true']::after {
+    animation: none;
+    opacity: 0.45;
+  }
 }
 
 .drawer-handle__text {

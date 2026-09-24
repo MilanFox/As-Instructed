@@ -14,7 +14,7 @@ import {
   storedDrawerWidth,
 } from './drawerSize.ts';
 import { FeedCanvas } from './FeedCanvas.tsx';
-import { flyoutOpensOnArrival, rememberFlyoutOpen } from './flyoutMemory.ts';
+import { flyoutOpensOnArrival, rememberFlyoutOpen, storedFlyoutOpen } from './flyoutMemory.ts';
 import { Postings } from './Postings.tsx';
 import { ReportSheet } from './ReportSheet.tsx';
 import { Subroutines } from './Subroutines.tsx';
@@ -72,6 +72,10 @@ export function Workspace(): React.ReactElement {
 
   const levelId = workspace.level?.id ?? null;
   const [open, setOpen] = useState(() => flyoutOpensOnArrival(levelId));
+  const [found, setFound] = useState(() => storedFlyoutOpen(levelId) !== null);
+  useEffect(() => {
+    if (open) setFound(true);
+  }, [open]);
   const [tab, setTab] = useState<DrawerTab>('dossier');
   const [orderOpen, setOrderOpen] = useState(false);
   const [telemetryOpen, setTelemetryOpen] = useState(false);
@@ -257,6 +261,7 @@ export function Workspace(): React.ReactElement {
     if (arrivedAt.current === levelId) return;
     arrivedAt.current = levelId;
     setOpen(flyoutOpensOnArrival(levelId));
+    setFound(storedFlyoutOpen(levelId) !== null);
   }, [levelId]);
 
   useEffect(() => {
@@ -381,6 +386,7 @@ export function Workspace(): React.ReactElement {
           ref={entry.id === tab ? handleRef : undefined}
           aria-expanded={workbenchOn && tab === entry.id}
           aria-controls="workspace-drawer"
+          data-beckon={String(entry.id === 'dossier' && !found && !flyoutOpen)}
           onClick={() => flap(entry.id)}
         >
           <span className="drawer-handle__text">{entry.label}</span>

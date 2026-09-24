@@ -6,16 +6,22 @@ export const MIN_DRAWER = 420;
 // the right column and a strip to read. Named --ws-board-keep in workspace.css.
 export const BOARD_KEEP = 380;
 
-// The narrowest deck the layout already ships — what a 1200px screen leaves it at its own
-// default width — and the gutters it sits in between the drawer's edge and the viewport's
-// right edge, under the column (--ws-deck-left, --ws-deck-right).
-const DECK_FLOOR = 500;
-const DECK_GUTTERS = 138;
+// The right column's width at each reflow step (--ws-column in workspace.css and reflow.css).
+export function columnWidth(viewport: number): number {
+  if (viewport <= 1200) return 280;
+  if (viewport <= 1440) return 300;
+  return 360;
+}
 
-// Past this the deck would wrap rather than shrink, so it is folded away instead — the drawer
-// carries its own Dispatch while it is open, which is the same trade the compact layout makes.
+// An open flyout leaves the deck the strip between its edge and the column, less the gutters
+// either side (--ws-deck-left while open, and the column's own gap). Narrower than the floor the
+// transport row wraps to a fourth line, so the deck is folded away instead — the drawer carries
+// its own Dispatch while it is open, which is the same trade the compact layout makes.
+const DECK_FLOOR = 340;
+const DECK_GUTTERS = 120;
+
 export function deckIsCrowded(drawer: number, viewport: number): boolean {
-  return viewport - drawer - DECK_GUTTERS < DECK_FLOOR;
+  return viewport - drawer - DECK_GUTTERS - columnWidth(viewport) < DECK_FLOOR;
 }
 
 export function maxDrawer(viewport: number): number {
