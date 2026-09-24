@@ -84,6 +84,15 @@
   text-transform: uppercase;
 }
 
+/* The event line is what the player steps by, so the cap notice gives way to it first. */
+.debug-strip__cap {
+  flex: 0 4 auto;
+  min-width: 9em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .debug-strip__step {
   flex: none;
 }
@@ -101,6 +110,26 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.debug-strip__call {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-decoration: underline dotted var(--ink-dim);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.debug-strip__call:hover,
+.debug-strip__call:focus-visible {
+  color: var(--accent);
+}
+
+.debug-strip__unrecorded {
+  color: var(--accent-2);
 }
 
 .transport {
@@ -213,6 +242,24 @@
   min-width: 0;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+}
+
+.run-log__values {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 0 8px;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.run-log__values .run-log__text {
+  flex: none;
+  max-width: 100%;
+}
+
+.run-log__values .value-tree {
+  line-height: inherit;
 }
 
 .run-log__line[data-kind='error'] .run-log__text {
