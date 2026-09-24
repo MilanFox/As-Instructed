@@ -84,15 +84,6 @@
   text-transform: uppercase;
 }
 
-/* The event line is what the player steps by, so the cap notice gives way to it first. */
-.debug-strip__cap {
-  flex: 0 4 auto;
-  min-width: 9em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .debug-strip__step {
   flex: none;
 }

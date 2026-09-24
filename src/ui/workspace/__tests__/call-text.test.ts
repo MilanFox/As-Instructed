@@ -56,6 +56,5 @@ describe('a call reads like the line that made it', () => {
 });
 
 test('the cap note counts what was not recorded', () => {
-  expect(unrecordedNote(312)).toBe('call log full · 312 calls unrecorded');
-  expect(unrecordedNote(1)).toBe('call log full · 1 call unrecorded');
+  expect(unrecordedNote(312)).toBe('log full · 312 unrecorded');
 });

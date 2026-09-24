@@ -9,7 +9,7 @@ import { callLine, unrecordedNote } from './call-text.ts';
 import { OverlayPanel, PanelBar } from './OverlayPanel.tsx';
 import { RunLogLine } from './RunLogLine.tsx';
 import type { DebugView, WorkspaceData } from './useWorkspace.ts';
-import { describeDebug } from './useWorkspace.ts';
+import { describeDebug, lineOf } from './useWorkspace.ts';
 
 const FILTERS = ['all', 'print', 'system'] as const;
 
@@ -42,14 +42,12 @@ function callToken(calls: readonly ApiCall[]): string | null {
   return `${callLine(first, CALL_CHARS)}${more}`;
 }
 
-// describeDebug reads `event n of m · kind · line`; the call takes the kind's place.
 function splitDebug(debug: DebugView): { head: string; tail: string } | null {
   if (debug.note !== null || debug.index === null) return null;
-  const head = `event ${String(debug.index + 1)} of ${String(debug.total)} · `;
-  const full = describeDebug(debug);
-  const kind = `${head}${debug.kind ?? '—'} · `;
-  if (!full.startsWith(kind)) return null;
-  return { head, tail: ` · ${full.slice(kind.length)}` };
+  return {
+    head: `event ${String(debug.index + 1)} of ${String(debug.total)} · `,
+    tail: ` · ${lineOf(debug)}`,
+  };
 }
 
 export interface TransportDeckProps {
@@ -164,9 +162,7 @@ export function TransportDeck({
           <span className="debug-strip__text">{describeDebug(workspace.debug)}</span>
         )}
         {recording && dropped > 0 ? (
-          <span className="debug-strip__grade debug-strip__cap" title={unrecordedNote(dropped)}>
-            {unrecordedNote(dropped)}
-          </span>
+          <span className="debug-strip__grade">{unrecordedNote(dropped)}</span>
         ) : null}
         {shutLib ? (
           <button
