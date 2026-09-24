@@ -107,6 +107,32 @@ describe('the happy path', () => {
     runner.dispose();
   });
 
+  test('progress from the worker reaches the caller of this request only', async () => {
+    const runner = makeRunner();
+    const worker = latest();
+    worker.responsive = false;
+    const seen: number[] = [];
+
+    const pending = runner.run({ ...REQUEST, seeds: [1, 2] }, (progress) => {
+      seen.push(progress.boardsDone);
+    });
+    const requestId = worker.received[0]?.requestId ?? 0;
+    const progress = (id: number, boardsDone: number): void => {
+      worker.onmessage?.({
+        data: { type: 'progress', requestId: id, boardsDone, boards: 2 },
+      } as MessageEvent);
+    };
+    progress(999, 1);
+    progress(requestId, 1);
+    expect(runner.busy).toBe(true);
+    worker.reply(requestId, okResponse(1));
+    progress(requestId, 2);
+
+    expect((await pending).ok).toBe(true);
+    expect(seen).toEqual([1]);
+    runner.dispose();
+  });
+
   test('a stale reply from a superseded request is ignored', async () => {
     const runner = makeRunner();
     const worker = latest();

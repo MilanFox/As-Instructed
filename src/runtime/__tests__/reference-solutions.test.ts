@@ -373,6 +373,27 @@ describe('through Runner, the worker protocol and the bindings', () => {
     });
   }
 
+  test('counting boards done does not change what the run computes', () => {
+    const level = getLevel('w7-04') as LevelDef;
+    const { js, lineMap } = compiledSource(level.id);
+    const request: RunRequest = {
+      code: (SOLUTIONS[level.id] as ReferenceSolution).source,
+      js,
+      lineMap,
+      levelId: level.id,
+      seeds: level.seeds,
+    };
+    const counted: string[] = [];
+    const watched = serveRunRequest(request, (progress) => {
+      counted.push(`${String(progress.boardsDone)}/${String(progress.boards)}`);
+    });
+
+    expect(counted).toEqual(
+      level.seeds.map((_, index) => `${String(index + 1)}/${String(level.seeds.length)}`),
+    );
+    expect(watched).toEqual(serveRunRequest(request));
+  });
+
   test('a single-bot level still comes back the same way', async () => {
     const level = getLevel('w1-01') as LevelDef;
     const response = await runThroughRunner(level);

@@ -56,6 +56,33 @@
   background: var(--danger);
 }
 
+.run-state[data-tone='busy'] {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  background: var(--accent-2);
+}
+
+.run-state[data-tone='busy']::after {
+  width: 6px;
+  height: 6px;
+  background: currentcolor;
+  animation: run-state-blink 0.8s steps(1, end) infinite;
+  content: '';
+}
+
+@keyframes run-state-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .run-state[data-tone='busy']::after {
+    animation: none;
+  }
+}
+
 .fuel-row {
   display: flex;
   gap: 10px;

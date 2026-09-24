@@ -8,7 +8,7 @@ import {
   isSimError,
   senseTotals,
 } from '../engine/index.ts';
-import type { RunResponse } from '../runtime/protocol.ts';
+import type { RunProgress, RunResponse } from '../runtime/protocol.ts';
 import { traceShape } from '../runtime/protocol.ts';
 import { getLevel } from '../levels/index.ts';
 
@@ -18,6 +18,7 @@ export interface RunSubmission {
   seeds: number[];
   debug?: boolean;
   timeoutMs?: number;
+  onProgress?: (progress: RunProgress) => void;
 }
 
 export interface RunnerPort {

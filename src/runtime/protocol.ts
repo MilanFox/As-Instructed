@@ -113,8 +113,18 @@ export interface WorkerResponseMessage {
   response: RunResponse;
 }
 
+export interface RunProgress {
+  boardsDone: number;
+  boards: number;
+}
+
+export interface WorkerProgressMessage extends RunProgress {
+  type: 'progress';
+  requestId: number;
+}
+
 export type WorkerInbound = WorkerRequestMessage;
-export type WorkerOutbound = WorkerResponseMessage;
+export type WorkerOutbound = WorkerResponseMessage | WorkerProgressMessage;
 
 export const WORKER_TIMEOUT_MS = 5000;
 

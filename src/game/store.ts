@@ -8,7 +8,12 @@ import type {
   Verdict,
 } from '../engine/index.ts';
 import { Medal, eventIndexAt, usesFuel } from '../engine/index.ts';
-import type { PerSeedResult, RuntimeFailure, TraceShape } from '../runtime/protocol.ts';
+import type {
+  PerSeedResult,
+  RunProgress,
+  RuntimeFailure,
+  TraceShape,
+} from '../runtime/protocol.ts';
 import { WORKER_TIMEOUT_MS } from '../runtime/protocol.ts';
 import { findModuleStatements } from '../runtime/index.ts';
 import type { LevelDef } from '../levels/index.ts';
@@ -39,6 +44,11 @@ export interface HeldRun {
 export interface BlockedLevel {
   levelId: string;
   reason: 'locked' | 'unknown';
+}
+
+export interface Computing extends RunProgress {
+  startedAt: number;
+  limitMs: number;
 }
 
 export interface ConsoleLine {
@@ -77,6 +87,7 @@ export interface GameState {
   runToken: number;
   runMode: 'dispatch' | 'preview' | 'debug' | null;
   previewState: RunState;
+  computing: Computing | null;
   trace: Trace | null;
   verdict: Verdict | null;
   seedResults: PerSeedResult[];
@@ -390,22 +401,34 @@ export const useGame = create<GameState>((set, get) => {
     watchdog = null;
   }
 
+  function computingFor(boards: number, limitMs: number): Computing {
+    return { boardsDone: 0, boards, startedAt: performance.now(), limitMs };
+  }
+
+  function progressOf(token: number): (progress: RunProgress) => void {
+    return (progress) => {
+      const computing = get().computing;
+      if (get().runToken !== token || computing === null) return;
+      set({ computing: { ...computing, ...progress } });
+    };
+  }
+
   function finishRun(token: number, patch: Partial<GameState>): void {
     if (get().runToken !== token) return;
     clearWatchdog();
-    set({ runState: 'idle', ...patch });
+    set({ runState: 'idle', computing: null, ...patch });
   }
 
   function finishPreview(token: number, patch: Partial<GameState>): void {
     if (get().runToken !== token) return;
     clearWatchdog();
-    set({ previewState: 'idle', ...patch });
+    set({ previewState: 'idle', computing: null, ...patch });
   }
 
   function cancelPreview(): void {
     const state = get();
     clearWatchdog();
-    set({ runToken: state.runToken + 1, previewState: 'idle' });
+    set({ runToken: state.runToken + 1, previewState: 'idle', computing: null });
     try {
       state.runner().cancel();
     } catch {
@@ -429,6 +452,7 @@ export const useGame = create<GameState>((set, get) => {
   }
 
   function cancelPrime(): void {
+    if (primePending) set({ computing: null });
     primePending = false;
     primeGeneration += 1;
   }
@@ -466,6 +490,7 @@ export const useGame = create<GameState>((set, get) => {
     set({
       runToken: token,
       previewState: 'running',
+      computing: computingFor(1, debug ? DEBUG_TIMEOUT_MS : WORKER_TIMEOUT_MS),
       runMode: debug ? 'debug' : 'preview',
       failure: null,
       verdict: null,
@@ -506,6 +531,7 @@ export const useGame = create<GameState>((set, get) => {
         code: state.code,
         levelId: level.id,
         seeds,
+        onProgress: progressOf(token),
         ...(debug ? { debug: true, timeoutMs: DEBUG_TIMEOUT_MS } : {}),
       })
       .then((response) => {
@@ -586,12 +612,14 @@ export const useGame = create<GameState>((set, get) => {
     const token = get().runToken;
     const generation = primeGeneration;
     primePending = true;
+    set({ computing: computingFor(1, WORKER_TIMEOUT_MS) });
     get()
       .runner()
       .run({ code, levelId, seeds: [seed] })
       .then((response) => {
         if (get().runToken !== token || primeGeneration !== generation) return;
         primePending = false;
+        set({ computing: null });
         // The board moved to another seed while this ran, so this trace is of the wrong world.
         if ((get().surveySeed ?? (level.seeds[0] as number)) !== seed) return;
         if (!response.ok) {
@@ -610,7 +638,7 @@ export const useGame = create<GameState>((set, get) => {
       .catch((error: unknown) => {
         if (primeGeneration !== generation) return;
         primePending = false;
-        set({ debugNote: error instanceof Error ? error.message : String(error) });
+        set({ computing: null, debugNote: error instanceof Error ? error.message : String(error) });
       });
   }
 
@@ -625,6 +653,7 @@ export const useGame = create<GameState>((set, get) => {
     runToken: 0,
     runMode: null,
     previewState: 'idle',
+    computing: null,
     trace: null,
     verdict: null,
     seedResults: [],
@@ -715,6 +744,7 @@ export const useGame = create<GameState>((set, get) => {
         runToken: get().runToken + 1,
         runMode: null,
         previewState: 'idle',
+        computing: null,
         trace: null,
         verdict: null,
         seedResults: [],
@@ -836,6 +866,7 @@ export const useGame = create<GameState>((set, get) => {
       set({
         runToken: token,
         runState: 'running',
+        computing: computingFor(seeds.length, WORKER_TIMEOUT_MS),
         runMode: 'dispatch',
         failure: null,
         verdict: null,
@@ -881,7 +912,7 @@ export const useGame = create<GameState>((set, get) => {
 
       state
         .runner()
-        .run({ code: state.code, levelId: level.id, seeds })
+        .run({ code: state.code, levelId: level.id, seeds, onProgress: progressOf(token) })
         .then((response) => {
           if (get().runToken !== token) return;
           if (!response.ok) {
@@ -1092,7 +1123,7 @@ export const useGame = create<GameState>((set, get) => {
     cancel() {
       const state = get();
       clearWatchdog();
-      set({ runToken: state.runToken + 1, runState: 'idle' });
+      set({ runToken: state.runToken + 1, runState: 'idle', computing: null });
       try {
         state.runner().cancel();
       } catch {

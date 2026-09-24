@@ -159,6 +159,7 @@ export interface WorkspaceData {
 
   runState: GameState['runState'];
   previewState: GameState['runState'];
+  computing: GameState['computing'];
   runMode: GameState['runMode'];
   traceSeed: number | null;
   ungraded: string | null;
@@ -259,6 +260,7 @@ export function useWorkspace(): WorkspaceData {
 
   const runState = useGame((state) => state.runState);
   const previewState = useGame((state) => state.previewState);
+  const computing = useGame((state) => state.computing);
   const runMode = useGame((state) => state.runMode);
   const trace = useGame((state) => state.trace);
   const verdict = useGame((state) => state.verdict);
@@ -572,6 +574,7 @@ export function useWorkspace(): WorkspaceData {
     resetCode,
     runState,
     previewState,
+    computing,
     runMode,
     traceSeed,
     ungraded,

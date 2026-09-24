@@ -17,7 +17,9 @@ scope.onmessage = (event: MessageEvent<WorkerInbound>): void => {
 
   let response: RunResponse;
   try {
-    response = serveRunRequest(message.request);
+    response = serveRunRequest(message.request, (progress) => {
+      reply({ type: 'progress', requestId: message.requestId, ...progress });
+    });
   } catch (error) {
     response = {
       ok: false,

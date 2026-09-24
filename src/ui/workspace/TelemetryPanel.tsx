@@ -8,11 +8,13 @@ import { resolveEventCursor, useGame } from '../../game/store.ts';
 import { ValueTree } from '../components/ValueTree.tsx';
 import type { TypeRef } from '../components/value-type.ts';
 import { pick, showCall, useInspect } from '../hooks/useInspect.ts';
+import { useSlowCompute } from './ComputeMeter.tsx';
 import { OverlayPanel, PanelBar } from './OverlayPanel.tsx';
 import type { CrewRow, WorkspaceData } from './useWorkspace.ts';
 
-function stateOf(workspace: WorkspaceData): { word: string; tone: string } {
+function stateOf(workspace: WorkspaceData, slow: boolean): { word: string; tone: string } {
   const single = workspace.runMode === 'debug' ? 'debug' : 'preview';
+  if (slow) return { word: 'computing', tone: 'busy' };
   if (workspace.runState === 'running') return { word: 'running', tone: 'live' };
   if (workspace.previewState === 'running') return { word: single, tone: 'live' };
   if (workspace.grade?.passed === true) return { word: 'pass', tone: 'pass' };
@@ -207,7 +209,7 @@ export function TelemetryPanel({
   onClose,
   onReport,
 }: TelemetryPanelProps): React.ReactElement {
-  const state = stateOf(workspace);
+  const state = stateOf(workspace, useSlowCompute(workspace.computing));
   const end = Math.max(0, Math.round(workspace.endTick));
   const at = Math.min(end, Math.floor(workspace.tick));
   const debugging = workspace.trace?.calls !== undefined;

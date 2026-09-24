@@ -195,6 +195,29 @@ describe('run state machine', () => {
     expect(useGame.getState().showResults).toBe(false);
   });
 
+  it('counts boards while computing, and clears the count when the run ends or stops', async () => {
+    reset();
+    const runner = new ScriptedRunner();
+    useGame.getState().attachRunner(runner);
+
+    useGame.getState().run();
+    const boards = runner.requests[0]?.seeds.length ?? 0;
+    expect(useGame.getState().computing).toMatchObject({ boardsDone: 0, boards });
+
+    runner.requests[0]?.onProgress?.({ boardsDone: 1, boards });
+    expect(useGame.getState().computing?.boardsDone).toBe(1);
+
+    useGame.getState().cancel();
+    expect(useGame.getState().computing).toBeNull();
+    runner.requests[0]?.onProgress?.({ boardsDone: 2, boards });
+    expect(useGame.getState().computing).toBeNull();
+
+    useGame.getState().run();
+    runner.settle(1, { ok: false, error: { kind: 'runtime', message: 'broke' } });
+    await vi.waitFor(() => expect(useGame.getState().runState).toBe('idle'));
+    expect(useGame.getState().computing).toBeNull();
+  });
+
   it('a run that never returns is cancellable even when cancel itself throws', () => {
     reset();
     useGame.getState().attachRunner(new WedgedRunner());

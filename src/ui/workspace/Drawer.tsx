@@ -91,7 +91,7 @@ export function Drawer({
           className={running ? 'control control--stop' : 'control control--go'}
           onClick={running ? workspace.cancel : onRun}
         >
-          {running ? 'Cancel' : 'Run ⌘⏎'}
+          {running ? 'Stop' : 'Run ⌘⏎'}
         </button>
         <span className="readout readout--dim">
           {problems > 0 ? `${String(problems)} problem${problems === 1 ? '' : 's'} · ` : ''}

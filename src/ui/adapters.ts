@@ -58,16 +58,19 @@ export class RuntimeRunner implements RunnerPort {
     const compiled = await compilePlayerCode(monaco, model);
     if (!compiled.ok) return { ok: false, error: compiled.error };
 
-    return this.runner.run({
-      code: submission.code,
-      js: compiled.js,
-      lineMap: compiled.lineMap,
-      levelId: submission.levelId,
-      seeds: submission.seeds,
-      ...(library.request ? { library: library.request } : {}),
-      ...(submission.debug === true ? { debug: true } : {}),
-      ...(submission.timeoutMs === undefined ? {} : { timeoutMs: submission.timeoutMs }),
-    });
+    return this.runner.run(
+      {
+        code: submission.code,
+        js: compiled.js,
+        lineMap: compiled.lineMap,
+        levelId: submission.levelId,
+        seeds: submission.seeds,
+        ...(library.request ? { library: library.request } : {}),
+        ...(submission.debug === true ? { debug: true } : {}),
+        ...(submission.timeoutMs === undefined ? {} : { timeoutMs: submission.timeoutMs }),
+      },
+      submission.onProgress,
+    );
   }
 
   cancel(): void {

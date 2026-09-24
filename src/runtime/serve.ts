@@ -3,7 +3,7 @@ import { getLevel } from '../levels/index.ts';
 import { aggregate } from './aggregate.ts';
 import { unlockedApiNames } from './ambient.ts';
 import { assertApiComplete } from './api-bindings.ts';
-import type { RunRequest, RunResponse } from './protocol.ts';
+import type { RunProgress, RunRequest, RunResponse } from './protocol.ts';
 import { runSeed, wrapperOffset } from './run-level.ts';
 import type { SeedRun } from './run-level.ts';
 
@@ -23,7 +23,10 @@ function fatal(message: string): RunResponse {
   return { ok: false, error: { kind: 'runtime', code: FailureCode.Crash, message } };
 }
 
-export function serveRunRequest(request: RunRequest): RunResponse {
+export function serveRunRequest(
+  request: RunRequest,
+  onProgress?: (progress: RunProgress) => void,
+): RunResponse {
   if (bootFailure !== undefined) return fatal(bootFailure);
 
   const level = getLevel(request.levelId);
@@ -53,6 +56,7 @@ export function serveRunRequest(request: RunRequest): RunResponse {
         ...(request.debug === true ? { debug: true } : {}),
       }),
     );
+    onProgress?.({ boardsDone: runs.length, boards: seeds.length });
   }
 
   return aggregate(runs);

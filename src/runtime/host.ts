@@ -1,6 +1,12 @@
 import { reviveTrace } from '../engine/index.ts';
 import { cancelledFailure, timeoutFailure } from './errors.ts';
-import type { RunRequest, RunResponse, WorkerOutbound, WorkerRequestMessage } from './protocol.ts';
+import type {
+  RunProgress,
+  RunRequest,
+  RunResponse,
+  WorkerOutbound,
+  WorkerRequestMessage,
+} from './protocol.ts';
 import { WORKER_TIMEOUT_MS } from './protocol.ts';
 
 export interface WorkerLike {
@@ -21,6 +27,7 @@ interface Pending {
   settle: (response: RunResponse) => void;
   timer: ReturnType<typeof setTimeout>;
   timeoutMs: number;
+  onProgress: ((progress: RunProgress) => void) | undefined;
 }
 
 function defaultWorkerFactory(): WorkerLike {
@@ -60,7 +67,7 @@ export class Runner {
     this.worker = worker;
   }
 
-  run(request: RunRequest): Promise<RunResponse> {
+  run(request: RunRequest, onProgress?: (progress: RunProgress) => void): Promise<RunResponse> {
     if (this.disposed) throw new Error('Runner has been disposed.');
     if (this.pending) this.cancel();
     this.warm();
@@ -84,7 +91,7 @@ export class Runner {
         this.abort(requestId, { ok: false, error: timeoutFailure(timeoutMs) });
       }, timeoutMs);
 
-      this.pending = { requestId, settle: resolve, timer, timeoutMs };
+      this.pending = { requestId, settle: resolve, timer, timeoutMs, onProgress };
 
       const message: WorkerRequestMessage = { type: 'run', requestId, request };
       try {
@@ -118,8 +125,12 @@ export class Runner {
 
   private onMessage(message: WorkerOutbound): void {
     const pending = this.pending;
-    if (!pending || !message || message.type !== 'result') return;
-    if (message.requestId !== pending.requestId) return;
+    if (!pending || !message || message.requestId !== pending.requestId) return;
+    if (message.type === 'progress') {
+      pending.onProgress?.({ boardsDone: message.boardsDone, boards: message.boards });
+      return;
+    }
+    if (message.type !== 'result') return;
 
     clearTimeout(pending.timer);
     this.pending = null;

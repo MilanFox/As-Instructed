@@ -6,6 +6,7 @@ import { SPEEDS, useGame } from '../../game/store.ts';
 import { showCall } from '../hooks/useInspect.ts';
 import { openOverlay, useOverlay } from '../hooks/useOverlay.ts';
 import { callLine, unrecordedNote } from './call-text.ts';
+import { ComputeMeter, useSlowCompute } from './ComputeMeter.tsx';
 import { useDeckGlide } from './deckGlide.ts';
 import { OverlayPanel, PanelBar } from './OverlayPanel.tsx';
 import { RunLogLine } from './RunLogLine.tsx';
@@ -70,6 +71,7 @@ export function TransportDeck({
   const end = Math.max(0, Math.round(workspace.endTick));
   const at = Math.min(end, Math.floor(workspace.tick));
   const fault = faultOf(workspace);
+  const slow = useSlowCompute(workspace.computing);
 
   useDeckGlide();
   const overlay = useOverlay().open;
@@ -184,7 +186,7 @@ export function TransportDeck({
           onClick={running ? workspace.cancel : workspace.run}
         >
           {running || surveyBusy
-            ? 'Cancel'
+            ? 'Stop'
             : surveyed === null
               ? 'Run'
               : `Run board ${String(surveyed)}`}
@@ -226,23 +228,29 @@ export function TransportDeck({
           </button>
         </span>
 
-        <input
-          className="scrubber"
-          type="range"
-          min={0}
-          max={Math.max(1, end)}
-          step={1}
-          value={at}
-          disabled={end === 0}
-          aria-label="Tick"
-          aria-valuetext={`tick ${String(at)} of ${String(end)}`}
-          onChange={(event) => workspace.seek(Number(event.target.value))}
-        />
+        {slow && workspace.computing !== null ? (
+          <ComputeMeter computing={workspace.computing} />
+        ) : (
+          <>
+            <input
+              className="scrubber"
+              type="range"
+              min={0}
+              max={Math.max(1, end)}
+              step={1}
+              value={at}
+              disabled={end === 0}
+              aria-label="Tick"
+              aria-valuetext={`tick ${String(at)} of ${String(end)}`}
+              onChange={(event) => workspace.seek(Number(event.target.value))}
+            />
 
-        <span className="readout">
-          {String(at).padStart(3, '0')}
-          <span className="readout--dim">/{String(end).padStart(3, '0')}</span>
-        </span>
+            <span className="readout">
+              {String(at).padStart(3, '0')}
+              <span className="readout--dim">/{String(end).padStart(3, '0')}</span>
+            </span>
+          </>
+        )}
 
         <span className="transport__group">
           <button
