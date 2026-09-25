@@ -206,7 +206,7 @@ const BINDERS: Record<string, Binder> = {
     (...values): void => {
       sim.print(
         botId,
-        values.map(stringify).join(' '),
+        values.map(printable).join(' '),
         undefined,
         sim.recordsCalls ? values : undefined,
       );
@@ -318,6 +318,21 @@ function stringify(value: unknown): string {
   return String(value);
 }
 
+const NON_FINITE = '\u{F8FF}';
+
+function printable(value: unknown): string {
+  if (typeof value !== 'object' || value === null) return stringify(value);
+  try {
+    const text =
+      JSON.stringify(value, (_key, entry: unknown) =>
+        typeof entry === 'number' && !Number.isFinite(entry) ? `${NON_FINITE}${entry}` : entry,
+      ) ?? String(value);
+    return text.replace(new RegExp(`"${NON_FINITE}(-?Infinity|NaN)"`, 'g'), '$1');
+  } catch {
+    return String(value);
+  }
+}
+
 const VALUES: Record<string, unknown> = {
   Dir: DirValue,
   Terrain: TerrainValue,
@@ -376,7 +391,7 @@ const CONSOLE_METHODS = ['log', 'info', 'warn', 'error', 'debug', 'trace'] as co
 
 function consoleFor(sim: Sim, botId: number, attribute: Attribute): unknown {
   const write = (...args: unknown[]): void => {
-    sim.print(botId, args.map(stringify).join(' '), undefined, sim.recordsCalls ? args : undefined);
+    sim.print(botId, args.map(printable).join(' '), undefined, sim.recordsCalls ? args : undefined);
   };
   return Object.fromEntries(
     CONSOLE_METHODS.map((method) => [method, attribute(write, `console.${method}`, botId)]),

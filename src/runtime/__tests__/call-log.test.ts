@@ -127,6 +127,11 @@ describe('print and console keep the structured value', () => {
     expect(line?.values).toEqual(['at', 3, { $: 'array', items: [1, 2], length: 2, omitted: 0 }]);
   });
 
+  test('print keeps non-finite numbers nested in a value', () => {
+    const { trace } = run('w1-01', 'print([Infinity, -Infinity, NaN], { d: Infinity });', false);
+    expect(prints(trace.events)[0]?.text).toBe('[Infinity,-Infinity,NaN] {"d":Infinity}');
+  });
+
   test('print(value) keeps the value as its one argument', () => {
     const { trace } = run('w1-01', 'print(pos());', true);
     expect(prints(trace.events)[0]?.values).toEqual([
