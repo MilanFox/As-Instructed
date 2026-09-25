@@ -100,12 +100,12 @@ describe('reference solutions', () => {
         });
       }
 
-      test('the starter compiles against this level firmware', () => {
-        expect(compileErrors(level.id, level.starter)).toEqual([]);
+      test('the starter compiles against the firmware', () => {
+        expect(compileErrors(level.starter)).toEqual([]);
       });
 
-      test('the solution source compiles against this level firmware', () => {
-        expect(compileErrors(level.id, solution.source)).toEqual([]);
+      test('the solution source compiles against the firmware', () => {
+        expect(compileErrors(solution.source)).toEqual([]);
       });
     });
   }

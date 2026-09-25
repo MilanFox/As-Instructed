@@ -1,22 +1,17 @@
+import { getLevel, hardwareUnlockedBy } from '../levels/index.ts';
 import type { ApiFunctionSpec, ApiTypeSpec } from './protocol.ts';
-import {
-  PLAYER_API,
-  apiUnlockedBy,
-  botHandleDeclaration,
-  docFor,
-  hasCrew,
-  perBotApi,
-  renderParams,
-} from './api-spec.ts';
+import { PLAYER_API, botHandleDeclaration, docFor, perBotApi, renderParams } from './api-spec.ts';
 
 const DTS_HEADER = [
   '// AS INSTRUCTED — bot commands.',
-  '// Generated from src/runtime/api-spec.ts. Do not edit; it is rebuilt on every level load.',
-  '// Only the commands this level has are declared here.',
+  '// Generated from src/runtime/api-spec.ts. Do not edit.',
+  '// Every command is declared on every level; a locked one throws when called.',
 ].join('\n');
 
 export function unlockedApiNames(levelId: string): string[] {
-  return apiUnlockedBy(levelId).map((fn) => fn.name);
+  if (!getLevel(levelId)) return [];
+  const installed = new Set(hardwareUnlockedBy(levelId));
+  return PLAYER_API.functions.filter((fn) => installed.has(fn.name)).map((fn) => fn.name);
 }
 
 export function apiFunctionsFor(names: readonly string[]): ApiFunctionSpec[] {
@@ -64,7 +59,12 @@ function safeForJsDoc(text: string): string {
 }
 
 function jsDoc(fn: ApiFunctionSpec, crew: boolean): string {
-  const lines: string[] = [docFor(fn, crew), '', costLine(fn.cost)];
+  const lines: string[] = [
+    docFor(fn, crew),
+    '',
+    costLine(fn.cost),
+    `Unlocked in level ${fn.unlockedBy}.`,
+  ];
 
   for (const param of fn.params) {
     const parts = [param.doc];
@@ -95,20 +95,18 @@ export function typeDeclarationFor(
   return botHandleDeclaration(perBotApi(unlocked), docFor);
 }
 
-export function buildAmbientDts(unlockedHardware: string[]): string {
-  const functions = apiFunctionsFor(unlockedHardware);
-  const types = requiredTypesFor(functions);
-  const crew = hasCrew(functions);
-  const docOf = (fn: ApiFunctionSpec): string => jsDoc(fn, crew);
+export function buildAmbientDts(): string {
+  const functions = PLAYER_API.functions;
+  const memberDoc = (fn: ApiFunctionSpec): string => jsDoc(fn, true);
 
   const blocks: string[] = [DTS_HEADER];
 
-  for (const type of types) {
-    blocks.push(`${jsDocForType(type)}\n${typeDeclarationFor(type, functions, docOf)}`);
+  for (const type of PLAYER_API.types) {
+    blocks.push(`${jsDocForType(type)}\n${typeDeclarationFor(type, functions, memberDoc)}`);
   }
 
   for (const fn of functions) {
-    blocks.push(`${docOf(fn)}\n${renderSignature(fn)}`);
+    blocks.push(`${jsDoc(fn, false)}\n${renderSignature(fn)}`);
   }
 
   return `${blocks.join('\n\n')}\n`;

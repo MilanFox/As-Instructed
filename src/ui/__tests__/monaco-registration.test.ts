@@ -114,6 +114,7 @@ describe('nothing is handed Monaco before the language service will answer', () 
       'editor configured',
       'waiting on the language service',
       'service up',
+      'declarations installed',
       'ready',
     ]);
   });

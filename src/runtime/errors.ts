@@ -7,7 +7,6 @@ import {
   isSimError,
 } from '../engine/index.ts';
 import type { RuntimeFailure } from './protocol.ts';
-import { apiFunction } from './api-spec.ts';
 import { toSourceLine } from './sourcemap.ts';
 import { PLAYER_FRAME_NAME, toPlayerLine } from './wrapper.ts';
 
@@ -26,7 +25,6 @@ export interface PlayerLocation {
 export interface ErrorContext {
   wrapperOffset: number;
   lineMap?: readonly number[];
-  unlocked?: readonly string[];
   locate?: (stack: string | undefined) => ModuleLocationLike | undefined;
   describeStack?: (stack: string | undefined) => string | undefined;
 }
@@ -167,38 +165,19 @@ function lastSegment(expression: string | undefined): string | undefined {
   return last !== undefined && /^\w+$/.test(last) ? last : undefined;
 }
 
-function lockedApiAdvice(
-  name: string,
-  unlocked: readonly string[] | undefined,
-): string | undefined {
-  const spec = apiFunction(name);
-  if (!spec) return undefined;
-  if (unlocked && unlocked.includes(name)) return undefined;
-  return `\`${name}()\` is not available yet. You get it in level ${spec.unlockedBy}.`;
-}
-
-export function rewriteMessage(
-  name: string,
-  message: string,
-  context: ErrorContext = { wrapperOffset: 0 },
-): string {
+export function rewriteMessage(name: string, message: string): string {
   const text = message.trim();
 
   const missing = NOT_DEFINED.exec(text);
   if (missing) {
     const identifier = missing[1] ?? missing[2] ?? '';
-    return (
-      lockedApiAdvice(identifier, context.unlocked) ??
-      `\`${identifier}\` does not exist. Check the spelling, and declare it before you use it.`
-    );
+    return `\`${identifier}\` does not exist. Check the spelling, and declare it before you use it.`;
   }
 
   for (const pattern of NOT_A_FUNCTION) {
     const match = pattern.exec(text);
     if (!match) continue;
     const identifier = match[3] ?? match[1] ?? match[4] ?? '';
-    const locked = lockedApiAdvice(identifier, context.unlocked);
-    if (locked) return locked;
     return (
       `\`${identifier}\` is not a function. You called it with \`()\`, but it held something else, ` +
       'often `undefined`.'
@@ -325,7 +304,7 @@ export function toRuntimeFailure(error: unknown, context: ErrorContext): Runtime
   } else if (isSimError(error)) {
     failure.code = error.code;
   } else {
-    failure.message = rewriteMessage(name, message, context);
+    failure.message = rewriteMessage(name, message);
   }
 
   if (isSimError(error) && error.at) failure.at = error.at;

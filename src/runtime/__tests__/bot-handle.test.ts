@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import type { Message, World } from '../../engine/index.ts';
 import { Dir, Sim, addBot, createWorld, vec } from '../../engine/index.ts';
-import { PLAYER_API, botHandleDeclaration, perBotApi } from '../api-spec.ts';
+import { perBotApi } from '../api-spec.ts';
 import { buildAmbientDts, unlockedApiNames } from '../ambient.ts';
 import { buildPlayerScope } from '../api-bindings.ts';
 import type { PlayerFunction } from '../api-bindings.ts';
@@ -29,7 +29,7 @@ describe('the handle carries the fleet-safe half of the API', () => {
     const members = Object.keys(handle(api, 0)).sort();
 
     expect(members).toEqual(
-      perBotApi(PLAYER_API.functions.filter((fn) => SWARM.includes(fn.name)))
+      perBotApi()
         .map((fn) => fn.name)
         .sort(),
     );
@@ -50,33 +50,20 @@ describe('the handle carries the fleet-safe half of the API', () => {
     const { sim } = site();
     const early = handle(scopeFor(sim, unlockedApiNames('w7-01')), 0);
     const later = handle(scopeFor(sim, unlockedApiNames('w7-02')), 0);
-    expect(Object.keys(early)).not.toContain('spawn');
-    expect(Object.keys(later)).toContain('spawn');
+    expect(() => (early['spawn'] as PlayerFunction)(Dir.East)).toThrow(
+      '`spawn()` is not available yet. You get it in level w7-02.',
+    );
+    expect(() => (later['spawn'] as PlayerFunction)(Dir.East)).not.toThrow();
   });
 
-  test('the declaration the editor sees lists the same members the runtime binds', () => {
+  test('the declaration the editor sees lists the members the runtime binds', () => {
     const { sim } = site();
+    const declared = buildAmbientDts();
+    expect(declared).toContain('interface Bot {');
     for (const levelId of ['w7-01', 'w7-03', 'w8-05']) {
-      const bound = Object.keys(handle(scopeFor(sim, unlockedApiNames(levelId)), 0)).sort();
-      const declared = perBotApi(
-        PLAYER_API.functions.filter((fn) => unlockedApiNames(levelId).includes(fn.name)),
-      )
-        .map((fn) => fn.name)
-        .sort();
-      expect(bound, levelId).toEqual(declared);
-      expect(buildAmbientDts(unlockedApiNames(levelId)), levelId).toContain(
-        botHandleDeclaration(
-          perBotApi(
-            PLAYER_API.functions.filter((fn) => unlockedApiNames(levelId).includes(fn.name)),
-          ),
-        ).split('\n')[0] as string,
-      );
+      const bound = Object.keys(handle(scopeFor(sim, unlockedApiNames(levelId)), 0));
+      for (const name of bound) expect(declared, `${levelId} ${name}`).toContain(`  ${name}(`);
     }
-  });
-
-  test('no Bot interface exists before the fleet does', () => {
-    expect(buildAmbientDts(unlockedApiNames('w6-05'))).not.toContain('interface Bot');
-    expect(buildAmbientDts(unlockedApiNames('w7-01'))).toContain('interface Bot');
   });
 });
 

@@ -6,6 +6,7 @@ import { Runner } from '../host.ts';
 import type { WorkerLike } from '../host.ts';
 import type { RunRequest, RunResponse, WorkerRequestMessage } from '../protocol.ts';
 import { unlockedApiNames } from '../ambient.ts';
+import { PLAYER_API } from '../api-spec.ts';
 import {
   LIB_FILE_PATH,
   PLAYER_FILE_PATH,
@@ -121,17 +122,23 @@ function transpile(source: string): Compiled {
 
 const editor = createFakeMonaco();
 
-function playerModel(levelId: string, source: string) {
-  configurePlayerLanguage(editor.monaco, { levelId });
+configurePlayerLanguage(editor.monaco);
+
+function playerModel(source: string) {
   return editor.model(PLAYER_FILE_PATH, source);
 }
 
-async function unknownNames(levelId: string, program: string): Promise<string[]> {
+function lockedCalls(levelId: string, source: string): string[] {
+  const installed = new Set(unlockedApiNames(levelId));
+  return PLAYER_API.functions
+    .filter((fn) => !installed.has(fn.name))
+    .filter((fn) => new RegExp(`(?<![\\w$])${fn.name}\\s*\\(`).test(source))
+    .map((fn) => fn.name);
+}
+
+async function unknownNames(program: string): Promise<string[]> {
   const names = new Set<string>();
-  for (const diagnostic of await getPlayerDiagnostics(
-    editor.monaco,
-    playerModel(levelId, program),
-  )) {
+  for (const diagnostic of await getPlayerDiagnostics(editor.monaco, playerModel(program))) {
     if (diagnostic.code !== 2304) continue;
     names.add(/'([^']+)'/.exec(diagnostic.message)?.[1] ?? diagnostic.message);
   }
@@ -191,11 +198,10 @@ describe('the reference sources are real programs', () => {
     const known = NOT_YET_A_PROGRAM[level.id];
 
     test(`${level.id} names only API that exists at that level`, async () => {
-      const missing = await unknownNames(
-        level.id,
-        (SOLUTIONS[level.id] as ReferenceSolution).source,
-      );
+      const source = (SOLUTIONS[level.id] as ReferenceSolution).source;
+      const missing = await unknownNames(source);
       expect(missing, known?.why ?? level.id).toEqual(known?.invents ?? []);
+      expect(lockedCalls(level.id, source), level.id).toEqual([]);
     });
 
     test(`${level.id} passes every seed through the runtime`, { timeout: 120_000 }, () => {
@@ -237,7 +243,7 @@ describe('the player-facing compiler accepts ordinary JavaScript', () => {
     const rejected: string[] = [];
     for (const level of LEVELS) {
       const source = (SOLUTIONS[level.id] as ReferenceSolution).source;
-      const result = await compilePlayerCode(editor.monaco, playerModel(level.id, source));
+      const result = await compilePlayerCode(editor.monaco, playerModel(source));
       if (!result.ok) rejected.push(`${level.id}: ${result.error.message}`);
       else if (result.js !== compiledSource(level.id).js) {
         rejected.push(`${level.id}: the editor emits different JavaScript`);
@@ -250,7 +256,7 @@ describe('the player-facing compiler accepts ordinary JavaScript', () => {
   test('every starter compiles cleanly', { timeout: 120_000 }, async () => {
     const rejected: string[] = [];
     for (const level of LEVELS) {
-      const result = await compilePlayerCode(editor.monaco, playerModel(level.id, level.starter));
+      const result = await compilePlayerCode(editor.monaco, playerModel(level.starter));
       if (!result.ok) rejected.push(`${level.id}: ${result.error.message}`);
     }
     expect(rejected).toEqual([]);
@@ -258,13 +264,12 @@ describe('the player-facing compiler accepts ordinary JavaScript', () => {
 
   test('an untyped arrow parameter is not an error', async () => {
     const source = 'const doubled = [1, 2, 3].map((n) => n * 2);\nprint(String(doubled.length));\n';
-    const result = await compilePlayerCode(editor.monaco, playerModel('w1-01', source));
+    const result = await compilePlayerCode(editor.monaco, playerModel(source));
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.diagnostics).toEqual([]);
   });
 
   test('the library is judged by the same standard, being player-authored too', async () => {
-    configurePlayerLanguage(editor.monaco, { levelId: 'w4-01' });
     const lib = editor.model(
       LIB_FILE_PATH,
       'export function firstOpen(views, pick) {\n  return views.find((v) => pick(v)) || null;\n}\n',
@@ -275,7 +280,6 @@ describe('the player-facing compiler accepts ordinary JavaScript', () => {
   });
 
   test('a library helper for later hardware does not stop an earlier level importing it', async () => {
-    configurePlayerLanguage(editor.monaco, { levelId: 'w3-03' });
     const lib = editor.model(
       LIB_FILE_PATH,
       [
@@ -288,34 +292,28 @@ describe('the player-facing compiler accepts ordinary JavaScript', () => {
     expect(result.ok ? [] : [result.error.message]).toEqual([]);
     if (!result.ok) return;
     expect(result.exports).toEqual(['scanAround', 'lookAround']);
-    expect(result.diagnostics.map((diagnostic) => diagnostic.message)).toContain(
-      '`look()` is not available until level w4-01.',
-    );
+    expect(result.diagnostics).toEqual([]);
   });
 
   test('a library that misspells a name still does not build', async () => {
-    configurePlayerLanguage(editor.monaco, { levelId: 'w3-03' });
     const lib = editor.model(LIB_FILE_PATH, 'export const here = () => scna();\n');
     const result = await compileLibrary(editor.monaco, lib);
     expect(result.ok).toBe(false);
   });
 
-  test('hardware the level has not installed is still TS2304', async () => {
-    const result = await compilePlayerCode(editor.monaco, playerModel('w1-01', 'scan();'));
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toContain(2304);
-    expect(result.error.message).toContain("Cannot find name 'scan'");
+  test('hardware a level has not installed still compiles; the runtime refuses the call', async () => {
+    const result = await compilePlayerCode(editor.monaco, playerModel('scan();'));
+    expect(result.ok ? [] : [result.error.message]).toEqual([]);
   });
 
   test('a wrong argument type is still an error', async () => {
-    const result = await compilePlayerCode(editor.monaco, playerModel('w1-01', 'move("north");'));
+    const result = await compilePlayerCode(editor.monaco, playerModel('move("north");'));
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.message).toContain('not assignable');
   });
 
   test('a misspelled API name is still an error', async () => {
-    const result = await compilePlayerCode(editor.monaco, playerModel('w2-01', 'scann();'));
+    const result = await compilePlayerCode(editor.monaco, playerModel('scann();'));
     expect(result.ok).toBe(false);
   });
 });

@@ -10,7 +10,7 @@ import {
 } from '../engine/index.ts';
 import type { ApiFunctionSpec } from './protocol.ts';
 import { PLAYER_API, perBotApi } from './api-spec.ts';
-import { apiFunctionsFor, requiredTypesFor } from './ambient.ts';
+import { apiFunctionsFor } from './ambient.ts';
 
 export type PlayerFunction = (...args: unknown[]) => unknown;
 
@@ -24,6 +24,12 @@ type Binder = (
 ) => PlayerFunction;
 
 const PLAIN: Attribute = (fn) => fn;
+
+function locked(fn: ApiFunctionSpec): PlayerFunction {
+  return () => {
+    throw new Error(`\`${fn.name}()\` is not available yet. You get it in level ${fn.unlockedBy}.`);
+  };
+}
 
 function attributing(sim: Sim, locate: () => EventOrigin | undefined): Attribute {
   return (fn, name, botId) =>
@@ -54,7 +60,7 @@ function botHandles(
   unlocked: readonly ApiFunctionSpec[],
   attribute: Attribute,
 ): (id: number) => Record<string, PlayerFunction> {
-  const members = perBotApi(unlocked);
+  const installed = new Set(unlocked);
   const cache = new Map<number, Record<string, PlayerFunction>>();
 
   return (id: number) => {
@@ -62,9 +68,11 @@ function botHandles(
     if (existing) return existing;
 
     const handle: Record<string, PlayerFunction> = {};
-    for (const fn of members) {
+    for (const fn of perBotApi()) {
       const binder = BINDERS[fn.name];
-      if (binder) handle[fn.name] = attribute(binder(sim, id, unlocked, attribute), fn.name, id);
+      if (!installed.has(fn)) handle[fn.name] = locked(fn);
+      else if (binder)
+        handle[fn.name] = attribute(binder(sim, id, unlocked, attribute), fn.name, id);
     }
     cache.set(id, handle);
     return handle;
@@ -125,10 +133,9 @@ function transmitPayload(sim: Sim, botId: number, text: string, cost: number): b
   const antenna = antennaFor(sim, botId);
   if (!antenna) {
     sim.refuseMachineAct(botId, '', cost);
-    throw new IllegalActionError(
-      'transmit(): this level has no antenna. Remove the call.',
-      { botId },
-    );
+    throw new IllegalActionError('transmit(): this level has no antenna. Remove the call.', {
+      botId,
+    });
   }
 
   const accepted = antenna.state !== 'off';
@@ -364,10 +371,15 @@ export function buildPlayerScope(
   locate?: () => EventOrigin | undefined,
 ): PlayerScope {
   const functions = apiFunctionsFor(unlockedHardware);
+  const installed = new Set(functions);
   const api: Record<string, PlayerFunction> = {};
   const attribute = locate === undefined ? PLAIN : attributing(sim, locate);
 
-  for (const fn of functions) {
+  for (const fn of PLAYER_API.functions) {
+    if (!installed.has(fn)) {
+      api[fn.name] = locked(fn);
+      continue;
+    }
     const binder = BINDERS[fn.name];
     if (!binder) {
       throw new Error(
@@ -378,10 +390,7 @@ export function buildPlayerScope(
     api[fn.name] = attribute(binder(sim, botId, functions, attribute), fn.name, botId);
   }
 
-  const values: Record<string, unknown> = {};
-  for (const type of requiredTypesFor(functions)) {
-    if (type.name in VALUES) values[type.name] = VALUES[type.name];
-  }
+  const values: Record<string, unknown> = { ...VALUES };
   values['console'] = consoleFor(sim, botId, attribute);
 
   return { api, values };

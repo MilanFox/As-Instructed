@@ -142,10 +142,9 @@ export function mountLibrary(runner: RuntimeRunner): () => void {
   useLibrary.getState().attach(host);
   useLibrary.getState().refreshUnlock();
 
-  const installTypes = async (levelId?: string | null): Promise<void> => {
+  const installTypes = async (): Promise<void> => {
     const state = useLibrary.getState();
     if (!state.save.unlocked || !activeRunner) return;
-    if (levelId) activeRunner.prepare(levelId);
     await prepareLibrary(await activeRunner.ready(), state.save.source);
   };
 
@@ -181,8 +180,6 @@ export function mountLibrary(runner: RuntimeRunner): () => void {
   let pending: { levelId: string; code: string } | null = null;
 
   const unsubscribe = useGame.subscribe((state, previous) => {
-    if (state.currentLevelId !== previous.currentLevelId) void installTypes(state.currentLevelId);
-
     if (state.showResults && !previous.showResults && state.verdict?.passed) {
       const levelId = state.currentLevelId;
       if (!levelId) return;

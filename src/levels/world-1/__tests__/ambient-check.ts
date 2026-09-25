@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
-import { buildAmbientDts, unlockedApiNames } from '../../../runtime/ambient.ts';
+import { buildAmbientDts } from '../../../runtime/ambient.ts';
 
 const AMBIENT_FILE = '/firmware.d.ts';
 const PLAYER_FILE = '/program.ts';
@@ -14,9 +14,9 @@ const OPTIONS: ts.CompilerOptions = {
   skipLibCheck: false,
 };
 
-export function compileErrors(levelId: string, program: string): string[] {
+export function compileErrors(program: string): string[] {
   const sources = new Map<string, string>([
-    [AMBIENT_FILE, buildAmbientDts(unlockedApiNames(levelId))],
+    [AMBIENT_FILE, buildAmbientDts()],
     [PLAYER_FILE, program],
   ]);
   const defaultLib = ts.getDefaultLibFilePath(OPTIONS);

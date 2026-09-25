@@ -1,7 +1,6 @@
 import type * as MonacoEditor from 'monaco-editor';
 import type { RuntimeFailure } from './protocol.ts';
-import { buildAmbientDts, unlockedApiNames } from './ambient.ts';
-import { PLAYER_API, apiFunction } from './api-spec.ts';
+import { buildAmbientDts } from './ambient.ts';
 import { compileFailure, offsetToPosition } from './errors.ts';
 import { decodeLineMap } from './sourcemap.ts';
 
@@ -40,19 +39,7 @@ export interface CompileFailure {
 
 export type CompileResult = CompileSuccess | CompileFailure;
 
-export interface LanguageOptions {
-  unlockedHardware?: readonly string[];
-  levelId?: string;
-  libraryDeclaration?: string;
-}
-
-function resolveUnlocked(options: LanguageOptions): string[] {
-  if (options.unlockedHardware) return [...options.unlockedHardware];
-  if (options.levelId) return unlockedApiNames(options.levelId);
-  return [];
-}
-
-export function configurePlayerLanguage(monaco: MonacoApi, options: LanguageOptions): void {
+export function configurePlayerLanguage(monaco: MonacoApi): void {
   const ts = monaco.languages.typescript;
 
   installLanguageOptions(monaco, {
@@ -73,8 +60,6 @@ export function configurePlayerLanguage(monaco: MonacoApi, options: LanguageOpti
     skipLibCheck: true,
   });
 
-  currentAmbientDts = buildAmbientDts(resolveUnlocked(options));
-  if (options.libraryDeclaration !== undefined) currentLibTypes = options.libraryDeclaration;
   installExtraLibs(monaco);
 }
 
@@ -96,8 +81,6 @@ function installLanguageOptions(
   });
   ts.typescriptDefaults.setEagerModelSync(true);
 }
-
-export { buildAmbientDts, unlockedApiNames } from './ambient.ts';
 
 function flattenMessage(message: TsDiagnostic['messageText']): string {
   if (typeof message === 'string') return message;
@@ -206,12 +189,14 @@ const LIB_TYPES_PATH = 'file:///as-instructed/lib.d.ts';
 
 const EMPTY_LIB_TYPES = `declare module 'lib' {\n  export {};\n}\n`;
 
-let currentAmbientDts = '';
+// Never varies by level: Monaco applies setExtraLibs on a later task and never says when, so a
+// compile right after a per-level swap would check against the previous level's firmware.
+const AMBIENT_DTS = buildAmbientDts();
 let currentLibTypes = EMPTY_LIB_TYPES;
 
 function installExtraLibs(monaco: MonacoApi): void {
   monaco.languages.typescript.typescriptDefaults.setExtraLibs([
-    { content: currentAmbientDts, filePath: AMBIENT_FILE_PATH },
+    { content: AMBIENT_DTS, filePath: AMBIENT_FILE_PATH },
     { content: currentLibTypes, filePath: LIB_TYPES_PATH },
   ]);
 }
@@ -262,28 +247,6 @@ function exportedNames(dts: string): string[] {
   return [...names];
 }
 
-const CANNOT_FIND_NAME = new Set([2304, 2552]);
-
-// lib.ts is shared by every level but is checked against the open level's hardware, so a helper
-// written for later hardware must not stop an earlier level from importing the rest of the file.
-function laterHardware(diagnostic: CompileDiagnostic): CompileDiagnostic {
-  if (!CANNOT_FIND_NAME.has(diagnostic.code)) return diagnostic;
-  const name = /'([^']+)'/.exec(diagnostic.message)?.[1];
-  if (name === undefined) return diagnostic;
-  const fn = apiFunction(name);
-  if (fn) {
-    return {
-      ...diagnostic,
-      severity: 'warning',
-      message: `\`${name}()\` is not available until level ${fn.unlockedBy}.`,
-    };
-  }
-  if (PLAYER_API.types.some((type) => type.name === name)) {
-    return { ...diagnostic, severity: 'warning', message: `\`${name}\` is not available yet.` };
-  }
-  return diagnostic;
-}
-
 export async function compileLibrary(
   monaco: MonacoApi,
   model: TextModel,
@@ -296,7 +259,7 @@ export async function compileLibrary(
     worker.getSyntacticDiagnostics(fileName),
     worker.getSemanticDiagnostics(fileName),
   ]);
-  const diagnostics = toCompileDiagnostics(source, [...syntactic, ...semantic]).map(laterHardware);
+  const diagnostics = toCompileDiagnostics(source, [...syntactic, ...semantic]);
   const errors = diagnostics.filter((diagnostic) => diagnostic.severity === 'error');
 
   if (errors.length > 0) {

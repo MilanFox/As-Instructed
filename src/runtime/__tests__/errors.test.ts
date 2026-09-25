@@ -156,70 +156,32 @@ describe('playerStack', () => {
 });
 
 describe('rewriteMessage', () => {
-  const unlocked = ['move', 'pos'];
-
-  test('names the level that installs a locked function', () => {
-    const message = rewriteMessage('ReferenceError', 'scan is not defined', {
-      wrapperOffset: 2,
-      unlocked,
-    });
-    expect(message).toContain('`scan()` is not available yet');
-    expect(message).toContain('w2-01');
-  });
-
-  test("handles Safari's wording for the same mistake", () => {
-    const message = rewriteMessage('ReferenceError', "Can't find variable: harvest", {
-      wrapperOffset: 2,
-      unlocked,
-    });
-    expect(message).toContain('w2-01');
-  });
-
   test('a genuine typo is not blamed on hardware', () => {
-    const message = rewriteMessage('ReferenceError', 'postion is not defined', {
-      wrapperOffset: 2,
-      unlocked,
-    });
+    const message = rewriteMessage('ReferenceError', 'postion is not defined');
     expect(message).toContain('`postion`');
     expect(message).toContain('spelling');
   });
 
-  test('calling a locked API through a value reports the lock, not the value', () => {
-    const message = rewriteMessage('TypeError', 'plant is not a function', {
-      wrapperOffset: 2,
-      unlocked,
-    });
-    expect(message).toContain('w2-01');
-  });
-
   test('reading a property of undefined explains array indexes', () => {
-    const v8 = rewriteMessage('TypeError', "Cannot read properties of undefined (reading 'x')", {
-      wrapperOffset: 2,
-    });
+    const v8 = rewriteMessage('TypeError', "Cannot read properties of undefined (reading 'x')");
     expect(v8).toContain('`.x`');
     expect(v8).toContain('undefined');
     expect(v8).toContain('array index past the end');
 
-    const safari = rewriteMessage('TypeError', "undefined is not an object (evaluating 'here.x')", {
-      wrapperOffset: 2,
-    });
+    const safari = rewriteMessage('TypeError', "undefined is not an object (evaluating 'here.x')");
     expect(safari).toContain('`.x`');
     expect(safari).toContain('is undefined');
   });
 
   test('null is reported as null, not as undefined', () => {
-    const message = rewriteMessage('TypeError', "Cannot read properties of null (reading 'kind')", {
-      wrapperOffset: 2,
-    });
+    const message = rewriteMessage('TypeError', "Cannot read properties of null (reading 'kind')");
     expect(message).toContain('`.kind`');
     expect(message).toContain('is null');
     expect(message).not.toContain('is undefined');
   });
 
   test("Firefox's wording for the same mistake lands in the same place", () => {
-    const message = rewriteMessage('TypeError', 'can\'t access property "x", here is undefined', {
-      wrapperOffset: 2,
-    });
+    const message = rewriteMessage('TypeError', 'can\'t access property "x", here is undefined');
     expect(message).toContain('`.x`');
     expect(message).toContain('is undefined');
   });
@@ -245,7 +207,7 @@ describe('rewriteMessage', () => {
 });
 
 describe('toRuntimeFailure', () => {
-  const context = { wrapperOffset: 2, unlocked: ['move', 'pos'] };
+  const context = { wrapperOffset: 2 };
 
   test('HaltError becomes a halt, message intact', () => {
     const failure = toRuntimeFailure(new HaltError(20000, 0), context);
@@ -274,16 +236,16 @@ describe('toRuntimeFailure', () => {
   });
 
   test('a player error is rewritten and located', () => {
-    const error = new ReferenceError('scan is not defined');
+    const error = new ReferenceError('postion is not defined');
     error.stack = V8_BROWSER.replace(
       "TypeError: Cannot read properties of undefined (reading 'x')",
-      'ReferenceError: scan is not defined',
+      'ReferenceError: postion is not defined',
     );
     const failure = toRuntimeFailure(error, context);
     expect(failure.kind).toBe('runtime');
     expect(failure.code).toBe('crash');
     expect(failure.line).toBe(4);
-    expect(failure.message).toContain('w2-01');
+    expect(failure.message).toContain('`postion` does not exist');
   });
 
   test('a thrown non-Error does not escape as a raw value', () => {

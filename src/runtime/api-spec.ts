@@ -793,10 +793,6 @@ export function apiForWorld(world: number): ApiFunctionSpec[] {
   return PLAYER_API.functions.filter((fn) => fn.world === world);
 }
 
-export function apiUnlockedBy(levelId: string): ApiFunctionSpec[] {
-  return PLAYER_API.functions.filter((fn) => fn.unlockedBy <= levelId);
-}
-
 export function apiUnlockedAt(levelId: string): string[] {
   return PLAYER_API.functions.filter((fn) => fn.unlockedBy === levelId).map((fn) => fn.name);
 }

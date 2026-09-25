@@ -19,7 +19,6 @@ export class RuntimeRunner implements RunnerPort {
   private readonly runner = new Runner();
   private loading: Promise<MonacoApi> | null = null;
   private levelId: string | null = null;
-  private configuredFor: string | null = null;
 
   get simulation(): Runner {
     return this.runner;
@@ -34,14 +33,10 @@ export class RuntimeRunner implements RunnerPort {
     this.loading ??= import('./monaco-setup.ts').then(async (module) => {
       const monaco = module.setupMonaco();
       await module.typescriptRegistered();
+      configurePlayerLanguage(monaco);
       return monaco;
     });
-    const monaco = await this.loading;
-    if (this.levelId && this.configuredFor !== this.levelId) {
-      configurePlayerLanguage(monaco, { levelId: this.levelId });
-      this.configuredFor = this.levelId;
-    }
-    return monaco;
+    return this.loading;
   }
 
   async run(submission: RunSubmission): Promise<RunResponse> {

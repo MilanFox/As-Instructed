@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { LEVELS } from '../../levels/index.ts';
-import { PLAYER_API, apiForWorld, apiFunction, apiUnlockedAt, apiUnlockedBy } from '../api-spec.ts';
+import { PLAYER_API, apiForWorld, apiFunction, apiUnlockedAt } from '../api-spec.ts';
+import { unlockedApiNames } from '../ambient.ts';
 import { hardwareNote } from '../../ui/copy.ts';
 
 describe('PLAYER_API', () => {
@@ -66,16 +67,15 @@ describe('PLAYER_API', () => {
       expect(apiFunction(fn.name)).toBe(fn);
       expect(apiForWorld(fn.world)).toContain(fn);
       expect(apiUnlockedAt(fn.unlockedBy)).toContain(fn.name);
-      expect(apiUnlockedBy(fn.unlockedBy).map((f) => f.name)).toContain(fn.name);
     }
     expect(apiFunction('teleport')).toBeUndefined();
   });
 
-  test('apiUnlockedBy grows monotonically across the campaign', () => {
+  test('the unlocked set grows monotonically across the campaign', () => {
     const ids = [...new Set(PLAYER_API.functions.map((f) => f.unlockedBy))].sort();
     let previous = 0;
     for (const id of ids) {
-      const count = apiUnlockedBy(id).length;
+      const count = unlockedApiNames(id).length;
       expect(count, id).toBeGreaterThan(previous);
       previous = count;
     }

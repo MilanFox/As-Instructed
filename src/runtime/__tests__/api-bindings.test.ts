@@ -48,24 +48,23 @@ describe('the spec and the bindings cannot drift', () => {
     expect(implementedApiNames().length).toBeGreaterThanOrEqual(PLAYER_API.functions.length);
   });
 
-  test('a name that is not in the spec is ignored rather than bound', () => {
+  test('the scope binds every function on every level, whatever is unlocked', () => {
     const { sim } = listeningPost();
-    expect(Object.keys(buildPlayerScope(sim, 0, ['move', 'teleport']).api)).toEqual(['move']);
+    const everything = PLAYER_API.functions.map((fn) => fn.name).sort();
+    for (const unlocked of [[], ['move', 'teleport'], ['move', 'pos']]) {
+      const scope = buildPlayerScope(sim, 0, unlocked);
+      expect(Object.keys(scope.api).sort()).toEqual(everything);
+      expect(Object.keys(scope.values).sort()).toEqual(['Dir', 'ItemKind', 'Terrain', 'console']);
+    }
   });
 
-  test('the scope holds exactly the unlocked functions', () => {
+  test('a locked function throws when called and names the level that installs it', () => {
     const { sim } = listeningPost();
-    const scope = buildPlayerScope(sim, 0, ['move', 'pos']);
-    expect(Object.keys(scope.api).sort()).toEqual(['move', 'pos']);
-    expect(Object.keys(scope.values).sort()).toEqual(['Dir', 'console']);
-  });
-
-  test('ambient values follow the unlocked types, not the whole engine', () => {
-    const { sim } = listeningPost();
-    expect(Object.keys(buildPlayerScope(sim, 0, ['harvest']).values).sort()).toEqual([
-      'ItemKind',
-      'console',
-    ]);
+    const { api: bound } = buildPlayerScope(sim, 0, ['move', 'pos']);
+    expect(() => bound['scan']?.()).toThrow(
+      '`scan()` is not available yet. You get it in level w2-01.',
+    );
+    expect(sim.ticks).toBe(0);
   });
 });
 
