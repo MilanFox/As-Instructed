@@ -408,7 +408,7 @@ export const w5_04: LevelDef = {
   ].join('\n'),
   board: {
     redrawn: [
-      'the tree: 2 or 3 branches from the reactor, each splitting 2 or 3 ways, some again',
+      'the tree: 2 or 3 junctions on the reactor, each feeding 2 or 3 taps or junctions; every tap is 1 or 2 junctions below the reactor',
       '6 to 9 taps, and every ceiling',
       '13 to 15 consumers, and the draw of each',
       'which tap has the reserve',
@@ -437,7 +437,8 @@ export const w5_04: LevelDef = {
     },
     {
       label: 'Tap',
-      value: 'An end of the tree. Consumers link only to taps.',
+      value:
+        'An end of the tree. Always fed by a junction, never by the reactor directly. Consumers link only to taps.',
     },
     {
       label: 'Reserve',
