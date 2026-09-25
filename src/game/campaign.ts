@@ -48,6 +48,8 @@ export interface Campaign {
   orders: CampaignOrder[];
   achievements: CampaignAchievement[];
   earnedCount: number;
+  achievementCount: number;
+  hiddenEarnedCount: number;
   points: number;
   maxPoints: number;
   closed: number;
@@ -130,7 +132,11 @@ export function buildCampaign(save: SaveFile): Campaign {
     sites,
     orders,
     achievements,
-    earnedCount: achievements.filter((entry) => entry.earnedAt !== null).length,
+    earnedCount: achievements.filter(
+      (entry) => !entry.achievement.hidden && entry.earnedAt !== null,
+    ).length,
+    achievementCount: ACHIEVEMENTS.filter((achievement) => !achievement.hidden).length,
+    hiddenEarnedCount: achievements.filter((entry) => entry.achievement.hidden === true).length,
     points: sites.reduce((sum, site) => sum + site.points, 0),
     maxPoints: sites.reduce((sum, site) => sum + site.maxPoints, 0),
     closed: sites.reduce((sum, site) => sum + site.closed, 0),

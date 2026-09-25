@@ -833,8 +833,8 @@
   display: grid;
   place-items: center;
   width: 46px;
-  height: 232px;
-  padding: 0;
+  min-height: 232px;
+  padding: var(--space-5) 0;
   border: 0;
   background: var(--survey-edge);
   color: #000;
@@ -859,6 +859,7 @@
 
 .survey-seals-tab__text {
   display: block;
+  white-space: nowrap;
   writing-mode: vertical-rl;
 }
 
@@ -1000,9 +1001,14 @@
 .survey[data-narrow='true'] .survey-seals-tab {
   bottom: calc(var(--survey-inset) + var(--survey-dock) + var(--survey-sheet) + 10px);
   width: 38px;
-  height: 150px;
+  min-height: 150px;
+  padding: 0;
   font-size: 10px;
   letter-spacing: 0.18em;
+}
+
+.survey[data-narrow='true'] .survey-seals-tab__hidden {
+  display: none;
 }
 
 .survey[data-narrow='true'] .survey-seals-tab[data-on='true'] {

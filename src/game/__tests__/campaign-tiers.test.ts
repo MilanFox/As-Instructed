@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { ACHIEVEMENTS } from '../achievements.ts';
 import { buildCampaign } from '../campaign.ts';
 import type { CampaignSite } from '../campaign.ts';
 import { emptySave } from '../save.ts';
@@ -151,5 +152,31 @@ describe('at par and every bonus met are independent facts', () => {
     );
 
     expect([site.complete, site.perfect, site.starred]).toEqual([false, false, false]);
+  });
+});
+
+describe('the achievement tally', () => {
+  const open = ACHIEVEMENTS.filter((achievement) => !achievement.hidden);
+  const secret = ACHIEVEMENTS.filter((achievement) => achievement.hidden === true);
+
+  test('the total counts only achievements everyone can see', () => {
+    const save = emptySave();
+    save.achievements = { [secret[0]?.id ?? '']: 1 };
+
+    const campaign = buildCampaign(save);
+
+    expect(campaign.achievementCount).toBe(open.length);
+    expect(campaign.earnedCount).toBe(0);
+    expect(campaign.hiddenEarnedCount).toBe(1);
+  });
+
+  test('an earned open achievement counts toward the total, not the hidden tally', () => {
+    const save = emptySave();
+    save.achievements = { [open[0]?.id ?? '']: 1 };
+
+    const campaign = buildCampaign(save);
+
+    expect(campaign.earnedCount).toBe(1);
+    expect(campaign.hiddenEarnedCount).toBe(0);
   });
 });

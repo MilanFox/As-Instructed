@@ -623,6 +623,10 @@ export function LevelSelect(): JSX.Element {
   }, []);
 
   const campaign = useMemo(() => buildCampaign(save), [save]);
+  const hiddenTally =
+    campaign.hiddenEarnedCount > 0 ? ` +${String(campaign.hiddenEarnedCount)} hidden` : '';
+  const hiddenSpoken =
+    campaign.hiddenEarnedCount > 0 ? `, plus ${String(campaign.hiddenEarnedCount)} hidden` : '';
   const narrow = box.w < NARROW;
   const paged = box.w <= PAGED;
   const titled = !narrow && box.flank - box.aside >= MARK_WIDTH + 2 * MARK_GUTTER;
@@ -1143,11 +1147,12 @@ export function LevelSelect(): JSX.Element {
         data-on={String(seals)}
         aria-expanded={seals}
         aria-controls="survey-seals"
-        aria-label={`Achievements, ${String(campaign.earnedCount)} of ${String(campaign.achievements.length)} awarded`}
+        aria-label={`Achievements, ${String(campaign.earnedCount)} of ${String(campaign.achievementCount)} awarded${hiddenSpoken}`}
         onClick={() => setSeals((was) => !was)}
       >
         <span className="survey-seals-tab__text">
-          Achievements {campaign.earnedCount}/{campaign.achievements.length}
+          Achievements {campaign.earnedCount}/{campaign.achievementCount}
+          <span className="survey-seals-tab__hidden">{hiddenTally}</span>
         </span>
       </button>
 
@@ -1163,7 +1168,7 @@ export function LevelSelect(): JSX.Element {
             <span>Achievements</span>
             <span className="survey-bar__tools">
               <span>
-                {campaign.earnedCount}/{campaign.achievements.length} awarded
+                {campaign.earnedCount}/{campaign.achievementCount} awarded{hiddenTally}
               </span>
               <button
                 type="button"
@@ -1183,6 +1188,9 @@ export function LevelSelect(): JSX.Element {
                   <span className="survey-seal__main">
                     <span className="survey-seal__title">
                       {won ? entry.achievement.title : 'Not awarded'}
+                      {won && entry.achievement.hidden ? (
+                        <span className="hidden-tag">Hidden</span>
+                      ) : null}
                     </span>
                     <span className="survey-seal__req">{entry.achievement.requirement}</span>
                   </span>

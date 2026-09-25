@@ -5,7 +5,9 @@ import { PublishDialog } from '../meta/ui/PublishDialog.tsx';
 import { useLibrary } from '../meta/store.ts';
 import { audio, mountAudio } from './audio.ts';
 import { mountCues } from './cues.ts';
+import { mountToasts } from './toasts.ts';
 import { mountLibrary } from './library.ts';
+import { AchievementToasts } from './components/AchievementToasts.tsx';
 import { ModalBoundary } from './components/ModalBoundary.tsx';
 import { usePaperwork } from './paper/usePaperwork.ts';
 import { useKeyboard } from './hooks/useKeyboard.ts';
@@ -40,11 +42,13 @@ export function App(): React.JSX.Element {
         useGame.getState().renderer().pulse('achievement');
       },
     });
+    const detachToasts = mountToasts();
     const detachLibrary = mountLibrary(runner);
     const level = state.currentLevelId;
     if (level) runner.prepare(level);
     return () => {
       detachLibrary();
+      detachToasts();
       detachCues();
       detachAudio();
     };
@@ -55,6 +59,7 @@ export function App(): React.JSX.Element {
       {screen === 'workspace' ? <Workspace /> : null}
       {screen === 'levels' ? <LevelSelect /> : null}
       <Settings />
+      <AchievementToasts />
       <div className="modal-layer">
         <ModalBoundary
           label="The publish window"

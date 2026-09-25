@@ -496,6 +496,10 @@ html[data-art='signal'] {
   background: transparent;
 }
 
+[data-art='signal'] .toast {
+  border-radius: 0;
+}
+
 [data-art='signal'] .score-cell__value {
   font-family: var(--font-mono);
   font-size: var(--t-big);
