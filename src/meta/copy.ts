@@ -161,7 +161,7 @@ export const DISCREPANCY = {
   layout: (seed: number): string => `BOARD ${seed}`,
   body: (levelId: string, seed: number): string =>
     `${levelId} was run on board ${seed} and failed.\n\n` +
-    `Board ${seed} is now part of that level. Open it and press Run to see what happened.`,
+    `Board ${seed} is now part of that level. Open it and press Submit to see what happened.`,
   note: 'sites change sometimes. your code just never saw this one before',
   kept: 'Your result stays. The medal is kept, and a failed run costs nothing.',
   open: 'OPEN AND RUN',

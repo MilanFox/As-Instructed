@@ -223,6 +223,12 @@
   background: var(--ink);
 }
 
+.control--lead {
+  border-color: var(--accent-2);
+  background: color-mix(in srgb, var(--accent-2) 18%, transparent);
+  color: var(--accent-2);
+}
+
 .control--stop {
   border-color: var(--danger);
   background: var(--danger);

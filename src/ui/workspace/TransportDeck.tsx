@@ -188,7 +188,7 @@ export function TransportDeck({
           {running || surveyBusy
             ? 'Stop'
             : surveyed === null
-              ? 'Run'
+              ? 'Submit'
               : `Run board ${String(surveyed)}`}
         </button>
 
@@ -212,7 +212,7 @@ export function TransportDeck({
           </button>
           <button
             type="button"
-            className="control control--tight"
+            className="control control--tight control--lead"
             onClick={workspace.togglePlay}
             aria-label={workspace.playing ? 'Pause' : 'Play'}
           >

@@ -91,7 +91,11 @@ export function Drawer({
           className={running ? 'control control--stop' : 'control control--go'}
           onClick={running ? workspace.cancel : onRun}
         >
-          {running ? 'Stop' : 'Run ⌘⏎'}
+          {running
+            ? 'Stop'
+            : workspace.surveySeed === null
+              ? 'Submit ⌘⏎'
+              : `Run board ${String(workspace.surveySeed)} ⌘⏎`}
         </button>
         <span className="readout readout--dim">
           {problems > 0 ? `${String(problems)} problem${problems === 1 ? '' : 's'} · ` : ''}

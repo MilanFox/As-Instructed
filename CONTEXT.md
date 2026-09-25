@@ -32,7 +32,7 @@ Four things. Which one depends on what was on screen:
 
 - the whole graded attempt across all seeds — `runMode` (`src/game/store.ts:68`), the report sheet
 - one seed's execution — `runs` (`src/ui/library.ts:71`)
-- pressing the button — `workspace.run`, labelled **Run**
+- pressing the button — `workspace.run`, labelled **Submit** (grades every board), or **Run board N** while one board is picked (ungraded); ▶ with no trace plays the picked board once, ungraded
 - scrubbing a finished trace — playback (`src/ui/workspace/TransportDeck.tsx:152`)
 
 `LevelProgress.attempts` and `CampaignStats.runs` are the same count (`src/game/save.ts:98`).
