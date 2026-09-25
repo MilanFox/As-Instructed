@@ -4,6 +4,7 @@ import { alpha, palette } from './theme.ts';
 import { roundRect } from './sprites.ts';
 
 const DRAW = 'draw';
+const RESERVE = 'reserve';
 
 export function drawLoadTree(
   ctx: CanvasRenderingContext2D,
@@ -31,6 +32,18 @@ export function drawLoadTree(
     }
   }
   ctx.stroke();
+
+  for (const tap of world.machines) {
+    if (typeof tap.vars[RESERVE] !== 'number') continue;
+    const inset = tilePx * 0.06;
+    const size = tilePx - inset * 2;
+    roundRect(ctx, tap.at.x * tilePx + inset, tap.at.y * tilePx + inset, size, size, tilePx * 0.1);
+    ctx.fillStyle = alpha(palette.gold, 0.14);
+    ctx.fill();
+    ctx.strokeStyle = alpha(palette.gold, 0.4);
+    ctx.lineWidth = Math.max(1, dpr);
+    ctx.stroke();
+  }
 
   for (const segment of segments) {
     const child = machineById(world, segment.id);
