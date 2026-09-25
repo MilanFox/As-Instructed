@@ -834,6 +834,71 @@ describe('rewards', () => {
     expect(useGame.getState().save.achievements['no-regressions']).toBeUndefined();
     expect(useGame.getState().freshAchievements).not.toContain('no-regressions');
   });
+
+  function surveyable(levelId: string, completed: boolean): LevelDef {
+    reset();
+    pickUp(levelId);
+    const save = useGame.getState().save;
+    useGame.setState({
+      save: {
+        ...save,
+        levels: {
+          ...save.levels,
+          [levelId]: { ...emptyProgress(), seedsUnlocked: true, completed },
+        },
+      },
+    });
+    return getLevel(levelId) as LevelDef;
+  }
+
+  it('awards a peek at another board only while the level is still open', () => {
+    const level = surveyable('w3-01', false);
+    const other = level.seeds[1] as number;
+    useGame.getState().showSeed(level.seeds[0] as number);
+    expect(useGame.getState().save.achievements['peeked']).toBeUndefined();
+
+    useGame.getState().showSeed(other);
+    const at = useGame.getState().save.achievements['peeked'];
+    expect(at).toBeGreaterThan(0);
+    expect(useGame.getState().freshAchievements).toEqual(['peeked']);
+
+    useGame.getState().showSeed(null);
+    useGame.getState().showSeed(other);
+    expect(useGame.getState().save.achievements['peeked']).toBe(at);
+    expect(useGame.getState().freshAchievements).toEqual(['peeked']);
+  });
+
+  it('pays no peek on a level already finished', () => {
+    const level = surveyable('w3-01', true);
+    useGame.getState().showSeed(level.seeds[1] as number);
+    expect(useGame.getState().surveySeed).toBe(level.seeds[1]);
+    expect(useGame.getState().save.achievements['peeked']).toBeUndefined();
+  });
+
+  it('pays no peek for unlocking the boards alone', () => {
+    reset();
+    pickUp('w3-01');
+    useGame.getState().unlockSeeds();
+    expect(useGame.getState().save.achievements['peeked']).toBeUndefined();
+  });
+
+  it('awards the first hint once and every hint when the last one opens', () => {
+    reset();
+    pickUp('w3-01');
+    const hints = (getLevel('w3-01') as LevelDef).hints.length;
+    expect(hints).toBeGreaterThan(1);
+
+    useGame.getState().revealHint(1);
+    const at = useGame.getState().save.achievements['first-hint'];
+    expect(at).toBeGreaterThan(0);
+    expect(useGame.getState().save.achievements['every-hint']).toBeUndefined();
+
+    useGame.getState().revealHint(2);
+    expect(useGame.getState().save.achievements['first-hint']).toBe(at);
+    useGame.getState().revealHint(hints);
+    expect(useGame.getState().save.achievements['every-hint']).toBeGreaterThan(0);
+    expect(useGame.getState().freshAchievements).toEqual(['first-hint', 'every-hint']);
+  });
 });
 
 describe('the unlock gate', () => {

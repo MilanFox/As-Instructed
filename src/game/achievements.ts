@@ -186,7 +186,7 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   },
   {
     id: 'resubmitted',
-    title: 'SAME AGAIN',
+    title: 'THE DEFINITION OF INSANITY',
     requirement: 'Run the same program twice, unchanged.',
     note: 'The result was also the same.',
     hidden: true,
@@ -217,6 +217,27 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
     title: 'A NOTE ON THE GROUND',
     requirement: 'Mark a tile during a run and never read it back.',
     note: 'It is still there.',
+    hidden: true,
+  },
+  {
+    id: 'peeked',
+    title: 'LOOKED AHEAD',
+    requirement: 'Look at another board of a level before you finish it.',
+    note: 'Nobody said you could not look.',
+    hidden: true,
+  },
+  {
+    id: 'first-hint',
+    title: 'ASKED FOR HELP',
+    requirement: 'Open a hint.',
+    note: 'Somebody wrote that a long time ago. Finally.',
+    hidden: true,
+  },
+  {
+    id: 'every-hint',
+    title: 'ASKED FOR ALL OF IT',
+    requirement: 'Open every hint on a level.',
+    note: 'Nobody had read that far. Not even the writer.',
     hidden: true,
   },
 ];

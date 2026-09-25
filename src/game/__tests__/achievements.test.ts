@@ -85,7 +85,7 @@ describe('the achievement list', () => {
 
   it('can award every achievement it prints', () => {
     const reachable = new Set(everythingEarned());
-    const granted = new Set(['built-on-it', 'swept-clean']);
+    const granted = new Set(['built-on-it', 'swept-clean', 'peeked', 'first-hint', 'every-hint']);
     const unreachable = ACHIEVEMENTS.map((achievement) => achievement.id).filter(
       (id) => !granted.has(id) && !reachable.has(id),
     );

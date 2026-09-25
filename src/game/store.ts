@@ -798,6 +798,10 @@ export const useGame = create<GameState>((set, get) => {
       if ((progress.hintsRevealed ?? 0) >= count) return;
       levels[id] = { ...progress, hintsRevealed: count };
       persist({ ...get().save, levels });
+      if (count < 1) return;
+      get().award('first-hint');
+      const hints = getLevel(id)?.hints.length ?? 0;
+      if (hints > 0 && count >= hints) get().award('every-hint');
     },
 
     unlockSeeds() {
@@ -826,6 +830,13 @@ export const useGame = create<GameState>((set, get) => {
       state.renderer().setTrace(next.trace);
       if (next.trace) state.renderer().seek(next.tick);
       set({ ...next, eventCursor: null, debugNote: null });
+      if (
+        seed !== null &&
+        seed !== level.seeds[0] &&
+        state.save.levels[level.id]?.completed !== true
+      ) {
+        get().award('peeked');
+      }
     },
 
     setPanel(panel) {
